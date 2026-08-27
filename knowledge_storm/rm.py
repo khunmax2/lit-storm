@@ -5,7 +5,7 @@ from typing import Callable, Union, List
 import backoff
 import dspy
 import requests
-from dsp import backoff_hdlr, giveup_hdlr
+from dsp import backoff_hdlr
 
 from .utils import WebPageHelper
 
@@ -725,6 +725,24 @@ class SearXNG(dspy.Retrieve):
         return collected_results
 
 
+def duckduckgo_giveup_hdlr(err: Exception) -> bool:
+    """Decide whether to stop retrying a DuckDuckGo search.
+
+    `dsp`'s shared `giveup_hdlr` reads `err.message`, an attribute only
+    Mistral's SDK exceptions carry. On a DuckDuckGo rate limit it raises
+    AttributeError from inside backoff, and that AttributeError is what
+    surfaces to the caller, killing the run and hiding the real failure.
+    Rate limits and timeouts are what the backoff exists for, so keep retrying
+    those and give up on anything else.
+    """
+    if type(err).__name__ in ("RatelimitException", "TimeoutException"):
+        return False
+    message = str(err).lower()
+    return not any(
+        hint in message for hint in ("ratelimit", "rate limit", "timeout", "202")
+    )
+
+
 class DuckDuckGoSearchRM(dspy.Retrieve):
     """Retrieve information from custom queries using DuckDuckGo."""
 
@@ -747,11 +765,13 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
         """
         super().__init__(k=k)
         try:
-            from duckduckgo_search import DDGS
-        except ImportError as err:
-            raise ImportError(
-                "Duckduckgo requires `pip install duckduckgo_search`."
-            ) from err
+            # `duckduckgo_search` was renamed to `ddgs`; the old package no longer returns results.
+            from ddgs import DDGS
+        except ImportError:
+            try:
+                from duckduckgo_search import DDGS
+            except ImportError as err:
+                raise ImportError("Duckduckgo requires `pip install ddgs`.") from err
         self.k = k
         self.webpage_helper = WebPageHelper(
             min_char_count=min_char_count,
@@ -762,8 +782,8 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
         # All params for search can be found here:
         #   https://duckduckgo.com/duckduckgo-help-pages/settings/params/
 
-        # Sets the backend to be api
-        self.duck_duck_go_backend = "api"
+        # "api" is deprecated in ddgs; "auto" falls back across the available backends.
+        self.duck_duck_go_backend = "auto"
 
         # Only gets safe search results
         self.duck_duck_go_safe_search = safe_search
@@ -791,7 +811,7 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
         max_time=1000,
         max_tries=8,
         on_backoff=backoff_hdlr,
-        giveup=giveup_hdlr,
+        giveup=duckduckgo_giveup_hdlr,
     )
     def request(self, query: str):
         results = self.ddgs.text(
@@ -820,7 +840,13 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
 
         for query in queries:
             #  list of dicts that will be parsed to return
-            results = self.request(query)
+            try:
+                results = self.request(query)
+            except Exception as e:
+                # A search that keeps failing shouldn't end a run that still has
+                # other queries and later rounds to draw on.
+                logging.error(f"Error occurs when searching query {query}: {e}")
+                continue
 
             for d in results:
                 # assert d is dict
@@ -849,8 +875,8 @@ class DuckDuckGoSearchRM(dspy.Retrieve):
                     else:
                         print(f"invalid source {url} or url in exclude_urls")
                 except Exception as e:
-                    print(f"Error occurs when processing {result=}: {e}\n")
-                    print(f"Error occurs when searching query {query}: {e}")
+                    # `result` may not be bound yet, so report the raw hit.
+                    print(f"Error occurs when processing {d=}: {e}\n")
 
         return collected_results
 

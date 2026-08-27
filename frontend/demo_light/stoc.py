@@ -4,6 +4,7 @@ import re
 
 import streamlit as st
 import unidecode
+from ui_language import t
 
 DISABLE_LINK_CSS = """
 <style>
@@ -37,7 +38,7 @@ class stoc:
         st.write(DISABLE_LINK_CSS, unsafe_allow_html=True)
         # st.sidebar.caption("Table of contents")
         if expander is None:
-            expander = st.sidebar.expander("**Table of contents**", expanded=True)
+            expander = st.sidebar.expander(t("article.toc"), expanded=True)
         with expander:
             with st.container(height=600, border=False):
                 markdown_toc = ""
@@ -107,12 +108,40 @@ class stoc:
             h5 { font-size: 18px; }
             /* Adjust the font size for normal text */
             p { font-size: 18px; }
+            /* Leave room above a heading jumped to from the contents. */
+            .stoc-anchor { position: relative; top: -1rem; }
         </style>
         """
         st.markdown(custom_css, unsafe_allow_html=True)
 
-        st.write(text)
+        cls._write_with_anchors(text)
         self.toc(expander=expander)
+
+    @staticmethod
+    def _write_with_anchors(text: str):
+        """Render the article, planting an anchor of our own above each heading.
+
+        Streamlit gives headings hash-based ids, which the slugs in the table of
+        contents can never match, so the links have to point at elements we
+        emit ourselves.
+        """
+        block = []
+
+        def flush():
+            if block:
+                st.write("\n".join(block))
+                block.clear()
+
+        for line in text.splitlines():
+            if line.startswith("#"):
+                flush()
+                heading = line.lstrip("#").strip()
+                st.markdown(
+                    f'<div class="stoc-anchor" id="{normalize(heading)}"></div>',
+                    unsafe_allow_html=True,
+                )
+            block.append(line)
+        flush()
 
 
 def normalize(s):
@@ -120,11 +149,13 @@ def normalize(s):
     Normalize titles as valid HTML ids for anchors
     >>> normalize("it's a test to spot how Things happ3n héhé")
     "it-s-a-test-to-spot-how-things-happ3n-h-h"
+    >>> normalize("ประวัติศาสตร์")
+    'prawatisaastr'
     """
 
     # Replace accents with "-"
     s_wo_accents = unidecode.unidecode(s)
-    accents = [s for s in s if s not in s_wo_accents]
+    accents = [c for c in s if c not in s_wo_accents]
     for accent in accents:
         s = s.replace(accent, "-")
 
@@ -135,5 +166,16 @@ def normalize(s):
     normalized = (
         "".join([char if char.isalnum() else "-" for char in s]).strip("-").lower()
     )
+
+    # Scripts with no Latin characters at all — Thai, CJK, Arabic — lose every
+    # character to the rule above and collapse to "", which would give every
+    # heading on the page the same empty anchor. Fall back to the
+    # transliteration, which is what makes them distinguishable.
+    if not normalized.strip("-"):
+        normalized = (
+            "".join(c if c.isalnum() else "-" for c in s_wo_accents.lower())
+            .strip("-")
+            .lower()
+        )
 
     return normalized

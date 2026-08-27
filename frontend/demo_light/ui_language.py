@@ -270,10 +270,6 @@ _STRINGS = {
         "English": "This topic has no finished article — the run stopped early.",
         "ไทย": "หัวข้อนี้ยังไม่มีบทความที่เสร็จสมบูรณ์ — การทำงานหยุดกลางคัน",
     },
-    "articles.back": {
-        "English": "← Back to all articles",
-        "ไทย": "← กลับไปหน้ารวมบทความ",
-    },
     # -- reading an article ----------------------------------------------
     "article.download": {
         "English": "Download as Markdown",

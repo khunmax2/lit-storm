@@ -96,19 +96,6 @@ def main():
     # A segmented control can be deselected by clicking the active option.
     selection = st.session_state["nav_page"] or CREATE_PAGE
 
-    # Reading an article is a level below the library, so the way back up is
-    # navigation and belongs with it. Drawn by the page, it landed after the
-    # account block at the foot of the rail, which is not where you look for
-    # it. The page still owns the state; this only owns where the way out
-    # sits.
-    if selection == ARTICLES_PAGE and "page2_selected_my_article" in st.session_state:
-        with st.sidebar:
-            if st.button(
-                t("articles.back"), key="nav_back", use_container_width=True
-            ):
-                del st.session_state["page2_selected_my_article"]
-                st.rerun()
-
     # After the navigation, and pinned to the foot of the rail by CSS.
     Account.sidebar_account()
 
@@ -117,11 +104,17 @@ def main():
     trail = [t(PAGE_LABELS[selection])]
     if selection == ARTICLES_PAGE and "page2_selected_my_article" in st.session_state:
         trail.append(st.session_state["page2_selected_my_article"].replace("_", " "))
-    ui_theme.top_bar(
+    clicked = ui_theme.top_bar(
         trail,
         name=auth.display_name(),
         role=t("auth.role_admin") if auth.is_admin() else t("auth.role_member"),
     )
+    # The only crumb above the current page today is the library, so clicking
+    # it means: stop reading this article. The trail is the way back, which is
+    # why there is no longer a separate button for it.
+    if clicked is not None:
+        st.session_state.pop("page2_selected_my_article", None)
+        st.rerun()
 
     if selection == ADMIN_PAGE:
         demo_util.clear_other_page_session_state(page_index=4)

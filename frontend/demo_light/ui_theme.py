@@ -651,30 +651,6 @@ span[class*="material-icons"] {{
     font-weight: 650 !important;
 }}
 
-/* The way out of an article sits under the destinations but is not one of
-   them: same row shape so the rail stays a single list, quieter weight and
-   a gap above so it reads as a step back rather than a fourth place to go. */
-.st-key-nav_back {{
-    margin: -1.1rem 0 1.5rem 0;
-}}
-.st-key-nav_back button {{
-    border: none !important;
-    background: transparent !important;
-    color: var(--rail-muted) !important;
-    font-weight: 500 !important;
-    border-radius: 8px !important;
-    padding: 0.62rem 0.8rem !important;
-    border-left: 3px solid transparent !important;
-}}
-.st-key-nav_back button > div {{
-    justify-content: flex-start !important;
-    width: 100%;
-}}
-.st-key-nav_back button:hover {{
-    background: var(--rail-hover) !important;
-    color: var(--rail-ink) !important;
-}}
-
 /* ---------- top bar ---------- */
 /* Streamlit's header is the only band that already spans the main area and
    follows the rail when it collapses, so the bar is that band: the header
@@ -695,24 +671,81 @@ span[class*="material-icons"] {{
         max-width: var(--rail-width) !important;
     }}
 }}
+/* Who you are, against the right-hand end of the band and clear of the
+   language and menu buttons that live there. Text only, so it takes no
+   clicks away from them. */
 .topbar {{
     position: fixed;
     top: 0;
-    left: calc(var(--rail-width) + var(--gutter));
-    right: 1rem;
+    right: 9.5rem;
     /* The header's own height. Taller and the bar draws past its edge. */
     height: 60px;
     z-index: 999992;
     pointer-events: none;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    /* Room for the language and menu buttons, which live at the far right
-       of the same band. */
-    padding-right: 8.5rem;
     font-size: 0.85rem;
     color: var(--muted);
+}}
+/* The trail, against the left-hand end. Fixed, so Streamlit's column never
+   lays it out or spends a gap on it. */
+.st-key-crumbs {{
+    position: fixed !important;
+    top: 0;
+    left: calc(var(--rail-width) + var(--gutter));
+    height: 60px;
+    z-index: 999992;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+    max-width: calc(100vw - var(--rail-width) - var(--gutter) - 16rem);
+    overflow: hidden !important;
+}}
+/* Every crumb but the first is preceded by a separator drawn here rather
+   than written into the row, so it belongs to no button and takes no click. */
+.st-key-crumbs
+    > [data-testid="stElementContainer"]
+    + [data-testid="stElementContainer"]::before {{
+    content: "/";
+    align-self: center;
+    padding: 0 0.45rem;
+    color: var(--muted);
+    opacity: 0.45;
+    font-size: 0.85rem;
+}}
+/* Crumbs keep their own width — allowed to shrink, Streamlit's button box
+   comes up a hair short of its label and clips the last letter. The strip
+   clips instead, at its own edge, if a title is long enough to run into the
+   identity. */
+.st-key-crumbs > [data-testid="stElementContainer"] {{
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 auto !important;
+}}
+/* A crumb is a link that happens to be a button: it should read as the text
+   around it until you go near it. */
+.st-key-crumbs .stButton > button {{
+    border: none !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-size: 0.85rem !important;
+    font-weight: 400 !important;
+    min-height: 0 !important;
+    padding: 0.2rem 0.35rem !important;
+    margin: 0 -0.35rem !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+}}
+.st-key-crumbs .stButton > button:hover:not(:disabled) {{
+    color: var(--ink) !important;
+    background: var(--nav-hover) !important;
+}}
+/* The page you are on: still a crumb, but the end of the trail. */
+.st-key-crumbs .stButton > button:disabled {{
+    color: var(--ink) !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+    cursor: default !important;
 }}
 .topbar .crumb {{
     white-space: nowrap;
@@ -765,15 +798,15 @@ span[class*="material-icons"] {{
     font-weight: 600;
     min-width: 0;
 }}
-/* On a phone the rail is an overlay rather than a column, so the bar has no
-   rail to sit beside — and it has to clear the button that opens it. Who
+/* On a phone the rail is an overlay rather than a column, so the trail has
+   no rail to sit beside — and it has to clear the button that opens it. Who
    you are is in the rail already; at this width the trail is worth more. */
 @media (max-width: 768px) {{
-    .topbar {{
-        left: 3.5rem;
-        padding-right: 6.5rem;
+    .st-key-crumbs {{
+        left: 3.5rem !important;
+        max-width: calc(100vw - 10.5rem) !important;
     }}
-    .topbar-user {{ display: none; }}
+    .topbar {{ display: none !important; }}
 }}
 
 /* ---------- dev-mode strip ---------- */
@@ -977,30 +1010,43 @@ def sidebar_brand():
 def top_bar(trail, name="", role=""):
     """The bar across the top of the main area: where you are, and who you are.
 
-    `trail` is a list of labels, innermost last. Streamlit has no header of its
-    own to hang this on, so it is the first thing the page draws.
-    """
-    crumbs = []
-    for index, label in enumerate(trail):
-        if index:
-            crumbs.append('<span class="sep">/</span>')
-        css = "here" if index == len(trail) - 1 else "crumb"
-        crumbs.append(f'<span class="{css}">{label}</span>')
+    `trail` is a list of labels, innermost last. Every label but the last is a
+    button, because that is what a breadcrumb is: the trail is the way back,
+    and one that cannot be walked is decoration. Returns the index of the
+    crumb that was clicked, or None.
 
-    identity = ""
+    The two halves are placed separately — the trail against the content
+    column on the left, the identity against the buttons on the right — so
+    neither has to know the other's width.
+    """
+    clicked = None
+    last = len(trail) - 1
+    with st.container(
+        key="crumbs", horizontal=True, vertical_alignment="center", gap=None
+    ):
+        # Every crumb is a button, the current page's one disabled. A row of
+        # one kind of element lines itself up; mixing text in left it sitting
+        # low, because Streamlit gives text in a horizontal container a fixed
+        # height of its own. The separators are drawn by CSS, so they stay out
+        # of the buttons' hit areas.
+        for index, label in enumerate(trail):
+            if st.button(
+                label,
+                key=f"crumb_{index}",
+                type="tertiary",
+                disabled=index == last,
+            ):
+                clicked = index
+
     if name:
         role_part = f'<span class="role">{role}</span>' if role else ""
-        identity = (
-            f'<div class="topbar-user">'
+        st.markdown(
+            f'<div class="topbar"><div class="topbar-user">'
             f'<span class="initial">{name.strip()[:1].upper()}</span>'
-            f'<span class="name">{name}</span>{role_part}</div>'
+            f'<span class="name">{name}</span>{role_part}</div></div>',
+            unsafe_allow_html=True,
         )
-
-    st.markdown(
-        f'<div class="topbar"><div class="crumbs">{"".join(crumbs)}</div>'
-        f"{identity}</div>",
-        unsafe_allow_html=True,
-    )
+    return clicked
 
 
 def dev_banner(who=""):

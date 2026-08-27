@@ -31,6 +31,7 @@ def main():
         initial_sidebar_state="auto",
     )
     ui_theme.apply()
+    ui_language.selector()
     ui_theme.sidebar_brand()
 
     if "first_run" not in st.session_state:
@@ -65,7 +66,6 @@ def main():
             key="nav_page",
             label_visibility="collapsed",
         )
-        ui_language.selector()
 
     # A segmented control can be deselected by clicking the active option.
     selection = st.session_state["nav_page"] or CREATE_PAGE

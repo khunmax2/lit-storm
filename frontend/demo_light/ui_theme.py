@@ -539,6 +539,59 @@ span[class*="material-icons"] {{
     font-weight: 650 !important;
 }}
 
+/* ---------- language picker, pinned beside Streamlit's menu ---------- */
+.st-key-lang_selector {{
+    position: fixed;
+    top: 0.75rem;
+    right: 3.4rem;
+    /* Streamlit's header is opaque at z-index 999990 and would cover this. */
+    z-index: 999991;
+    width: auto !important;
+}}
+.st-key-lang_selector button {{
+    border: 1px solid var(--line) !important;
+    background: var(--surface) !important;
+    color: var(--muted) !important;
+    border-radius: 8px !important;
+    padding: 0.3rem 0.6rem !important;
+    min-height: 0 !important;
+}}
+.st-key-lang_selector button:hover {{
+    border-color: var(--brand) !important;
+    color: var(--brand) !important;
+}}
+
+/* ---------- Streamlit's own menu ---------- */
+/* Screen recording has nothing to do with reading or writing an article, and
+   the build stamp is for us, not for the reader. The theme switch and Print
+   stay: this app's output is a long cited document people print. */
+[data-testid="stMainMenuItem-recordScreencast"],
+[data-testid="stMainMenuList"] + div {{
+    display: none !important;
+}}
+
+/* ---------- print ---------- */
+/* Printing is the article, not the application around it. */
+@media print {{
+    [data-testid="stSidebar"],
+    [data-testid="stHeader"],
+    .st-key-lang_selector,
+    .st-key-nav_page,
+    [data-testid="stDownloadButton"] {{
+        display: none !important;
+    }}
+    [data-testid="stMainBlockContainer"] {{
+        max-width: none;
+        padding: 0;
+    }}
+    .article-scroll [data-testid="stVerticalBlock"] {{
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }}
+    a[href^="http"] {{ color: inherit; }}
+}}
+
 /* Hide the "Deploy"/status chrome the demo does not need. */
 [data-testid="stStatusWidget"] {{ visibility: hidden; }}
 </style>

@@ -314,6 +314,27 @@ def month(number):
     return _MONTHS.get(current(), _MONTHS[DEFAULT])[number - 1]
 
 
+# The two-letter tag shown on the trigger, so the button says which language
+# is active without opening it.
+_SHORT = {"English": "EN", "ไทย": "TH"}
+
+
 def selector():
-    """The sidebar language picker. Changing it reruns the app translated."""
-    st.sidebar.selectbox(t("lang.label"), LANGUAGES, key=STATE_KEY)
+    """The language picker, pinned beside Streamlit's own menu.
+
+    A globe is the one control people look for in a top corner when a page is
+    in the wrong language, and it belongs next to the other app-wide setting
+    (the theme) rather than buried in the sidebar with the navigation.
+    """
+    with st.popover(
+        _SHORT.get(current(), current()),
+        icon=":material/language:",
+        help=t("lang.label"),
+        key="lang_selector",
+    ):
+        st.radio(
+            t("lang.label"),
+            LANGUAGES,
+            key=STATE_KEY,
+            label_visibility="collapsed",
+        )

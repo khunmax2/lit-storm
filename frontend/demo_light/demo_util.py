@@ -474,20 +474,34 @@ def _display_main_article(
         selected_article_file_path_dict
     )
 
-    st.markdown('<div class="article-scroll">', unsafe_allow_html=True)
-    with st.container(height=900, border=False):
-        table_content_sidebar = st.sidebar.expander(t("article.toc"), expanded=True)
-        _display_main_article_text(
-            article_text=article_data.get("article", ""),
-            citation_dict=article_data.get("citations", {}),
-            table_content_sidebar=table_content_sidebar,
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Contents and references sit in a right-hand column beside the article
+    # rather than in the sidebar, which the navigation now owns.
+    # 173px of aside was too narrow for a wrapped Thai heading.
+    body_column, aside_column = st.columns([2.5, 1], gap="large")
+
+    with aside_column:
+        toc_panel = st.container()
+        references_panel = st.container()
+
+    with toc_panel, st.container(border=True):
+        ui_theme.aside_title(t("article.toc"))
+        toc_target = st.container()
+
+    with body_column:
+        st.markdown('<div class="article-scroll">', unsafe_allow_html=True)
+        with st.container(height=900, border=False):
+            _display_main_article_text(
+                article_text=article_data.get("article", ""),
+                citation_dict=article_data.get("citations", {}),
+                table_content_sidebar=toc_target,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # display reference panel
     if show_reference and "citations" in article_data:
-        with st.sidebar.expander(t("article.references"), expanded=True):
-            with st.container(height=560, border=False):
+        with references_panel, st.container(border=True):
+            ui_theme.aside_title(t("article.references"))
+            with st.container(height=420, border=False):
                 _display_references(citation_dict=article_data.get("citations", {}))
 
     # display conversation history

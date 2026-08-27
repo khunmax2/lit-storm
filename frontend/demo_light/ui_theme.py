@@ -539,6 +539,98 @@ span[class*="material-icons"] {{
     font-weight: 650 !important;
 }}
 
+/* ---------- top bar ---------- */
+/* Streamlit has no header slot, so this is a row drawn at the top of the
+   main area and styled to read as one. */
+.topbar {{
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 2.6rem;
+    /* Streamlit's header is opaque and 60px tall; a bar drawn any higher
+       than this is simply painted over. */
+    margin: 1.1rem 0 1.4rem 0;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+    color: var(--muted);
+}}
+.topbar .crumb {{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+.topbar .sep {{ opacity: 0.45; }}
+.topbar .here {{
+    color: var(--ink);
+    font-weight: 600;
+    min-width: 0;
+}}
+
+/* ---------- sidebar as a brand rail ---------- */
+/* Fixed dark in both themes: it reads as the product's frame rather than
+   part of the page, which is what keeps the eye on the article. */
+[data-testid="stSidebar"] {{
+    background: #131A2B !important;
+    border-right: 1px solid #1F2940 !important;
+}}
+[data-testid="stSidebar"] .side-brand {{ border-bottom-color: #263048; }}
+[data-testid="stSidebar"] .side-brand .name {{ color: #F2F5FA; }}
+[data-testid="stSidebar"] .side-brand .tag {{ color: #8C97AE; }}
+[data-testid="stSidebar"] .side-label {{ color: #8C97AE; }}
+.st-key-nav_page button[data-variant="segmented_control"] {{
+    color: #A7B1C6 !important;
+}}
+.st-key-nav_page button[data-variant="segmented_control"]:hover {{
+    background: #1C2438 !important;
+    color: #F2F5FA !important;
+}}
+.st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
+    background: #1F2A44 !important;
+    color: #FFFFFF !important;
+}}
+/* Everything the article page puts in the rail has to be legible on it. */
+[data-testid="stSidebar"] [data-testid="stExpander"] details {{
+    background: transparent;
+    border-color: #263048;
+}}
+[data-testid="stSidebar"] summary,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stMarkdown {{
+    color: #C6CEDD;
+}}
+[data-testid="stSidebar"] a.toc {{ color: #A7B1C6 !important; }}
+[data-testid="stSidebar"] a.toc:hover {{ color: #FFFFFF !important; }}
+[data-testid="stSidebar"] .stButton > button {{
+    background: transparent !important;
+    border-color: #2C3550 !important;
+    color: #C6CEDD !important;
+}}
+
+/* ---------- the aside column: contents and references ---------- */
+/* The article is a tall scroll; the panels beside it stay put. */
+[data-testid="stColumn"]:last-child:has(.aside-title) {{
+    position: sticky;
+    top: 4.5rem;
+    align-self: flex-start;
+}}
+
+.aside-card {{
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+}}
+.aside-card .aside-title {{
+    font-size: 0.7rem;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+}}
+
 /* ---------- language picker, pinned beside Streamlit's menu ---------- */
 .st-key-lang_selector {{
     position: fixed;
@@ -610,6 +702,26 @@ def sidebar_brand():
         f'<div class="tag">{t("brand.tagline")}</div></div>',
         unsafe_allow_html=True,
     )
+
+
+def top_bar(trail):
+    """The breadcrumb row across the top of the main area.
+
+    `trail` is a list of labels, innermost last. Streamlit has no header of
+    its own to hang this on, so it is the first thing the page draws.
+    """
+    parts = []
+    for index, label in enumerate(trail):
+        if index:
+            parts.append('<span class="sep">/</span>')
+        css = "here" if index == len(trail) - 1 else "crumb"
+        parts.append(f'<span class="{css}">{label}</span>')
+    st.markdown(f'<div class="topbar">{"".join(parts)}</div>', unsafe_allow_html=True)
+
+
+def aside_title(text):
+    """Heading for one of the panels in the right-hand column."""
+    st.markdown(f'<div class="aside-title">{text}</div>', unsafe_allow_html=True)
 
 
 def section_label(text, aside=""):

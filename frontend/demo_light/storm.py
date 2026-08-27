@@ -70,6 +70,13 @@ def main():
     # A segmented control can be deselected by clicking the active option.
     selection = st.session_state["nav_page"] or CREATE_PAGE
 
+    # Breadcrumb. The article name is already in state by the time this draws,
+    # because it is set on the run before the article page appears.
+    trail = [t(PAGE_LABELS[selection])]
+    if selection == ARTICLES_PAGE and "page2_selected_my_article" in st.session_state:
+        trail.append(st.session_state["page2_selected_my_article"].replace("_", " "))
+    ui_theme.top_bar(trail)
+
     if selection == ARTICLES_PAGE:
         demo_util.clear_other_page_session_state(page_index=2)
         MyArticles.my_articles_page()

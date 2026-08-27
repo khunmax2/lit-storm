@@ -187,8 +187,8 @@ _STRINGS = {
         "English": "Download as Markdown",
         "ไทย": "ดาวน์โหลดเป็น Markdown",
     },
-    "article.toc": {"English": "**Table of contents**", "ไทย": "**สารบัญ**"},
-    "article.references": {"English": "**References**", "ไทย": "**แหล่งอ้างอิง**"},
+    "article.toc": {"English": "Table of contents", "ไทย": "สารบัญ"},
+    "article.references": {"English": "References", "ไทย": "แหล่งอ้างอิง"},
     "article.no_references": {
         "English": "No references available.",
         "ไทย": "ไม่มีแหล่งอ้างอิง",

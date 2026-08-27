@@ -86,6 +86,24 @@ _CSS = f"""
 
 .stApp {{
 {_vars()}
+
+    /* Layout constants the top bar is aligned against. Streamlit sets the
+       rail's width inline, so it is pinned below to the same number rather
+       than trusted to stay there. */
+    --rail: 300px;
+    --content-max: 1180px;
+    /* Where the content column starts, measured from the rail: the block's
+       own 5rem of padding, plus half of whatever slack is left once the
+       block reaches its max width and centres itself. This is what puts the
+       breadcrumb over the title below it. */
+    --gutter: max(
+        5rem,
+        calc((100vw - var(--rail) - var(--content-max)) / 2 + 5rem)
+    );
+}}
+/* Collapsed rail: the same sums with no rail in them. */
+.stApp:has([data-testid="stSidebar"][aria-expanded="false"]) {{
+    --rail: 0px;
 }}
 
 html, body, [class*="st-"], button, input, textarea {{
@@ -108,7 +126,8 @@ span[class*="material-icons"] {{
 
 /* Roomier page gutters, capped so long articles stay readable. */
 [data-testid="stMainBlockContainer"] {{
-    padding-top: 2.4rem;
+    /* Clear of the 60px header, which the top bar is drawn into. */
+    padding-top: 5.5rem;
     padding-bottom: 4rem;
     max-width: 1180px;
 }}
@@ -572,19 +591,41 @@ span[class*="material-icons"] {{
 }}
 
 /* ---------- top bar ---------- */
-/* Streamlit has no header slot, so this is a row drawn at the top of the
-   main area and styled to read as one. */
+/* Streamlit's header is the only band that already spans the main area and
+   follows the rail when it collapses, so the bar is that band: the header
+   gets the edge, and the breadcrumb is placed into it. Drawn in the page
+   instead, as it was, it sat in the content's own column and read as the
+   first line of the article rather than as the frame around it.
+
+   It is laid over the header rather than inside it — Streamlit gives no way
+   in — so it takes no clicks, and keeps clear of the buttons at the far
+   right. */
+[data-testid="stHeader"] {{
+    border-bottom: 1px solid var(--line);
+}}
+@media (min-width: 769px) {{
+    [data-testid="stSidebar"] {{
+        width: var(--rail) !important;
+        min-width: var(--rail) !important;
+        max-width: var(--rail) !important;
+    }}
+}}
 .topbar {{
+    position: fixed;
+    top: 0;
+    left: calc(var(--rail) + var(--gutter));
+    right: 1rem;
+    /* The header's own height. Taller and the bar draws past its edge. */
+    height: 60px;
+    z-index: 999992;
+    pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    height: 2.6rem;
-    /* Streamlit's header is opaque and 60px tall; a bar drawn any higher
-       than this is simply painted over. */
-    margin: 1.1rem 0 1.4rem 0;
-    padding-bottom: 0.9rem;
-    border-bottom: 1px solid var(--line);
+    /* Room for the language and menu buttons, which live at the far right
+       of the same band. */
+    padding-right: 8.5rem;
     font-size: 0.85rem;
     color: var(--muted);
 }}
@@ -638,6 +679,16 @@ span[class*="material-icons"] {{
     color: var(--ink);
     font-weight: 600;
     min-width: 0;
+}}
+/* On a phone the rail is an overlay rather than a column, so the bar has no
+   rail to sit beside — and it has to clear the button that opens it. Who
+   you are is in the rail already; at this width the trail is worth more. */
+@media (max-width: 768px) {{
+    .topbar {{
+        left: 3.5rem;
+        padding-right: 6.5rem;
+    }}
+    .topbar-user {{ display: none; }}
 }}
 
 /* ---------- dev-mode strip ---------- */

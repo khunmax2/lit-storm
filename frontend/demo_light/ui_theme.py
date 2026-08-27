@@ -124,14 +124,18 @@ _CSS = f"""
        rail's width inline, so it is pinned below to the same number rather
        than trusted to stay there. */
     --rail-width: 300px;
-    --content-max: 1180px;
+    --content-max: 1600px;
     /* Where the content column starts, measured from the rail: the block's
        own 5rem of padding, plus half of whatever slack is left once the
        block reaches its max width and centres itself. This is what puts the
        breadcrumb over the title below it. */
+    --page-pad: 3.5rem;
     --gutter: max(
-        5rem,
-        calc((100vw - var(--rail-width) - var(--content-max)) / 2 + 5rem)
+        var(--page-pad),
+        calc(
+            (100vw - var(--rail-width) - var(--content-max)) / 2
+                + var(--page-pad)
+        )
     );
 }}
 /* Collapsed rail: the same sums with no rail in them. */
@@ -157,13 +161,19 @@ span[class*="material-icons"] {{
     font-family: "Material Symbols Rounded" !important;
 }}
 
-/* Roomier page gutters, capped so long articles stay readable. */
+/* The page fills the width it is given, up to a wide cap. Capped at 1180 it
+   left a third of a large screen empty on either side, which the reference
+   does not: there the grid grows and the gutters stay put. Long prose is
+   held to its own measure by the article column instead, so widening here
+   does not widen the reading line. */
 [data-testid="stMainBlockContainer"] {{
     /* Clear of the 60px header the top bar is drawn into, plus a gap —
        not another header's worth of it. */
     padding-top: 5.25rem;
+    padding-left: var(--page-pad);
+    padding-right: var(--page-pad);
     padding-bottom: 4rem;
-    max-width: 1180px;
+    max-width: var(--content-max);
 }}
 
 /* Two things in the main column draw nothing where they sit: the stylesheet
@@ -187,12 +197,12 @@ span[class*="material-icons"] {{
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
-    margin: 0.4rem 0 1.6rem 0;
-    padding-bottom: 0.9rem;
+    margin: 0.4rem 0 1.9rem 0;
+    padding-bottom: 1.1rem;
     border-bottom: 1px solid var(--line);
 }}
 .page-head h1 {{
-    font-size: 1.65rem;
+    font-size: 1.9rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--ink);
@@ -325,8 +335,8 @@ span[class*="material-icons"] {{
 [data-testid="stVerticalBlockBorderWrapper"]:has(.acard) {{
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 1.1rem 1.15rem 0.9rem 1.15rem;
+    border-radius: 12px;
+    padding: 1.25rem 1.3rem 1.05rem 1.3rem;
     height: 100%;
     transition: border-color 0.15s ease, box-shadow 0.15s ease,
         transform 0.15s ease;
@@ -421,7 +431,7 @@ span[class*="material-icons"] {{
 
 /* ---------- buttons ---------- */
 .stButton > button, [data-testid="stFormSubmitButton"] > button {{
-    border-radius: 9px;
+    border-radius: 8px;
     border: 1px solid var(--line);
     font-weight: 550;
     transition: background 0.15s ease, border-color 0.15s ease,
@@ -503,9 +513,13 @@ span[class*="material-icons"] {{
 [data-testid="stLayoutWrapper"]:has(> .st-key-side_account) {{
     margin-top: auto !important;
 }}
+/* The reference sets the account apart in a panel rather than under a rule,
+   which also keeps it from reading as one more row of the menu. */
 .st-key-side_account {{
-    padding-top: 0.7rem;
-    border-top: 1px solid var(--rail-line-soft);
+    padding: 0.85rem 0.9rem 0.5rem 0.9rem;
+    background: var(--rail-hover);
+    border: 1px solid var(--rail-border);
+    border-radius: 12px;
 }}
 .side-label {{
     font-size: 0.7rem;
@@ -549,7 +563,15 @@ span[class*="material-icons"] {{
     border-radius: 999px;
     padding: 0.16rem 0.6rem;
 }}
-.article-body {{ max-width: 46rem; }}
+/* The reading measure. The column grows with the window; a line of prose
+   should not — past roughly 75 characters the eye loses its place on the way
+   back to the next line. Measured rather than guessed: at this face and size
+   an average character is 7.15px, so 34rem is about 76 of them. The rule
+   this replaces named a class no element carried, and lines had been running
+   to 103. */
+.st-key-article_text [data-testid="stMarkdownContainer"] {{
+    max-width: 34rem;
+}}
 
 /* Inline citation links inside the article text. */
 [data-testid="stMarkdownContainer"] a[href^="http"] {{
@@ -789,32 +811,36 @@ span[class*="material-icons"] {{
 .topbar-user {{
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
     flex-shrink: 0;
 }}
 .topbar-user .initial {{
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 999px;
-    background: var(--brand-soft);
-    color: var(--brand);
-    font-size: 0.78rem;
+    background: var(--brand);
+    color: var(--on-brand);
+    font-size: 0.82rem;
     font-weight: 650;
     display: flex;
     align-items: center;
     justify-content: center;
 }}
+/* Name over role rather than side by side, as in the reference: two short
+   words on one line read as one long one. */
+.topbar-user .who {{
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}}
 .topbar-user .name {{
     font-size: 0.82rem;
-    font-weight: 550;
+    font-weight: 600;
     color: var(--ink);
 }}
 .topbar-user .role {{
     font-size: 0.72rem;
     color: var(--muted);
-    padding-left: 0.4rem;
-    margin-left: 0.4rem;
-    border-left: 1px solid var(--line);
 }}
 .topbar .here {{
     color: var(--ink);
@@ -902,7 +928,7 @@ span[class*="material-icons"] {{
     border: none !important;
     color: var(--rail-muted) !important;
     justify-content: flex-start !important;
-    padding-left: 0.8rem !important;
+    padding-left: 0 !important;
 }}
 .st-key-side_account .stButton > button > div {{
     justify-content: flex-start !important;
@@ -915,7 +941,7 @@ span[class*="material-icons"] {{
 
 /* ---------- who is signed in ---------- */
 .side-account {{
-    padding: 0 0 0.5rem 0;
+    padding: 0 0 0.55rem 0;
 }}
 .side-account .who {{
     font-size: 0.9rem;
@@ -1001,7 +1027,7 @@ span[class*="material-icons"] {{
         max-width: none;
         padding: 0;
     }}
-    .article-scroll [data-testid="stVerticalBlock"] {{
+    .st-key-article_text [data-testid="stVerticalBlock"] {{
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
@@ -1065,7 +1091,8 @@ def top_bar(trail, name="", role=""):
         st.markdown(
             f'<div class="topbar"><div class="topbar-user">'
             f'<span class="initial">{name.strip()[:1].upper()}</span>'
-            f'<span class="name">{name}</span>{role_part}</div></div>',
+            f'<span class="who"><span class="name">{name}</span>'
+            f"{role_part}</span></div></div>",
             unsafe_allow_html=True,
         )
     return clicked

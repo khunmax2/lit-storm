@@ -478,7 +478,9 @@ def _display_main_article(
     # Contents and references sit in a right-hand column beside the article
     # rather than in the sidebar, which the navigation now owns.
     # 173px of aside was too narrow for a wrapped Thai heading.
-    body_column, aside_column = st.columns([2.5, 1], gap="large")
+    # The article is held to a reading measure, so a wider body column would
+    # only add blank paper between the text and the contents beside it.
+    body_column, aside_column = st.columns([1.8, 1], gap="large")
 
     with aside_column:
         toc_panel = st.container()
@@ -489,14 +491,17 @@ def _display_main_article(
         toc_target = st.container()
 
     with body_column:
-        st.markdown('<div class="article-scroll">', unsafe_allow_html=True)
-        with st.container(height=900, border=False):
-            _display_main_article_text(
-                article_text=article_data.get("article", ""),
-                citation_dict=article_data.get("citations", {}),
-                table_content_sidebar=toc_target,
-            )
-        st.markdown("</div>", unsafe_allow_html=True)
+        # A keyed container, not a pair of marker divs: an open tag in one
+        # st.markdown and its close in another do not wrap what is between
+        # them — Streamlit closes each one where it stands, and the class was
+        # landing on an empty div while the article sat outside it.
+        with st.container(key="article_text"):
+            with st.container(height=900, border=False):
+                _display_main_article_text(
+                    article_text=article_data.get("article", ""),
+                    citation_dict=article_data.get("citations", {}),
+                    table_content_sidebar=toc_target,
+                )
 
     # display reference panel
     if show_reference and "citations" in article_data:

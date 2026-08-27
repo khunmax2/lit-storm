@@ -537,6 +537,51 @@ span[class*="material-icons"] {{
     background: var(--surface);
 }}
 
+/* ---------- the article as a sheet ---------- */
+/* The reference sets the article on a white card rather than straight onto
+   the page, with the contents and the references as two more cards beside
+   it. Three panels, one shape. */
+.st-key-article_card,
+.st-key-toc_card,
+.st-key-refs_card {{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px var(--shadow-soft);
+}}
+.st-key-article_card {{
+    padding: 2rem 2.4rem 1.4rem 2.4rem;
+}}
+.st-key-toc_card,
+.st-key-refs_card {{
+    padding: 1.3rem 1.4rem;
+}}
+.st-key-refs_card {{
+    margin-top: 1rem;
+}}
+/* The rule under the title block, spanning the card's own measure. */
+.article-rule {{
+    height: 1px;
+    background: var(--line);
+    margin: 1.4rem 0 0.4rem 0;
+}}
+
+/* The badges under the title: icon then figure, as in the reference. */
+.article-head .meta .chip {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.34rem 0.75rem;
+    font-size: 0.79rem;
+}}
+.article-head .meta .chip .material-symbols-rounded {{
+    font-size: 1rem !important;
+    color: var(--muted);
+}}
+
 /* ---------- article body ---------- */
 .article-head {{
     margin: 0.5rem 0 1.4rem 0;
@@ -557,20 +602,15 @@ span[class*="material-icons"] {{
     font-size: 0.78rem;
     color: var(--muted);
 }}
-.article-head .meta .chip {{
-    background: var(--canvas);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 0.16rem 0.6rem;
-}}
-/* The reading measure. The column grows with the window; a line of prose
-   should not — past roughly 75 characters the eye loses its place on the way
-   back to the next line. Measured rather than guessed: at this face and size
-   an average character is 7.15px, so 34rem is about 76 of them. The rule
-   this replaces named a class no element carried, and lines had been running
-   to 103. */
+
+/* The article's card sets the measure, as the reference's does: at the sizes
+   this is read at the text fills the card. The cap is a backstop for a very
+   wide screen — measured rather than guessed, an average character is 7.15px
+   at this face and size, so 40rem is about 89 of them. It is a cap and not
+   the measure because the reference runs longer lines than a cap of 75 would
+   allow, and a card with text down one side of it looks broken. */
 .st-key-article_text [data-testid="stMarkdownContainer"] {{
-    max-width: 34rem;
+    max-width: 40rem;
 }}
 
 /* Inline citation links inside the article text. */
@@ -1040,6 +1080,61 @@ span[class*="material-icons"] {{
     align-self: flex-start;
 }}
 
+/* The panel headings carry a mark, and the contents are bulleted the way
+   the reference bullets them: a filled dot for a section, a ring for what
+   sits under one. */
+.aside-title .material-symbols-rounded {{
+    font-size: 1.15rem !important;
+    color: var(--brand);
+    margin-right: 0.5rem;
+    vertical-align: -0.2rem;
+}}
+.st-key-toc_card ul {{
+    list-style: none;
+    padding-left: 0;
+    margin: 0.2rem 0 0 0;
+}}
+.st-key-toc_card li {{
+    position: relative;
+    padding-left: 1.15rem;
+    margin: 0.5rem 0;
+}}
+.st-key-toc_card li::before {{
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--brand);
+}}
+.st-key-toc_card ul ul {{
+    padding-left: 1.1rem;
+    margin: 0.35rem 0;
+}}
+.st-key-toc_card ul ul li::before {{
+    background: transparent;
+    border: 1.5px solid var(--line-strong);
+}}
+/* The one button in the references panel, and the way the reference draws
+   it: quiet, filled with the brand at its lightest. */
+.st-key-refs_open button {{
+    background: var(--brand-soft) !important;
+    border-color: transparent !important;
+    color: var(--brand) !important;
+    font-weight: 550 !important;
+}}
+.st-key-refs_open button:hover {{
+    border-color: var(--brand) !important;
+}}
+.dialog-head {{
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.9rem;
+}}
+
 .aside-card {{
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -1183,9 +1278,14 @@ def dev_banner(who=""):
     )
 
 
-def aside_title(text):
+def aside_title(text, icon=""):
     """Heading for one of the panels in the right-hand column."""
-    st.markdown(f'<div class="aside-title">{text}</div>', unsafe_allow_html=True)
+    mark = (
+        f'<span class="material-symbols-rounded">{icon}</span>' if icon else ""
+    )
+    st.markdown(
+        f'<div class="aside-title">{mark}{text}</div>', unsafe_allow_html=True
+    )
 
 
 def section_label(text, aside=""):
@@ -1233,8 +1333,22 @@ def empty_state(icon, title, body):
 
 
 def chips(items):
-    """Pill-shaped badges — used on the article page header."""
-    return "".join(f'<span class="chip">{item}</span>' for item in items)
+    """Pill-shaped badges — used on the article page header.
+
+    An item is either a label or an (icon, label) pair; the icon is a
+    Material Symbols ligature name.
+    """
+    out = []
+    for item in items:
+        if isinstance(item, tuple):
+            icon, label = item
+            out.append(
+                f'<span class="chip">'
+                f'<span class="material-symbols-rounded">{icon}</span>{label}</span>'
+            )
+        else:
+            out.append(f'<span class="chip">{item}</span>')
+    return "".join(out)
 
 
 def meta_line(items):

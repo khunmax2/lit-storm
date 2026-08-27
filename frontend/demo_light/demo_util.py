@@ -422,24 +422,35 @@ def _display_main_article_text(article_text, citation_dict, table_content_sideba
     stoc.from_markdown(article_text, table_content_sidebar)
 
 
-def _display_references(citation_dict):
-    if not citation_dict:
-        st.caption(t("article.no_references"))
-        return
-
-    reference_list = [f"[{i}]" for i in range(1, len(citation_dict) + 1)]
-    selected_key = st.selectbox(t("article.jump_reference"), reference_list)
-    citation_val = citation_dict[reference_list.index(selected_key) + 1]
-    title = citation_val["title"].replace("$", "\\$")
+def _reference_card(number, citation):
+    title = citation["title"].replace("$", "\\$")
     st.markdown(
-        f'<div class="ref-card"><div class="ref-title">{title}</div>'
-        f'<div class="ref-url"><a href="{citation_val["url"]}" target="_blank">'
-        f'{citation_val["url"]}</a></div></div>',
+        f'<div class="ref-card"><div class="ref-title">[{number}] {title}</div>'
+        f'<div class="ref-url"><a href="{citation["url"]}" target="_blank">'
+        f'{citation["url"]}</a></div></div>',
         unsafe_allow_html=True,
     )
-    snippets = "\n\n".join(citation_val["snippets"]).replace("$", "\\$")
-    st.caption(t("article.highlights"))
-    st.markdown(snippets)
+
+
+@st.dialog(" ", width="large")
+def _references_dialog(citation_dict):
+    """Every source behind the article, in one place.
+
+    The panel beside the article used to hold a picker that showed one source
+    at a time, which meant the list could not be read as a list. The reference
+    puts a single button there instead.
+    """
+    st.markdown(
+        f'<div class="dialog-head">{t("article.references")}</div>',
+        unsafe_allow_html=True,
+    )
+    for number in sorted(citation_dict):
+        citation = citation_dict[number]
+        _reference_card(number, citation)
+        snippets = "\n\n".join(citation.get("snippets", [])).replace("$", "\\$")
+        if snippets:
+            with st.expander(t("article.highlights")):
+                st.markdown(snippets)
 
 
 def _display_persona_conversations(conversation_log):
@@ -469,7 +480,10 @@ def _display_persona_conversations(conversation_log):
 
 
 def _display_main_article(
-    selected_article_file_path_dict, show_reference=True, show_conversation=True
+    selected_article_file_path_dict,
+    show_reference=True,
+    show_conversation=True,
+    head=None,
 ):
     article_data = DemoFileIOHelper.assemble_article_data(
         selected_article_file_path_dict
@@ -478,19 +492,24 @@ def _display_main_article(
     # Contents and references sit in a right-hand column beside the article
     # rather than in the sidebar, which the navigation now owns.
     # 173px of aside was too narrow for a wrapped Thai heading.
-    # The article is held to a reading measure, so a wider body column would
-    # only add blank paper between the text and the contents beside it.
-    body_column, aside_column = st.columns([1.8, 1], gap="large")
+    # The card is the measure now: at the widths this is used at, the text
+    # fills it the way the reference's does, and the cap below only bites on
+    # a very wide screen.
+    body_column, aside_column = st.columns([1.5, 1], gap="medium")
 
     with aside_column:
         toc_panel = st.container()
         references_panel = st.container()
 
-    with toc_panel, st.container(border=True):
-        ui_theme.aside_title(t("article.toc"))
+    with toc_panel, st.container(key="toc_card"):
+        ui_theme.aside_title(t("article.toc"), icon="format_list_bulleted")
         toc_target = st.container()
 
-    with body_column:
+    # Title, badges and the download sit inside the article's own card rather
+    # than on the page above it, so the article reads as one sheet.
+    with body_column, st.container(key="article_card"):
+        if head is not None:
+            head()
         # A keyed container, not a pair of marker divs: an open tag in one
         # st.markdown and its close in another do not wrap what is between
         # them — Streamlit closes each one where it stands, and the class was
@@ -505,10 +524,18 @@ def _display_main_article(
 
     # display reference panel
     if show_reference and "citations" in article_data:
-        with references_panel, st.container(border=True):
-            ui_theme.aside_title(t("article.references"))
-            with st.container(height=420, border=False):
-                _display_references(citation_dict=article_data.get("citations", {}))
+        citations = article_data.get("citations", {})
+        with references_panel, st.container(key="refs_card"):
+            ui_theme.aside_title(t("article.references"), icon="menu_book")
+            if not citations:
+                st.caption(t("article.no_references"))
+            elif st.button(
+                t("article.view_all_references"),
+                icon=":material/open_in_new:",
+                use_container_width=True,
+                key="refs_open",
+            ):
+                _references_dialog(citations)
 
     # display conversation history
     if show_conversation and "conversation_log" in article_data:
@@ -609,27 +636,33 @@ def display_article_page(
                 os.path.getmtime(article_path),
             )
             meta = [
-                ui_theme.humanize_date(os.path.getmtime(article_path)),
-                ui_theme.length_label(length),
+                ("calendar_today", ui_theme.humanize_date(os.path.getmtime(article_path))),
+                ("description", ui_theme.length_label(length)),
             ]
             if sources:
-                meta.append(t("articles.sources", n=sources))
-        st.markdown(
-            f'<div class="article-head">'
-            f"<h1>{selected_article_name.replace('_', ' ')}</h1>"
-            f'<div class="meta">{ui_theme.chips(meta)}</div></div>',
-            unsafe_allow_html=True,
-        )
-        if article_path and os.path.exists(article_path):
-            st.download_button(
-                t("article.download"),
-                data=open(article_path).read(),
-                file_name=f"{selected_article_name}.md",
-                mime="text/markdown",
+                meta.append(("layers", t("articles.sources", n=sources)))
+        def head():
+            st.markdown(
+                f'<div class="article-head">'
+                f"<h1>{selected_article_name.replace('_', ' ')}</h1>"
+                f'<div class="meta">{ui_theme.chips(meta)}</div></div>',
+                unsafe_allow_html=True,
             )
+            if article_path and os.path.exists(article_path):
+                st.download_button(
+                    t("article.download"),
+                    data=open(article_path).read(),
+                    file_name=f"{selected_article_name}.md",
+                    mime="text/markdown",
+                    icon=":material/download:",
+                )
+            st.markdown('<div class="article-rule"></div>', unsafe_allow_html=True)
+
+    else:
+        head = None
 
     if show_main_article:
-        _display_main_article(selected_article_file_path_dict)
+        _display_main_article(selected_article_file_path_dict, head=head)
 
 
 def _in_script_run_ctx(method):

@@ -283,6 +283,10 @@ _STRINGS = {
         "ไทย": "ดาวน์โหลดเป็น Markdown",
     },
     "article.toc": {"English": "Table of contents", "ไทย": "สารบัญ"},
+    "article.view_all_references": {
+        "English": "View all references",
+        "ไทย": "ดูแหล่งอ้างอิงทั้งหมด",
+    },
     "article.references": {"English": "References", "ไทย": "แหล่งอ้างอิง"},
     "article.no_references": {
         "English": "No references available.",

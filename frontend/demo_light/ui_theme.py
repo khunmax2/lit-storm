@@ -154,10 +154,26 @@ span[class*="material-icons"] {{
 
 /* Roomier page gutters, capped so long articles stay readable. */
 [data-testid="stMainBlockContainer"] {{
-    /* Clear of the 60px header, which the top bar is drawn into. */
-    padding-top: 5.5rem;
+    /* Clear of the 60px header the top bar is drawn into, plus a gap —
+       not another header's worth of it. */
+    padding-top: 5.25rem;
     padding-bottom: 4rem;
     max-width: 1180px;
+}}
+
+/* Two things in the main column draw nothing where they sit: the stylesheet
+   above, and the top bar, which is fixed into Streamlit's header. Streamlit
+   still lays each one out as a row and puts its 16px gap after it, so every
+   page opened 32px lower than it was asked to. Taking them out of the flex
+   flow costs the gap; `position: fixed` inside still resolves to the
+   viewport, because absolute ancestors do not contain it. */
+[data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:has(
+    [data-testid="stMarkdownContainer"] > style:only-child
+),
+[data-testid="stMainBlockContainer"] [data-testid="stElementContainer"]:has(
+    .topbar
+) {{
+    position: absolute;
 }}
 
 /* ---------- page header ---------- */
@@ -201,6 +217,7 @@ span[class*="material-icons"] {{
     margin-bottom: 1rem;
 }}
 .hero h1 {{
+    padding: 0;
     font-size: 2.3rem;
     font-weight: 700;
     letter-spacing: -0.03em;
@@ -429,9 +446,12 @@ span[class*="material-icons"] {{
    76px, and the padding here added another 26 on top of it — a third of the
    rail was empty before the logo. */
 [data-testid="stSidebarHeader"] {{
-    height: 2.6rem;
-    padding-top: 0.5rem;
+    height: 2.25rem;
+    padding-top: 0.25rem;
     padding-bottom: 0;
+    /* Streamlit puts a rem of margin under this strip as well. The strip
+       holds one 28px button; the brand should start right after it. */
+    margin-bottom: 0 !important;
 }}
 [data-testid="stSidebarUserContent"] {{ padding-top: 0.25rem; }}
 
@@ -471,6 +491,7 @@ span[class*="material-icons"] {{
     margin: 0.5rem 0 1.4rem 0;
 }}
 .article-head h1 {{
+    padding: 0;
     font-size: 2rem;
     font-weight: 700;
     letter-spacing: -0.025em;

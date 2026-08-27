@@ -144,6 +144,13 @@ _CSS = f"""
 .stApp:has([data-testid="stSidebar"][aria-expanded="false"]) {{
     --rail-width: 0px;
 }}
+/* A desktop gutter on a phone is most of the screen: 3.5rem either side of a
+   375px window leaves 263px of page, which is narrower than a card. */
+@media (max-width: 760px) {{
+    .stApp {{
+        --page-pad: 1.15rem;
+    }}
+}}
 
 html, body, [class*="st-"], button, input, textarea {{
     font-family: {FONT_STACK};
@@ -334,34 +341,154 @@ span[class*="material-icons"] {{
 }}
 
 /* ---------- article cards ---------- */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.acard) {{
+/* The card is the vertical block that holds the markup, matched through its
+   own first child: `st.container(border=True)` puts the border on that block
+   itself in this version, and there is no wrapper around it to hang this on.
+   Matching `:has(.acard)` without the child path would also match every
+   block the cards sit inside, the grid included. */
+/* Three across, two on a tablet, one on a phone. st.columns() decides the
+   count in Python, when the page renders, so it cannot answer a window that
+   changes afterwards; the cards go into one flat list and this lays them
+   out. */
+.st-key-article_grid {{
+    display: grid !important;
+    /* Below the desktop breakpoint the card's own minimum decides how many
+       fit — the rail can be open or shut, so the window's width does not
+       actually say how much room the grid has. Two columns forced onto a
+       tablet with the rail open gave 190px cards with clipped titles. */
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 1.35rem;
+}}
+/* Streamlit wraps each card in a layout div, and that div is the grid item —
+   so it is the one that has to stretch before the card's own height: 100%
+   has a row height to fill. Without this a card with less in it sits 6px
+   short of its neighbours and its button misses their line. */
+.st-key-article_grid > [data-testid="stLayoutWrapper"] {{
+    height: 100%;
+}}
+
+/* Three across on a desktop, and never four however wide the window gets. */
+@media (min-width: 1181px) {{
+    .st-key-article_grid {{
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }}
+}}
+
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+) {{
+    position: relative;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 1.25rem 1.3rem 1.05rem 1.3rem;
+    padding: 1.25rem 1.3rem 1.15rem 1.3rem;
     height: 100%;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease,
-        transform 0.15s ease;
+    /* Flat by default. A card that lifts off the page on hover reads as a
+       toy; the border and a hairline of shadow are enough to say it is live. */
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.acard) .stButton > button {{
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+):hover {{
+    border-color: var(--brand);
+    box-shadow: 0 1px 3px var(--shadow-soft);
+}}
+/* The card is a column, and its action is the last thing in it whatever the
+   title and the excerpt did with the space above. */
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+) > div,
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+) > div > [data-testid="stVerticalBlock"] {{
+    height: 100%;
+}}
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    [data-testid="stElementContainer"]:has(.stButton) {{
+    margin-top: auto;
+    /* A block container leaves a few pixels of leading under an inline-block
+       button, and the amount depends on the label — so two cards in a row
+       ended up with their buttons on different lines. A flex box is the
+       height of what is in it. */
+    display: flex;
+}}
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    [data-testid="stElementContainer"]:has(.stButton) .stButton {{
+    width: 100%;
+    /* The button is inline-flex inside a block, so the line box around it
+       reserves room for a descender under it — a few pixels that vary with
+       the label, which is what knocked one card's button off its row's line. */
+    display: flex;
+}}
+/* The menu sits in the corner rather than in a row of its own, so a card
+   without one is the same shape as a card with one. */
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    :is(
+        [data-testid="stElementContainer"], [data-testid="stLayoutWrapper"]
+    ):has([data-testid="stPopover"]) {{
+    position: absolute;
+    top: 0.75rem;
+    right: 0.7rem;
+    width: auto;
+    z-index: 2;
+}}
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    [data-testid="stPopover"] button {{
+    border: none !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    padding: 0.2rem !important;
+    min-height: 0 !important;
+    opacity: 0.55;
+}}
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    [data-testid="stPopover"] button:hover {{
+    opacity: 1;
+    color: var(--ink) !important;
+    background: var(--nav-hover) !important;
+}}
+/* Streamlit adds a chevron after a popover's label; on a menu that is only
+   its icon, the chevron is a second glyph saying the same thing. */
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    [data-testid="stPopover"] button [data-testid="stIconMaterial"]:last-of-type {{
+    display: none;
+}}
+/* The card's own action: outlined, not filled. It opens something, it does
+   not commit anything. */
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+) .stButton > button {{
+    min-height: 2.5rem;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
     color: var(--brand) !important;
-    font-weight: 550 !important;
 }}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.acard) .stButton > button:hover:not(:disabled) {{
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+) .stButton > button:hover:not(:disabled) {{
     background: var(--brand-soft) !important;
     border-color: var(--brand) !important;
 }}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.acard):hover {{
-    border-color: var(--line-strong);
-    box-shadow: 0 6px 20px -8px var(--shadow);
-    transform: translateY(-2px);
-}}
 .acard .title {{
-    font-size: 1.02rem;
-    font-weight: 650;
+    font-size: 1.05rem;
+    font-weight: 600;
     line-height: 1.35;
     color: var(--ink);
-    margin-bottom: 0.45rem;
+    /* Clear of the menu in the corner. */
+    padding-right: 1.6rem;
+    margin-bottom: 0.5rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -382,14 +509,32 @@ span[class*="material-icons"] {{
 /* A run that never finished is a state, not a measurement, so it is set
    apart from the date and the counts rather than listed beside them. */
 .acard .state {{
+    display: block;
+    margin-bottom: 0.6rem;
+}}
+.badge {{
     display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.73rem;
+    font-weight: 500;
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    line-height: 1.4;
+}}
+.badge.is-info {{
     color: var(--brand);
     background: var(--brand-soft);
-    border-radius: 999px;
-    padding: 0.14rem 0.55rem;
-    margin-bottom: 0.6rem;
+}}
+.badge.is-positive {{
+    color: light-dark(#047857, #34D399);
+    background: light-dark(#ECFDF5, rgba(52, 211, 153, 0.14));
+}}
+.badge.is-warning {{
+    color: light-dark(#B45309, #FBBF24);
+    background: light-dark(#FFFBEB, rgba(251, 191, 36, 0.14));
+}}
+.badge.is-critical {{
+    color: light-dark(#B91C1C, #F87171);
+    background: light-dark(#FEF2F2, rgba(248, 113, 113, 0.14));
 }}
 .acard .excerpt {{
     font-size: 0.84rem;
@@ -1349,6 +1494,33 @@ def chips(items):
         else:
             out.append(f'<span class="chip">{item}</span>')
     return "".join(out)
+
+
+BADGE_TONES = ("info", "positive", "warning", "critical")
+
+
+def badge(text, tone="info"):
+    """A small pill for a card's state.
+
+    The library has one state to show today — a run that stopped before it
+    wrote anything — but the tone is a parameter so the next one is a word
+    rather than another rule.
+    """
+    if tone not in BADGE_TONES:
+        raise ValueError(f"unknown badge tone: {tone}")
+    return f'<span class="badge is-{tone}">{text}</span>'
+
+
+@st.cache_data(show_spinner=False)
+def read_text(path, mtime):
+    """File contents, cached on the path and its modification time.
+
+    The cards offer the article as a download, and re-reading every one of
+    them on every rerun of the library is the kind of cost that only shows up
+    once somebody has a hundred articles.
+    """
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
 
 
 def meta_line(items):

@@ -6,7 +6,6 @@ import ui_theme
 from demo_util import DemoFileIOHelper
 from ui_language import t
 
-CARDS_PER_ROW = 3
 
 
 def _load_articles():
@@ -18,7 +17,28 @@ def _load_articles():
     return st.session_state["page2_user_articles_file_path_dict"]
 
 
-def _article_card(column, article_name, file_path_dict):
+def _card_menu(article_name, article_path):
+    """The quiet menu in a card's top corner.
+
+    Only what there is actually a file for: the article itself. A menu whose
+    items do nothing is worse than no menu, so a card with no finished
+    article does not get one.
+    """
+    if not (article_path and os.path.exists(article_path)):
+        return
+    with st.popover("", icon=":material/more_vert:"):
+        st.download_button(
+            t("article.download"),
+            data=ui_theme.read_text(article_path, os.path.getmtime(article_path)),
+            file_name=f"{article_name}.md",
+            mime="text/markdown",
+            icon=":material/download:",
+            key=f"card_download_{article_name}",
+            use_container_width=True,
+        )
+
+
+def _article_card(article_name, file_path_dict):
     """One card in the grid. Returns True when the user opens the article."""
     title = article_name.replace("_", " ")
     article_path = file_path_dict.get(
@@ -41,40 +61,40 @@ def _article_card(column, article_name, file_path_dict):
         # state rather than a measurement, so it is not listed beside the date
         # and the counts.
         meta = []
-        state = t("articles.incomplete")
+        state = ui_theme.badge(t("articles.incomplete"), tone="info")
         excerpt = t("articles.incomplete_body")
         ready = False
 
-    with column:
-        with st.container(border=True):
-            body = f'<div class="acard"><div class="title">{title}</div>'
-            if state:
-                body += f'<div class="state">{state}</div>'
-            if meta:
-                body += f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
-            body += f'<div class="excerpt">{excerpt}</div></div>'
-            st.markdown(body, unsafe_allow_html=True)
-            return st.button(
-                t("articles.read") if ready else t("articles.inspect"),
-                icon=":material/description:" if ready else ":material/search:",
-                key=f"open_{article_name}",
-                use_container_width=True,
-                disabled=not ready,
-            )
+    with st.container(border=True):
+        body = f'<div class="acard"><div class="title">{title}</div>'
+        if state:
+            body += f'<div class="state">{state}</div>'
+        if meta:
+            body += f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
+        body += f'<div class="excerpt">{excerpt}</div></div>'
+        st.markdown(body, unsafe_allow_html=True)
+        # Drawn after the body and lifted into the corner by CSS, so it needs
+        # no row of its own to sit in.
+        _card_menu(article_name, article_path)
+        return st.button(
+            t("articles.read") if ready else t("articles.inspect"),
+            icon=":material/description:" if ready else ":material/search:",
+            key=f"open_{article_name}",
+            use_container_width=True,
+            disabled=not ready,
+        )
 
 
 def _grid(article_names, articles):
-    # One st.columns() per row, so cards in a row share the same height.
-    for row_start in range(0, len(article_names), CARDS_PER_ROW):
-        row = article_names[row_start : row_start + CARDS_PER_ROW]
-        columns = st.columns(CARDS_PER_ROW, gap="medium")
-        for column, article_name in zip(columns, row):
-            clicked = _article_card(
-                column=column,
-                article_name=article_name,
-                file_path_dict=articles[article_name],
-            )
-            if clicked:
+    """Every card in one container, laid out by CSS.
+
+    st.columns() fixes the number of columns when the page renders, so a
+    three-up row stayed three-up on a tablet and overflowed on a phone. A
+    grid over one flat list reflows to 3, 2 or 1 on its own.
+    """
+    with st.container(key="article_grid"):
+        for article_name in article_names:
+            if _article_card(article_name, articles[article_name]):
                 st.session_state["page2_selected_my_article"] = article_name
                 st.rerun()
 

@@ -12,6 +12,7 @@ policies are what actually enforce this, and the checks here only decide what
 to draw.
 """
 
+import os
 from datetime import datetime, timezone
 
 import streamlit as st
@@ -24,19 +25,32 @@ class AuthUnavailable(RuntimeError):
     """Supabase is not configured, so there is nothing to sign in to."""
 
 
+def setting(name):
+    """A secret from secrets.toml, or failing that the environment.
+
+    A container image should not carry secrets.toml, so the same settings have
+    to be reachable as environment variables for a Docker deployment.
+    """
+    try:
+        if name in st.secrets:
+            return st.secrets[name]
+    except FileNotFoundError:
+        pass
+    return os.environ.get(name)
+
+
 @st.cache_resource(show_spinner=False)
 def _client():
     """The Supabase client, built once per process."""
     from supabase import create_client
 
-    try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_ANON_KEY"]
-    except (KeyError, FileNotFoundError) as error:
+    url = setting("SUPABASE_URL")
+    key = setting("SUPABASE_ANON_KEY")
+    if not url or not key:
         raise AuthUnavailable(
             "SUPABASE_URL and SUPABASE_ANON_KEY are missing from "
-            ".streamlit/secrets.toml"
-        ) from error
+            ".streamlit/secrets.toml and from the environment"
+        )
     return create_client(url, key)
 
 
@@ -207,3 +221,67 @@ def record_run_end(run_id, status, folder=None, error=None):
             "finished_at": datetime.now(timezone.utc).isoformat(),
         }
     ).eq("id", run_id).execute()
+
+
+# ----------------------------------------------------------------- admin
+# These read and write other people's rows. The row-level policies are what
+# actually permit or refuse that; `is_admin()` here only decides what to draw.
+def list_profiles():
+    """Every profile, newest first. Empty for a member — by policy, not by us."""
+    if not signed_in():
+        return []
+    client = _client()
+    client.postgrest.auth(session().access_token)
+    rows = (
+        client.table("profiles")
+        .select("*")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return rows.data or []
+
+
+def update_profile(profile_id, **fields):
+    """Change role, limit or active state on one profile."""
+    client = _client()
+    client.postgrest.auth(session().access_token)
+    client.table("profiles").update(fields).eq("id", profile_id).execute()
+    # The signed-in user may have just changed their own row.
+    st.session_state.pop(PROFILE_KEY, None)
+
+
+def usage_since_month_start():
+    """Runs started this month, counted per user id."""
+    if not signed_in():
+        return {}
+    client = _client()
+    client.postgrest.auth(session().access_token)
+    rows = (
+        client.table("runs")
+        .select("user_id")
+        .gte("started_at", _month_start().isoformat())
+        .execute()
+    )
+    counts = {}
+    for row in rows.data or []:
+        counts[row["user_id"]] = counts.get(row["user_id"], 0) + 1
+    return counts
+
+
+def recent_runs(limit=25):
+    if not signed_in():
+        return []
+    client = _client()
+    client.postgrest.auth(session().access_token)
+    rows = (
+        client.table("runs")
+        .select("topic,language,status,started_at,user_id")
+        .order("started_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return rows.data or []
+
+
+def admin_count(profiles):
+    return sum(1 for row in profiles if row.get("role") == "admin")

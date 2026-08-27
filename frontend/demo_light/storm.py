@@ -3,22 +3,29 @@ import os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 wiki_root_dir = os.path.dirname(os.path.dirname(script_dir))
 
+import auth
 import demo_util
 import streamlit as st
 import ui_language
 import ui_theme
-from pages_util import Account, MyArticles, CreateNewArticle
+from pages_util import Account, Admin, MyArticles, CreateNewArticle
 from ui_language import t
 
 # The page names double as `nav_page` state, so they stay these fixed English
 # ids and are translated only on the way to the screen.
 ARTICLES_PAGE = "My Articles"
 CREATE_PAGE = "Create New Article"
+ADMIN_PAGE = "Members"
 PAGE_ICONS = {
     ARTICLES_PAGE: ":material/collections_bookmark:",
     CREATE_PAGE: ":material/auto_awesome:",
+    ADMIN_PAGE: ":material/group:",
 }
-PAGE_LABELS = {ARTICLES_PAGE: "nav.articles", CREATE_PAGE: "nav.home"}
+PAGE_LABELS = {
+    ARTICLES_PAGE: "nav.articles",
+    CREATE_PAGE: "nav.home",
+    ADMIN_PAGE: "nav.admin",
+}
 
 
 def main():
@@ -66,10 +73,18 @@ def main():
     # All navigation lives in the sidebar. The article page needs a sidebar
     # regardless — it is where the contents and references go — so a second
     # bar across the top would only duplicate a surface that has to exist.
+    # The roster is only listed for an admin. A member who reaches the page
+    # another way still gets refused — by the page, and by the policies.
+    pages = [CREATE_PAGE, ARTICLES_PAGE]
+    if auth.is_admin():
+        pages.append(ADMIN_PAGE)
+    if st.session_state["nav_page"] not in pages:
+        st.session_state["nav_page"] = CREATE_PAGE
+
     with st.sidebar:
         st.segmented_control(
             t("nav.label"),
-            [CREATE_PAGE, ARTICLES_PAGE],
+            pages,
             format_func=lambda page: f"{PAGE_ICONS[page]} {t(PAGE_LABELS[page])}",
             key="nav_page",
             label_visibility="collapsed",
@@ -85,7 +100,10 @@ def main():
         trail.append(st.session_state["page2_selected_my_article"].replace("_", " "))
     ui_theme.top_bar(trail)
 
-    if selection == ARTICLES_PAGE:
+    if selection == ADMIN_PAGE:
+        demo_util.clear_other_page_session_state(page_index=4)
+        Admin.admin_page()
+    elif selection == ARTICLES_PAGE:
         demo_util.clear_other_page_session_state(page_index=2)
         MyArticles.my_articles_page()
     else:

@@ -552,7 +552,7 @@ def set_storm_runner():
     # configure STORM runner with Google Gemini + DuckDuckGo
     llm_configs = STORMWikiLMConfigs()
     gemini_kwargs = {
-        "api_key": st.secrets["GOOGLE_API_KEY"],
+        "api_key": auth.setting("GOOGLE_API_KEY"),
         "temperature": 1.0,
         "top_p": 0.9,
         # Ride out the occasional 429 rather than failing the whole run.

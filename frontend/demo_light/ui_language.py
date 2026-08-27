@@ -160,6 +160,42 @@ _STRINGS = {
         "ไทย": "บัญชีนี้ยังไม่มีข้อมูลโปรไฟล์ กรุณารันสคีมาใน "
         "docs/supabase-schema.sql",
     },
+    # -- admin ------------------------------------------------------------
+    "nav.admin": {"English": "Members", "ไทย": "สมาชิก"},
+    "admin.title": {"English": "Members", "ไทย": "จัดการสมาชิก"},
+    "admin.count": {"English": "{n} accounts", "ไทย": "{n} บัญชี"},
+    "admin.col_name": {"English": "Name", "ไทย": "ชื่อ"},
+    "admin.col_email": {"English": "Email", "ไทย": "อีเมล"},
+    "admin.col_role": {"English": "Role", "ไทย": "สิทธิ์"},
+    "admin.col_limit": {"English": "Runs / month", "ไทย": "โควตา/เดือน"},
+    "admin.col_used": {"English": "Used", "ไทย": "ใช้ไป"},
+    "admin.col_active": {"English": "Active", "ไทย": "ใช้งานอยู่"},
+    "admin.col_joined": {"English": "Joined", "ไทย": "สมัครเมื่อ"},
+    "admin.help_limit": {
+        "English": "Research runs allowed each calendar month. 0 stops new runs "
+        "without closing the account.",
+        "ไทย": "จำนวนครั้งที่ค้นคว้าได้ต่อเดือน ตั้ง 0 เพื่อหยุดการรันใหม่ "
+        "โดยไม่ต้องปิดบัญชี",
+    },
+    "admin.save": {"English": "Save changes", "ไทย": "บันทึกการแก้ไข"},
+    "admin.saved": {"English": "Saved {n} change(s).", "ไทย": "บันทึกแล้ว {n} รายการ"},
+    "admin.no_changes": {"English": "Nothing to save.", "ไทย": "ไม่มีการแก้ไข"},
+    "admin.last_admin": {
+        "English": "You are the only admin — keep at least one, or nobody can "
+        "manage members.",
+        "ไทย": "คุณเป็นผู้ดูแลคนเดียว ต้องเหลือผู้ดูแลอย่างน้อยหนึ่งคน "
+        "ไม่งั้นจะไม่มีใครจัดการสมาชิกได้",
+    },
+    "admin.runs_label": {"English": "Recent runs", "ไทย": "การค้นคว้าล่าสุด"},
+    "admin.runs_empty": {"English": "No runs yet.", "ไทย": "ยังไม่มีการค้นคว้า"},
+    "admin.col_topic": {"English": "Topic", "ไทย": "หัวข้อ"},
+    "admin.col_status": {"English": "Status", "ไทย": "สถานะ"},
+    "admin.col_when": {"English": "Started", "ไทย": "เริ่มเมื่อ"},
+    "admin.col_who": {"English": "By", "ไทย": "โดย"},
+    "admin.denied": {
+        "English": "Members only. Ask an admin if you need access.",
+        "ไทย": "เฉพาะผู้ดูแลเท่านั้น หากต้องการสิทธิ์กรุณาติดต่อผู้ดูแล",
+    },
     # -- landing / home --------------------------------------------------
     "nav.home": {"English": "Home", "ไทย": "หน้าแรก"},
     "home.hero_note": {

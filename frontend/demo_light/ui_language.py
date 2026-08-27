@@ -87,6 +87,22 @@ _STRINGS = {
         "English": "Step 2 of 2 · article ready",
         "ไทย": "ขั้นที่ 2 จาก 2 · บทความพร้อมแล้ว",
     },
+    "create.failed_label": {
+        "English": "Run stopped",
+        "ไทย": "การค้นคว้าหยุดกลางคัน",
+    },
+    "create.failed_quota": {
+        "English": "The model provider turned the request away — usually a rate "
+        "limit or an empty balance. Check the API key's quota, then try again.",
+        "ไทย": "ผู้ให้บริการโมเดลปฏิเสธคำขอ ส่วนใหญ่เกิดจากโควตาเต็มหรือเครดิตหมด "
+        "ตรวจสอบโควตาของ API key แล้วลองใหม่",
+    },
+    "create.failed_generic": {
+        "English": "Something went wrong partway through. Nothing was saved.",
+        "ไทย": "เกิดข้อผิดพลาดระหว่างทาง ยังไม่มีอะไรถูกบันทึก",
+    },
+    "create.failed_detail": {"English": "Technical detail", "ไทย": "รายละเอียดทางเทคนิค"},
+    "create.retry": {"English": "Start over", "ไทย": "เริ่มใหม่"},
     "create.read_article": {"English": "Read the article", "ไทย": "อ่านบทความ"},
     # -- landing / home --------------------------------------------------
     "nav.home": {"English": "Home", "ไทย": "หน้าแรก"},

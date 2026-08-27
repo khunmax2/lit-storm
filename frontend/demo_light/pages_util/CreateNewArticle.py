@@ -213,6 +213,27 @@ def _running_header():
     )
 
 
+def _report_failure(status, error):
+    """Show a failed run as a message rather than a traceback.
+
+    Streamlit's default is to render the exception and its stack into the
+    page, which tells a researcher nothing and looks like the app broke.
+    """
+    status.update(label=t("create.failed_label"), state="error")
+    quota = ("ratelimit", "rate limit", "quota", "credits", "429")
+    text = str(error).lower()
+    st.error(
+        t("create.failed_quota")
+        if any(hint in text for hint in quota)
+        else t("create.failed_generic")
+    )
+    with st.expander(t("create.failed_detail")):
+        st.code(f"{type(error).__name__}: {error}", language=None)
+    st.session_state["page3_write_article_state"] = "not started"
+    if st.button(t("create.retry"), type="primary"):
+        st.rerun()
+
+
 def handle_pre_writing():
     if st.session_state["page3_write_article_state"] != "pre_writing":
         return
@@ -220,15 +241,25 @@ def handle_pre_writing():
     _running_header()
     status = st.status(t("create.step1"), expanded=True)
     st_callback_handler = demo_util.StreamlitCallbackHandler(status)
+    failure = None
     with status:
-        st.session_state["runner"].run(
-            topic=st.session_state["page3_topic"],
-            do_research=True,
-            do_generate_outline=True,
-            do_generate_article=False,
-            do_polish_article=False,
-            callback_handler=st_callback_handler,
-        )
+        try:
+            st.session_state["runner"].run(
+                topic=st.session_state["page3_topic"],
+                do_research=True,
+                do_generate_outline=True,
+                do_generate_article=False,
+                do_polish_article=False,
+                callback_handler=st_callback_handler,
+            )
+        except Exception as error:  # noqa: BLE001 - any failure ends the run
+            failure = error
+    # Reported outside the status: an errored status collapses, and the
+    # explanation has to stay on screen.
+    if failure is not None:
+        _report_failure(status, failure)
+        return
+    with status:
         conversation_log_path = os.path.join(
             st.session_state["page3_current_working_dir"],
             st.session_state["page3_topic_name_truncated"],
@@ -247,18 +278,25 @@ def handle_final_writing():
 
     with st.status(t("create.step2"), expanded=True) as status:
         st.write(t("create.step2_writing"))
-        st.session_state["runner"].run(
-            topic=st.session_state["page3_topic"],
-            do_research=False,
-            do_generate_outline=False,
-            do_generate_article=True,
-            do_polish_article=True,
-            remove_duplicate=False,
-        )
-        st.session_state["runner"].post_run()
+        try:
+            st.session_state["runner"].run(
+                topic=st.session_state["page3_topic"],
+                do_research=False,
+                do_generate_outline=False,
+                do_generate_article=True,
+                do_polish_article=True,
+                remove_duplicate=False,
+            )
+            st.session_state["runner"].post_run()
+        except Exception as error:  # noqa: BLE001 - any failure ends the run
+            failure = error
+        else:
+            failure = None
+            st.session_state["page3_write_article_state"] = "prepare_to_show_result"
+            status.update(label=t("create.step2_done"), state="complete")
 
-        st.session_state["page3_write_article_state"] = "prepare_to_show_result"
-        status.update(label=t("create.step2_done"), state="complete")
+    if failure is not None:
+        _report_failure(status, failure)
 
 
 def handle_prepare_to_show_result():

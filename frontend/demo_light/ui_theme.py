@@ -96,8 +96,11 @@ h1, h2, h3, .hero h1, .page-head h1, .article-head h1, .lp-step .t {{
     font-family: {DISPLAY_STACK};
 }}
 
-/* ...but never on the icon spans, whose glyphs are font ligatures. */
-[data-testid="stIconMaterial"],
+/* ...but never on the icon spans, whose glyphs are font ligatures. Streamlit
+   names these several ways — stIconMaterial, stExpanderIconError and so on —
+   so match the family rather than each one, or a status that turns red shows
+   the word "error" where the symbol belongs. */
+[data-testid*="Icon"],
 span[class*="material-symbols"],
 span[class*="material-icons"] {{
     font-family: "Material Symbols Rounded" !important;
@@ -295,7 +298,9 @@ span[class*="material-icons"] {{
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    min-height: 3.9em;
+    /* Three lines at the line-height above. 3.9em only reserved two, so a
+       card with a short excerpt sat 10px shorter than its neighbours. */
+    min-height: 4.65em;
 }}
 
 /* ---------- empty state ---------- */

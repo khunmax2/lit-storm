@@ -79,12 +79,9 @@ def my_articles_page():
     articles = _load_articles()
 
     # ---- reading a single article -------------------------------------
+    # The way back to the library is drawn by the shell, with the rest of the
+    # navigation — see storm.py.
     if "page2_selected_my_article" in st.session_state:
-        with st.sidebar:
-            if st.button(t("articles.back"), use_container_width=True):
-                del st.session_state["page2_selected_my_article"]
-                st.rerun()
-
         selected = st.session_state["page2_selected_my_article"]
         demo_util.display_article_page(
             selected_article_name=selected,

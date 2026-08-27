@@ -651,6 +651,30 @@ span[class*="material-icons"] {{
     font-weight: 650 !important;
 }}
 
+/* The way out of an article sits under the destinations but is not one of
+   them: same row shape so the rail stays a single list, quieter weight and
+   a gap above so it reads as a step back rather than a fourth place to go. */
+.st-key-nav_back {{
+    margin: -1.1rem 0 1.5rem 0;
+}}
+.st-key-nav_back button {{
+    border: none !important;
+    background: transparent !important;
+    color: var(--rail-muted) !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    padding: 0.62rem 0.8rem !important;
+    border-left: 3px solid transparent !important;
+}}
+.st-key-nav_back button > div {{
+    justify-content: flex-start !important;
+    width: 100%;
+}}
+.st-key-nav_back button:hover {{
+    background: var(--rail-hover) !important;
+    color: var(--rail-ink) !important;
+}}
+
 /* ---------- top bar ---------- */
 /* Streamlit's header is the only band that already spans the main area and
    follows the rail when it collapses, so the bar is that band: the header

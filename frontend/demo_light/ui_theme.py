@@ -29,6 +29,20 @@ LIGHT = {
     "nav-hover": "#ECEFF4",
     "shadow": "rgba(20, 22, 26, 0.18)",
     "shadow-soft": "rgba(20, 22, 26, 0.25)",
+    # The rail has its own ramp. It is a surface in its own right rather than
+    # a slice of the page, so its greys are cooler and its steps are its own;
+    # reusing the page tokens made it disappear into the content.
+    "rail-bg": "#F5F7FA",
+    "rail-line": "#DFE4EC",
+    "rail-line-soft": "#E3E7EF",
+    "rail-ink": "#14161A",
+    "rail-text": "#3C4353",
+    "rail-muted": "#69707D",
+    "rail-nav": "#4B5364",
+    "rail-hover": "#EAEEF5",
+    "rail-active": "#E1E8F4",
+    "rail-active-ink": "#14161A",
+    "rail-border": "#D3D9E4",
 }
 
 DARK = {
@@ -46,6 +60,20 @@ DARK = {
     "nav-hover": "#1E232C",
     "shadow": "rgba(0, 0, 0, 0.55)",
     "shadow-soft": "rgba(0, 0, 0, 0.6)",
+    # Dark navy rather than the page's near-black: the rail reads as the
+    # product's frame either way, and in this theme that means darker and
+    # bluer than the article beside it.
+    "rail-bg": "#131A2B",
+    "rail-line": "#1F2940",
+    "rail-line-soft": "#263048",
+    "rail-ink": "#F2F5FA",
+    "rail-text": "#C6CEDD",
+    "rail-muted": "#8C97AE",
+    "rail-nav": "#A7B1C6",
+    "rail-hover": "#1C2438",
+    "rail-active": "#1F2A44",
+    "rail-active-ink": "#FFFFFF",
+    "rail-border": "#2C3550",
 }
 
 # Trirong (serif) and IBM Plex Sans Thai both ship Thai *and* Latin glyphs.
@@ -90,7 +118,7 @@ _CSS = f"""
     /* Layout constants the top bar is aligned against. Streamlit sets the
        rail's width inline, so it is pinned below to the same number rather
        than trusted to stay there. */
-    --rail: 300px;
+    --rail-width: 300px;
     --content-max: 1180px;
     /* Where the content column starts, measured from the rail: the block's
        own 5rem of padding, plus half of whatever slack is left once the
@@ -98,12 +126,12 @@ _CSS = f"""
        breadcrumb over the title below it. */
     --gutter: max(
         5rem,
-        calc((100vw - var(--rail) - var(--content-max)) / 2 + 5rem)
+        calc((100vw - var(--rail-width) - var(--content-max)) / 2 + 5rem)
     );
 }}
 /* Collapsed rail: the same sums with no rail in them. */
 .stApp:has([data-testid="stSidebar"][aria-expanded="false"]) {{
-    --rail: 0px;
+    --rail-width: 0px;
 }}
 
 html, body, [class*="st-"], button, input, textarea {{
@@ -420,7 +448,7 @@ span[class*="material-icons"] {{
 }}
 .st-key-side_account {{
     padding-top: 0.7rem;
-    border-top: 1px solid #263048;
+    border-top: 1px solid var(--rail-line-soft);
 }}
 .side-label {{
     font-size: 0.7rem;
@@ -605,15 +633,15 @@ span[class*="material-icons"] {{
 }}
 @media (min-width: 769px) {{
     [data-testid="stSidebar"] {{
-        width: var(--rail) !important;
-        min-width: var(--rail) !important;
-        max-width: var(--rail) !important;
+        width: var(--rail-width) !important;
+        min-width: var(--rail-width) !important;
+        max-width: var(--rail-width) !important;
     }}
 }}
 .topbar {{
     position: fixed;
     top: 0;
-    left: calc(var(--rail) + var(--gutter));
+    left: calc(var(--rail-width) + var(--gutter));
     right: 1rem;
     /* The header's own height. Taller and the bar draws past its edge. */
     height: 60px;
@@ -715,48 +743,52 @@ span[class*="material-icons"] {{
 }}
 
 /* ---------- sidebar as a brand rail ---------- */
-/* Fixed dark in both themes: it reads as the product's frame rather than
-   part of the page, which is what keeps the eye on the article. */
+/* A surface of its own, on its own ramp, in whichever theme is running: the
+   rail should read as the product's frame rather than as part of the page,
+   and it was pinned dark to get that. Pinned, it stayed black behind a light
+   page. The `--rail-*` tokens say the same thing in both themes instead. */
 [data-testid="stSidebar"] {{
-    background: #131A2B !important;
-    border-right: 1px solid #1F2940 !important;
+    background: var(--rail-bg) !important;
+    border-right: 1px solid var(--rail-line) !important;
 }}
-[data-testid="stSidebar"] .side-brand {{ border-bottom-color: #263048; }}
-[data-testid="stSidebar"] .side-brand .name {{ color: #F2F5FA; }}
-[data-testid="stSidebar"] .side-brand .tag {{ color: #8C97AE; }}
-[data-testid="stSidebar"] .side-label {{ color: #8C97AE; }}
+[data-testid="stSidebar"] .side-brand {{
+    border-bottom-color: var(--rail-line-soft);
+}}
+[data-testid="stSidebar"] .side-brand .name {{ color: var(--rail-ink); }}
+[data-testid="stSidebar"] .side-brand .tag {{ color: var(--rail-muted); }}
+[data-testid="stSidebar"] .side-label {{ color: var(--rail-muted); }}
 .st-key-nav_page button[data-variant="segmented_control"] {{
-    color: #A7B1C6 !important;
+    color: var(--rail-nav) !important;
 }}
 .st-key-nav_page button[data-variant="segmented_control"]:hover {{
-    background: #1C2438 !important;
-    color: #F2F5FA !important;
+    background: var(--rail-hover) !important;
+    color: var(--rail-ink) !important;
 }}
 .st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
-    background: #1F2A44 !important;
-    color: #FFFFFF !important;
+    background: var(--rail-active) !important;
+    color: var(--rail-active-ink) !important;
     border-left-color: var(--brand) !important;
 }}
 /* Everything the article page puts in the rail has to be legible on it. */
 [data-testid="stSidebar"] [data-testid="stExpander"] details {{
     background: transparent;
-    border-color: #263048;
+    border-color: var(--rail-line-soft);
 }}
 [data-testid="stSidebar"] summary,
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] .stMarkdown {{
-    color: #C6CEDD;
+    color: var(--rail-text);
 }}
-[data-testid="stSidebar"] a.toc {{ color: #A7B1C6 !important; }}
-[data-testid="stSidebar"] a.toc:hover {{ color: #FFFFFF !important; }}
+[data-testid="stSidebar"] a.toc {{ color: var(--rail-nav) !important; }}
+[data-testid="stSidebar"] a.toc:hover {{ color: var(--rail-ink) !important; }}
 [data-testid="stSidebar"] .stButton > button {{
     background: transparent !important;
-    border-color: #2C3550 !important;
-    color: #C6CEDD !important;
+    border-color: var(--rail-border) !important;
+    color: var(--rail-text) !important;
 }}
 .st-key-side_account .stButton > button {{
     border: none !important;
-    color: #8C97AE !important;
+    color: var(--rail-muted) !important;
     justify-content: flex-start !important;
     padding-left: 0.8rem !important;
 }}
@@ -765,8 +797,8 @@ span[class*="material-icons"] {{
     width: 100%;
 }}
 .st-key-side_account .stButton > button:hover {{
-    color: #F2F5FA !important;
-    background: #1C2438 !important;
+    color: var(--rail-ink) !important;
+    background: var(--rail-hover) !important;
 }}
 
 /* ---------- who is signed in ---------- */
@@ -776,14 +808,14 @@ span[class*="material-icons"] {{
 .side-account .who {{
     font-size: 0.9rem;
     font-weight: 600;
-    color: #F2F5FA;
+    color: var(--rail-ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }}
 .side-account .meta {{
     font-size: 0.74rem;
-    color: #8C97AE;
+    color: var(--rail-muted);
     margin-top: 0.15rem;
 }}
 .side-account .sep {{ opacity: 0.5; }}

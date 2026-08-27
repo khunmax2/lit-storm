@@ -133,8 +133,40 @@ def profile():
         client.table("profiles").select("*").eq("id", user_id()).limit(1).execute()
     )
     found = rows.data[0] if rows.data else None
+
+    if found is None:
+        # First sign-in. The row is written here rather than by a trigger on
+        # auth.users, which Supabase does not let a project own.
+        found = _create_profile(client)
+
     st.session_state[PROFILE_KEY] = found
     return found
+
+
+def _create_profile(client):
+    """Write this account's profile row. Role and quota keep their defaults —
+    the insert policy allows only your own id, and the column grants mean the
+    values that matter cannot be chosen here anyway."""
+    current = session().user
+    meta = current.user_metadata or {}
+    try:
+        rows = (
+            client.table("profiles")
+            .insert(
+                {
+                    "id": current.id,
+                    "email": current.email,
+                    "display_name": meta.get("display_name")
+                    or (current.email or "").split("@")[0],
+                }
+            )
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 - a racing sign-in may have won
+        rows = (
+            client.table("profiles").select("*").eq("id", current.id).limit(1).execute()
+        )
+    return rows.data[0] if rows.data else None
 
 
 def is_admin():
@@ -242,10 +274,24 @@ def list_profiles():
 
 
 def update_profile(profile_id, **fields):
-    """Change role, limit or active state on one profile."""
+    """Change role, limit or active state on one profile.
+
+    Through a SECURITY DEFINER function, not a table write: `authenticated`
+    deliberately has no grant on those three columns, so that a member cannot
+    promote themselves through the same policy that lets them rename
+    themselves. The admin check lives inside the function.
+    """
     client = _client()
     client.postgrest.auth(session().access_token)
-    client.table("profiles").update(fields).eq("id", profile_id).execute()
+    client.rpc(
+        "admin_set_profile",
+        {
+            "target": profile_id,
+            "new_role": fields.get("role"),
+            "new_limit": fields.get("monthly_run_limit"),
+            "new_active": fields.get("is_active"),
+        },
+    ).execute()
     # The signed-in user may have just changed their own row.
     st.session_state.pop(PROFILE_KEY, None)
 

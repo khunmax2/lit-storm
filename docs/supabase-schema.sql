@@ -1,13 +1,14 @@
 -- STORM — accounts, roles and run accounting.
--- Paste this into the Supabase SQL editor once, on a fresh project.
+-- Paste the whole file into the Supabase SQL editor and run it once. It is
+-- safe to run again.
 --
 -- Two roles, because the app does two kinds of thing:
 --   member — signs up, creates reports, sees their own
---   admin  — all of that, plus sees everyone and manages the roster
+--   admin  — all of that, plus everyone's runs and the roster
 --
 -- Cost control is deliberately NOT a role. Every member can create reports,
 -- which is the point of the product; what keeps one shared API key from being
--- drained is a per-person monthly limit that an admin can raise or lower.
+-- drained is a per-person monthly limit an admin can raise or lower.
 
 -- ---------------------------------------------------------------- profiles
 create table if not exists public.profiles (
@@ -25,28 +26,10 @@ comment on column public.profiles.monthly_run_limit is
     'Research runs allowed per calendar month. 0 blocks new runs without '
     'removing the account; raise it for people who need more.';
 
--- A profile row for every new sign-up, so the app never meets a user it has
--- no record of.
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = ''
-as $$
-begin
-    insert into public.profiles (id, email, display_name)
-    values (
-        new.id,
-        new.email,
-        coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
-    );
-    return new;
-end;
-$$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-    after insert on auth.users
-    for each row execute function public.handle_new_user();
+-- Deliberately no trigger on auth.users. Supabase does not grant ownership of
+-- that table, so `create trigger ... on auth.users` fails — and because the
+-- editor runs the file as one transaction, that failure would roll back every
+-- table above it. The app writes the profile row on first sign-in instead.
 
 -- -------------------------------------------------------------------- runs
 -- One row per research run: what was asked, how it ended, and what it cost in
@@ -91,14 +74,23 @@ drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile" on public.profiles
     for select using (auth.uid() = id or public.is_admin());
 
-drop policy if exists "update own name" on public.profiles;
-create policy "update own name" on public.profiles
+-- The app creates this row the first time someone signs in. Only ever your
+-- own, and the columns that matter are locked down by the grants below.
+drop policy if exists "create own profile" on public.profiles;
+create policy "create own profile" on public.profiles
+    for insert with check (auth.uid() = id);
+
+drop policy if exists "update own profile" on public.profiles;
+create policy "update own profile" on public.profiles
     for update using (auth.uid() = id) with check (auth.uid() = id);
 
--- Only an admin changes roles, limits or active state.
-drop policy if exists "admin manages profiles" on public.profiles;
-create policy "admin manages profiles" on public.profiles
-    for update using (public.is_admin()) with check (public.is_admin());
+-- A row policy cannot restrict *which columns* an update touches, so without
+-- this a member could set their own role to 'admin', or hand themselves an
+-- unlimited quota, through the same policy that lets them rename themselves.
+-- Column grants are what actually prevent that. Role, limit and active state
+-- change only through admin_set_profile() below.
+revoke update on public.profiles from authenticated;
+grant update (display_name) on public.profiles to authenticated;
 
 drop policy if exists "read own runs" on public.runs;
 create policy "read own runs" on public.runs
@@ -111,6 +103,40 @@ create policy "record own runs" on public.runs
 drop policy if exists "close own runs" on public.runs;
 create policy "close own runs" on public.runs
     for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ------------------------------------------------------- admin edits
+-- The one way role, quota and active state change. SECURITY DEFINER so it can
+-- write columns the caller has no grant on, with the admin check inside rather
+-- than trusting whoever called it.
+create or replace function public.admin_set_profile(
+    target      uuid,
+    new_role    text default null,
+    new_limit   integer default null,
+    new_active  boolean default null
+)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+    if not public.is_admin() then
+        raise exception 'not authorised';
+    end if;
+    if new_role is not null and new_role not in ('member', 'admin') then
+        raise exception 'unknown role %', new_role;
+    end if;
+
+    update public.profiles
+    set role              = coalesce(new_role, role),
+        monthly_run_limit = coalesce(new_limit, monthly_run_limit),
+        is_active         = coalesce(new_active, is_active)
+    where id = target;
+end;
+$$;
+
+revoke all on function public.admin_set_profile(uuid, text, integer, boolean) from public;
+grant execute on function public.admin_set_profile(uuid, text, integer, boolean)
+    to authenticated;
 
 -- ------------------------------------------------------------- first admin
 -- Sign up through the app first, then run this once with your own address.

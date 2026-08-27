@@ -640,6 +640,29 @@ span[class*="material-icons"] {{
     min-width: 0;
 }}
 
+/* ---------- dev-mode strip ---------- */
+/* Deliberately ugly. It marks a build whose sign-in is switched off, and it
+   should never be mistaken for part of the product. */
+.dev-strip {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.6rem 0 0 0;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid #B45309;
+    border-left: 4px solid #B45309;
+    border-radius: 6px;
+    background: light-dark(#FEF3C7, #3B2A08);
+    color: light-dark(#7C2D12, #FCD34D);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}}
+.dev-strip .who {{
+    font-weight: 500;
+    opacity: 0.85;
+}}
+
 /* ---------- sidebar as a brand rail ---------- */
 /* Fixed dark in both themes: it reads as the product's frame rather than
    part of the page, which is what keeps the eye on the article. */
@@ -836,6 +859,16 @@ def top_bar(trail, name="", role=""):
     st.markdown(
         f'<div class="topbar"><div class="crumbs">{"".join(crumbs)}</div>'
         f"{identity}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def dev_banner(who=""):
+    """Say, on every page, that this build is not asking anyone to sign in."""
+    detail = f'<span class="who">signed in as {who}</span>' if who else ""
+    st.markdown(
+        f'<div class="dev-strip"><span>DEV MODE — sign-in bypassed</span>'
+        f"{detail}</div>",
         unsafe_allow_html=True,
     )
 

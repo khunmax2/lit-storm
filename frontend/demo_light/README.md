@@ -111,6 +111,40 @@ system PATH, which is usually nothing at all.
 Articles are written to `frontend/demo_light/DEMO_WORKING_DIR/`, which is
 gitignored.
 
+### Working on the interface without signing in every time
+
+Streamlit keeps the session in memory, so saving a file restarts the script and
+puts you back at the sign-in screen. While building a page that lives behind
+that screen, run with the bypass on:
+
+```bash
+STORM_DEV_USER=1 ../../.venv/bin/streamlit run storm.py
+```
+
+A stand-in account is signed in — admin by default, so the roster is reachable;
+`STORM_DEV_ROLE=member` to see the app as everyone else sees it. An
+undismissable strip across the top says the build is not asking anyone to sign
+in, and **Sign out** stands the bypass down so the real sign-in screen can be
+looked at too (reload to get back in).
+
+Three things fence it off, because an auth bypass that reaches a deployment is
+the whole system gone:
+
+- it is off unless the variable is set, and the variable belongs in the
+  environment or in `secrets.toml`, neither of which is committed;
+- it is refused unless the browser asked for the page over loopback, so it does
+  nothing on the network URL, behind a proxy, or in a container people can
+  reach;
+- it never touches Supabase. The profile, the roster and the run ledger are all
+  fabricated in memory, so a stray flag can neither read nor write real rows —
+  which also means the roster you see is made up, and saving it saves nothing.
+
+The stand-in account gets its own folder under `DEMO_WORKING_DIR/`, like any
+other account, so the library starts empty. Copy an article folder into it if
+you need cards on the page.
+
+Runs are real: the bypass skips sign-in, not the API bill.
+
 ## Models and quota
 
 The app uses Gemini through litellm, configured in `set_storm_runner()` in

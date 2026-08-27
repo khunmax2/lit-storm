@@ -41,6 +41,11 @@ def main():
     ui_language.selector()
     ui_theme.sidebar_brand()
 
+    # Drawn before the gate, so it is on the screen whether or not the bypass
+    # let anybody through.
+    if auth.dev_enabled():
+        ui_theme.dev_banner(auth.display_name())
+
     # Nothing else is drawn until there is an account behind the request:
     # every run spends the deployment's API credit, and every article belongs
     # to somebody.

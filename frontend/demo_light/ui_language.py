@@ -25,6 +25,13 @@ _STRINGS = {
     "nav.label": {"English": "Navigation", "ไทย": "เมนู"},
     "nav.articles": {"English": "My Articles", "ไทย": "บทความของฉัน"},
     "nav.create": {"English": "Create New Article", "ไทย": "สร้างบทความใหม่"},
+    # A short label under the wordmark, as in the reference. The sentence it
+    # replaced described the product; at rail width it wrapped to two lines
+    # and read as a paragraph someone forgot to move.
+    "brand.role": {
+        "English": "Research Assistant",
+        "ไทย": "ผู้ช่วยงานวิจัย",
+    },
     "brand.tagline": {
         "English": "Researches a topic from many perspectives, then writes a cited article.",
         "ไทย": "ค้นคว้าหัวข้อจากหลายมุมมอง แล้วเรียบเรียงเป็นบทความพร้อมแหล่งอ้างอิง",

@@ -112,16 +112,21 @@ def sidebar_account():
                 t("auth.role_admin") if auth.is_admin() else t("auth.role_member")
             )
             used, limit = auth.quota()
+            name = auth.display_name()
             st.markdown(
                 f'<div class="side-account">'
-                f'<div class="who">{auth.display_name()}</div>'
-                f'<div class="meta">{role_label}'
+                f'<span class="avatar">{name.strip()[:1].upper()}</span>'
+                f'<span class="who"><span class="name">{name}</span>'
+                f'<span class="meta">{role_label}'
                 f'<span class="sep"> · </span>'
-                f'{t("auth.quota", used=used, limit=limit)}</div></div>',
+                f'{t("auth.quota", used=used, limit=limit)}</span></span></div>',
                 unsafe_allow_html=True,
             )
         if st.button(
-            t("auth.signout"), type="tertiary", use_container_width=True
+            t("auth.signout"),
+            icon=":material/logout:",
+            type="tertiary",
+            use_container_width=True,
         ):
             auth.sign_out()
             st.rerun()

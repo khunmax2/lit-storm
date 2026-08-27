@@ -35,6 +35,7 @@ LIGHT = {
     # The rail. Same values in both themes: it is the product's frame, and
     # the reference draws it dark against a light page.
     "rail-bg": "#0D1A2D",
+    "rail-bg-foot": "#102341",
     "rail-line": "#1B2C45",
     "rail-line-soft": "#1B2C45",
     "rail-ink": "#F1F5F9",
@@ -66,6 +67,7 @@ DARK = {
     "shadow": "rgba(0, 0, 0, 0.55)",
     "shadow-soft": "rgba(0, 0, 0, 0.6)",
     "rail-bg": "#0D1A2D",
+    "rail-bg-foot": "#102341",
     "rail-line": "#1B2C45",
     "rail-line-soft": "#1B2C45",
     "rail-ink": "#F1F5F9",
@@ -513,13 +515,11 @@ span[class*="material-icons"] {{
 [data-testid="stLayoutWrapper"]:has(> .st-key-side_account) {{
     margin-top: auto !important;
 }}
-/* The reference sets the account apart in a panel rather than under a rule,
-   which also keeps it from reading as one more row of the menu. */
+/* The container is only the anchor that holds the foot of the rail; the
+   panel is drawn around the identity inside it, so that Sign out can sit
+   below the panel and line up with the menu, as it does in the reference. */
 .st-key-side_account {{
-    padding: 0.85rem 0.9rem 0.5rem 0.9rem;
-    background: var(--rail-hover);
-    border: 1px solid var(--rail-border);
-    border-radius: 12px;
+    padding: 0;
 }}
 .side-label {{
     font-size: 0.7rem;
@@ -586,26 +586,41 @@ span[class*="material-icons"] {{
 }}
 
 /* ---------- sidebar brand block ---------- */
+/* Mark and wordmark on one line, the role beneath the name — the reference
+   sets them as a lockup rather than as a heading with a sentence under it. */
 .side-brand {{
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid var(--line);
-}}
-.side-brand .name {{
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 1.05rem;
-    letter-spacing: 0.01em;
+    gap: 0.7rem;
+    padding: 0.1rem 0 1.1rem 0;
+    margin-bottom: 1.1rem;
+    border-bottom: 1px solid var(--rail-line-soft);
+}}
+.side-brand .mark {{
+    font-size: 2.6rem !important;
+    line-height: 1;
+    color: var(--rail-ink);
+    flex-shrink: 0;
+}}
+.side-brand .words {{
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+}}
+.side-brand .name {{
+    font-size: 1.12rem;
     font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--ink);
+    letter-spacing: -0.01em;
+    color: var(--rail-ink);
 }}
 .side-brand .tag {{
-    font-size: 0.78rem;
-    color: var(--muted);
-    line-height: 1.5;
-    margin-top: 0.25rem;
+    font-size: 0.76rem;
+    color: var(--rail-muted);
+    margin-top: 0.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }}
 
 /* ---------- reference panel ---------- */
@@ -644,6 +659,12 @@ span[class*="material-icons"] {{
     width: 100% !important;
     margin: 0.2rem 0 1.5rem 0;
 }}
+/* The icon carries as much of the row as the word does, so it is set at
+   reading size rather than at the caption size Streamlit gives it. */
+.st-key-nav_page button[data-variant="segmented_control"] [data-testid*="Icon"] {{
+    font-size: 1.35rem !important;
+    width: 1.35rem;
+}}
 /* A flex parent stretches the wrapper; setting a width on the wrapper
    directly loses to a Streamlit rule that sizes it to its content. */
 .st-key-nav_page [data-testid="stButtonGroup"] {{
@@ -658,7 +679,7 @@ span[class*="material-icons"] {{
     max-width: none;
     flex: 1 1 auto;
     align-items: stretch;
-    gap: 0.15rem;
+    gap: 0.65rem;
     background: transparent;
     border: none;
     padding: 0;
@@ -669,14 +690,19 @@ span[class*="material-icons"] {{
     color: var(--muted) !important;
     font-weight: 550 !important;
     border-radius: 10px !important;
+    font-size: 0.95rem !important;
+    /* Streamlit sets a height on these, so padding alone left the rows two
+       thirds of the height the reference gives them. */
+    height: auto !important;
+    min-height: 3rem !important;
     /* Taller rows with a wider gutter: a rail of destinations reads as a
        list, not as a row of buttons that happen to be stacked. */
-    padding: 0.66rem 0.85rem !important;
+    padding: 0.72rem 1.05rem !important;
     width: 100% !important;
     justify-content: flex-start !important;
 }}
 .st-key-nav_page button[data-variant="segmented_control"] > div {{
-    gap: 0.65rem !important;
+    gap: 0.9rem !important;
 }}
 /* The button's own content wrapper centres its children, so left-aligning
    the button alone leaves the label in the middle of the row. */
@@ -856,6 +882,11 @@ span[class*="material-icons"] {{
         max-width: calc(100vw - 10.5rem) !important;
     }}
     .topbar {{ display: none !important; }}
+    /* The trail is laid over Streamlit's header, which puts it above the
+       rail as well; here the rail is an overlay and should cover it. */
+    .stApp:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-crumbs {{
+        display: none !important;
+    }}
 }}
 
 /* ---------- dev-mode strip ---------- */
@@ -887,7 +918,11 @@ span[class*="material-icons"] {{
    and it was pinned dark to get that. Pinned, it stayed black behind a light
    page. The `--rail-*` tokens say the same thing in both themes instead. */
 [data-testid="stSidebar"] {{
-    background: var(--rail-bg) !important;
+    /* Not flat: the reference lifts very slightly towards the foot, which
+       keeps a tall rail from reading as a cut-out. */
+    background: linear-gradient(
+        180deg, var(--rail-bg) 0%, var(--rail-bg-foot) 100%
+    ) !important;
     border-right: 1px solid var(--rail-line) !important;
 }}
 [data-testid="stSidebar"] .side-brand {{
@@ -924,15 +959,26 @@ span[class*="material-icons"] {{
     border-color: var(--rail-border) !important;
     color: var(--rail-text) !important;
 }}
+/* Below the panel and lined up with the menu, not inside the panel: it is
+   an action on the rail, not a field of the account. */
 .st-key-side_account .stButton > button {{
     border: none !important;
+    background: transparent !important;
     color: var(--rail-muted) !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    border-radius: 10px !important;
+    padding: 0.72rem 1.05rem !important;
     justify-content: flex-start !important;
-    padding-left: 0 !important;
 }}
 .st-key-side_account .stButton > button > div {{
     justify-content: flex-start !important;
+    gap: 0.9rem !important;
     width: 100%;
+}}
+.st-key-side_account .stButton > button [data-testid*="Icon"] {{
+    font-size: 1.35rem !important;
+    width: 1.35rem;
 }}
 .st-key-side_account .stButton > button:hover {{
     color: var(--rail-ink) !important;
@@ -941,10 +987,36 @@ span[class*="material-icons"] {{
 
 /* ---------- who is signed in ---------- */
 .side-account {{
-    padding: 0 0 0.55rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem 0.9rem;
+    background: var(--rail-hover);
+    border: 1px solid var(--rail-border);
+    border-radius: 12px;
+    margin-bottom: 0.35rem;
+}}
+.side-account .avatar {{
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 999px;
+    background: var(--brand);
+    color: var(--on-brand);
+    font-size: 0.85rem;
+    font-weight: 650;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }}
 .side-account .who {{
-    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    min-width: 0;
+}}
+.side-account .name {{
+    font-size: 0.86rem;
     font-weight: 600;
     color: var(--rail-ink);
     white-space: nowrap;
@@ -952,9 +1024,11 @@ span[class*="material-icons"] {{
     text-overflow: ellipsis;
 }}
 .side-account .meta {{
-    font-size: 0.74rem;
+    font-size: 0.73rem;
     color: var(--rail-muted);
-    margin-top: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }}
 .side-account .sep {{ opacity: 0.5; }}
 
@@ -1048,9 +1122,10 @@ def apply():
 def sidebar_brand():
     """Keeps the sidebar from looking abandoned on pages with no TOC."""
     st.sidebar.markdown(
-        '<div class="side-brand"><div class="name">'
-        '<span class="material-symbols-rounded">cyclone</span> STORM</div>'
-        f'<div class="tag">{t("brand.tagline")}</div></div>',
+        '<div class="side-brand">'
+        '<span class="mark material-symbols-rounded">cyclone</span>'
+        '<span class="words"><span class="name">STORM</span>'
+        f'<span class="tag">{t("brand.role")}</span></span></div>',
         unsafe_allow_html=True,
     )
 

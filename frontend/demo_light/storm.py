@@ -17,8 +17,8 @@ ARTICLES_PAGE = "My Articles"
 CREATE_PAGE = "Create New Article"
 ADMIN_PAGE = "Members"
 PAGE_ICONS = {
-    ARTICLES_PAGE: ":material/collections_bookmark:",
-    CREATE_PAGE: ":material/auto_awesome:",
+    ARTICLES_PAGE: ":material/description:",
+    CREATE_PAGE: ":material/home:",
     ADMIN_PAGE: ":material/group:",
 }
 PAGE_LABELS = {

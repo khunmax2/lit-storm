@@ -84,13 +84,20 @@ drop policy if exists "update own profile" on public.profiles;
 create policy "update own profile" on public.profiles
     for update using (auth.uid() = id) with check (auth.uid() = id);
 
--- A row policy cannot restrict *which columns* an update touches, so without
--- this a member could set their own role to 'admin', or hand themselves an
--- unlimited quota, through the same policy that lets them rename themselves.
--- Column grants are what actually prevent that. Role, limit and active state
--- change only through admin_set_profile() below.
+-- A row policy cannot restrict *which columns* a statement touches, so on its
+-- own the policy above would let a member set their own role to 'admin', or
+-- hand themselves an unlimited quota, through the same rule that lets them
+-- rename themselves. Column grants are what actually prevent that.
+--
+-- Both verbs need locking down, not just one. Revoking UPDATE alone still
+-- leaves INSERT, and the insert policy only checks that the row is yours —
+-- so a new account could simply *arrive* as an admin on the request that
+-- creates its profile. What is not granted falls back to the column default.
 revoke update on public.profiles from authenticated;
 grant update (display_name) on public.profiles to authenticated;
+
+revoke insert on public.profiles from authenticated;
+grant insert (id, email, display_name) on public.profiles to authenticated;
 
 drop policy if exists "read own runs" on public.runs;
 create policy "read own runs" on public.runs
@@ -103,6 +110,15 @@ create policy "record own runs" on public.runs
 drop policy if exists "close own runs" on public.runs;
 create policy "close own runs" on public.runs
     for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- The ledger is what the monthly limit is counted from, so the columns that
+-- decide whether a row counts are not the caller's to write. `started_at`
+-- especially: left writable, anyone could backdate their own runs out of the
+-- current month and start again from zero.
+revoke insert, update on public.runs from authenticated;
+grant insert (user_id, topic, language, status) on public.runs to authenticated;
+grant update (status, folder, word_count, source_count, error, finished_at)
+    on public.runs to authenticated;
 
 -- ------------------------------------------------------- admin edits
 -- The one way role, quota and active state change. SECURITY DEFINER so it can

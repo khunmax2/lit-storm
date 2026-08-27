@@ -388,13 +388,19 @@ span[class*="material-icons"] {{
 }}
 [data-testid="stSidebarUserContent"] {{ padding-top: 0.25rem; }}
 
-/* The rail is a column: navigation at the top, the account at the foot. */
-[data-testid="stSidebarUserContent"] > div[data-testid="stVerticalBlock"] {{
-    min-height: calc(100vh - 6rem);
+/* The rail is a column: navigation at the top, the account at the foot.
+   Streamlit wraps a keyed container in a stLayoutWrapper, so the margin has
+   to go on that wrapper — it is the flex child, not the container itself. */
+[data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"]:has(
+    > [data-testid="stLayoutWrapper"] > .st-key-side_account
+) {{
+    min-height: calc(100vh - 7rem);
+}}
+[data-testid="stLayoutWrapper"]:has(> .st-key-side_account) {{
+    margin-top: auto !important;
 }}
 .st-key-side_account {{
-    margin-top: auto;
-    padding-top: 0.6rem;
+    padding-top: 0.7rem;
     border-top: 1px solid #263048;
 }}
 .side-label {{
@@ -461,8 +467,9 @@ span[class*="material-icons"] {{
 .side-brand .name {{
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 1.15rem;
+    gap: 0.5rem;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--ink);
@@ -535,9 +542,16 @@ span[class*="material-icons"] {{
     color: var(--muted) !important;
     font-weight: 550 !important;
     border-radius: 8px !important;
-    padding: 0.5rem 0.7rem !important;
+    /* Taller rows with a wider gutter: a rail of destinations reads as a
+       list, not as a row of buttons that happen to be stacked. */
+    padding: 0.62rem 0.8rem !important;
     width: 100% !important;
     justify-content: flex-start !important;
+    /* Room for the marker the active row grows on its left edge. */
+    border-left: 3px solid transparent !important;
+}}
+.st-key-nav_page button[data-variant="segmented_control"] > div {{
+    gap: 0.65rem !important;
 }}
 /* The button's own content wrapper centres its children, so left-aligning
    the button alone leaves the label in the middle of the row. */
@@ -563,7 +577,8 @@ span[class*="material-icons"] {{
 .topbar {{
     display: flex;
     align-items: center;
-    gap: 0.45rem;
+    justify-content: space-between;
+    gap: 1rem;
     height: 2.6rem;
     /* Streamlit's header is opaque and 60px tall; a bar drawn any higher
        than this is simply painted over. */
@@ -579,6 +594,46 @@ span[class*="material-icons"] {{
     text-overflow: ellipsis;
 }}
 .topbar .sep {{ opacity: 0.45; }}
+.topbar .crumbs {{
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}}
+
+/* Who is signed in, at the end of the bar. The initial stands in for the
+   avatar a real deployment would have; there are no uploaded pictures to
+   show, and a generic silhouette says less than a letter does. */
+.topbar-user {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}}
+.topbar-user .initial {{
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 999px;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 0.78rem;
+    font-weight: 650;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}}
+.topbar-user .name {{
+    font-size: 0.82rem;
+    font-weight: 550;
+    color: var(--ink);
+}}
+.topbar-user .role {{
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding-left: 0.4rem;
+    margin-left: 0.4rem;
+    border-left: 1px solid var(--line);
+}}
 .topbar .here {{
     color: var(--ink);
     font-weight: 600;
@@ -606,6 +661,7 @@ span[class*="material-icons"] {{
 .st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
     background: #1F2A44 !important;
     color: #FFFFFF !important;
+    border-left-color: var(--brand) !important;
 }}
 /* Everything the article page puts in the rail has to be legible on it. */
 [data-testid="stSidebar"] [data-testid="stExpander"] details {{
@@ -628,7 +684,11 @@ span[class*="material-icons"] {{
     border: none !important;
     color: #8C97AE !important;
     justify-content: flex-start !important;
-    padding-left: 0.7rem !important;
+    padding-left: 0.8rem !important;
+}}
+.st-key-side_account .stButton > button > div {{
+    justify-content: flex-start !important;
+    width: 100%;
 }}
 .st-key-side_account .stButton > button:hover {{
     color: #F2F5FA !important;
@@ -751,19 +811,33 @@ def sidebar_brand():
     )
 
 
-def top_bar(trail):
-    """The breadcrumb row across the top of the main area.
+def top_bar(trail, name="", role=""):
+    """The bar across the top of the main area: where you are, and who you are.
 
-    `trail` is a list of labels, innermost last. Streamlit has no header of
-    its own to hang this on, so it is the first thing the page draws.
+    `trail` is a list of labels, innermost last. Streamlit has no header of its
+    own to hang this on, so it is the first thing the page draws.
     """
-    parts = []
+    crumbs = []
     for index, label in enumerate(trail):
         if index:
-            parts.append('<span class="sep">/</span>')
+            crumbs.append('<span class="sep">/</span>')
         css = "here" if index == len(trail) - 1 else "crumb"
-        parts.append(f'<span class="{css}">{label}</span>')
-    st.markdown(f'<div class="topbar">{"".join(parts)}</div>', unsafe_allow_html=True)
+        crumbs.append(f'<span class="{css}">{label}</span>')
+
+    identity = ""
+    if name:
+        role_part = f'<span class="role">{role}</span>' if role else ""
+        identity = (
+            f'<div class="topbar-user">'
+            f'<span class="initial">{name.strip()[:1].upper()}</span>'
+            f'<span class="name">{name}</span>{role_part}</div>'
+        )
+
+    st.markdown(
+        f'<div class="topbar"><div class="crumbs">{"".join(crumbs)}</div>'
+        f"{identity}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def aside_title(text):

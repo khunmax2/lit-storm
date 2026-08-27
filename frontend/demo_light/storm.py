@@ -99,7 +99,11 @@ def main():
     trail = [t(PAGE_LABELS[selection])]
     if selection == ARTICLES_PAGE and "page2_selected_my_article" in st.session_state:
         trail.append(st.session_state["page2_selected_my_article"].replace("_", " "))
-    ui_theme.top_bar(trail)
+    ui_theme.top_bar(
+        trail,
+        name=auth.display_name(),
+        role=t("auth.role_admin") if auth.is_admin() else t("auth.role_member"),
+    )
 
     if selection == ADMIN_PAGE:
         demo_util.clear_other_page_session_state(page_index=4)

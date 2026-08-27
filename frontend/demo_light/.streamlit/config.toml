@@ -1,10 +1,27 @@
 [client]
 showErrorDetails = false
-toolbarMode = "minimal"
+# "viewer" keeps the settings menu reachable, which is where the
+# light/dark/system appearance switch lives.
+toolbarMode = "viewer"
 
 [theme]
-primaryColor = "#F63366"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
 font = "sans serif"
+baseRadius = "0.6rem"
+buttonRadius = "0.55rem"
+
+# Keep these in sync with LIGHT / DARK in ui_theme.py.
+[theme.light]
+primaryColor = "#E11D62"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F7F8FA"
+textColor = "#14161A"
+borderColor = "#E5E8EF"
+linkColor = "#E11D62"
+
+[theme.dark]
+primaryColor = "#FF5C87"
+backgroundColor = "#0F1219"
+secondaryBackgroundColor = "#14171E"
+textColor = "#E9ECF1"
+borderColor = "#272C36"
+linkColor = "#FF5C87"

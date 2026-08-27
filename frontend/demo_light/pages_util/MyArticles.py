@@ -2,108 +2,157 @@ import os
 
 import demo_util
 import streamlit as st
-from demo_util import DemoFileIOHelper, DemoUIHelper
-from streamlit_card import card
+import ui_theme
+from demo_util import DemoFileIOHelper
+from ui_language import t
+
+CARDS_PER_ROW = 3
 
 
-# set page config and display title
-def my_articles_page():
-    with st.sidebar:
-        _, return_button_col = st.columns([2, 5])
-        with return_button_col:
-            if st.button(
-                "Select another article",
-                disabled="page2_selected_my_article" not in st.session_state,
-            ):
-                if "page2_selected_my_article" in st.session_state:
-                    del st.session_state["page2_selected_my_article"]
-                st.rerun()
-
-    # sync my articles
+def _load_articles():
     if "page2_user_articles_file_path_dict" not in st.session_state:
         local_dir = os.path.join(demo_util.get_demo_dir(), "DEMO_WORKING_DIR")
         os.makedirs(local_dir, exist_ok=True)
         st.session_state["page2_user_articles_file_path_dict"] = (
             DemoFileIOHelper.read_structure_to_dict(local_dir)
         )
+    return st.session_state["page2_user_articles_file_path_dict"]
 
-    # if no feature demo selected, display all featured articles as info cards
-    def article_card_setup(column_to_add, card_title, article_name):
-        with column_to_add:
-            cleaned_article_title = article_name.replace("_", " ")
-            hasClicked = card(
-                title=" / ".join(card_title),
-                text=article_name.replace("_", " "),
-                image=DemoFileIOHelper.read_image_as_base64(
-                    os.path.join(demo_util.get_demo_dir(), "assets", "void.jpg")
-                ),
-                styles=DemoUIHelper.get_article_card_UI_style(boarder_color="#9AD8E1"),
+
+def _article_card(column, article_name, file_path_dict):
+    """One card in the grid. Returns True when the user opens the article."""
+    title = article_name.replace("_", " ")
+    article_path = file_path_dict.get(
+        "storm_gen_article_polished.txt"
+    ) or file_path_dict.get("storm_gen_article.txt")
+    url_info_path = file_path_dict.get("url_to_info.json")
+
+    if article_path and os.path.exists(article_path):
+        mtime = os.path.getmtime(article_path)
+        length, sources, excerpt = ui_theme.summarize_article(
+            article_path, url_info_path, mtime
+        )
+        meta = [ui_theme.humanize_date(mtime), ui_theme.length_label(length)]
+        if sources:
+            meta.append(t("articles.sources", n=sources))
+        ready = True
+    else:
+        # A run that was interrupted before the article was written.
+        meta = [t("articles.incomplete")]
+        excerpt = t("articles.incomplete_body")
+        ready = False
+
+    with column:
+        with st.container(border=True):
+            st.markdown(
+                f'<div class="acard">'
+                f'<div class="title">{title}</div>'
+                f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
+                f'<div class="excerpt">{excerpt}</div>'
+                f"</div>",
+                unsafe_allow_html=True,
             )
-            if hasClicked:
+            return st.button(
+                t("articles.read") if ready else t("articles.inspect"),
+                key=f"open_{article_name}",
+                use_container_width=True,
+                disabled=not ready,
+            )
+
+
+def _grid(article_names, articles):
+    # One st.columns() per row, so cards in a row share the same height.
+    for row_start in range(0, len(article_names), CARDS_PER_ROW):
+        row = article_names[row_start : row_start + CARDS_PER_ROW]
+        columns = st.columns(CARDS_PER_ROW, gap="medium")
+        for column, article_name in zip(columns, row):
+            clicked = _article_card(
+                column=column,
+                article_name=article_name,
+                file_path_dict=articles[article_name],
+            )
+            if clicked:
                 st.session_state["page2_selected_my_article"] = article_name
                 st.rerun()
 
-    if "page2_selected_my_article" not in st.session_state:
-        # display article cards
-        my_article_columns = st.columns(3)
-        if len(st.session_state["page2_user_articles_file_path_dict"]) > 0:
-            # get article names
-            article_names = sorted(
-                list(st.session_state["page2_user_articles_file_path_dict"].keys())
-            )
-            # configure pagination
-            pagination = st.container()
-            bottom_menu = st.columns((1, 4, 1, 1, 1))[1:-1]
-            with bottom_menu[2]:
-                batch_size = st.selectbox("Page Size", options=[24, 48, 72])
-            with bottom_menu[1]:
-                total_pages = (
-                    int(len(article_names) / batch_size)
-                    if int(len(article_names) / batch_size) > 0
-                    else 1
-                )
-                current_page = st.number_input(
-                    "Page", min_value=1, max_value=total_pages, step=1
-                )
-            with bottom_menu[0]:
-                st.markdown(f"Page **{current_page}** of **{total_pages}** ")
-            # show article cards
-            with pagination:
-                my_article_count = 0
-                start_index = (current_page - 1) * batch_size
-                end_index = min(current_page * batch_size, len(article_names))
-                for article_name in article_names[start_index:end_index]:
-                    column_to_add = my_article_columns[my_article_count % 3]
-                    my_article_count += 1
-                    article_card_setup(
-                        column_to_add=column_to_add,
-                        card_title=["My Article"],
-                        article_name=article_name,
-                    )
-        else:
-            with my_article_columns[0]:
-                hasClicked = card(
-                    title="Get started",
-                    text="Start your first research!",
-                    image=DemoFileIOHelper.read_image_as_base64(
-                        os.path.join(demo_util.get_demo_dir(), "assets", "void.jpg")
-                    ),
-                    styles=DemoUIHelper.get_article_card_UI_style(),
-                )
-                if hasClicked:
-                    st.session_state.selected_page = 1
-                    st.session_state["manual_selection_override"] = True
-                    st.session_state["rerun_requested"] = True
-                    st.rerun()
-    else:
-        selected_article_name = st.session_state["page2_selected_my_article"]
-        selected_article_file_path_dict = st.session_state[
-            "page2_user_articles_file_path_dict"
-        ][selected_article_name]
 
+def my_articles_page():
+    articles = _load_articles()
+
+    # ---- reading a single article -------------------------------------
+    if "page2_selected_my_article" in st.session_state:
+        with st.sidebar:
+            if st.button(t("articles.back"), use_container_width=True):
+                del st.session_state["page2_selected_my_article"]
+                st.rerun()
+
+        selected = st.session_state["page2_selected_my_article"]
         demo_util.display_article_page(
-            selected_article_name=selected_article_name,
-            selected_article_file_path_dict=selected_article_file_path_dict,
+            selected_article_name=selected,
+            selected_article_file_path_dict=articles[selected],
             show_title=True,
             show_main_article=True,
         )
+        return
+
+    # ---- the library ---------------------------------------------------
+    if not articles:
+        ui_theme.page_header(t("nav.articles"))
+        ui_theme.empty_state(
+            "📚",
+            t("articles.empty_title"),
+            t("articles.empty_body", create=t("nav.create")),
+        )
+        _, button_col, _ = st.columns([3, 2, 3])
+        with button_col:
+            if st.button(
+                t("articles.start_first"),
+                type="primary",
+                use_container_width=True,
+            ):
+                st.session_state["nav_page"] = "Create New Article"
+                st.rerun()
+        return
+
+    article_names = sorted(articles.keys(), key=lambda n: n.lower())
+    ui_theme.page_header(
+        t("nav.articles"),
+        t(
+            "articles.count",
+            n=len(article_names),
+            s="s" if len(article_names) > 1 else "",
+        ),
+    )
+
+    search_col, _ = st.columns([2, 3])
+    with search_col:
+        query = st.text_input(
+            t("articles.search"),
+            placeholder=t("articles.search_placeholder"),
+            label_visibility="collapsed",
+        )
+    if query:
+        needle = query.lower().replace(" ", "_")
+        article_names = [n for n in article_names if needle in n.lower()]
+        if not article_names:
+            ui_theme.empty_state(
+                "🔍", t("articles.no_match_title"), t("articles.no_match_body", query=query)
+            )
+            return
+
+    # Pagination only matters once the library gets big.
+    page_size = 24
+    total_pages = max(1, -(-len(article_names) // page_size))
+    if total_pages > 1:
+        nav_col, _ = st.columns([1, 4])
+        with nav_col:
+            current_page = st.number_input(
+                t("articles.page", total=total_pages),
+                min_value=1,
+                max_value=total_pages,
+                step=1,
+            )
+        start = (current_page - 1) * page_size
+        article_names = article_names[start : start + page_size]
+
+    _grid(article_names, articles)

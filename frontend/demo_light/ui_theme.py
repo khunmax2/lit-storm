@@ -1,0 +1,535 @@
+"""Shared look-and-feel for the STORM demo UI.
+
+Everything visual that is not tied to a single page lives here: the global
+stylesheet, the colour tokens the pages reference, and a couple of small
+building blocks (page headers, article cards) that keep the two pages
+consistent.
+"""
+
+import os
+from datetime import datetime
+
+import streamlit as st
+import ui_language
+from ui_language import t
+
+# Colour tokens, one set per theme. Keep these in sync with the
+# [theme.light] / [theme.dark] sections of .streamlit/config.toml.
+LIGHT = {
+    "brand": "#E11D62",
+    "brand-hover": "#C4104F",
+    "brand-soft": "#FDE7EF",
+    "on-brand": "#FFFFFF",
+    "ink": "#14161A",
+    "muted": "#69707D",
+    "line": "#E5E8EF",
+    "line-strong": "#C9CEDA",
+    "canvas": "#F7F8FA",
+    "surface": "#FFFFFF",
+    "nav-hover": "#ECEFF4",
+    "shadow": "rgba(20, 22, 26, 0.18)",
+    "shadow-soft": "rgba(20, 22, 26, 0.25)",
+}
+
+DARK = {
+    "brand": "#FF5C87",
+    "brand-hover": "#FF7C9F",
+    "brand-soft": "rgba(255, 92, 135, 0.16)",
+    # The dark-mode brand is a light pink, so it needs dark text on top.
+    "on-brand": "#14171E",
+    "ink": "#E9ECF1",
+    "muted": "#98A1B0",
+    "line": "#272C36",
+    "line-strong": "#3A424F",
+    "canvas": "#14171E",
+    "surface": "#181C24",
+    "nav-hover": "#1E232C",
+    "shadow": "rgba(0, 0, 0, 0.55)",
+    "shadow-soft": "rgba(0, 0, 0, 0.6)",
+}
+
+FONT_STACK = (
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", '
+    "Arial, sans-serif"
+)
+
+def _vars():
+    """Every token as `light-dark(light, dark)`.
+
+    These are declared on `.stApp`, the one element Streamlit gives a real
+    `color-scheme`, so `light-dark()` resolves against the theme Streamlit is
+    actually painting with. That keeps the two in lockstep through a settings
+    change — `prefers-color-scheme` would miss a manual override, and reading
+    `st.context.theme.type` in Python reports the *previous* theme for one
+    rerun after the switch, which paints dark text on a light page.
+    """
+    return "\n".join(
+        f"    --{name}: light-dark({LIGHT[name]}, {DARK[name]});" for name in LIGHT
+    )
+
+
+_CSS = f"""
+<style>
+.stApp {{
+{_vars()}
+}}
+
+html, body, [class*="st-"], button, input, textarea {{
+    font-family: {FONT_STACK};
+}}
+
+/* ...but never on the icon spans, whose glyphs are font ligatures. */
+[data-testid="stIconMaterial"],
+span[class*="material-symbols"],
+span[class*="material-icons"] {{
+    font-family: "Material Symbols Rounded" !important;
+}}
+
+/* Roomier page gutters, capped so long articles stay readable. */
+[data-testid="stMainBlockContainer"] {{
+    padding-top: 2.4rem;
+    padding-bottom: 4rem;
+    max-width: 1180px;
+}}
+
+/* ---------- page header ---------- */
+.page-head {{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0.4rem 0 1.6rem 0;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--line);
+}}
+.page-head h1 {{
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0;
+    padding: 0;
+}}
+.page-head .sub {{
+    font-size: 0.9rem;
+    color: var(--muted);
+}}
+
+/* ---------- hero (create page) ---------- */
+.hero {{
+    text-align: center;
+    margin: 2.4rem 0 1.8rem 0;
+}}
+.hero .eyebrow {{
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brand);
+    background: var(--brand-soft);
+    padding: 0.28rem 0.7rem;
+    border-radius: 999px;
+    margin-bottom: 1rem;
+}}
+.hero h1 {{
+    font-size: 2.3rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    margin: 0 0 0.6rem 0;
+    line-height: 1.15;
+}}
+.hero p {{
+    font-size: 1rem;
+    color: var(--muted);
+    margin: 0 auto;
+    max-width: 34rem;
+    line-height: 1.6;
+}}
+
+/* ---------- article cards ---------- */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.acard) {{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1.1rem 1.15rem 0.9rem 1.15rem;
+    height: 100%;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease,
+        transform 0.15s ease;
+}}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.acard):hover {{
+    border-color: var(--line-strong);
+    box-shadow: 0 6px 20px -8px var(--shadow);
+    transform: translateY(-2px);
+}}
+.acard .title {{
+    font-size: 1.02rem;
+    font-weight: 650;
+    line-height: 1.35;
+    color: var(--ink);
+    margin-bottom: 0.45rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.7em;
+}}
+/* One line, never wrapping — otherwise cards in a row end up different
+   heights as soon as the sidebar narrows them. */
+.acard .meta {{
+    font-size: 0.76rem;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+.acard .meta .sep {{ opacity: 0.45; padding: 0 0.35rem; }}
+.acard .excerpt {{
+    font-size: 0.84rem;
+    line-height: 1.55;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 3.9em;
+}}
+
+/* ---------- empty state ---------- */
+.empty {{
+    text-align: center;
+    padding: 3.2rem 1rem 2.4rem 1rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: 16px;
+    background: var(--canvas);
+}}
+.empty .icon {{ font-size: 2.2rem; }}
+.empty h3 {{
+    font-size: 1.1rem;
+    font-weight: 650;
+    color: var(--ink);
+    margin: 0.7rem 0 0.35rem 0;
+}}
+.empty p {{
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin: 0;
+}}
+
+/* ---------- buttons ---------- */
+.stButton > button, [data-testid="stFormSubmitButton"] > button {{
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    font-weight: 550;
+    transition: background 0.15s ease, border-color 0.15s ease,
+        color 0.15s ease;
+}}
+.stButton > button:hover:not(:disabled),
+[data-testid="stFormSubmitButton"] > button:hover:not(:disabled) {{
+    border-color: var(--brand);
+    color: var(--brand);
+}}
+[data-testid="stBaseButton-primary"],
+[data-testid="stBaseButton-primaryFormSubmit"] {{
+    background: var(--brand) !important;
+    border-color: var(--brand) !important;
+    color: var(--on-brand) !important;
+}}
+[data-testid="stBaseButton-primary"]:hover,
+[data-testid="stBaseButton-primaryFormSubmit"]:hover {{
+    background: var(--brand-hover) !important;
+    border-color: var(--brand-hover) !important;
+    color: var(--on-brand) !important;
+}}
+
+/* ---------- inputs ---------- */
+[data-testid="stTextInputRootElement"] {{
+    border-radius: 10px;
+    border-color: var(--line);
+}}
+[data-testid="stTextInputRootElement"]:focus-within {{
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+}}
+[data-testid="stForm"] {{
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 1.6rem;
+    background: var(--surface);
+    box-shadow: 0 8px 30px -18px var(--shadow-soft);
+}}
+
+/* ---------- sidebar ---------- */
+[data-testid="stSidebar"] {{
+    background: var(--canvas);
+    border-right: 1px solid var(--line);
+}}
+[data-testid="stSidebarUserContent"] {{ padding-top: 1.6rem; }}
+.side-label {{
+    font-size: 0.7rem;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+}}
+
+/* ---------- expanders / status ---------- */
+[data-testid="stExpander"] details {{
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+}}
+
+/* ---------- article body ---------- */
+.article-head {{
+    margin: 0.5rem 0 1.4rem 0;
+}}
+.article-head h1 {{
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    color: var(--ink);
+    margin: 0 0 0.6rem 0;
+}}
+.article-head .meta {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.6rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+}}
+.article-head .meta .chip {{
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.16rem 0.6rem;
+}}
+.article-body {{ max-width: 46rem; }}
+
+/* Inline citation links inside the article text. */
+[data-testid="stMarkdownContainer"] a[href^="http"] {{
+    color: var(--brand);
+    text-decoration: none;
+    font-size: 0.82em;
+    vertical-align: 0.28em;
+    padding: 0 0.04em;
+}}
+[data-testid="stMarkdownContainer"] a[href^="http"]:hover {{
+    text-decoration: underline;
+}}
+
+/* ---------- sidebar brand block ---------- */
+.side-brand {{
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--line);
+}}
+.side-brand .name {{
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+}}
+.side-brand .tag {{
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 0.25rem;
+}}
+
+/* ---------- reference panel ---------- */
+.ref-card {{
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.8rem 0.9rem;
+    background: var(--surface);
+}}
+.ref-card .ref-title {{
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.4;
+    margin-bottom: 0.3rem;
+}}
+.ref-card .ref-url {{
+    font-size: 0.74rem;
+    color: var(--muted);
+    word-break: break-all;
+    margin-bottom: 0.5rem;
+}}
+.ref-card .ref-url a {{ color: var(--brand); text-decoration: none; }}
+
+/* ---------- top navigation ---------- */
+/* st.segmented_control, centred and dressed as a pill switcher. Deliberately
+   a native widget rather than a custom component: components render inside an
+   iframe that this stylesheet cannot reach, so their colours would have to be
+   resolved in Python and would lag a theme change by one rerun. */
+/* `.st-key-nav_page` is Streamlit's per-widget class, derived from the
+   segmented control's key in storm.py. */
+/* The widget is sized to its content, so it needs the full row before
+   `justify-content` has anything to centre within. */
+.st-key-nav_page {{
+    display: flex;
+    justify-content: center;
+    width: 100% !important;
+    margin-bottom: 1.2rem;
+}}
+.st-key-nav_page [data-testid="stButtonGroup"] {{
+    display: inline-flex;
+}}
+.st-key-nav_page [data-testid="stButtonGroup"] > div {{
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.25rem;
+    gap: 0.15rem;
+}}
+.st-key-nav_page button[data-variant="segmented_control"] {{
+    border: none !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-weight: 550 !important;
+    border-radius: 9px !important;
+    padding: 0.42rem 1.1rem !important;
+}}
+.st-key-nav_page button[data-variant="segmented_control"]:hover {{
+    background: var(--nav-hover) !important;
+    color: var(--ink) !important;
+}}
+.st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
+    background: var(--surface) !important;
+    color: var(--ink) !important;
+    font-weight: 650 !important;
+    box-shadow: 0 1px 3px var(--shadow);
+}}
+
+/* Hide the "Deploy"/status chrome the demo does not need. */
+[data-testid="stStatusWidget"] {{ visibility: hidden; }}
+</style>
+"""
+
+def apply():
+    """Inject the global stylesheet. Safe to call on every rerun."""
+    st.markdown(_CSS, unsafe_allow_html=True)
+
+
+def sidebar_brand():
+    """Keeps the sidebar from looking abandoned on pages with no TOC."""
+    st.sidebar.markdown(
+        '<div class="side-brand"><div class="name">🌪️ STORM</div>'
+        f'<div class="tag">{t("brand.tagline")}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def page_header(title, subtitle=""):
+    sub = f'<span class="sub">{subtitle}</span>' if subtitle else ""
+    st.markdown(
+        f'<div class="page-head"><h1>{title}</h1>{sub}</div>', unsafe_allow_html=True
+    )
+
+
+def hero(title, subtitle, eyebrow=""):
+    brow = f'<span class="eyebrow">{eyebrow}</span>' if eyebrow else ""
+    st.markdown(
+        f'<div class="hero">{brow}<h1>{title}</h1><p>{subtitle}</p></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def empty_state(icon, title, body):
+    st.markdown(
+        f'<div class="empty"><div class="icon">{icon}</div>'
+        f"<h3>{title}</h3><p>{body}</p></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def chips(items):
+    """Pill-shaped badges — used on the article page header."""
+    return "".join(f'<span class="chip">{item}</span>' for item in items)
+
+
+def meta_line(items):
+    """Single-line 'a · b · c' metadata, used on the article cards."""
+    return '<span class="sep">·</span>'.join(items)
+
+
+def humanize_date(timestamp):
+    """Render a file mtime as 'today' / 'Mar 4' / 'Mar 4, 2025', translated."""
+    when = datetime.fromtimestamp(timestamp)
+    today = datetime.now()
+    delta = (today.date() - when.date()).days
+    if delta == 0:
+        return t("date.today", time=f"{when:%H:%M}")
+    if delta == 1:
+        return t("date.yesterday")
+    if delta < 7:
+        return t("date.days_ago", n=delta)
+    key = "date.this_year" if when.year == today.year else "date.other_year"
+    return t(key, month=ui_language.month(when.month), day=when.day, year=when.year)
+
+
+def measure_length(text):
+    """How long an article is, as a (count, unit) pair.
+
+    Thai, like Chinese and Japanese, does not put spaces between words, so
+    splitting on whitespace would report a whole sentence as one word. For
+    those scripts, count characters instead and say so.
+
+    The pair is returned unformatted rather than as a label because the caller
+    caches it, and the label depends on the interface language of the moment.
+    """
+    unspaced = sum(
+        1
+        for char in text
+        if "฀" <= char <= "๿"  # Thai
+        or "一" <= char <= "鿿"  # CJK
+        or "぀" <= char <= "ヿ"  # kana
+    )
+    if unspaced > len(text) * 0.2:
+        return unspaced, "chars"
+    return len(text.split()), "words"
+
+
+def length_label(length):
+    """Turn a `measure_length` pair into '1,234 words' in the current language."""
+    count, unit = length
+    return t(f"length.{unit}", n=count)
+
+
+@st.cache_data(show_spinner=False)
+def summarize_article(article_path, url_info_path, mtime):
+    """Length, source count and a short excerpt for the article cards.
+
+    `mtime` is part of the cache key so edits on disk invalidate the entry.
+    Nothing returned here is language-dependent, so the cache survives a
+    switch of interface language.
+    """
+    length, sources, excerpt = (0, "words"), 0, ""
+    if article_path and os.path.exists(article_path):
+        import re
+
+        text = open(article_path).read()
+        body = "\n".join(
+            line for line in text.splitlines() if not line.strip().startswith("#")
+        )
+        body = re.sub(r"\[\d+\]", "", body).strip()
+        length = measure_length(body)
+        # Strip markdown emphasis so the card preview reads as plain prose.
+        plain = re.sub(r"[*_`]+", "", " ".join(body.split()))
+        # Removing "[3]" leaves a space before the punctuation that followed it.
+        plain = re.sub(r"\s+([.,;:])", r"\1", plain)
+        excerpt = plain[:220].rsplit(" ", 1)[0] + "…"
+    if url_info_path and os.path.exists(url_info_path):
+        import json
+
+        try:
+            sources = len(json.load(open(url_info_path)).get("url_to_info", {}))
+        except (ValueError, AttributeError):
+            sources = 0
+    return length, sources, excerpt

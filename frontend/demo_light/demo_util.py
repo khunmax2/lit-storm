@@ -1,13 +1,19 @@
 import base64
 import datetime
+import functools
 import json
 import os
 import re
+import threading
 from typing import Optional
 
 import markdown
 import pytz
 import streamlit as st
+import ui_language
+import ui_theme
+from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+from ui_language import t
 
 # If you install the source code instead of the `knowledge-storm` package,
 # Uncomment the following lines:
@@ -18,8 +24,8 @@ from knowledge_storm import (
     STORMWikiRunner,
     STORMWikiLMConfigs,
 )
-from knowledge_storm.lm import OpenAIModel
-from knowledge_storm.rm import YouRM
+from knowledge_storm.lm import LitellmModel
+from knowledge_storm.rm import DuckDuckGoSearchRM
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 from knowledge_storm.utils import truncate_filename
 from stoc import stoc
@@ -360,76 +366,6 @@ class DemoTextProcessingHelper:
 
 
 class DemoUIHelper:
-    def st_markdown_adjust_size(content, font_size=20):
-        st.markdown(
-            f"""
-        <span style='font-size: {font_size}px;'>{content}</span>
-        """,
-            unsafe_allow_html=True,
-        )
-
-    @staticmethod
-    def get_article_card_UI_style(boarder_color="#9AD8E1"):
-        return {
-            "card": {
-                "width": "100%",
-                "height": "116px",
-                "max-width": "640px",
-                "background-color": "#FFFFF",
-                "border": "1px solid #CCC",
-                "padding": "20px",
-                "border-radius": "5px",
-                "border-left": f"0.5rem solid {boarder_color}",
-                "box-shadow": "0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15)",
-                "margin": "0px",
-            },
-            "title": {
-                "white-space": "nowrap",
-                "overflow": "hidden",
-                "text-overflow": "ellipsis",
-                "font-size": "17px",
-                "color": "rgb(49, 51, 63)",
-                "text-align": "left",
-                "width": "95%",
-                "font-weight": "normal",
-            },
-            "text": {
-                "white-space": "nowrap",
-                "overflow": "hidden",
-                "text-overflow": "ellipsis",
-                "font-size": "25px",
-                "color": "rgb(49, 51, 63)",
-                "text-align": "left",
-                "width": "95%",
-            },
-            "filter": {"background-color": "rgba(0, 0, 0, 0)"},
-        }
-
-    @staticmethod
-    def customize_toast_css_style():
-        # Note padding is top right bottom left
-        st.markdown(
-            """
-            <style>
-
-                div[data-testid=stToast] {
-                    padding: 20px 10px 40px 10px;
-                    background-color: #FF0000;   /* red */
-                    width: 40%;
-                }
-
-                [data-testid=toastContainer] [data-testid=stMarkdownContainer] > p {
-                    font-size: 25px;
-                    font-style: normal;
-                    font-weight: 400;
-                    color: #FFFFFF;   /* white */
-                    line-height: 1.5; /* Adjust this value as needed */
-                }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
     @staticmethod
     def article_markdown_to_html(article_title, article_content):
         return f"""
@@ -486,17 +422,23 @@ def _display_main_article_text(article_text, citation_dict, table_content_sideba
 
 
 def _display_references(citation_dict):
-    if citation_dict:
-        reference_list = [f"reference [{i}]" for i in range(1, len(citation_dict) + 1)]
-        selected_key = st.selectbox("Select a reference", reference_list)
-        citation_val = citation_dict[reference_list.index(selected_key) + 1]
-        citation_val["title"] = citation_val["title"].replace("$", "\\$")
-        st.markdown(f"**Title:** {citation_val['title']}")
-        st.markdown(f"**Url:** {citation_val['url']}")
-        snippets = "\n\n".join(citation_val["snippets"]).replace("$", "\\$")
-        st.markdown(f"**Highlights:**\n\n {snippets}")
-    else:
-        st.markdown("**No references available**")
+    if not citation_dict:
+        st.caption(t("article.no_references"))
+        return
+
+    reference_list = [f"[{i}]" for i in range(1, len(citation_dict) + 1)]
+    selected_key = st.selectbox(t("article.jump_reference"), reference_list)
+    citation_val = citation_dict[reference_list.index(selected_key) + 1]
+    title = citation_val["title"].replace("$", "\\$")
+    st.markdown(
+        f'<div class="ref-card"><div class="ref-title">{title}</div>'
+        f'<div class="ref-url"><a href="{citation_val["url"]}" target="_blank">'
+        f'{citation_val["url"]}</a></div></div>',
+        unsafe_allow_html=True,
+    )
+    snippets = "\n\n".join(citation_val["snippets"]).replace("$", "\\$")
+    st.caption(t("article.highlights"))
+    st.markdown(snippets)
 
 
 def _display_persona_conversations(conversation_log):
@@ -515,7 +457,9 @@ def _display_persona_conversations(conversation_log):
             st.info(parsed_conversation_history[idx][1])
             # show user / agent utterance in dialogue UI
             for message in parsed_conversation_history[idx][2]:
-                message["content"] = message["content"].replace("$", "\\$")
+                message["content"] = ui_language.localize_engine_reply(
+                    message["content"]
+                ).replace("$", "\\$")
                 with st.chat_message(message["role"]):
                     if message["role"] == "user":
                         st.markdown(f"**{message['content']}**")
@@ -530,28 +474,25 @@ def _display_main_article(
         selected_article_file_path_dict
     )
 
-    with st.container(height=1000, border=True):
-        table_content_sidebar = st.sidebar.expander(
-            "**Table of contents**", expanded=True
-        )
+    st.markdown('<div class="article-scroll">', unsafe_allow_html=True)
+    with st.container(height=900, border=False):
+        table_content_sidebar = st.sidebar.expander(t("article.toc"), expanded=True)
         _display_main_article_text(
             article_text=article_data.get("article", ""),
             citation_dict=article_data.get("citations", {}),
             table_content_sidebar=table_content_sidebar,
         )
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # display reference panel
     if show_reference and "citations" in article_data:
-        with st.sidebar.expander("**References**", expanded=True):
-            with st.container(height=800, border=False):
+        with st.sidebar.expander(t("article.references"), expanded=True):
+            with st.container(height=560, border=False):
                 _display_references(citation_dict=article_data.get("citations", {}))
 
     # display conversation history
     if show_conversation and "conversation_log" in article_data:
-        with st.expander(
-            "**STORM** is powered by a knowledge agent that proactively research a given topic by asking good questions coming from different perspectives.\n\n"
-            ":sunglasses: Click here to view the agent's brain**STORM**ing process!"
-        ):
+        with st.expander(t("article.conversation")):
             _display_persona_conversations(
                 conversation_log=article_data.get("conversation_log", {})
             )
@@ -579,21 +520,29 @@ def set_storm_runner():
     if not os.path.exists(current_working_dir):
         os.makedirs(current_working_dir)
 
-    # configure STORM runner
+    # configure STORM runner with Google Gemini + DuckDuckGo
     llm_configs = STORMWikiLMConfigs()
-    llm_configs.init_openai_model(
-        openai_api_key=st.secrets["OPENAI_API_KEY"], openai_type="openai"
+    gemini_kwargs = {
+        "api_key": st.secrets["GOOGLE_API_KEY"],
+        "temperature": 1.0,
+        "top_p": 0.9,
+        # Ride out the occasional 429 rather than failing the whole run.
+        "num_retries": 6,
+    }
+    # Use the "-latest" aliases: pinned 2.x ids are 404/quota-blocked for new API keys.
+    fast_lm = LitellmModel(
+        model="gemini/gemini-flash-lite-latest", max_tokens=500, **gemini_kwargs
     )
-    llm_configs.set_question_asker_lm(
-        OpenAIModel(
-            model="gpt-4-1106-preview",
-            api_key=st.secrets["OPENAI_API_KEY"],
-            api_provider="openai",
-            max_tokens=500,
-            temperature=1.0,
-            top_p=0.9,
-        )
+    strong_lm = LitellmModel(
+        model="gemini/gemini-flash-latest", max_tokens=3000, **gemini_kwargs
     )
+
+    llm_configs.set_conv_simulator_lm(fast_lm)
+    llm_configs.set_question_asker_lm(fast_lm)
+    llm_configs.set_outline_gen_lm(strong_lm)
+    llm_configs.set_article_gen_lm(strong_lm)
+    llm_configs.set_article_polish_lm(strong_lm)
+
     engine_args = STORMWikiRunnerArguments(
         output_dir=current_working_dir,
         max_conv_turn=3,
@@ -602,7 +551,7 @@ def set_storm_runner():
         retrieve_top_k=5,
     )
 
-    rm = YouRM(ydc_api_key=st.secrets["YDC_API_KEY"], k=engine_args.search_top_k)
+    rm = DuckDuckGoSearchRM(k=engine_args.search_top_k, safe_search="On", region="us-en")
 
     runner = STORMWikiRunner(engine_args, llm_configs, rm)
     st.session_state["runner"] = runner
@@ -615,37 +564,78 @@ def display_article_page(
     show_main_article=True,
 ):
     if show_title:
+        article_path = selected_article_file_path_dict.get(
+            "storm_gen_article_polished.txt"
+        ) or selected_article_file_path_dict.get("storm_gen_article.txt")
+        meta = []
+        if article_path and os.path.exists(article_path):
+            length, sources, _ = ui_theme.summarize_article(
+                article_path,
+                selected_article_file_path_dict.get("url_to_info.json"),
+                os.path.getmtime(article_path),
+            )
+            meta = [
+                ui_theme.humanize_date(os.path.getmtime(article_path)),
+                ui_theme.length_label(length),
+            ]
+            if sources:
+                meta.append(t("articles.sources", n=sources))
         st.markdown(
-            f"<h2 style='text-align: center;'>{selected_article_name.replace('_', ' ')}</h2>",
+            f'<div class="article-head">'
+            f"<h1>{selected_article_name.replace('_', ' ')}</h1>"
+            f'<div class="meta">{ui_theme.chips(meta)}</div></div>',
             unsafe_allow_html=True,
         )
+        if article_path and os.path.exists(article_path):
+            st.download_button(
+                t("article.download"),
+                data=open(article_path).read(),
+                file_name=f"{selected_article_name}.md",
+                mime="text/markdown",
+            )
 
     if show_main_article:
         _display_main_article(selected_article_file_path_dict)
 
 
+def _in_script_run_ctx(method):
+    """STORM fires callbacks from its worker threads, which have no Streamlit
+    context; writing to a container from there raises RuntimeError. Re-attach
+    the script run context captured when the handler was built."""
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if self._script_run_ctx is not None:
+            add_script_run_ctx(threading.current_thread(), self._script_run_ctx)
+        return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class StreamlitCallbackHandler(BaseCallbackHandler):
     def __init__(self, status_container):
         self.status_container = status_container
+        self._script_run_ctx = get_script_run_ctx()
 
+    @_in_script_run_ctx
     def on_identify_perspective_start(self, **kwargs):
-        self.status_container.info(
-            "Start identifying different perspectives for researching the topic."
-        )
+        self.status_container.info(t("status.perspectives_start"))
 
+    @_in_script_run_ctx
     def on_identify_perspective_end(self, perspectives: list[str], **kwargs):
-        perspective_list = "\n- ".join(perspectives)
         self.status_container.success(
-            f"Finish identifying perspectives. Will now start gathering information"
-            f" from the following perspectives:\n- {perspective_list}"
+            t("status.perspectives_end", perspectives="\n- ".join(perspectives))
         )
 
+    @_in_script_run_ctx
     def on_information_gathering_start(self, **kwargs):
-        self.status_container.info("Start browsing the Internet.")
+        self.status_container.info(t("status.browsing_start"))
 
+    @_in_script_run_ctx
     def on_dialogue_turn_end(self, dlg_turn, **kwargs):
         urls = list(set([r.url for r in dlg_turn.search_results]))
         for url in urls:
+            link = f'<a href="{url}" class="small-font" target="_blank">{url}</a>'
             self.status_container.markdown(
                 f"""
                     <style>
@@ -655,23 +645,23 @@ class StreamlitCallbackHandler(BaseCallbackHandler):
                         padding: 0px;
                     }}
                     </style>
-                    <div class="small-font">Finish browsing <a href="{url}" class="small-font" target="_blank">{url}</a>.</div>
+                    <div class="small-font">{t("status.browsed", link=link)}</div>
                     """,
                 unsafe_allow_html=True,
             )
 
+    @_in_script_run_ctx
     def on_information_gathering_end(self, **kwargs):
-        self.status_container.success("Finish collecting information.")
+        self.status_container.success(t("status.browsing_end"))
 
+    @_in_script_run_ctx
     def on_information_organization_start(self, **kwargs):
-        self.status_container.info(
-            "Start organizing information into a hierarchical outline."
-        )
+        self.status_container.info(t("status.organizing_start"))
 
+    @_in_script_run_ctx
     def on_direct_outline_generation_end(self, outline: str, **kwargs):
-        self.status_container.success(
-            f"Finish leveraging the internal knowledge of the large language model."
-        )
+        self.status_container.success(t("status.outline_internal"))
 
+    @_in_script_run_ctx
     def on_outline_refinement_end(self, outline: str, **kwargs):
-        self.status_container.success(f"Finish leveraging the collected information.")
+        self.status_container.success(t("status.outline_collected"))

@@ -1,60 +1,116 @@
 import os
-import time
 
+import article_language
 import demo_util
 import streamlit as st
-from demo_util import (
-    DemoFileIOHelper,
-    DemoTextProcessingHelper,
-    DemoUIHelper,
-    truncate_filename,
-)
+import ui_language
+import ui_theme
+from demo_util import DemoFileIOHelper, truncate_filename
+from ui_language import t
+
+EXAMPLE_TOPICS = {
+    "English": [
+        "The history of Thai silk",
+        "Perovskite solar cells",
+        "Slow travel in Japan",
+    ],
+    "ไทย": [
+        "ประวัติศาสตร์ผ้าไหมไทย",
+        "เซลล์แสงอาทิตย์เพอรอฟสไกต์",
+        "ภูมิปัญญาการทอผ้าล้านนา",
+    ],
+}
+
+
+def _language():
+    """The language the article will be written in.
+
+    Someone reading a Thai interface almost always wants a Thai article, so the
+    interface language seeds this; the picker below can still override it.
+    """
+    default = ui_language.current()
+    if default not in article_language.LANGUAGES:
+        default = article_language.DEFAULT
+    return st.session_state.get("page3_language", default)
+
+
+def _follow_interface_language():
+    """Point the article picker at the interface language whenever that changes.
+
+    Only on a change, so an explicit pick of a different article language
+    survives the reruns that follow it.
+    """
+    interface = ui_language.current()
+    if st.session_state.get("page3_language_followed") == interface:
+        return
+    st.session_state["page3_language_followed"] = interface
+    if interface in article_language.LANGUAGES:
+        st.session_state["page3_language"] = interface
+
+
+def _start_research(topic):
+    """Move the page into the research state for `topic`."""
+    topic = topic.strip()
+    if not topic:
+        st.warning(t("create.needs_topic"), icon="⚠️")
+        return
+    cleaned = topic.replace(" ", "_").replace("/", "_")
+    st.session_state["page3_topic"] = topic
+    st.session_state["page3_topic_name_cleaned"] = cleaned
+    st.session_state["page3_topic_name_truncated"] = truncate_filename(cleaned)
+    st.session_state["page3_write_article_state"] = "initiated"
 
 
 def handle_not_started():
-    if st.session_state["page3_write_article_state"] == "not started":
-        _, search_form_column, _ = st.columns([2, 5, 2])
-        with search_form_column:
-            with st.form(key="search_form"):
-                # Text input for the search topic
-                DemoUIHelper.st_markdown_adjust_size(
-                    content="Enter the topic you want to learn in depth:", font_size=18
-                )
-                st.session_state["page3_topic"] = st.text_input(
-                    label="page3_topic", label_visibility="collapsed"
-                )
-                pass_appropriateness_check = True
+    if st.session_state["page3_write_article_state"] != "not started":
+        return
 
-                # Submit button for the form
-                submit_button = st.form_submit_button(label="Research")
-                # only start new search when button is clicked, not started, or already finished previous one
-                if submit_button and st.session_state["page3_write_article_state"] in [
-                    "not started",
-                    "show results",
-                ]:
-                    if not st.session_state["page3_topic"].strip():
-                        pass_appropriateness_check = False
-                        st.session_state["page3_warning_message"] = (
-                            "topic could not be empty"
-                        )
+    _follow_interface_language()
 
-                    st.session_state["page3_topic_name_cleaned"] = (
-                        st.session_state["page3_topic"]
-                        .replace(" ", "_")
-                        .replace("/", "_")
-                    )
-                    st.session_state["page3_topic_name_truncated"] = truncate_filename(
-                        st.session_state["page3_topic_name_cleaned"]
-                    )
-                    if not pass_appropriateness_check:
-                        st.session_state["page3_write_article_state"] = "not started"
-                        alert = st.warning(
-                            st.session_state["page3_warning_message"], icon="⚠️"
-                        )
-                        time.sleep(5)
-                        alert.empty()
-                    else:
-                        st.session_state["page3_write_article_state"] = "initiated"
+    ui_theme.hero(
+        eyebrow=t("create.eyebrow"),
+        title=t("create.title"),
+        subtitle=t("create.subtitle"),
+    )
+
+    _, form_column, _ = st.columns([1, 3, 1])
+    with form_column:
+        with st.form(key="search_form"):
+            topic = st.text_input(
+                t("create.topic"),
+                placeholder=t("create.topic_placeholder"),
+                label_visibility="collapsed",
+            )
+            language_column, button_column = st.columns([1, 2])
+            with language_column:
+                st.selectbox(
+                    t("create.article_language"),
+                    list(article_language.LANGUAGES),
+                    key="page3_language",
+                    label_visibility="collapsed",
+                )
+            with button_column:
+                submitted = st.form_submit_button(
+                    t("create.submit"), type="primary", use_container_width=True
+                )
+            st.caption(t("create.caption"))
+        if submitted:
+            _start_research(topic)
+            if st.session_state["page3_write_article_state"] == "initiated":
+                st.rerun()
+
+        st.markdown(
+            '<div class="side-label" style="margin-top:1.4rem;text-align:center">'
+            f'{t("create.try_example")}</div>',
+            unsafe_allow_html=True,
+        )
+        examples = EXAMPLE_TOPICS.get(_language(), EXAMPLE_TOPICS["English"])
+        example_columns = st.columns(len(examples))
+        for column, example in zip(example_columns, examples):
+            with column:
+                if st.button(example, key=f"eg_{example}", use_container_width=True):
+                    _start_research(example)
+                    st.rerun()
 
 
 def handle_initiated():
@@ -65,75 +121,82 @@ def handle_initiated():
 
         if "runner" not in st.session_state:
             demo_util.set_storm_runner()
+        # Rewrites STORM's writing prompts in place, so it has to happen before
+        # the run rather than when the (cached) runner was built.
+        article_language.apply(_language())
         st.session_state["page3_current_working_dir"] = current_working_dir
         st.session_state["page3_write_article_state"] = "pre_writing"
 
 
+def _running_header():
+    st.markdown(
+        f'<div class="article-head"><h1>{st.session_state["page3_topic"]}</h1>'
+        f'<div class="meta">{ui_theme.chips([t("create.in_progress")])}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def handle_pre_writing():
-    if st.session_state["page3_write_article_state"] == "pre_writing":
-        status = st.status(
-            "I am brain**STORM**ing now to research the topic. (This may take 2-3 minutes.)"
+    if st.session_state["page3_write_article_state"] != "pre_writing":
+        return
+
+    _running_header()
+    status = st.status(t("create.step1"), expanded=True)
+    st_callback_handler = demo_util.StreamlitCallbackHandler(status)
+    with status:
+        st.session_state["runner"].run(
+            topic=st.session_state["page3_topic"],
+            do_research=True,
+            do_generate_outline=True,
+            do_generate_article=False,
+            do_polish_article=False,
+            callback_handler=st_callback_handler,
         )
-        st_callback_handler = demo_util.StreamlitCallbackHandler(status)
-        with status:
-            # STORM main gen outline
-            st.session_state["runner"].run(
-                topic=st.session_state["page3_topic"],
-                do_research=True,
-                do_generate_outline=True,
-                do_generate_article=False,
-                do_polish_article=False,
-                callback_handler=st_callback_handler,
-            )
-            conversation_log_path = os.path.join(
-                st.session_state["page3_current_working_dir"],
-                st.session_state["page3_topic_name_truncated"],
-                "conversation_log.json",
-            )
-            demo_util._display_persona_conversations(
-                DemoFileIOHelper.read_json_file(conversation_log_path)
-            )
-            st.session_state["page3_write_article_state"] = "final_writing"
-            status.update(label="brain**STORM**ing complete!", state="complete")
+        conversation_log_path = os.path.join(
+            st.session_state["page3_current_working_dir"],
+            st.session_state["page3_topic_name_truncated"],
+            "conversation_log.json",
+        )
+        demo_util._display_persona_conversations(
+            DemoFileIOHelper.read_json_file(conversation_log_path)
+        )
+        st.session_state["page3_write_article_state"] = "final_writing"
+        status.update(label=t("create.step1_done"), state="complete")
 
 
 def handle_final_writing():
-    if st.session_state["page3_write_article_state"] == "final_writing":
-        # polish final article
-        with st.status(
-            "Now I will connect the information I found for your reference. (This may take 4-5 minutes.)"
-        ) as status:
-            st.info(
-                "Now I will connect the information I found for your reference. (This may take 4-5 minutes.)"
-            )
-            st.session_state["runner"].run(
-                topic=st.session_state["page3_topic"],
-                do_research=False,
-                do_generate_outline=False,
-                do_generate_article=True,
-                do_polish_article=True,
-                remove_duplicate=False,
-            )
-            # finish the session
-            st.session_state["runner"].post_run()
+    if st.session_state["page3_write_article_state"] != "final_writing":
+        return
 
-            # update status bar
-            st.session_state["page3_write_article_state"] = "prepare_to_show_result"
-            status.update(label="information snythesis complete!", state="complete")
+    with st.status(t("create.step2"), expanded=True) as status:
+        st.write(t("create.step2_writing"))
+        st.session_state["runner"].run(
+            topic=st.session_state["page3_topic"],
+            do_research=False,
+            do_generate_outline=False,
+            do_generate_article=True,
+            do_polish_article=True,
+            remove_duplicate=False,
+        )
+        st.session_state["runner"].post_run()
+
+        st.session_state["page3_write_article_state"] = "prepare_to_show_result"
+        status.update(label=t("create.step2_done"), state="complete")
 
 
 def handle_prepare_to_show_result():
     if st.session_state["page3_write_article_state"] == "prepare_to_show_result":
-        _, show_result_col, _ = st.columns([4, 3, 4])
-        with show_result_col:
-            if st.button("show final article"):
+        _, button_column, _ = st.columns([3, 2, 3])
+        with button_column:
+            if st.button(
+                t("create.read_article"), type="primary", use_container_width=True
+            ):
                 st.session_state["page3_write_article_state"] = "completed"
                 st.rerun()
 
 
 def handle_completed():
     if st.session_state["page3_write_article_state"] == "completed":
-        # display polished article
         current_working_dir_paths = DemoFileIOHelper.read_structure_to_dict(
             st.session_state["page3_current_working_dir"]
         )

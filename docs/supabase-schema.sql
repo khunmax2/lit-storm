@@ -76,9 +76,17 @@ create policy "read own profile" on public.profiles
 
 -- The app creates this row the first time someone signs in. Only ever your
 -- own, and the columns that matter are locked down by the grants below.
+--
+-- `email` is checked against the token rather than left to the caller. It is
+-- only ever displayed, so a wrong value impersonates nobody — but it is the
+-- address an admin reads off the roster before deciding who to promote, and
+-- that decision should not be made from a self-declared string.
 drop policy if exists "create own profile" on public.profiles;
 create policy "create own profile" on public.profiles
-    for insert with check (auth.uid() = id);
+    for insert with check (
+        auth.uid() = id
+        and email = auth.jwt() ->> 'email'
+    );
 
 drop policy if exists "update own profile" on public.profiles;
 create policy "update own profile" on public.profiles

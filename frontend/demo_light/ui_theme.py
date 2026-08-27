@@ -445,15 +445,23 @@ span[class*="material-icons"] {{
 /* Streamlit's sidebar header holds only the collapse button but reserves
    76px, and the padding here added another 26 on top of it — a third of the
    rail was empty before the logo. */
+/* The collapse button uses the right-hand end of a strip Streamlit reserves
+   across the whole rail, so the brand was pushed below an otherwise empty
+   row. The two belong on one line: the strip keeps its height for the
+   button, and the content below is pulled back up over it. Raising the
+   strip keeps the button clickable through the brand, which is not. */
 [data-testid="stSidebarHeader"] {{
     height: 2.25rem;
     padding-top: 0.25rem;
     padding-bottom: 0;
-    /* Streamlit puts a rem of margin under this strip as well. The strip
-       holds one 28px button; the brand should start right after it. */
     margin-bottom: 0 !important;
+    position: relative;
+    z-index: 2;
 }}
-[data-testid="stSidebarUserContent"] {{ padding-top: 0.25rem; }}
+[data-testid="stSidebarUserContent"] {{
+    padding-top: 0.25rem;
+    margin-top: -2rem;
+}}
 
 /* The rail is a column: navigation at the top, the account at the foot.
    Streamlit wraps a keyed container in a stLayoutWrapper, so the margin has
@@ -461,7 +469,7 @@ span[class*="material-icons"] {{
 [data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"]:has(
     > [data-testid="stLayoutWrapper"] > .st-key-side_account
 ) {{
-    min-height: calc(100vh - 7rem);
+    min-height: calc(100vh - 5rem);
 }}
 [data-testid="stLayoutWrapper"]:has(> .st-key-side_account) {{
     margin-top: auto !important;

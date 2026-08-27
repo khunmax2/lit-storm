@@ -104,6 +104,62 @@ _STRINGS = {
     "create.failed_detail": {"English": "Technical detail", "ไทย": "รายละเอียดทางเทคนิค"},
     "create.retry": {"English": "Start over", "ไทย": "เริ่มใหม่"},
     "create.read_article": {"English": "Read the article", "ไทย": "อ่านบทความ"},
+    # -- accounts ---------------------------------------------------------
+    "auth.title": {"English": "Sign in to STORM", "ไทย": "เข้าสู่ระบบ STORM"},
+    "auth.subtitle": {
+        "English": "Your research and the articles you generate stay with your "
+        "account.",
+        "ไทย": "งานค้นคว้าและบทความที่คุณสร้างจะผูกกับบัญชีของคุณ",
+    },
+    "auth.tab_signin": {"English": "Sign in", "ไทย": "เข้าสู่ระบบ"},
+    "auth.tab_signup": {"English": "Create account", "ไทย": "สมัครสมาชิก"},
+    "auth.email": {"English": "Email", "ไทย": "อีเมล"},
+    "auth.password": {"English": "Password", "ไทย": "รหัสผ่าน"},
+    "auth.name": {"English": "Display name", "ไทย": "ชื่อที่ใช้แสดง"},
+    "auth.do_signin": {"English": "Sign in", "ไทย": "เข้าสู่ระบบ"},
+    "auth.do_signup": {"English": "Create account", "ไทย": "สมัครสมาชิก"},
+    "auth.signout": {"English": "Sign out", "ไทย": "ออกจากระบบ"},
+    "auth.needs_fields": {
+        "English": "Enter an email and a password.",
+        "ไทย": "กรุณากรอกอีเมลและรหัสผ่าน",
+    },
+    "auth.password_short": {
+        "English": "Use at least 8 characters.",
+        "ไทย": "รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร",
+    },
+    "auth.check_email": {
+        "English": "Account created. Check your email for the confirmation "
+        "link, then sign in.",
+        "ไทย": "สร้างบัญชีแล้ว กรุณาเปิดอีเมลเพื่อยืนยัน แล้วจึงเข้าสู่ระบบ",
+    },
+    "auth.failed": {
+        "English": "That did not work. Check the address and password.",
+        "ไทย": "เข้าสู่ระบบไม่สำเร็จ ตรวจสอบอีเมลและรหัสผ่านอีกครั้ง",
+    },
+    "auth.not_configured": {
+        "English": "Sign-in is not set up: add SUPABASE_URL and "
+        "SUPABASE_ANON_KEY to .streamlit/secrets.toml.",
+        "ไทย": "ยังไม่ได้ตั้งค่าระบบสมาชิก — เพิ่ม SUPABASE_URL และ "
+        "SUPABASE_ANON_KEY ใน .streamlit/secrets.toml",
+    },
+    "auth.role_member": {"English": "Member", "ไทย": "สมาชิก"},
+    "auth.role_admin": {"English": "Admin", "ไทย": "ผู้ดูแล"},
+    "auth.quota": {
+        "English": "{used} of {limit} runs this month",
+        "ไทย": "ใช้ไป {used} จาก {limit} ครั้งในเดือนนี้",
+    },
+    "auth.quota_spent": {
+        "English": "You have used this month's {limit} research runs. An admin "
+        "can raise your limit.",
+        "ไทย": "คุณใช้สิทธิ์ค้นคว้าครบ {limit} ครั้งของเดือนนี้แล้ว "
+        "ผู้ดูแลสามารถเพิ่มโควตาให้ได้",
+    },
+    "auth.no_profile": {
+        "English": "Your account has no profile row yet. Run the schema in "
+        "docs/supabase-schema.sql.",
+        "ไทย": "บัญชีนี้ยังไม่มีข้อมูลโปรไฟล์ กรุณารันสคีมาใน "
+        "docs/supabase-schema.sql",
+    },
     # -- landing / home --------------------------------------------------
     "nav.home": {"English": "Home", "ไทย": "หน้าแรก"},
     "home.hero_note": {

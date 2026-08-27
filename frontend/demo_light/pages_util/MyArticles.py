@@ -11,8 +11,7 @@ CARDS_PER_ROW = 3
 
 def _load_articles():
     if "page2_user_articles_file_path_dict" not in st.session_state:
-        local_dir = os.path.join(demo_util.get_demo_dir(), "DEMO_WORKING_DIR")
-        os.makedirs(local_dir, exist_ok=True)
+        local_dir = demo_util.working_dir()
         st.session_state["page2_user_articles_file_path_dict"] = (
             DemoFileIOHelper.read_structure_to_dict(local_dir)
         )

@@ -607,6 +607,27 @@ span[class*="material-icons"] {{
     color: #C6CEDD !important;
 }}
 
+/* ---------- who is signed in ---------- */
+.side-account {{
+    padding: 0.7rem 0 0.9rem 0;
+    margin-top: 0.4rem;
+    border-top: 1px solid #263048;
+}}
+.side-account .who {{
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #F2F5FA;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+.side-account .meta {{
+    font-size: 0.74rem;
+    color: #8C97AE;
+    margin-top: 0.15rem;
+}}
+.side-account .sep {{ opacity: 0.5; }}
+
 /* ---------- the aside column: contents and references ---------- */
 /* The article is a tall scroll; the panels beside it stay put. */
 [data-testid="stColumn"]:last-child:has(.aside-title) {{

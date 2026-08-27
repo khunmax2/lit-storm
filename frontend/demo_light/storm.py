@@ -7,7 +7,7 @@ import demo_util
 import streamlit as st
 import ui_language
 import ui_theme
-from pages_util import MyArticles, CreateNewArticle
+from pages_util import Account, MyArticles, CreateNewArticle
 from ui_language import t
 
 # The page names double as `nav_page` state, so they stay these fixed English
@@ -33,6 +33,14 @@ def main():
     ui_theme.apply()
     ui_language.selector()
     ui_theme.sidebar_brand()
+
+    # Nothing else is drawn until there is an account behind the request:
+    # every run spends the deployment's API credit, and every article belongs
+    # to somebody.
+    if not Account.gate():
+        return
+
+    Account.sidebar_account()
 
     if "first_run" not in st.session_state:
         st.session_state["first_run"] = True

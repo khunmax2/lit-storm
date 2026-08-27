@@ -10,6 +10,7 @@ from typing import Optional
 import markdown
 import pytz
 import streamlit as st
+import auth
 import ui_language
 import ui_theme
 from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
@@ -514,6 +515,20 @@ def _display_main_article(
             )
 
 
+def working_dir():
+    """Where this user's articles live.
+
+    Everything used to land in one shared folder, so every account would have
+    seen every other account's work. Scoping by user id keeps them apart on
+    disk as well as in the database.
+    """
+    root = os.path.join(get_demo_dir(), "DEMO_WORKING_DIR")
+    owner = auth.user_id()
+    path = os.path.join(root, owner) if owner else root
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def get_demo_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -532,9 +547,7 @@ def clear_other_page_session_state(page_index: Optional[int]):
 
 
 def set_storm_runner():
-    current_working_dir = os.path.join(get_demo_dir(), "DEMO_WORKING_DIR")
-    if not os.path.exists(current_working_dir):
-        os.makedirs(current_working_dir)
+    current_working_dir = working_dir()
 
     # configure STORM runner with Google Gemini + DuckDuckGo
     llm_configs = STORMWikiLMConfigs()

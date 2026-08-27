@@ -47,8 +47,6 @@ def main():
     if not Account.gate():
         return
 
-    Account.sidebar_account()
-
     if "first_run" not in st.session_state:
         st.session_state["first_run"] = True
 
@@ -89,6 +87,9 @@ def main():
             key="nav_page",
             label_visibility="collapsed",
         )
+
+    # After the navigation, and pinned to the foot of the rail by CSS.
+    Account.sidebar_account()
 
     # A segmented control can be deselected by clicking the active option.
     selection = st.session_state["nav_page"] or CREATE_PAGE

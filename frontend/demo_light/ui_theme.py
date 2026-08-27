@@ -378,7 +378,25 @@ span[class*="material-icons"] {{
     background: var(--canvas);
     border-right: 1px solid var(--line);
 }}
-[data-testid="stSidebarUserContent"] {{ padding-top: 1.6rem; }}
+/* Streamlit's sidebar header holds only the collapse button but reserves
+   76px, and the padding here added another 26 on top of it — a third of the
+   rail was empty before the logo. */
+[data-testid="stSidebarHeader"] {{
+    height: 2.6rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0;
+}}
+[data-testid="stSidebarUserContent"] {{ padding-top: 0.25rem; }}
+
+/* The rail is a column: navigation at the top, the account at the foot. */
+[data-testid="stSidebarUserContent"] > div[data-testid="stVerticalBlock"] {{
+    min-height: calc(100vh - 6rem);
+}}
+.st-key-side_account {{
+    margin-top: auto;
+    padding-top: 0.6rem;
+    border-top: 1px solid #263048;
+}}
 .side-label {{
     font-size: 0.7rem;
     font-weight: 650;
@@ -606,12 +624,20 @@ span[class*="material-icons"] {{
     border-color: #2C3550 !important;
     color: #C6CEDD !important;
 }}
+.st-key-side_account .stButton > button {{
+    border: none !important;
+    color: #8C97AE !important;
+    justify-content: flex-start !important;
+    padding-left: 0.7rem !important;
+}}
+.st-key-side_account .stButton > button:hover {{
+    color: #F2F5FA !important;
+    background: #1C2438 !important;
+}}
 
 /* ---------- who is signed in ---------- */
 .side-account {{
-    padding: 0.7rem 0 0.9rem 0;
-    margin-top: 0.4rem;
-    border-top: 1px solid #263048;
+    padding: 0 0 0.5rem 0;
 }}
 .side-account .who {{
     font-size: 0.9rem;

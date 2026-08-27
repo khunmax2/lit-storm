@@ -97,23 +97,31 @@ def gate():
 
 
 def sidebar_account():
-    """Who is signed in, what they may still spend, and the way out."""
-    profile = auth.profile()
-    if profile is None:
-        st.sidebar.warning(t("auth.no_profile"))
-    else:
-        role_label = (
-            t("auth.role_admin") if auth.is_admin() else t("auth.role_member")
-        )
-        used, limit = auth.quota()
-        st.sidebar.markdown(
-            f'<div class="side-account">'
-            f'<div class="who">{auth.display_name()}</div>'
-            f'<div class="meta">{role_label}'
-            f'<span class="sep"> · </span>'
-            f'{t("auth.quota", used=used, limit=limit)}</div></div>',
-            unsafe_allow_html=True,
-        )
-    if st.sidebar.button(t("auth.signout"), use_container_width=True):
-        auth.sign_out()
-        st.rerun()
+    """Who is signed in, what they may still spend, and the way out.
+
+    Drawn after the navigation and pushed to the foot of the rail: it is who
+    you are, not where you are going, and it should not sit between the brand
+    and the menu.
+    """
+    with st.sidebar.container(key="side_account"):
+        profile = auth.profile()
+        if profile is None:
+            st.warning(t("auth.no_profile"))
+        else:
+            role_label = (
+                t("auth.role_admin") if auth.is_admin() else t("auth.role_member")
+            )
+            used, limit = auth.quota()
+            st.markdown(
+                f'<div class="side-account">'
+                f'<div class="who">{auth.display_name()}</div>'
+                f'<div class="meta">{role_label}'
+                f'<span class="sep"> · </span>'
+                f'{t("auth.quota", used=used, limit=limit)}</div></div>',
+                unsafe_allow_html=True,
+            )
+        if st.button(
+            t("auth.signout"), type="tertiary", use_container_width=True
+        ):
+            auth.sign_out()
+            st.rerun()

@@ -16,73 +16,75 @@ from ui_language import t
 # Colour tokens, one set per theme. Keep these in sync with the
 # [theme.light] / [theme.dark] sections of .streamlit/config.toml.
 LIGHT = {
-    "brand": "#E11D62",
-    "brand-hover": "#C4104F",
-    "brand-soft": "#FDE7EF",
+    # Blue, on a slate-grey page. The rail is dark navy in this theme too —
+    # in the reference the frame stays dark while the page is light, which is
+    # what keeps the two reading as different surfaces.
+    "brand": "#1D4ED8",
+    "brand-hover": "#1E40AF",
+    "brand-soft": "#E8EEFC",
     "on-brand": "#FFFFFF",
-    "ink": "#14161A",
-    "muted": "#69707D",
-    "line": "#E5E8EF",
-    "line-strong": "#C9CEDA",
-    "canvas": "#F7F8FA",
+    "ink": "#0F172A",
+    "muted": "#64748B",
+    "line": "#E2E8F0",
+    "line-strong": "#CBD5E1",
+    "canvas": "#F1F5F9",
     "surface": "#FFFFFF",
-    "nav-hover": "#ECEFF4",
-    "shadow": "rgba(20, 22, 26, 0.18)",
-    "shadow-soft": "rgba(20, 22, 26, 0.25)",
-    # The rail has its own ramp. It is a surface in its own right rather than
-    # a slice of the page, so its greys are cooler and its steps are its own;
-    # reusing the page tokens made it disappear into the content.
-    "rail-bg": "#F5F7FA",
-    "rail-line": "#DFE4EC",
-    "rail-line-soft": "#E3E7EF",
-    "rail-ink": "#14161A",
-    "rail-text": "#3C4353",
-    "rail-muted": "#69707D",
-    "rail-nav": "#4B5364",
-    "rail-hover": "#EAEEF5",
-    "rail-active": "#E1E8F4",
-    "rail-active-ink": "#14161A",
-    "rail-border": "#D3D9E4",
+    "nav-hover": "#EEF2F8",
+    "shadow": "rgba(15, 23, 42, 0.16)",
+    "shadow-soft": "rgba(15, 23, 42, 0.22)",
+    # The rail. Same values in both themes: it is the product's frame, and
+    # the reference draws it dark against a light page.
+    "rail-bg": "#0D1A2D",
+    "rail-line": "#1B2C45",
+    "rail-line-soft": "#1B2C45",
+    "rail-ink": "#F1F5F9",
+    "rail-text": "#CBD5E1",
+    "rail-muted": "#94A3B8",
+    "rail-nav": "#A8B5CA",
+    "rail-hover": "#16283F",
+    "rail-active": "#1D4ED8",
+    "rail-active-ink": "#FFFFFF",
+    "rail-border": "#25384F",
 }
 
+
 DARK = {
-    "brand": "#FF5C87",
-    "brand-hover": "#FF7C9F",
-    "brand-soft": "rgba(255, 92, 135, 0.16)",
-    # The dark-mode brand is a light pink, so it needs dark text on top.
-    "on-brand": "#14171E",
-    "ink": "#E9ECF1",
-    "muted": "#98A1B0",
-    "line": "#272C36",
-    "line-strong": "#3A424F",
-    "canvas": "#14171E",
-    "surface": "#181C24",
-    "nav-hover": "#1E232C",
+    # The same blue family, lightened to carry on a dark page, and the page
+    # itself moved off neutral black onto the navy the rail is cut from.
+    "brand": "#60A5FA",
+    "brand-hover": "#93C5FD",
+    "brand-soft": "rgba(96, 165, 250, 0.16)",
+    # The dark-mode brand is a light blue, so it needs dark text on top.
+    "on-brand": "#0B1220",
+    "ink": "#E2E8F0",
+    "muted": "#94A3B8",
+    "line": "#1E293B",
+    "line-strong": "#334155",
+    "canvas": "#111A2B",
+    "surface": "#131E31",
+    "nav-hover": "#1A2740",
     "shadow": "rgba(0, 0, 0, 0.55)",
     "shadow-soft": "rgba(0, 0, 0, 0.6)",
-    # Dark navy rather than the page's near-black: the rail reads as the
-    # product's frame either way, and in this theme that means darker and
-    # bluer than the article beside it.
-    "rail-bg": "#131A2B",
-    "rail-line": "#1F2940",
-    "rail-line-soft": "#263048",
-    "rail-ink": "#F2F5FA",
-    "rail-text": "#C6CEDD",
-    "rail-muted": "#8C97AE",
-    "rail-nav": "#A7B1C6",
-    "rail-hover": "#1C2438",
-    "rail-active": "#1F2A44",
+    "rail-bg": "#0D1A2D",
+    "rail-line": "#1B2C45",
+    "rail-line-soft": "#1B2C45",
+    "rail-ink": "#F1F5F9",
+    "rail-text": "#CBD5E1",
+    "rail-muted": "#94A3B8",
+    "rail-nav": "#A8B5CA",
+    "rail-hover": "#16283F",
+    "rail-active": "#1D4ED8",
     "rail-active-ink": "#FFFFFF",
-    "rail-border": "#2C3550",
+    "rail-border": "#25384F",
 }
+
 
 # Trirong (serif) and IBM Plex Sans Thai both ship Thai *and* Latin glyphs.
 # A Latin-only pairing would leave Thai text to a system fallback, so the same
 # page would render in two unrelated typefaces depending on the language.
 FONT_IMPORT = (
     "@import url('https://fonts.googleapis.com/css2?"
-    "family=IBM+Plex+Sans+Thai:wght@400;500;600&"
-    "family=Trirong:wght@500;600;700&display=swap');"
+    "family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');"
 )
 
 FONT_STACK = (
@@ -90,7 +92,10 @@ FONT_STACK = (
     '"Helvetica Neue", Arial, sans-serif'
 )
 
-DISPLAY_STACK = '"Trirong", Georgia, "Times New Roman", serif'
+# Headings are the body face at a heavier weight and tighter tracking rather
+# than a second family: the reference sets the whole interface in one sans,
+# and a serif heading over a sans page read as a different product.
+DISPLAY_STACK = FONT_STACK
 
 
 def _vars():
@@ -326,6 +331,14 @@ span[class*="material-icons"] {{
     transition: border-color 0.15s ease, box-shadow 0.15s ease,
         transform 0.15s ease;
 }}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.acard) .stButton > button {{
+    color: var(--brand) !important;
+    font-weight: 550 !important;
+}}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.acard) .stButton > button:hover:not(:disabled) {{
+    background: var(--brand-soft) !important;
+    border-color: var(--brand) !important;
+}}
 [data-testid="stVerticalBlockBorderWrapper"]:has(.acard):hover {{
     border-color: var(--line-strong);
     box-shadow: 0 6px 20px -8px var(--shadow);
@@ -354,6 +367,18 @@ span[class*="material-icons"] {{
     text-overflow: ellipsis;
 }}
 .acard .meta .sep {{ opacity: 0.45; padding: 0 0.35rem; }}
+/* A run that never finished is a state, not a measurement, so it is set
+   apart from the date and the counts rather than listed beside them. */
+.acard .state {{
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--brand);
+    background: var(--brand-soft);
+    border-radius: 999px;
+    padding: 0.14rem 0.55rem;
+    margin-bottom: 0.6rem;
+}}
 .acard .excerpt {{
     font-size: 0.84rem;
     line-height: 1.55;
@@ -621,14 +646,12 @@ span[class*="material-icons"] {{
     background: transparent !important;
     color: var(--muted) !important;
     font-weight: 550 !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     /* Taller rows with a wider gutter: a rail of destinations reads as a
        list, not as a row of buttons that happen to be stacked. */
-    padding: 0.62rem 0.8rem !important;
+    padding: 0.66rem 0.85rem !important;
     width: 100% !important;
     justify-content: flex-start !important;
-    /* Room for the marker the active row grows on its left edge. */
-    border-left: 3px solid transparent !important;
 }}
 .st-key-nav_page button[data-variant="segmented_control"] > div {{
     gap: 0.65rem !important;
@@ -643,12 +666,12 @@ span[class*="material-icons"] {{
     background: var(--nav-hover) !important;
     color: var(--ink) !important;
 }}
-/* The active row is marked with the brand rather than a raised card; a
-   sidebar list reads better flat. */
+/* The active row is a filled pill in the brand, as in the reference: on a
+   dark rail a tint of the brand is too quiet to find at a glance. */
 .st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
-    background: var(--brand-soft) !important;
-    color: var(--brand) !important;
-    font-weight: 650 !important;
+    background: var(--brand) !important;
+    color: var(--on-brand) !important;
+    font-weight: 600 !important;
 }}
 
 /* ---------- top bar ---------- */
@@ -857,7 +880,6 @@ span[class*="material-icons"] {{
 .st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
     background: var(--rail-active) !important;
     color: var(--rail-active-ink) !important;
-    border-left-color: var(--brand) !important;
 }}
 /* Everything the article page puts in the rail has to be legible on it. */
 [data-testid="stSidebar"] [data-testid="stExpander"] details {{

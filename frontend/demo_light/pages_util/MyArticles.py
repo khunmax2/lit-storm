@@ -34,25 +34,29 @@ def _article_card(column, article_name, file_path_dict):
         meta = [ui_theme.humanize_date(mtime), ui_theme.length_label(length)]
         if sources:
             meta.append(t("articles.sources", n=sources))
+        state = ""
         ready = True
     else:
-        # A run that was interrupted before the article was written.
-        meta = [t("articles.incomplete")]
+        # A run that was interrupted before the article was written. That is a
+        # state rather than a measurement, so it is not listed beside the date
+        # and the counts.
+        meta = []
+        state = t("articles.incomplete")
         excerpt = t("articles.incomplete_body")
         ready = False
 
     with column:
         with st.container(border=True):
-            st.markdown(
-                f'<div class="acard">'
-                f'<div class="title">{title}</div>'
-                f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
-                f'<div class="excerpt">{excerpt}</div>'
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+            body = f'<div class="acard"><div class="title">{title}</div>'
+            if state:
+                body += f'<div class="state">{state}</div>'
+            if meta:
+                body += f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
+            body += f'<div class="excerpt">{excerpt}</div></div>'
+            st.markdown(body, unsafe_allow_html=True)
             return st.button(
                 t("articles.read") if ready else t("articles.inspect"),
+                icon=":material/description:" if ready else ":material/search:",
                 key=f"open_{article_name}",
                 use_container_width=True,
                 disabled=not ready,
@@ -125,6 +129,7 @@ def my_articles_page():
         query = st.text_input(
             t("articles.search"),
             placeholder=t("articles.search_placeholder"),
+            icon=":material/search:",
             label_visibility="collapsed",
         )
     if query:

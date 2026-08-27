@@ -461,6 +461,10 @@ span[class*="material-icons"] {{
 [data-testid="stSidebarUserContent"] {{
     padding-top: 0.25rem;
     margin-top: -2rem;
+    /* Streamlit reserves 6rem under the rail's content for a scroll that a
+       column pinned to the viewport never has, which left the account
+       block floating short of the foot. */
+    padding-bottom: 1rem;
 }}
 
 /* The rail is a column: navigation at the top, the account at the foot.
@@ -469,7 +473,7 @@ span[class*="material-icons"] {{
 [data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"]:has(
     > [data-testid="stLayoutWrapper"] > .st-key-side_account
 ) {{
-    min-height: calc(100vh - 5rem);
+    min-height: calc(100vh - 1.5rem);
 }}
 [data-testid="stLayoutWrapper"]:has(> .st-key-side_account) {{
     margin-top: auto !important;

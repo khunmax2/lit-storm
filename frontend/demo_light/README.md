@@ -41,19 +41,59 @@ enough, since nothing here needs conda's non-Python packages.
 `-e .` is what puts `knowledge_storm` on the path. Skipping it is the usual
 cause of `ModuleNotFoundError: No module named 'knowledge_storm'`.
 
-### 3. Add your API key
+### 3. Add your keys
 
-Create `frontend/demo_light/.streamlit/secrets.toml`:
-
-```toml
-GOOGLE_API_KEY = "your-key-here"
+```bash
+cp frontend/demo_light/.streamlit/secrets.toml.example \
+   frontend/demo_light/.streamlit/secrets.toml
 ```
 
-Get a key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key).
+Then fill it in:
+
+```toml
+GOOGLE_API_KEY    = "..."   # https://ai.google.dev/gemini-api/docs/api-key
+SUPABASE_URL      = "..."   # Supabase -> Project Settings -> Data API
+SUPABASE_ANON_KEY = "..."   # the anon public key, never service_role
+```
+
 The quotes are required — TOML rejects a bare unquoted value, and Streamlit
 reports it as a missing key rather than a syntax error.
 
-The file is gitignored and must stay that way.
+`secrets.toml` is gitignored and must stay that way; only the `.example` is
+tracked. Every one of these is also read from the environment when it is
+absent from the file, which is how they reach a container.
+
+Leave the Supabase pair empty to run without accounts — the sign-in screen
+will say what is missing instead of failing.
+
+### 3b. Set up accounts
+
+Accounts, roles and the per-person run quota live in Supabase.
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Paste [docs/supabase-schema.sql](../../docs/supabase-schema.sql) into the
+   SQL editor and run it once. It creates `profiles` and `runs`, the
+   row-level policies, and a trigger that gives every sign-up a profile.
+3. While testing locally, turn off e-mail confirmation under
+   Authentication → Providers → Email, or no one can sign in until they open
+   a confirmation link.
+4. Sign up through the app, then make yourself an admin:
+
+   ```sql
+   update public.profiles set role = 'admin' where email = 'you@example.com';
+   ```
+
+There are two roles. A `member` signs up and creates reports — that is what
+the app is for. An `admin` does that and also sees everyone's runs and manages
+the roster under **Members**.
+
+Spending is not a role: every member can create reports, and what keeps one
+shared API key from paying for all of it is `monthly_run_limit` on each
+profile, which an admin changes per person. Failed runs count against it.
+
+Sessions live in Streamlit's session state, so reloading the page signs you
+out. Streamlit has no cookie API; this is a limitation of running auth inside
+it rather than a missing feature here.
 
 ### 4. Run
 

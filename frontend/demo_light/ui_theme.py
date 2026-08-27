@@ -48,10 +48,22 @@ DARK = {
     "shadow-soft": "rgba(0, 0, 0, 0.6)",
 }
 
-FONT_STACK = (
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", '
-    "Arial, sans-serif"
+# Trirong (serif) and IBM Plex Sans Thai both ship Thai *and* Latin glyphs.
+# A Latin-only pairing would leave Thai text to a system fallback, so the same
+# page would render in two unrelated typefaces depending on the language.
+FONT_IMPORT = (
+    "@import url('https://fonts.googleapis.com/css2?"
+    "family=IBM+Plex+Sans+Thai:wght@400;500;600&"
+    "family=Trirong:wght@500;600;700&display=swap');"
 )
+
+FONT_STACK = (
+    '"IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", '
+    '"Helvetica Neue", Arial, sans-serif'
+)
+
+DISPLAY_STACK = '"Trirong", Georgia, "Times New Roman", serif'
+
 
 def _vars():
     """Every token as `light-dark(light, dark)`.
@@ -70,12 +82,18 @@ def _vars():
 
 _CSS = f"""
 <style>
+{FONT_IMPORT}
+
 .stApp {{
 {_vars()}
 }}
 
 html, body, [class*="st-"], button, input, textarea {{
     font-family: {FONT_STACK};
+}}
+
+h1, h2, h3, .hero h1, .page-head h1, .article-head h1, .lp-step .t {{
+    font-family: {DISPLAY_STACK};
 }}
 
 /* ...but never on the icon spans, whose glyphs are font ligatures. */
@@ -122,7 +140,7 @@ span[class*="material-icons"] {{
 }}
 .hero .eyebrow {{
     display: inline-block;
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -146,6 +164,89 @@ span[class*="material-icons"] {{
     margin: 0 auto;
     max-width: 34rem;
     line-height: 1.6;
+}}
+
+/* ---------- landing ---------- */
+/* Swiss-modernist section marker: small, spaced, sitting on a hairline. */
+.lp-label {{
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 0.6rem;
+    margin: 3.2rem 0 1.6rem 0;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}}
+
+.lp-note {{
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 1rem;
+}}
+
+/* Three columns on a shared baseline; collapses to one on small screens
+   rather than shrinking into unreadable columns. */
+.lp-steps {{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}}
+@media (max-width: 820px) {{
+    .lp-steps {{ grid-template-columns: 1fr; gap: 1.6rem; }}
+}}
+.lp-step .n {{
+    font-family: {DISPLAY_STACK};
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--brand);
+    display: block;
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.8rem;
+    border-top: 2px solid var(--brand);
+    padding-top: 0.7rem;
+}}
+.lp-step .t {{
+    font-size: 1.02rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+}}
+.lp-step .b {{
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--muted);
+    /* 65-75 characters is the readable measure; the column is usually
+       narrower than this, so it only bites on very wide screens. */
+    max-width: 34ch;
+}}
+
+/* Touch targets. 40px clears the WCAG 2.2 minimum but sits under the 44px
+   platform guidance, which is what thumbs actually need — so raise our own
+   controls on the widths where the pointer is a finger. */
+@media (max-width: 768px) {{
+    .stButton > button,
+    [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stSegmentedControl"] button,
+    .st-key-nav_page button[data-variant="segmented_control"] {{
+        min-height: 44px;
+    }}
+    [data-testid="stTextInputRootElement"],
+    [data-baseweb="select"] > div {{
+        min-height: 44px;
+    }}
+}}
+
+@media (prefers-reduced-motion: reduce) {{
+    *, *::before, *::after {{
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }}
 }}
 
 /* ---------- article cards ---------- */
@@ -205,7 +306,13 @@ span[class*="material-icons"] {{
     border-radius: 16px;
     background: var(--canvas);
 }}
-.empty .icon {{ font-size: 2.2rem; }}
+.empty .icon {{
+    display: block;
+    font-size: 2.4rem;
+    line-height: 1;
+    color: var(--muted);
+    margin-bottom: 0.2rem;
+}}
 .empty h3 {{
     font-size: 1.1rem;
     font-weight: 650;
@@ -329,6 +436,9 @@ span[class*="material-icons"] {{
     border-bottom: 1px solid var(--line);
 }}
 .side-brand .name {{
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 1.15rem;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -420,10 +530,30 @@ def apply():
 def sidebar_brand():
     """Keeps the sidebar from looking abandoned on pages with no TOC."""
     st.sidebar.markdown(
-        '<div class="side-brand"><div class="name">🌪️ STORM</div>'
+        '<div class="side-brand"><div class="name">'
+        '<span class="material-symbols-rounded">cyclone</span> STORM</div>'
         f'<div class="tag">{t("brand.tagline")}</div></div>',
         unsafe_allow_html=True,
     )
+
+
+def section_label(text, aside=""):
+    """The hairline section marker the landing page is divided by."""
+    right = f"<span>{aside}</span>" if aside else ""
+    st.markdown(
+        f'<div class="lp-label"><span>{text}</span>{right}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def steps(items):
+    """`items` is a sequence of (title, body); numbering is added here."""
+    cells = "".join(
+        f'<div class="lp-step"><span class="n">{index:02d}</span>'
+        f'<div class="t">{title}</div><div class="b">{body}</div></div>'
+        for index, (title, body) in enumerate(items, start=1)
+    )
+    st.markdown(f'<div class="lp-steps">{cells}</div>', unsafe_allow_html=True)
 
 
 def page_header(title, subtitle=""):
@@ -442,8 +572,10 @@ def hero(title, subtitle, eyebrow=""):
 
 
 def empty_state(icon, title, body):
+    """`icon` is a Material Symbols name, e.g. "library_books"."""
     st.markdown(
-        f'<div class="empty"><div class="icon">{icon}</div>'
+        f'<div class="empty">'
+        f'<span class="material-symbols-rounded icon">{icon}</span>'
         f"<h3>{title}</h3><p>{body}</p></div>",
         unsafe_allow_html=True,
     )

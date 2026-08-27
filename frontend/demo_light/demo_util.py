@@ -492,6 +492,8 @@ def _display_main_article(
 
     # display conversation history
     if show_conversation and "conversation_log" in article_data:
+        # No icon: Streamlit renders the expander's icon slot as the raw
+        # ligature name rather than a glyph, and the chevron already marks it.
         with st.expander(t("article.conversation")):
             _display_persona_conversations(
                 conversation_log=article_data.get("conversation_log", {})

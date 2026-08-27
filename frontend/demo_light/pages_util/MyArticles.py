@@ -99,9 +99,9 @@ def my_articles_page():
     if not articles:
         ui_theme.page_header(t("nav.articles"))
         ui_theme.empty_state(
-            "📚",
+            "library_books",
             t("articles.empty_title"),
-            t("articles.empty_body", create=t("nav.create")),
+            t("articles.empty_body", create=t("nav.home")),
         )
         _, button_col, _ = st.columns([3, 2, 3])
         with button_col:
@@ -110,7 +110,7 @@ def my_articles_page():
                 type="primary",
                 use_container_width=True,
             ):
-                st.session_state["nav_page"] = "Create New Article"
+                st.session_state["nav_pending"] = "Create New Article"
                 st.rerun()
         return
 
@@ -136,7 +136,7 @@ def my_articles_page():
         article_names = [n for n in article_names if needle in n.lower()]
         if not article_names:
             ui_theme.empty_state(
-                "🔍", t("articles.no_match_title"), t("articles.no_match_body", query=query)
+                "search_off", t("articles.no_match_title"), t("articles.no_match_body", query=query)
             )
             return
 

@@ -88,6 +88,47 @@ _STRINGS = {
         "ไทย": "ขั้นที่ 2 จาก 2 · บทความพร้อมแล้ว",
     },
     "create.read_article": {"English": "Read the article", "ไทย": "อ่านบทความ"},
+    # -- landing / home --------------------------------------------------
+    "nav.home": {"English": "Home", "ไทย": "หน้าแรก"},
+    "home.hero_note": {
+        "English": "Every claim carries a citation you can open and check.",
+        "ไทย": "ทุกข้อความมีแหล่งอ้างอิงที่กดเปิดตรวจสอบได้",
+    },
+    "home.how_label": {"English": "How it works", "ไทย": "ทำงานอย่างไร"},
+    "home.step1_title": {
+        "English": "It finds the angles you would not have asked about",
+        "ไทย": "หามุมที่คุณอาจนึกไม่ถึง",
+    },
+    "home.step1_body": {
+        "English": "STORM reads around the topic first, then assembles a panel of "
+        "editors — a historian, an economist, a practitioner — who each "
+        "interview the subject from their own angle.",
+        "ไทย": "STORM อ่านเรื่องรอบ ๆ หัวข้อก่อน แล้วตั้งคณะผู้เขียนหลายมุม "
+        "เช่น นักประวัติศาสตร์ นักเศรษฐศาสตร์ คนทำงานจริง "
+        "ให้แต่ละคนสัมภาษณ์หัวข้อจากมุมของตัวเอง",
+    },
+    "home.step2_title": {
+        "English": "Every question becomes a real search",
+        "ไทย": "ทุกคำถามถูกแปลงเป็นการค้นจริง",
+    },
+    "home.step2_body": {
+        "English": "Each question is turned into search queries, the pages are read, "
+        "and the source behind every answer is kept.",
+        "ไทย": "แต่ละคำถามถูกแปลงเป็นคำค้น ระบบเปิดอ่านหน้าเว็บจริง "
+        "และเก็บแหล่งที่มาของทุกคำตอบไว้",
+    },
+    "home.step3_title": {
+        "English": "You get an article, not a summary",
+        "ไทย": "ได้บทความ ไม่ใช่บทสรุป",
+    },
+    "home.step3_body": {
+        "English": "The findings are organised into an outline and written up section "
+        "by section, with inline citations and a reference list.",
+        "ไทย": "ข้อมูลที่ได้ถูกจัดเป็นโครงเรื่อง แล้วเขียนทีละหัวข้อ "
+        "พร้อมอ้างอิงในเนื้อความและรายการแหล่งข้อมูลท้ายบทความ",
+    },
+    "home.recent_label": {"English": "Made with STORM", "ไทย": "ตัวอย่างผลงาน"},
+    "home.recent_all": {"English": "See all articles", "ไทย": "ดูบทความทั้งหมด"},
     # -- the library -----------------------------------------------------
     # `{s}` is the English plural suffix; Thai simply ignores it.
     "articles.count": {"English": "{n} article{s}", "ไทย": "{n} บทความ"},
@@ -142,9 +183,9 @@ _STRINGS = {
     },
     "article.highlights": {"English": "Highlights", "ไทย": "ข้อความสำคัญจากแหล่งข้อมูล"},
     "article.conversation": {
-        "English": "🧠 See how STORM researched this — the agent interviews the topic "
+        "English": "See how STORM researched this — the agent interviews the topic "
         "from several perspectives before writing",
-        "ไทย": "🧠 ดูวิธีที่ STORM ค้นคว้า — ระบบจะสัมภาษณ์หัวข้อนี้จากหลายมุมมองก่อนลงมือเขียน",
+        "ไทย": "ดูวิธีที่ STORM ค้นคว้า — ระบบจะสัมภาษณ์หัวข้อนี้จากหลายมุมมองก่อนลงมือเขียน",
     },
     # -- research progress -----------------------------------------------
     "status.perspectives_start": {

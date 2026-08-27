@@ -12,12 +12,12 @@ EXAMPLE_TOPICS = {
     "English": [
         "The history of Thai silk",
         "Perovskite solar cells",
-        "Slow travel in Japan",
+        "AI adoption among Thai SMEs",
     ],
     "ไทย": [
         "ประวัติศาสตร์ผ้าไหมไทย",
         "เซลล์แสงอาทิตย์เพอรอฟสไกต์",
-        "ภูมิปัญญาการทอผ้าล้านนา",
+        "แนวโน้มการใช้ AI ในธุรกิจไทย",
     ],
 }
 
@@ -52,13 +52,82 @@ def _start_research(topic):
     """Move the page into the research state for `topic`."""
     topic = topic.strip()
     if not topic:
-        st.warning(t("create.needs_topic"), icon="⚠️")
+        st.warning(t("create.needs_topic"), icon=":material/warning:")
         return
     cleaned = topic.replace(" ", "_").replace("/", "_")
     st.session_state["page3_topic"] = topic
     st.session_state["page3_topic_name_cleaned"] = cleaned
     st.session_state["page3_topic_name_truncated"] = truncate_filename(cleaned)
     st.session_state["page3_write_article_state"] = "initiated"
+
+
+def _recent_articles(limit=3):
+    """The newest finished articles, as (name, path, mtime).
+
+    Reads the directory directly rather than going through the library page,
+    whose cache lives under a `page2_` key that is cleared while this page is
+    the active one.
+    """
+    root = os.path.join(demo_util.get_demo_dir(), "DEMO_WORKING_DIR")
+    if not os.path.isdir(root):
+        return []
+    found = []
+    for name in os.listdir(root):
+        for filename in ("storm_gen_article_polished.txt", "storm_gen_article.txt"):
+            path = os.path.join(root, name, filename)
+            if os.path.exists(path):
+                found.append((name, path, os.path.getmtime(path)))
+                break
+    return sorted(found, key=lambda row: row[2], reverse=True)[:limit]
+
+
+def _open_in_library(article_name):
+    st.session_state["nav_pending"] = "My Articles"
+    st.session_state["page2_selected_my_article"] = article_name
+    st.rerun()
+
+
+def _how_it_works():
+    ui_theme.section_label(t("home.how_label"))
+    ui_theme.steps(
+        [
+            (t("home.step1_title"), t("home.step1_body")),
+            (t("home.step2_title"), t("home.step2_body")),
+            (t("home.step3_title"), t("home.step3_body")),
+        ]
+    )
+
+
+def _recent_work():
+    """Proof the thing works, drawn from what this instance has actually made."""
+    recent = _recent_articles()
+    if not recent:
+        return
+
+    ui_theme.section_label(t("home.recent_label"))
+    columns = st.columns(3, gap="medium")
+    for column, (name, path, mtime) in zip(columns, recent):
+        length, sources, excerpt = ui_theme.summarize_article(
+            path,
+            os.path.join(os.path.dirname(path), "url_to_info.json"),
+            mtime,
+        )
+        meta = [ui_theme.humanize_date(mtime), ui_theme.length_label(length)]
+        if sources:
+            meta.append(t("articles.sources", n=sources))
+        with column:
+            with st.container(border=True):
+                st.markdown(
+                    f'<div class="acard">'
+                    f'<div class="title">{name.replace("_", " ")}</div>'
+                    f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
+                    f'<div class="excerpt">{excerpt}</div></div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    t("articles.read"), key=f"recent_{name}", use_container_width=True
+                ):
+                    _open_in_library(name)
 
 
 def handle_not_started():
@@ -111,6 +180,14 @@ def handle_not_started():
                 if st.button(example, key=f"eg_{example}", use_container_width=True):
                     _start_research(example)
                     st.rerun()
+
+        st.markdown(
+            f'<div class="lp-note">{t("home.hero_note")}</div>',
+            unsafe_allow_html=True,
+        )
+
+    _how_it_works()
+    _recent_work()
 
 
 def handle_initiated():

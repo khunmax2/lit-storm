@@ -14,8 +14,11 @@ from ui_language import t
 # ids and are translated only on the way to the screen.
 ARTICLES_PAGE = "My Articles"
 CREATE_PAGE = "Create New Article"
-PAGE_ICONS = {ARTICLES_PAGE: ":material/collections_bookmark:", CREATE_PAGE: ":material/auto_awesome:"}
-PAGE_LABELS = {ARTICLES_PAGE: "nav.articles", CREATE_PAGE: "nav.create"}
+PAGE_ICONS = {
+    ARTICLES_PAGE: ":material/collections_bookmark:",
+    CREATE_PAGE: ":material/auto_awesome:",
+}
+PAGE_LABELS = {ARTICLES_PAGE: "nav.articles", CREATE_PAGE: "nav.home"}
 
 
 def main():
@@ -23,7 +26,9 @@ def main():
         page_title="STORM",
         page_icon="🌪️",
         layout="wide",
-        initial_sidebar_state="expanded",
+        # "auto" expands the sidebar on desktop but collapses it on phones,
+        # where an expanded sidebar covers the whole landing page.
+        initial_sidebar_state="auto",
     )
     ui_theme.apply()
     ui_theme.sidebar_brand()
@@ -41,18 +46,25 @@ def main():
     # `nav_page` is the segmented control's own state, so other pages can
     # navigate simply by assigning to it before the widget is drawn.
     if "nav_page" not in st.session_state:
-        st.session_state["nav_page"] = ARTICLES_PAGE
+        st.session_state["nav_page"] = CREATE_PAGE
+
+    # Streamlit refuses assignment to a widget's key once that widget exists,
+    # so a page that wants to navigate queues the destination here instead and
+    # this consumes it on the next run, before the control is drawn.
+    queued = st.session_state.pop("nav_pending", None)
+    if queued:
+        st.session_state["nav_page"] = queued
 
     st.segmented_control(
         t("nav.label"),
-        [ARTICLES_PAGE, CREATE_PAGE],
+        [CREATE_PAGE, ARTICLES_PAGE],
         format_func=lambda page: f"{PAGE_ICONS[page]} {t(PAGE_LABELS[page])}",
         key="nav_page",
         label_visibility="collapsed",
     )
 
     # A segmented control can be deselected by clicking the active option.
-    selection = st.session_state["nav_page"] or ARTICLES_PAGE
+    selection = st.session_state["nav_page"] or CREATE_PAGE
 
     if selection == ARTICLES_PAGE:
         demo_util.clear_other_page_session_state(page_index=2)

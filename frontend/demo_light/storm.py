@@ -32,7 +32,6 @@ def main():
     )
     ui_theme.apply()
     ui_theme.sidebar_brand()
-    ui_language.selector()
 
     if "first_run" not in st.session_state:
         st.session_state["first_run"] = True
@@ -55,13 +54,18 @@ def main():
     if queued:
         st.session_state["nav_page"] = queued
 
-    st.segmented_control(
-        t("nav.label"),
-        [CREATE_PAGE, ARTICLES_PAGE],
-        format_func=lambda page: f"{PAGE_ICONS[page]} {t(PAGE_LABELS[page])}",
-        key="nav_page",
-        label_visibility="collapsed",
-    )
+    # All navigation lives in the sidebar. The article page needs a sidebar
+    # regardless — it is where the contents and references go — so a second
+    # bar across the top would only duplicate a surface that has to exist.
+    with st.sidebar:
+        st.segmented_control(
+            t("nav.label"),
+            [CREATE_PAGE, ARTICLES_PAGE],
+            format_func=lambda page: f"{PAGE_ICONS[page]} {t(PAGE_LABELS[page])}",
+            key="nav_page",
+            label_visibility="collapsed",
+        )
+        ui_language.selector()
 
     # A segmented control can be deselected by clicking the active option.
     selection = st.session_state["nav_page"] or CREATE_PAGE

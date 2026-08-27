@@ -480,41 +480,58 @@ span[class*="material-icons"] {{
    resolved in Python and would lag a theme change by one rerun. */
 /* `.st-key-nav_page` is Streamlit's per-widget class, derived from the
    segmented control's key in storm.py. */
-/* The widget is sized to its content, so it needs the full row before
-   `justify-content` has anything to centre within. */
+/* A vertical list, not a pill bar: two destinations do not warrant a bar of
+   their own, and the sidebar has to exist regardless — it is where the
+   article page puts its contents and references. */
 .st-key-nav_page {{
-    display: flex;
-    justify-content: center;
     width: 100% !important;
-    margin-bottom: 1.2rem;
+    margin: 0.2rem 0 1.5rem 0;
 }}
+/* A flex parent stretches the wrapper; setting a width on the wrapper
+   directly loses to a Streamlit rule that sizes it to its content. */
 .st-key-nav_page [data-testid="stButtonGroup"] {{
-    display: inline-flex;
+    display: flex;
+    width: 100%;
 }}
 .st-key-nav_page [data-testid="stButtonGroup"] > div {{
-    background: var(--canvas);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 0.25rem;
+    display: flex;
+    flex-direction: column;
+    /* The wrapper carries `max-width: fit-content`, which is what actually
+       pins the rows to their label width — width alone never wins. */
+    max-width: none;
+    flex: 1 1 auto;
+    align-items: stretch;
     gap: 0.15rem;
+    background: transparent;
+    border: none;
+    padding: 0;
 }}
 .st-key-nav_page button[data-variant="segmented_control"] {{
     border: none !important;
     background: transparent !important;
     color: var(--muted) !important;
     font-weight: 550 !important;
-    border-radius: 9px !important;
-    padding: 0.42rem 1.1rem !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 0.7rem !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+}}
+/* The button's own content wrapper centres its children, so left-aligning
+   the button alone leaves the label in the middle of the row. */
+.st-key-nav_page button[data-variant="segmented_control"] > div {{
+    justify-content: flex-start !important;
+    width: 100%;
 }}
 .st-key-nav_page button[data-variant="segmented_control"]:hover {{
     background: var(--nav-hover) !important;
     color: var(--ink) !important;
 }}
+/* The active row is marked with the brand rather than a raised card; a
+   sidebar list reads better flat. */
 .st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
-    background: var(--surface) !important;
-    color: var(--ink) !important;
+    background: var(--brand-soft) !important;
+    color: var(--brand) !important;
     font-weight: 650 !important;
-    box-shadow: 0 1px 3px var(--shadow);
 }}
 
 /* Hide the "Deploy"/status chrome the demo does not need. */

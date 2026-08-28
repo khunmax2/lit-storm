@@ -75,7 +75,7 @@ def _source_card(name, chosen):
             if source["signup"]:
                 st.caption(f"[{t('search.get_key')}]({source['signup']})")
         else:
-            st.caption(t("search.no_key_needed"))
+            st.caption(t(source.get("note", "search.no_key_needed")))
 
         left, right = st.columns(2)
         with left:

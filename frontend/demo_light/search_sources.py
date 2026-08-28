@@ -54,13 +54,14 @@ SOURCES = {
         "free": False,
         "signup": "https://api.you.com/",
     },
-    # Present in the library, not offerable from here.
     "arxiv": {
-        "label": "arXiv (Stanford Oval)",
+        "label": "arXiv",
         "key": None,
         "free": True,
-        "unavailable": "needs_endpoint",
+        "signup": "",
+        "note": "arxiv_note",
     },
+    # Present in the library, not offerable from here.
     "vector": {
         "label": "Your own documents",
         "key": None,
@@ -169,6 +170,12 @@ def _construct(name, secret, k):
         return BraveRM(brave_search_api_key=secret, k=k)
     if name == "you":
         return YouRM(ydc_api_key=secret, k=k)
+    if name == "arxiv":
+        # Ours, not knowledge_storm's: that one is a client for a private
+        # Stanford service whose address is not published.
+        from arxiv_rm import ArxivRM
+
+        return ArxivRM(k=k)
     raise SearchConfigError(f"{name} cannot be built from this page.")
 
 

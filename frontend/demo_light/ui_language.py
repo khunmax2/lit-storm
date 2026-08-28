@@ -77,6 +77,16 @@ _STRINGS = {
         "English": "The search went through but came back empty.",
         "ไทย": "เชื่อมต่อได้ แต่ไม่มีผลลัพธ์กลับมา",
     },
+    "arxiv_note": {
+        "English": "Paper abstracts straight from arxiv.org — no key, no "
+        "account. Strong on computing, physics and maths; thin on history, "
+        "law and the humanities. One search every three seconds, as arXiv "
+        "asks, so a run takes longer.",
+        "ไทย": "บทคัดย่องานวิจัยจาก arxiv.org โดยตรง ไม่ต้องมีคีย์หรือบัญชี · "
+        "แข็งด้านคอมพิวเตอร์ ฟิสิกส์ คณิตศาสตร์ · บางด้านประวัติศาสตร์ "
+        "กฎหมาย สังคมศาสตร์ · ค้นได้ 3 วินาทีต่อครั้งตามที่ arXiv ขอ "
+        "การรันจึงใช้เวลานานขึ้น",
+    },
     "search.needs_endpoint": {
         "English": "Marked internal-only in the library, and needs a private "
         "Stanford endpoint that is not published.",

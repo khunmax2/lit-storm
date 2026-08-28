@@ -200,14 +200,15 @@ def handle_initiated():
     if st.session_state["page3_write_article_state"] == "initiated":
         current_working_dir = demo_util.working_dir()
 
-        if "runner" not in st.session_state:
-            try:
-                demo_util.set_storm_runner()
-            except demo_util.LMConfigError as error:
-                st.error(t("create.failed_model"))
-                st.code(str(error), language=None)
-                st.session_state["page3_write_article_state"] = "not started"
-                return
+        # Called on every run, not only the first: it is what notices that the
+        # provider in secrets.toml has changed.
+        try:
+            demo_util.set_storm_runner()
+        except demo_util.LMConfigError as error:
+            st.error(t("create.failed_model"))
+            st.code(str(error), language=None)
+            st.session_state["page3_write_article_state"] = "not started"
+            return
         # Rewrites STORM's writing prompts in place, so it has to happen before
         # the run rather than when the (cached) runner was built.
         article_language.apply(_language())

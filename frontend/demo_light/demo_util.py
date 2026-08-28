@@ -1,6 +1,7 @@
 import base64
 import datetime
 import functools
+import hashlib
 import json
 import os
 import re
@@ -672,11 +673,41 @@ def lm_settings():
     return tuple(_resolve_role(role, default) for role in ROLES)
 
 
-def set_storm_runner():
-    current_working_dir = working_dir()
+def _settings_fingerprint(*calls):
+    """A short digest of what the runner was built from.
 
+    Keys are hashed rather than kept, so what sits in session state cannot be
+    read back out of it.
+    """
+    parts = []
+    for model, kwargs in calls:
+        secret = f"{kwargs.get('api_key', '')}|{kwargs.get('api_base', '')}"
+        parts.append(f"{model}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}")
+    return "|".join(parts)
+
+
+def set_storm_runner():
+    """Put a runner in session state, built from the current settings.
+
+    Rebuilds when those settings change. The runner used to be built once and
+    kept for the life of the browser session, so switching provider in
+    secrets.toml changed nothing until the session was thrown away — the app
+    went on calling the provider it was started with, and said so in that
+    provider's own error message.
+    """
     llm_configs = STORMWikiLMConfigs()
     (fast_model, fast_kwargs), (strong_model, strong_kwargs) = lm_settings()
+
+    fingerprint = _settings_fingerprint(
+        (fast_model, fast_kwargs), (strong_model, strong_kwargs)
+    )
+    if (
+        "runner" in st.session_state
+        and st.session_state.get("runner_settings") == fingerprint
+    ):
+        return
+
+    current_working_dir = working_dir()
     fast_lm = LitellmModel(model=fast_model, max_tokens=500, **fast_kwargs)
     strong_lm = LitellmModel(model=strong_model, max_tokens=3000, **strong_kwargs)
 
@@ -696,8 +727,8 @@ def set_storm_runner():
 
     rm = DuckDuckGoSearchRM(k=engine_args.search_top_k, safe_search="On", region="us-en")
 
-    runner = STORMWikiRunner(engine_args, llm_configs, rm)
-    st.session_state["runner"] = runner
+    st.session_state["runner"] = STORMWikiRunner(engine_args, llm_configs, rm)
+    st.session_state["runner_settings"] = fingerprint
 
 
 def display_article_page(

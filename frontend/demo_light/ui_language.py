@@ -108,6 +108,10 @@ _STRINGS = {
         "English": "Something went wrong partway through. Nothing was saved.",
         "ไทย": "เกิดข้อผิดพลาดระหว่างทาง ยังไม่มีอะไรถูกบันทึก",
     },
+    "create.failed_model": {
+        "English": "The language model is not configured, so no run was started.",
+        "ไทย": "ยังตั้งค่าโมเดลภาษาไม่ครบ จึงยังไม่ได้เริ่มค้นคว้า",
+    },
     "create.failed_detail": {"English": "Technical detail", "ไทย": "รายละเอียดทางเทคนิค"},
     "create.retry": {"English": "Start over", "ไทย": "เริ่มใหม่"},
     "create.read_article": {"English": "Read the article", "ไทย": "อ่านบทความ"},

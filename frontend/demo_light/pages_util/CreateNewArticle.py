@@ -201,7 +201,13 @@ def handle_initiated():
         current_working_dir = demo_util.working_dir()
 
         if "runner" not in st.session_state:
-            demo_util.set_storm_runner()
+            try:
+                demo_util.set_storm_runner()
+            except demo_util.LMConfigError as error:
+                st.error(t("create.failed_model"))
+                st.code(str(error), language=None)
+                st.session_state["page3_write_article_state"] = "not started"
+                return
         # Rewrites STORM's writing prompts in place, so it has to happen before
         # the run rather than when the (cached) runner was built.
         article_language.apply(_language())

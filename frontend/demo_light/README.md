@@ -147,18 +147,69 @@ Runs are real: the bypass skips sign-in, not the API bill.
 
 ## Models and quota
 
-The app uses Gemini through litellm, configured in `set_storm_runner()` in
-[demo_util.py](demo_util.py):
+Two models, named by the work they do rather than by their size:
 
 | Stage | Model |
 | --- | --- |
-| Asking questions, simulating the conversation | `gemini/gemini-flash-lite-latest` |
-| Outline, article, polish | `gemini/gemini-flash-latest` |
+| Asking questions, simulating the conversation | the **fast** one |
+| Outline, article, polish | the **strong** one |
 
-Use the `-latest` aliases rather than a pinned id such as
-`gemini-2.5-flash`. Google returns 404 — *"no longer available to new users"* —
-for pinned 2.x ids on keys created recently, even though `list_models()` still
-lists them.
+Which provider serves them is a setting, not a code change. The wrapper
+underneath is litellm, so a hundred providers are reachable; these are the
+ones with a key name of their own:
+
+```toml
+LLM_PROVIDER = "gemini"        # or openrouter, groq, openai, openai-compatible
+GOOGLE_API_KEY = "..."
+```
+
+Gemini ships defaults — `gemini/gemini-flash-lite-latest` and
+`gemini/gemini-flash-latest`. Use those `-latest` aliases rather than a pinned
+id such as `gemini-2.5-flash`: Google returns 404 — *"no longer available to
+new users"* — for pinned 2.x ids on keys created recently, even though
+`list_models()` still lists them.
+
+Every other provider needs its models named, because an id guessed here would
+fail in the middle of a run rather than at startup:
+
+```toml
+LLM_PROVIDER     = "openrouter"
+OPENROUTER_API_KEY = "..."
+LLM_FAST_MODEL   = "google/gemini-2.5-flash-lite"
+LLM_STRONG_MODEL = "anthropic/claude-sonnet-4"
+```
+
+Model ids are written the way the provider writes them; the provider part is
+added for you. That matters for OpenRouter, whose own ids contain a slash —
+`anthropic/claude-sonnet-4` is an OpenRouter id, not an instruction to call
+Anthropic directly.
+
+Either role can sit on a different provider than the other, which is how you
+put the questions somewhere cheap and fast and the writing somewhere strong:
+
+```toml
+LLM_FAST_PROVIDER   = "groq"
+GROQ_API_KEY        = "..."
+LLM_FAST_MODEL      = "llama-3.1-8b-instant"
+
+LLM_STRONG_PROVIDER = "openrouter"
+OPENROUTER_API_KEY  = "..."
+LLM_STRONG_MODEL    = "anthropic/claude-sonnet-4"
+```
+
+Anything else that speaks the OpenAI API — z.ai, Together, a model served on
+your own machine — goes through `openai-compatible` with its own base URL:
+
+```toml
+LLM_PROVIDER = "openai-compatible"
+LLM_API_BASE = "https://api.z.ai/api/paas/v4"
+LLM_API_KEY  = "..."
+LLM_FAST_MODEL   = "glm-4-flash"
+LLM_STRONG_MODEL = "glm-4-plus"
+```
+
+Settings that do not describe a model we can call are reported on the page
+before the run starts, rather than as a traceback partway through it.
 
 The engine ships configured for a **paid key**:
 

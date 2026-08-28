@@ -578,25 +578,107 @@ def clear_other_page_session_state(page_index: Optional[int]):
         del st.session_state[key]
 
 
-def set_storm_runner():
-    current_working_dir = working_dir()
+class LMConfigError(RuntimeError):
+    """The language model settings do not describe a model we can call."""
 
-    # configure STORM runner with Google Gemini + DuckDuckGo
-    llm_configs = STORMWikiLMConfigs()
-    gemini_kwargs = {
-        "api_key": auth.setting("GOOGLE_API_KEY"),
+
+# What each provider needs and what its ids look like. The wrapper underneath
+# is litellm, which speaks to a hundred of these; the entries here are the
+# ones with a key name of their own. Anything else that speaks the OpenAI API
+# — z.ai, Together, a model served on your own machine — goes through
+# "openai-compatible" with its own base URL.
+PROVIDERS = {
+    "gemini": {
+        "key": "GOOGLE_API_KEY",
+        "prefix": "gemini/",
+        # The "-latest" aliases, not a pinned 2.x id: Google returns 404 for
+        # those on keys created recently, even though list_models() lists them.
+        "fast": "gemini-flash-lite-latest",
+        "strong": "gemini-flash-latest",
+    },
+    "openrouter": {"key": "OPENROUTER_API_KEY", "prefix": "openrouter/"},
+    "groq": {"key": "GROQ_API_KEY", "prefix": "groq/"},
+    "openai": {"key": "OPENAI_API_KEY", "prefix": "openai/"},
+    "openai-compatible": {
+        "key": "LLM_API_KEY",
+        "prefix": "openai/",
+        "base": "LLM_API_BASE",
+    },
+}
+
+# Two models, named for the work they do rather than for their size.
+ROLES = ("FAST", "STRONG")
+
+
+def _resolve_role(role, default_provider):
+    """(model id, call arguments) for one of the two roles.
+
+    The provider's prefix is always applied. It is tempting to leave a name
+    that already contains a slash alone, but OpenRouter's own ids look like
+    "anthropic/claude-sonnet-4" — under that rule the call would go straight
+    to Anthropic, with an OpenRouter key. A role that belongs somewhere else
+    says so in LLM_<ROLE>_PROVIDER instead.
+    """
+    name = (auth.setting(f"LLM_{role}_PROVIDER") or default_provider).strip().lower()
+    if name not in PROVIDERS:
+        raise LMConfigError(
+            f"{name!r} is not a provider this app knows. Choose one of: "
+            + ", ".join(sorted(PROVIDERS))
+        )
+    provider = PROVIDERS[name]
+
+    api_key = auth.setting(provider["key"])
+    if not api_key:
+        raise LMConfigError(
+            f"{provider['key']} is missing, and the {role.lower()} model is "
+            f"set to {name!r}, which reads its key from there."
+        )
+
+    model = auth.setting(f"LLM_{role}_MODEL") or provider.get(role.lower())
+    if not model:
+        raise LMConfigError(
+            f"{name!r} ships no default models, so LLM_{role}_MODEL has to "
+            "name one. Guessing an id here would fail in the middle of a run "
+            "rather than before it starts."
+        )
+
+    kwargs = {
+        "api_key": api_key,
         "temperature": 1.0,
         "top_p": 0.9,
         # Ride out the occasional 429 rather than failing the whole run.
         "num_retries": 6,
     }
-    # Use the "-latest" aliases: pinned 2.x ids are 404/quota-blocked for new API keys.
-    fast_lm = LitellmModel(
-        model="gemini/gemini-flash-lite-latest", max_tokens=500, **gemini_kwargs
-    )
-    strong_lm = LitellmModel(
-        model="gemini/gemini-flash-latest", max_tokens=3000, **gemini_kwargs
-    )
+    if "base" in provider:
+        base = auth.setting(provider["base"])
+        if not base:
+            raise LMConfigError(
+                f"{provider['base']} is missing. {name!r} is any endpoint that "
+                "speaks the OpenAI API, so it has to be told which one."
+            )
+        kwargs["api_base"] = base
+
+    return provider["prefix"] + model, kwargs
+
+
+def lm_settings():
+    """The two models to call, from secrets or the environment.
+
+    Only LLM_PROVIDER has to be set, and only if it is not Gemini. Each role
+    can override the provider as well as the model, so the questions can be
+    asked somewhere cheap while the writing happens somewhere strong.
+    """
+    default = (auth.setting("LLM_PROVIDER") or "gemini").strip().lower()
+    return tuple(_resolve_role(role, default) for role in ROLES)
+
+
+def set_storm_runner():
+    current_working_dir = working_dir()
+
+    llm_configs = STORMWikiLMConfigs()
+    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = lm_settings()
+    fast_lm = LitellmModel(model=fast_model, max_tokens=500, **fast_kwargs)
+    strong_lm = LitellmModel(model=strong_model, max_tokens=3000, **strong_kwargs)
 
     llm_configs.set_conv_simulator_lm(fast_lm)
     llm_configs.set_question_asker_lm(fast_lm)

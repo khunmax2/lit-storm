@@ -220,6 +220,16 @@ def _secure_cookie():
 
 
 def _write_cookie(refresh_token, started, seen=None):
+    """Hand the crumb to the browser.
+
+    At most once per script run: `set` draws a component under a fixed key,
+    and Streamlit refuses a second element with a key it has already seen —
+    which is what restoring a session and then touching it did, one after the
+    other, on the same run. A real write is minutes apart, so a second within
+    the same second is the duplicate and not a lost update.
+    """
+    if time.time() - st.session_state.get(WROTE_KEY, 0) < 1:
+        return
     _, absolute = _limits()
     remaining = absolute - (time.time() - started)
     if remaining <= 0:
@@ -227,6 +237,7 @@ def _write_cookie(refresh_token, started, seen=None):
     payload = json.dumps(
         {"t": refresh_token, "start": started, "seen": seen or time.time()}
     )
+    st.session_state[WROTE_KEY] = time.time()
     _cookies().set(
         COOKIE_NAME,
         payload,
@@ -342,7 +353,6 @@ def touch():
 
     st.session_state[SEEN_KEY] = now
     if now - st.session_state.get(WROTE_KEY, 0) > _TOUCH_EVERY:
-        st.session_state[WROTE_KEY] = now
         token = getattr(session(), "refresh_token", None)
         if token:
             _write_cookie(token, started, now)

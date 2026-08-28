@@ -8,7 +8,13 @@ import demo_util
 import streamlit as st
 import ui_language
 import ui_theme
-from pages_util import Account, Admin, MyArticles, CreateNewArticle
+from pages_util import (
+    Account,
+    Admin,
+    CreateNewArticle,
+    MyArticles,
+    SearchSources,
+)
 from ui_language import t
 
 # The page names double as `nav_page` state, so they stay these fixed English
@@ -16,15 +22,18 @@ from ui_language import t
 ARTICLES_PAGE = "My Articles"
 CREATE_PAGE = "Create New Article"
 ADMIN_PAGE = "Members"
+SOURCES_PAGE = "Search sources"
 PAGE_ICONS = {
     ARTICLES_PAGE: ":material/description:",
     CREATE_PAGE: ":material/home:",
     ADMIN_PAGE: ":material/group:",
+    SOURCES_PAGE: ":material/travel_explore:",
 }
 PAGE_LABELS = {
     ARTICLES_PAGE: "nav.articles",
     CREATE_PAGE: "nav.home",
     ADMIN_PAGE: "nav.admin",
+    SOURCES_PAGE: "nav.sources",
 }
 
 
@@ -81,6 +90,7 @@ def main():
     pages = [CREATE_PAGE, ARTICLES_PAGE]
     if auth.is_admin():
         pages.append(ADMIN_PAGE)
+        pages.append(SOURCES_PAGE)
     if st.session_state["nav_page"] not in pages:
         st.session_state["nav_page"] = CREATE_PAGE
 
@@ -116,7 +126,10 @@ def main():
         st.session_state.pop("page2_selected_my_article", None)
         st.rerun()
 
-    if selection == ADMIN_PAGE:
+    if selection == SOURCES_PAGE:
+        demo_util.clear_other_page_session_state(page_index=5)
+        SearchSources.search_sources_page()
+    elif selection == ADMIN_PAGE:
         demo_util.clear_other_page_session_state(page_index=4)
         Admin.admin_page()
     elif selection == ARTICLES_PAGE:

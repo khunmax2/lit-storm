@@ -12,6 +12,7 @@ import markdown
 import pytz
 import streamlit as st
 import auth
+import search_sources
 import ui_language
 import ui_theme
 from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
@@ -27,7 +28,6 @@ from knowledge_storm import (
     STORMWikiLMConfigs,
 )
 from knowledge_storm.lm import LitellmModel
-from knowledge_storm.rm import DuckDuckGoSearchRM
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 from knowledge_storm.utils import truncate_filename
 from stoc import stoc
@@ -725,7 +725,7 @@ def set_storm_runner():
         retrieve_top_k=5,
     )
 
-    rm = DuckDuckGoSearchRM(k=engine_args.search_top_k, safe_search="On", region="us-en")
+    rm = search_sources.build(k=engine_args.search_top_k)
 
     st.session_state["runner"] = STORMWikiRunner(engine_args, llm_configs, rm)
     st.session_state["runner_settings"] = fingerprint

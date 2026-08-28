@@ -37,6 +37,62 @@ _STRINGS = {
         "ไทย": "ค้นคว้าหัวข้อจากหลายมุมมอง แล้วเรียบเรียงเป็นบทความพร้อมแหล่งอ้างอิง",
     },
     "lang.label": {"English": "Interface language", "ไทย": "ภาษาของระบบ"},
+    "nav.sources": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
+    # -- search sources ---------------------------------------------------
+    "search.title": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
+    "search.using": {"English": "researching with {name}", "ไทย": "กำลังใช้ {name}"},
+    "search.one_at_a_time": {
+        "English": "STORM researches with one source at a time. Pick the one "
+        "it should use; the rest keep their keys for later.",
+        "ไทย": "STORM ใช้แหล่งค้นคว้าได้ทีละหนึ่งแหล่ง เลือกแหล่งที่จะใช้ "
+        "ส่วนแหล่งอื่นจะเก็บคีย์ไว้ให้",
+    },
+    "search.free": {"English": "no key", "ไทย": "ไม่ต้องใช้คีย์"},
+    "search.paid": {"English": "needs a key", "ไทย": "ต้องมีคีย์"},
+    "search.in_use": {"English": "in use", "ไทย": "ใช้อยู่"},
+    "search.unavailable": {"English": "unavailable", "ไทย": "ใช้ไม่ได้"},
+    "search.key_saved": {
+        "English": "API key — saved, ending {last4}. Type a new one to replace it.",
+        "ไทย": "API key — บันทึกแล้ว ลงท้าย {last4} · พิมพ์ค่าใหม่เพื่อแทนที่",
+    },
+    "search.key_needed": {"English": "API key", "ไทย": "API key"},
+    "search.no_key_needed": {
+        "English": "Public search, no account needed.",
+        "ไทย": "ค้นหาสาธารณะ ไม่ต้องสมัครบัญชี",
+    },
+    "search.get_key": {"English": "Where to get one", "ไทย": "ขอคีย์ได้ที่นี่"},
+    "search.test": {"English": "Test", "ไทย": "ทดสอบ"},
+    "search.testing": {"English": "Searching…", "ไทย": "กำลังค้นหา…"},
+    "search.use": {"English": "Use this", "ไทย": "ใช้แหล่งนี้"},
+    "search.forget_key": {"English": "Forget this key", "ไทย": "ลบคีย์นี้"},
+    "search.test_ok": {
+        "English": "Working — {n} results, from {hosts}.",
+        "ไทย": "ใช้งานได้ — ได้ผล {n} รายการ จาก {hosts}",
+    },
+    "search.test_failed": {
+        "English": "The search did not go through.",
+        "ไทย": "ค้นหาไม่สำเร็จ",
+    },
+    "search.no_results": {
+        "English": "The search went through but came back empty.",
+        "ไทย": "เชื่อมต่อได้ แต่ไม่มีผลลัพธ์กลับมา",
+    },
+    "search.needs_endpoint": {
+        "English": "Marked internal-only in the library, and needs a private "
+        "Stanford endpoint that is not published.",
+        "ไทย": "ไลบรารีระบุว่าใช้ภายในเท่านั้น และต้องมี endpoint ของ Stanford "
+        "ซึ่งไม่ได้เปิดสาธารณะ",
+    },
+    "search.needs_collection": {
+        "English": "Searches your own documents, which have to be embedded "
+        "into a vector store first — a setup of its own, not a key.",
+        "ไทย": "ค้นจากเอกสารของคุณเอง ซึ่งต้องนำเข้าฐานข้อมูลเวกเตอร์ก่อน "
+        "เป็นการติดตั้งอีกชุด ไม่ใช่แค่ใส่คีย์",
+    },
+    "search.failed_config": {
+        "English": "The search source is not configured, so no run was started.",
+        "ไทย": "ยังตั้งค่าแหล่งค้นคว้าไม่ครบ จึงยังไม่ได้เริ่มค้นคว้า",
+    },
     # -- creating an article --------------------------------------------
     "create.eyebrow": {"English": "Powered by STORM", "ไทย": "ขับเคลื่อนด้วย STORM"},
     "create.title": {

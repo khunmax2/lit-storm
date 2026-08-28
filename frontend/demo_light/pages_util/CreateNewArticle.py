@@ -3,6 +3,7 @@ import os
 import article_language
 import auth
 import demo_util
+import search_sources
 import streamlit as st
 import ui_language
 import ui_theme
@@ -204,6 +205,11 @@ def handle_initiated():
         # provider in secrets.toml has changed.
         try:
             demo_util.set_storm_runner()
+        except search_sources.SearchConfigError as error:
+            st.error(t("search.failed_config"))
+            st.code(str(error), language=None)
+            st.session_state["page3_write_article_state"] = "not started"
+            return
         except demo_util.LMConfigError as error:
             st.error(t("create.failed_model"))
             st.code(str(error), language=None)

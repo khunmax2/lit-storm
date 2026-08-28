@@ -549,6 +549,32 @@ span[class*="material-icons"] {{
     min-height: 4.65em;
 }}
 
+/* ---------- a search source's card ---------- */
+.src-head {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+}}
+.src-head .name {{
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ink);
+}}
+/* A button that cannot be pressed has to look it. Streamlit leaves a
+   disabled primary button in full brand colour, which reads as the thing to
+   press next — on this page that is the button waiting for a key. */
+[class*="st-key-src_"] button:disabled {{
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+}}
+.src-head .tags {{
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}}
+
 /* ---------- empty state ---------- */
 .empty {{
     text-align: center;

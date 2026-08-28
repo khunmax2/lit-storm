@@ -211,6 +211,27 @@ LLM_STRONG_MODEL = "glm-4-plus"
 Settings that do not describe a model we can call are reported on the page
 before the run starts, rather than as a traceback partway through it.
 
+## Staying signed in
+
+A refresh used to cost a password: the session lived in `st.session_state`,
+which dies with the page. It now survives in a cookie, on two clocks:
+
+| | default | setting |
+| --- | --- | --- |
+| Idle — nothing touched for this long | 30 minutes | `SESSION_IDLE_MINUTES` |
+| Absolute — however busy, from signing in | 12 hours | `SESSION_MAX_HOURS` |
+
+Only Supabase's refresh token is stored, never the password, and the cookie
+is `SameSite=Strict` — `Secure` as well once the app is served over https.
+
+Streamlit gives you half a cookie API, so the two halves come from different
+places. `st.context.cookies` reads the cookies the browser sent with the
+request, which is the only reader available early enough to matter on a
+refresh; there is no `set_cookie`, so writing goes through the `CookieManager`
+component in `extra-streamlit-components`. Its `get()` is not used: it returns
+None on the first render of a page load, which is exactly when a refreshed
+page needs the answer.
+
 The engine ships configured for a **paid key**:
 
 ```python

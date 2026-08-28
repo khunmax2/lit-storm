@@ -12,13 +12,19 @@ policies are what actually enforce this, and the checks here only decide what
 to draw.
 """
 
+import json
 import os
+import time
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 import streamlit as st
 
 SESSION_KEY = "auth_session"
 PROFILE_KEY = "auth_profile"
+STARTED_KEY = "auth_started"
+SEEN_KEY = "auth_seen"
+WROTE_KEY = "auth_cookie_written"
 
 # ------------------------------------------------------------- dev bypass
 # Streamlit keeps the session in memory, so every code edit restarts the
@@ -159,15 +165,188 @@ def configured():
 
 
 # --------------------------------------------------------------- session
-def _remember(session):
-    """Hold the session for this browser tab and load the profile with it.
+# Streamlit's own session state dies with the page, so a refresh used to end
+# the session and ask for the password again. What survives a refresh is a
+# cookie, and Streamlit can read one but not write one — `st.context.cookies`
+# is read-only and there is no `set_cookie`. A component can write it, and
+# the one below already ships with the app.
+#
+# Two clocks, as sessions normally have:
+#   idle      nothing touched for this long, and the session ends
+#   absolute  the session ends this long after signing in, however busy
+COOKIE_NAME = "storm_session"
+IDLE_MINUTES = 30
+MAX_HOURS = 12
+# How stale the "last seen" stamp may get before it is written again. Every
+# write is a round trip to the browser, so it is not done on every rerun.
+_TOUCH_EVERY = 120
 
-    Streamlit has no cookie API, so this lives in session state: reloading the
-    page ends the session and asks for the password again. That is a real
-    limitation, not an oversight — see the README.
+
+def _limits():
+    idle = float(setting("SESSION_IDLE_MINUTES") or IDLE_MINUTES) * 60
+    absolute = float(setting("SESSION_MAX_HOURS") or MAX_HOURS) * 3600
+    return idle, absolute
+
+
+COOKIE_MANAGER_KEY = "auth_cookie_manager"
+
+
+def _cookies():
+    """One cookie component per session. Instantiating it twice draws two.
+
+    Held in session state rather than @st.cache_resource: it is a widget, and
+    Streamlit refuses to build a widget inside a cached function — the cache
+    would hand the same widget to every session.
+    """
+    if COOKIE_MANAGER_KEY not in st.session_state:
+        import extra_streamlit_components as stx
+
+        st.session_state[COOKIE_MANAGER_KEY] = stx.CookieManager(key="storm_cookies")
+    return st.session_state[COOKIE_MANAGER_KEY]
+
+
+def _secure_cookie():
+    """Whether the browser reached us over https.
+
+    A Secure cookie is dropped on plain http, which is how a local run is
+    served — so this follows the request rather than being set either way.
+    """
+    try:
+        return (st.context.headers or {}).get("X-Forwarded-Proto") == "https" or (
+            st.context.url or ""
+        ).startswith("https://")
+    except Exception:  # noqa: BLE001 - no request behind this run
+        return False
+
+
+def _write_cookie(refresh_token, started, seen=None):
+    _, absolute = _limits()
+    remaining = absolute - (time.time() - started)
+    if remaining <= 0:
+        return
+    payload = json.dumps(
+        {"t": refresh_token, "start": started, "seen": seen or time.time()}
+    )
+    _cookies().set(
+        COOKIE_NAME,
+        payload,
+        key="storm_cookie_set",
+        max_age=remaining,
+        same_site="strict",
+        secure=_secure_cookie(),
+    )
+
+
+def _read_cookie():
+    """The crumb from the browser, read from the request that carried it.
+
+    Not through the component: its `get` returns None on the first render of
+    a page load, because the value has not come back from the browser yet —
+    which is exactly the moment a refreshed page needs it. `st.context.cookies`
+    carries the cookies the browser sent with the request itself, so it is
+    there before the first line of the script runs. The component still does
+    the writing, which is the half Streamlit has no API for.
+    """
+    try:
+        raw = (st.context.cookies or {}).get(COOKIE_NAME)
+    except Exception:  # noqa: BLE001 - no request behind this run
+        raw = None
+    if not raw:
+        # A cookie written earlier in this same page load is not in the
+        # request that started it; the component knows about that one.
+        try:
+            raw = _cookies().get(COOKIE_NAME)
+        except Exception:  # noqa: BLE001 - component not ready
+            return None
+    if not raw:
+        return None
+    try:
+        return json.loads(unquote(raw))
+    except (ValueError, TypeError):  # a corrupt cookie is no cookie
+        return None
+
+
+def _clear_cookie():
+    try:
+        _cookies().delete(COOKIE_NAME, key="storm_cookie_delete")
+    except Exception:  # noqa: BLE001 - already gone
+        pass
+
+
+def _remember(session):
+    """Hold the session for this tab, and leave a crumb for the next load.
+
+    Only the refresh token is kept. It is what Supabase issues for exactly
+    this purpose, it expires, and it is not the password.
     """
     st.session_state[SESSION_KEY] = session
+    st.session_state[STARTED_KEY] = time.time()
+    st.session_state[SEEN_KEY] = time.time()
     st.session_state.pop(PROFILE_KEY, None)
+    token = getattr(session, "refresh_token", None)
+    if token:
+        _write_cookie(token, st.session_state[STARTED_KEY])
+
+
+def restore():
+    """Bring back a session the browser still remembers.
+
+    Returns True when the caller should carry on as signed in. Called before
+    the gate, so a refresh does not land on the sign-in screen.
+    """
+    if dev_mode() or signed_in():
+        return True
+    crumb = _read_cookie()
+    if not crumb:
+        return False
+
+    idle, absolute = _limits()
+    now = time.time()
+    if now - crumb.get("seen", 0) > idle or now - crumb.get("start", 0) > absolute:
+        _clear_cookie()
+        return False
+
+    try:
+        result = _client().auth.refresh_session(crumb["t"])
+    except Exception:  # noqa: BLE001 - a refused token is a signed-out user
+        _clear_cookie()
+        return False
+    if not result or not result.session:
+        _clear_cookie()
+        return False
+
+    st.session_state[SESSION_KEY] = result.session
+    st.session_state[STARTED_KEY] = crumb["start"]
+    st.session_state[SEEN_KEY] = now
+    st.session_state.pop(PROFILE_KEY, None)
+    _write_cookie(result.session.refresh_token, crumb["start"], now)
+    return True
+
+
+def touch():
+    """Mark the session as still in use, and end it when it is not.
+
+    Returns False when the session has just been ended, so the caller can
+    draw the sign-in screen instead of a page the user is no longer allowed.
+    """
+    if dev_mode() or not signed_in():
+        return signed_in()
+
+    idle, absolute = _limits()
+    now = time.time()
+    seen = st.session_state.get(SEEN_KEY, now)
+    started = st.session_state.get(STARTED_KEY, now)
+    if now - seen > idle or now - started > absolute:
+        sign_out()
+        return False
+
+    st.session_state[SEEN_KEY] = now
+    if now - st.session_state.get(WROTE_KEY, 0) > _TOUCH_EVERY:
+        st.session_state[WROTE_KEY] = now
+        token = getattr(session(), "refresh_token", None)
+        if token:
+            _write_cookie(token, started, now)
+    return True
 
 
 def sign_up(email, password, display_name):
@@ -203,7 +382,8 @@ def sign_out():
         _client().auth.sign_out()
     except Exception:  # noqa: BLE001 - signing out must not raise at the user
         pass
-    for key in (SESSION_KEY, PROFILE_KEY):
+    _clear_cookie()
+    for key in (SESSION_KEY, PROFILE_KEY, STARTED_KEY, SEEN_KEY, WROTE_KEY):
         st.session_state.pop(key, None)
 
 

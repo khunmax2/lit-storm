@@ -55,6 +55,12 @@ def main():
     if auth.dev_enabled():
         ui_theme.dev_banner(auth.display_name())
 
+    # A refresh should not cost a password. The browser still holds a crumb
+    # from the last sign-in; this trades it for a session before the gate is
+    # drawn, and `touch` ends a session that has been idle too long.
+    auth.restore()
+    auth.touch()
+
     # Nothing else is drawn until there is an account behind the request:
     # every run spends the deployment's API credit, and every article belongs
     # to somebody.

@@ -183,6 +183,12 @@ class LoggingWrapper:
             yield
         except Exception as e:
             print(f"Error occurred during pipeline stage '{pipeline_stage}': {e}")
+            # Re-raised, or the `with` block swallows it and the caller runs
+            # on as though the stage had worked. `generate_report` returns
+            # inside such a block: when the exception was eaten here, the
+            # return never ran and the caller was handed None with nothing
+            # said about why.
+            raise
         finally:
             self.logging_dict[self.current_pipeline_stage]["total_wall_time"] = (
                 time.time() - start_time

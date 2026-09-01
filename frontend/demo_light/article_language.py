@@ -1,4 +1,4 @@
-"""Run STORM in a language other than English.
+"""Run STORM and Co-STORM in a language other than English.
 
 STORM's prompts live as docstrings on its ``dspy.Signature`` classes, and DSPy
 reads ``Signature.instructions`` straight off ``__doc__`` every time it builds a
@@ -6,15 +6,26 @@ prompt. So the language is switched by appending a directive to the docstrings
 of the signatures whose output a reader ever sees, and restored by putting the
 originals back.
 
-Everything the demo shows is covered: the article itself, and the research
-transcript in "See how STORM researched this" — the editor personas, their
-questions and the expert's answers. The one thing deliberately left alone is
-the *search queries*, because query wording decides which sources are found and
-pinning it to one language would shrink the evidence the article is built from.
-``FindRelatedTopic`` is left alone too: it names English Wikipedia pages used
-internally for inspiration, and is never shown.
+Everything the demo shows is covered. For STORM: the article itself, and the
+research transcript in "See how STORM researched this" — the editor personas,
+their questions and the expert's answers. For Co-STORM: the invited speakers,
+what they say at the round table, and the report the discussion ends with.
+
+The one thing deliberately left alone in both is the *search queries*, because
+query wording decides which sources are found and pinning it to one language
+would shrink the evidence the article is built from. ``FindRelatedTopic`` is
+left alone too: it names English Wikipedia pages used internally for
+inspiration, and is never shown.
 """
 
+from knowledge_storm.collaborative_storm.modules import (
+    article_generation as costorm_article_generation,
+    expert_generation,
+    grounded_question_answering,
+    grounded_question_generation,
+    information_insertion_module,
+    warmstart_hierarchical_chat,
+)
 from knowledge_storm.storm_wiki.modules import (
     article_generation,
     article_polish,
@@ -93,9 +104,42 @@ to the people who speak it. Mixing the two across queries is fine.
 """
 
 
+def _speaker(language):
+    """The invited experts, whose roles are shown as the speakers' names."""
+    return f"""
+
+IMPORTANT — Language:
+Write each speaker's role and description in {language}.
+Keep the numbered "1. role: description" output format exactly as specified,
+including the colon — it is what separates the name from the description.
+"""
+
+
+def _utterance(language):
+    """What is said at the round table: the questions and the replies."""
+    return f"""
+
+IMPORTANT — Language:
+Speak in {language}. The gathered information is usually in another language;
+translate what you use rather than quoting it verbatim, and keep the inline
+citation markers [1], [2], ... exactly where they belong.
+"""
+
+
+def _heading(language):
+    """Names of the mind map's concepts, which become the report's headings."""
+    return f"""
+
+IMPORTANT — Language:
+Write the section names in {language}, keeping the output format specified
+above exactly as it is.
+"""
+
+
 # Every signature whose output reaches the reader, with the directive that
 # fits it. Order is irrelevant; each is patched independently.
 _TARGETS = (
+    # -- STORM: the article, and the persona interviews behind it ---------
     (outline_generation.WritePageOutline, _article),
     (outline_generation.WritePageOutlineFromConv, _article),
     (article_generation.WriteSection, _article),
@@ -106,6 +150,23 @@ _TARGETS = (
     (knowledge_curation.AskQuestionWithPersona, _question),
     (knowledge_curation.AnswerQuestion, _answer),
     (knowledge_curation.QuestionToQuery, _query),
+    # -- Co-STORM: the round table, and the report it ends with -----------
+    # `InsertInformation` is deliberately absent. Its output is a control
+    # token — "insert", "step: <node>", "create: <node>" — and a directive
+    # about language is as likely to translate the keyword as the node name.
+    # The concepts it invents keep whatever language the model reaches for;
+    # the two signatures that name most of them are patched below.
+    (costorm_article_generation.WriteSection, _article),
+    (expert_generation.GenerateExpertGeneral, _speaker),
+    (expert_generation.GenerateExpertWithFocus, _speaker),
+    (grounded_question_answering.AnswerQuestion, _utterance),
+    (grounded_question_answering.QuestionToQuery, _query),
+    (grounded_question_generation.ConvertUtteranceStyle, _utterance),
+    (grounded_question_generation.GroundedQuestionGeneration, _utterance),
+    (warmstart_hierarchical_chat.WarmStartModerator, _utterance),
+    (warmstart_hierarchical_chat.SectionToConvTranscript, _utterance),
+    (warmstart_hierarchical_chat.GenerateWarmStartOutline, _heading),
+    (information_insertion_module.ExpandSection, _heading),
 )
 
 _ORIGINAL_DOCS = {}

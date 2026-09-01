@@ -963,12 +963,12 @@ class TavilySearchRM(dspy.Retrieve):
         collected_results = []
 
         for query in queries:
-            args = {
-                "max_results": self.k,
-                "include_raw_contents": self.include_raw_content,
-            }
             #  list of dicts that will be parsed to return
-            responseData = self.tavily_client.search(query)
+            responseData = self.tavily_client.search(
+                query,
+                max_results=self.k,
+                include_raw_content=self.include_raw_content,
+            )
             results = responseData.get("results")
             for d in results:
                 # assert d is dict
@@ -982,8 +982,11 @@ class TavilySearchRM(dspy.Retrieve):
                     title = d.get("title", None)
                     description = d.get("content", None)
                     snippets = []
-                    if d.get("raw_body_content"):
-                        snippets.append(d.get("raw_body_content"))
+                    # Tavily calls the full page "raw_content". It is only
+                    # present when include_raw_content asked for it, and even
+                    # then not for every page.
+                    if d.get("raw_content"):
+                        snippets.append(d.get("raw_content"))
                     else:
                         snippets.append(d.get("content"))
 
@@ -1001,8 +1004,11 @@ class TavilySearchRM(dspy.Retrieve):
                     else:
                         print(f"invalid source {url} or url in exclude_urls")
                 except Exception as e:
-                    print(f"Error occurs when processing {result=}: {e}\n")
-                    print(f"Error occurs when searching query {query}: {e}")
+                    # `d`, not the parsed `result`: the failure above can
+                    # happen before `result` exists, and reporting a name that
+                    # is not bound yet turns a skippable result into an
+                    # UnboundLocalError that ends the whole search.
+                    print(f"Error occurs when processing result {d}: {e}\n")
 
         return collected_results
 

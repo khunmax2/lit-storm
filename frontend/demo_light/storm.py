@@ -11,7 +11,7 @@ import ui_theme
 from pages_util import (
     Account,
     Admin,
-    CreateNewArticle,
+    Home,
     MyArticles,
     SearchSources,
 )
@@ -142,8 +142,8 @@ def main():
         demo_util.clear_other_page_session_state(page_index=2)
         MyArticles.my_articles_page()
     else:
-        demo_util.clear_other_page_session_state(page_index=3)
-        CreateNewArticle.create_new_article_page()
+        # Both engines live behind this one page; it picks between them.
+        Home.home_page()
 
 
 if __name__ == "__main__":

@@ -33,6 +33,42 @@ from knowledge_storm.utils import truncate_filename
 from stoc import stoc
 
 
+def _quiet_litellm():
+    """Stop litellm narrating every call it makes into the terminal.
+
+    Three separate noises, all from the same library and none of them a
+    problem with the run:
+
+    - a red "Provider List:" banner, printed whenever litellm is handed a
+      model name with no provider prefix that it cannot place. The "-latest"
+      aliases are exactly that, so it fires, prints, and then swallows its
+      own exception;
+    - an INFO line per call, logged twice over because litellm both attaches
+      a handler and lets the record propagate to the root logger;
+    - a pydantic serializer warning, raised when litellm writes a Gemini
+      response — seven fields — through a model shaped for OpenAI's ten.
+
+    Only the chatter goes. Anything litellm considers a warning or an error —
+    a rate limit, a refused key, a failed call — still reaches the terminal.
+    """
+    import logging
+    import warnings
+
+    import litellm
+
+    litellm.suppress_debug_info = True
+    for name in ("LiteLLM", "LiteLLM Router", "LiteLLM Proxy"):
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.WARNING)
+        logger.propagate = False
+    warnings.filterwarnings(
+        "ignore", message="Pydantic serializer warnings", category=UserWarning
+    )
+
+
+_quiet_litellm()
+
+
 class DemoFileIOHelper:
     @staticmethod
     def read_structure_to_dict(articles_root_path):

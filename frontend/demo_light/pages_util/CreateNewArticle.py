@@ -143,8 +143,8 @@ def handle_not_started():
 
     _follow_interface_language()
 
+    # No eyebrow: the switch above the hero already says which engine this is.
     ui_theme.hero(
-        eyebrow=t("create.eyebrow"),
         title=t("create.title"),
         subtitle=t("create.subtitle"),
     )
@@ -352,6 +352,18 @@ def handle_completed():
             show_title=True,
             show_main_article=True,
         )
+
+
+def busy():
+    """Whether a run is under way and should keep the page to itself.
+
+    The state is a `page3_` key, so walking to another page clears it — a run
+    only owns the page for as long as the reader stays on it.
+    """
+    return (
+        st.session_state.get("page3_write_article_state", "not started")
+        != "not started"
+    )
 
 
 def create_new_article_page():

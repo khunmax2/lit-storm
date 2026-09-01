@@ -89,9 +89,18 @@ class Encoder:
                 "api_base": api_base or os.getenv("AZURE_API_BASE"),
                 "api_version": api_version or os.getenv("AZURE_API_VERSION"),
             }
+        elif encoder_type.lower() == "gemini":
+            # Co-STORM needs an embedding model as well as a chat model, and a
+            # deployment running on Gemini has no OpenAI key to fall back on.
+            self.embedding_model_name = "gemini/gemini-embedding-001"
+            self.kargs = {
+                "api_key": api_key
+                or os.getenv("GEMINI_API_KEY")
+                or os.getenv("GOOGLE_API_KEY")
+            }
         else:
             raise ValueError(
-                f"Unsupported ENCODER_API_TYPE '{encoder_type}'. Supported types are 'openai', 'azure', 'together'."
+                f"Unsupported ENCODER_API_TYPE '{encoder_type}'. Supported types are 'openai', 'azure', 'gemini'."
             )
 
     def get_total_token_usage(self, reset: bool = False) -> int:

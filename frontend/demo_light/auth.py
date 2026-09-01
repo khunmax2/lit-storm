@@ -284,6 +284,26 @@ def _clear_cookie():
         pass
 
 
+def remember_preference(name, value, *, key, max_age):
+    """Keep a small, non-secret preference in a cookie of the browser's.
+
+    The session cookie above has its own writer, which has to be careful about
+    writing twice in one run. This is the plain version, for the things that
+    are choices rather than credentials — the interface language, so far. It
+    goes through the same component, because a second `CookieManager` would
+    draw a second widget, and it applies the same SameSite and Secure rules so
+    a preference cannot be read from another site either.
+    """
+    _cookies().set(
+        name,
+        value,
+        key=key,
+        max_age=max_age,
+        same_site="strict",
+        secure=_secure_cookie(),
+    )
+
+
 def _remember(session):
     """Hold the session for this tab, and leave a crumb for the next load.
 

@@ -9,7 +9,10 @@ picking a UI language sets the default for it, because someone reading a Thai
 interface almost always wants a Thai article too.
 """
 
+from urllib.parse import unquote
+
 import streamlit as st
+import auth
 
 # Display name -> itself. Language names are written in their own language,
 # which is what a picker should show to someone who cannot read the current one.
@@ -19,6 +22,14 @@ DEFAULT = "English"
 
 # Not prefixed with "page", so it survives `clear_other_page_session_state`.
 STATE_KEY = "ui_lang"
+
+# Session state dies with the websocket, so on its own it makes the choice
+# last exactly until the reader presses refresh — and a Thai page coming back
+# in English is the one moment the picker is hardest to find. The crumb below
+# outlives the session the same way the sign-in one does.
+COOKIE_NAME = "storm_lang"
+COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+_PENDING_WRITE = "ui_lang_changed"
 
 _STRINGS = {
     # -- chrome ---------------------------------------------------------
@@ -38,6 +49,7 @@ _STRINGS = {
     },
     "lang.label": {"English": "Interface language", "ไทย": "ภาษาของระบบ"},
     "nav.sources": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
+    "nav.roundtable": {"English": "Round table", "ไทย": "โต๊ะกลม"},
     # -- search sources ---------------------------------------------------
     "search.title": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
     "search.using": {"English": "researching with {name}", "ไทย": "กำลังใช้ {name}"},
@@ -279,6 +291,27 @@ _STRINGS = {
         "English": "Every claim carries a citation you can open and check.",
         "ไทย": "ทุกข้อความมีแหล่งอ้างอิงที่กดเปิดตรวจสอบได้",
     },
+    "home.engine_label": {
+        "English": "How should the research happen?",
+        "ไทย": "อยากให้ค้นคว้าแบบไหน",
+    },
+    # The engines' own names, in both languages: a proper noun does not
+    # translate, and the line under the switch is where the difference between
+    # them is actually explained.
+    "home.engine_storm": {"English": "STORM", "ไทย": "STORM"},
+    "home.engine_costorm": {"English": "Co-STORM", "ไทย": "Co-STORM"},
+    "home.engine_storm_note": {
+        "English": "STORM researches on its own and hands back a cited "
+        "article. About 2–5 minutes, nothing to do but wait.",
+        "ไทย": "STORM ค้นคว้าเองจนจบ แล้วส่งบทความพร้อมอ้างอิงกลับมา "
+        "ใช้เวลาราว 2–5 นาที ระหว่างนั้นไม่ต้องทำอะไร",
+    },
+    "home.engine_costorm_note": {
+        "English": "Co-STORM lets a panel argue it out while you watch, "
+        "interrupt, and steer. Slower, and the direction is yours.",
+        "ไทย": "Co-STORM เปิดวงให้ผู้เชี่ยวชาญถกกันให้ดู "
+        "คุณแทรกและกำหนดทิศทางได้ตลอด ช้ากว่า แต่คุมเองได้",
+    },
     "home.how_label": {"English": "How it works", "ไทย": "ทำงานอย่างไร"},
     "home.step1_title": {
         "English": "It finds the angles you would not have asked about",
@@ -418,6 +451,234 @@ _STRINGS = {
         "Please ask another question.",
         "ไทย": "ขออภัย ไม่พบข้อมูลสำหรับคำถามนี้ กรุณาถามคำถามอื่น",
     },
+    # -- the round table (Co-STORM) ---------------------------------------
+    "table.title": {
+        "English": "Sit in on the research",
+        "ไทย": "ร่วมวงค้นคว้าไปด้วยกัน",
+    },
+    "table.subtitle": {
+        "English": "A panel of experts discusses your topic while you watch. "
+        "Ask a question, push back, or steer them somewhere else at "
+        "any point — then have them write the report.",
+        "ไทย": "ผู้เชี่ยวชาญหลายคนจะตั้งวงคุยหัวข้อของคุณให้ดูสด ๆ "
+        "คุณแทรกเข้าไปถาม แย้ง หรือเปลี่ยนทิศทางได้ตลอด "
+        "แล้วค่อยให้สรุปออกมาเป็นรายงาน",
+    },
+    "table.topic_placeholder": {
+        "English": "e.g. Should Thailand build a land bridge?",
+        "ไทย": "เช่น ไทยควรสร้างแลนด์บริดจ์หรือไม่?",
+    },
+    "table.submit": {"English": "Open the discussion", "ไทย": "เปิดวงสนทนา"},
+    "table.caption": {
+        "English": "Getting the room up to speed takes roughly 2–4 minutes. "
+        "After that every turn is a minute or so, and nothing happens "
+        "until you ask for it.",
+        "ไทย": "ช่วงตั้งวงใช้เวลาประมาณ 2–4 นาที "
+        "จากนั้นแต่ละตาใช้เวลาราวหนึ่งนาที "
+        "และจะไม่มีอะไรเดินต่อจนกว่าคุณจะสั่ง",
+    },
+    "table.step1_title": {"English": "They read up", "ไทย": "เตรียมตัว"},
+    "table.step1_body": {
+        "English": "A panel is picked for the topic and interviews itself, "
+        "searching the web, until everyone shares the same background.",
+        "ไทย": "ระบบเลือกผู้เชี่ยวชาญให้เข้ากับหัวข้อ "
+        "แล้วให้สัมภาษณ์กันเองพร้อมค้นเว็บ จนทุกคนมีพื้นเรื่องตรงกัน",
+    },
+    "table.step2_title": {"English": "You join in", "ไทย": "คุณร่วมวง"},
+    "table.step2_body": {
+        "English": "Let the table run a turn at a time, or say something "
+        "yourself. A moderator steps in when the experts circle.",
+        "ไทย": "จะปล่อยให้คุยกันเองทีละตา หรือพิมพ์แทรกเองก็ได้ "
+        "มีผู้ดำเนินรายการคอยเปลี่ยนประเด็นเมื่อวงเริ่มวนที่เดิม",
+    },
+    "table.step3_title": {"English": "It gets written up", "ไทย": "สรุปเป็นรายงาน"},
+    "table.step3_body": {
+        "English": "Everything said is filed into a mind map as it goes. The "
+        "report is written from that map, and lands in your library.",
+        "ไทย": "ทุกอย่างที่คุยถูกจัดลงแผนผังความคิดไปเรื่อย ๆ "
+        "รายงานเขียนจากแผนผังนั้น และไปเก็บไว้ในคลังบทความของคุณ",
+    },
+    "table.in_progress": {"English": "round table open", "ไทย": "วงกำลังเปิดอยู่"},
+    "table.warm_label": {
+        "English": "Getting the room up to speed (about 3 minutes).",
+        "ไทย": "กำลังตั้งวงและปูพื้นเรื่อง (ประมาณ 3 นาที)",
+    },
+    "table.warm_done": {"English": "The table is ready.", "ไทย": "วงพร้อมแล้ว"},
+    "table.warm_step1": {
+        "English": "Inviting experts and letting them interview each other.",
+        "ไทย": "กำลังเชิญผู้เชี่ยวชาญ และให้สัมภาษณ์กันเอง",
+    },
+    "table.warm_step2": {
+        "English": "Organising what they found.",
+        "ไทย": "กำลังจัดระเบียบข้อมูลที่ได้มา",
+    },
+    "table.warm_step3": {
+        "English": "Filing it into the mind map.",
+        "ไทย": "กำลังบันทึกลงแผนผังความคิด",
+    },
+    "table.warm_step4": {
+        "English": "Writing the opening of the discussion.",
+        "ไทย": "กำลังเรียบเรียงบทเปิดวง",
+    },
+    "table.thinking": {"English": "The table is thinking…", "ไทย": "วงกำลังคิด…"},
+    "table.thinking_done": {"English": "Your turn.", "ไทย": "ถึงตาคุณแล้ว"},
+    "table.planning": {
+        "English": "Deciding who speaks next.",
+        "ไทย": "กำลังเลือกว่าใครจะพูดต่อ",
+    },
+    "table.searching": {
+        "English": "Searching for something to back it up.",
+        "ไทย": "กำลังค้นหาหลักฐานมาสนับสนุน",
+    },
+    "table.polishing": {
+        "English": "Putting it into words.",
+        "ไทย": "กำลังเรียบเรียงคำพูด",
+    },
+    "table.filing": {
+        "English": "Filing what was said into the mind map.",
+        "ไทย": "กำลังบันทึกสิ่งที่พูดลงแผนผังความคิด",
+    },
+    "table.reorganising": {
+        "English": "Tidying up the mind map.",
+        "ไทย": "กำลังจัดระเบียบแผนผังความคิดใหม่",
+    },
+    "table.step_browsed": {
+        "English": "Read {n} sources so far…",
+        "ไทย": "อ่านมาแล้ว {n} แหล่ง…",
+    },
+    "table.deciding": {
+        "English": "The speaker is deciding what to say.",
+        "ไทย": "ผู้พูดกำลังตัดสินใจว่าจะพูดอะไร",
+    },
+    "table.decided": {
+        "English": "Decided what to say.",
+        "ไทย": "ตัดสินใจแล้วว่าจะพูดอะไร",
+    },
+    "table.drafted": {
+        "English": "Drafted a reply from what was found.",
+        "ไทย": "ร่างคำตอบจากข้อมูลที่หามาได้แล้ว",
+    },
+    "table.updating_experts": {
+        "English": "Working out who else should be at the table.",
+        "ไทย": "กำลังพิจารณาว่าควรเชิญใครเข้าวงเพิ่ม",
+    },
+    "table.filed": {
+        "English": "Filed into the mind map.",
+        "ไทย": "บันทึกลงแผนผังความคิดแล้ว",
+    },
+    "table.writing_sections": {
+        "English": "Writing the report, one section at a time.",
+        "ไทย": "กำลังเขียนรายงานทีละหัวข้อ",
+    },
+    # -- what the reader wants the discussion for -------------------------
+    "table.purpose_label": {
+        "English": "What do you want this for?",
+        "ไทย": "อยากได้ไปทำอะไร",
+    },
+    "table.purpose_report": {
+        "English": "Write a report",
+        "ไทย": "เขียนรายงานหรือบทความ",
+    },
+    "table.purpose_report_note": {
+        "English": "Cited material you will write up yourself",
+        "ไทย": "อยากได้เนื้อหาที่อ้างอิงได้ไปเรียบเรียงต่อ",
+    },
+    "table.purpose_decide": {"English": "Make a decision", "ไทย": "ใช้ตัดสินใจ"},
+    "table.purpose_decide_note": {
+        "English": "The case for and against, and what the risks are",
+        "ไทย": "อยากรู้ข้อดีข้อเสียและความเสี่ยง",
+    },
+    "table.purpose_learn": {
+        "English": "Understand the basics",
+        "ไทย": "ทำความเข้าใจพื้นฐาน",
+    },
+    "table.purpose_learn_note": {
+        "English": "New to this and after the shape of it",
+        "ไทย": "เพิ่งเริ่มสนใจ อยากได้ภาพรวมก่อน",
+    },
+    "table.purpose_teach": {
+        "English": "Teach or present it",
+        "ไทย": "เตรียมสอนหรือนำเสนอ",
+    },
+    "table.purpose_teach_note": {
+        "English": "Points you can explain to somebody else",
+        "ไทย": "อยากได้ประเด็นที่อธิบายคนอื่นได้",
+    },
+    "table.purpose_none": {"English": "Rather not say", "ไทย": "ยังไม่แน่ใจ"},
+    "table.purpose_none_note": {
+        "English": "Let the panel choose its own direction",
+        "ไทย": "ปล่อยให้วงเลือกทิศทางเอง",
+    },
+    "table.purpose_own": {"English": "Or say it yourself", "ไทย": "หรือพิมพ์เอง"},
+    "table.purpose_own_placeholder": {
+        "English": "e.g. I have to brief a committee on this next week",
+        "ไทย": "เช่น ต้องไปบรีฟคณะกรรมการสัปดาห์หน้า",
+    },
+    "table.purpose_said": {
+        "English": "Before we start — what I want out of this is to {purpose}.",
+        "ไทย": "ก่อนเริ่ม — สิ่งที่ผมอยากได้จากวงนี้คือ{purpose}",
+    },
+    # -- questions the table could be asked next --------------------------
+    "table.suggest": {"English": "Suggest questions", "ไทย": "ขอคำแนะนำคำถาม"},
+    "table.suggesting": {
+        "English": "Working out what would be worth asking…",
+        "ไทย": "กำลังคิดว่าน่าจะถามอะไรดี…",
+    },
+    "table.suggested": {
+        "English": "Some things you could ask.",
+        "ไทย": "นี่คือคำถามที่น่าจะถามต่อ",
+    },
+    "table.suggestions_label": {
+        "English": "Ask one of these, or write your own below",
+        "ไทย": "เลือกถามข้อใดข้อหนึ่ง หรือพิมพ์เองด้านล่าง",
+    },
+    "table.say_placeholder": {
+        "English": "Ask the table something…",
+        "ไทย": "ถามวงสนทนา…",
+    },
+    "table.next_turn": {"English": "Let them continue", "ไทย": "ให้คุยต่อ"},
+    "table.write_report": {"English": "Write the report", "ไทย": "เขียนรายงาน"},
+    "table.writing_label": {
+        "English": "Writing the report from the mind map (about a minute).",
+        "ไทย": "กำลังเขียนรายงานจากแผนผังความคิด (ประมาณหนึ่งนาที)",
+    },
+    "table.writing_done": {"English": "The report is ready.", "ไทย": "รายงานพร้อมแล้ว"},
+    "table.new": {"English": "New discussion", "ไทย": "เริ่มวงใหม่"},
+    "table.new_confirm": {
+        "English": "Starting a new discussion closes this one. Its report, if "
+        "you wrote one, stays in your library.",
+        "ไทย": "การเริ่มวงใหม่จะปิดวงนี้ "
+        "รายงานที่เขียนไว้แล้วจะยังอยู่ในคลังบทความ",
+    },
+    "table.mind_map": {"English": "Mind map", "ไทย": "แผนผังความคิด"},
+    "table.mind_map_empty": {
+        "English": "Nothing filed yet.",
+        "ไทย": "ยังไม่มีอะไรถูกบันทึก",
+    },
+    "table.you": {"English": "You", "ไทย": "คุณ"},
+    "table.turns": {"English": "{n} turns", "ไทย": "{n} ตา"},
+    "table.report_ready": {
+        "English": "The report is in your library.",
+        "ไทย": "รายงานถูกเก็บไว้ในคลังบทความแล้ว",
+    },
+    "table.failed_turn": {
+        "English": "That turn did not go through. The discussion is still "
+        "open — try again, or say something yourself.",
+        "ไทย": "ตานี้ไม่สำเร็จ วงยังเปิดอยู่ "
+        "ลองใหม่อีกครั้ง หรือพิมพ์แทรกเองก็ได้",
+    },
+    "table.failed_empty_report": {
+        "English": "The report came back empty, so nothing was saved. The "
+        "discussion is untouched — try again.",
+        "ไทย": "รายงานที่ได้กลับมาว่างเปล่า จึงยังไม่ได้บันทึกอะไร "
+        "วงสนทนายังอยู่ครบ ลองใหม่อีกครั้งได้",
+    },
+    "table.failed_embedding": {
+        "English": "Co-STORM sorts every source it finds by similarity, which "
+        "needs an embedding model the current settings do not provide.",
+        "ไทย": "Co-STORM ต้องจัดกลุ่มแหล่งข้อมูลด้วยความคล้ายกัน "
+        "ซึ่งต้องใช้โมเดล embedding ที่การตั้งค่าปัจจุบันยังไม่มี",
+    },
     # -- dates and lengths -------------------------------------------------
     "date.today": {"English": "{time} today", "ไทย": "{time} วันนี้"},
     "date.yesterday": {"English": "yesterday", "ไทย": "เมื่อวาน"},
@@ -449,6 +710,58 @@ def current():
     """The interface language in use. Always one of `LANGUAGES`."""
     language = st.session_state.get(STATE_KEY, DEFAULT)
     return language if language in LANGUAGES else DEFAULT
+
+
+def _remembered():
+    """The language the browser is carrying, if it is still one we have.
+
+    Read from the request's own cookies rather than through the component:
+    the component returns None on the first render of a page load, which is
+    precisely the moment a refreshed page needs the answer.
+
+    Unquoted on the way in, because a language named in its own script is
+    percent-encoded on the way out — "ไทย" comes back as "%E0%B9%84...", which
+    matches nothing in `LANGUAGES`.
+    """
+    try:
+        value = (st.context.cookies or {}).get(COOKIE_NAME)
+    except Exception:  # noqa: BLE001 - no request behind this run
+        return None
+    if not value:
+        return None
+    value = unquote(value)
+    return value if value in LANGUAGES else None
+
+
+def _picked():
+    """The radio's on_change: note that a person moved it.
+
+    Only a note. Writing the cookie draws a component, and a callback is not
+    allowed to draw — so the write happens on the rerun that follows.
+    """
+    st.session_state[_PENDING_WRITE] = True
+
+
+def _remember():
+    """Write the picker's value to the browser, if a person just changed it.
+
+    Guarded on an actual change rather than run unconditionally. Writing on
+    every run looks harmless until the read fails for some other reason: the
+    picker falls back to English, and then this would helpfully save English
+    over the choice the reader had made — which is exactly how the first
+    version of this erased a Thai cookie on every refresh.
+    """
+    if not st.session_state.pop(_PENDING_WRITE, False):
+        return
+    try:
+        auth.remember_preference(
+            COOKIE_NAME,
+            current(),
+            key="storm_lang_cookie_set",
+            max_age=COOKIE_MAX_AGE,
+        )
+    except Exception:  # noqa: BLE001 - a preference is not worth a stack trace
+        pass
 
 
 def t(key, **kwargs):
@@ -495,6 +808,12 @@ def selector():
     in the wrong language, and it belongs next to the other app-wide setting
     (the theme) rather than buried in the sidebar with the navigation.
     """
+    # Seeded before the radio is drawn: Streamlit refuses an assignment to a
+    # widget's key once that widget exists, so restoring the remembered choice
+    # has to happen on the way in rather than after.
+    if STATE_KEY not in st.session_state:
+        st.session_state[STATE_KEY] = _remembered() or DEFAULT
+
     with st.popover(
         _SHORT.get(current(), current()),
         icon=":material/language:",
@@ -505,5 +824,8 @@ def selector():
             t("lang.label"),
             LANGUAGES,
             key=STATE_KEY,
+            on_change=_picked,
             label_visibility="collapsed",
         )
+
+    _remember()

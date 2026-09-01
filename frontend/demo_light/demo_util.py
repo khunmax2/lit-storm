@@ -12,6 +12,7 @@ import markdown
 import pytz
 import streamlit as st
 import auth
+import html_report
 import search_sources
 import ui_language
 import ui_theme
@@ -767,6 +768,47 @@ def set_storm_runner():
     st.session_state["runner_settings"] = fingerprint
 
 
+@st.cache_data(show_spinner=False)
+def _report_bytes(article_name, file_path_dict, mtime, lang):
+    """The interactive report, cached on the run's own modification time.
+
+    Streamlit needs a download button's payload on every rerun, so building
+    the file inline would recompile the whole article on every click anywhere
+    on the page. `mtime` is in the key so a re-run of the topic invalidates it.
+    """
+    return html_report.build_report(article_name, file_path_dict, lang).encode("utf-8")
+
+
+def download_report_button(article_name, file_path_dict, article_path, key, short=False):
+    """Hand over the whole run as one file that opens anywhere.
+
+    The Markdown download beside it is the article's text alone; this is the
+    article with the evidence and the interviews still attached, which is what
+    makes it worth reading away from the app.
+    """
+    try:
+        data = _report_bytes(
+            article_name,
+            file_path_dict,
+            os.path.getmtime(article_path),
+            ui_language.current(),
+        )
+    except (ValueError, OSError):
+        # A run that stopped before the article was written has nothing to
+        # compile. The Markdown button is already hidden in that case.
+        return
+    st.download_button(
+        t("article.download_report_short" if short else "article.download_report"),
+        data=data,
+        file_name=html_report.report_filename(article_name),
+        mime="text/html",
+        icon=":material/find_in_page:",
+        help=t("article.report_help"),
+        key=key,
+        use_container_width=True,
+    )
+
+
 def display_article_page(
     selected_article_name,
     selected_article_file_path_dict,
@@ -798,20 +840,76 @@ def display_article_page(
                 unsafe_allow_html=True,
             )
             if article_path and os.path.exists(article_path):
-                st.download_button(
-                    t("article.download"),
-                    data=open(article_path).read(),
-                    file_name=f"{selected_article_name}.md",
-                    mime="text/markdown",
-                    icon=":material/download:",
-                )
+                # Two ways out of the app, on one row: the text, and the whole
+                # run. The report goes first because it is the one worth
+                # sending to someone else.
+                report_col, markdown_col = st.columns(2, gap="small")
+                with report_col:
+                    download_report_button(
+                        selected_article_name,
+                        selected_article_file_path_dict,
+                        article_path,
+                        key="head_report",
+                        short=True,
+                    )
+                with markdown_col:
+                    st.download_button(
+                        t("article.download_short"),
+                        data=open(article_path).read(),
+                        file_name=f"{selected_article_name}.md",
+                        mime="text/markdown",
+                        icon=":material/download:",
+                        use_container_width=True,
+                    )
             st.markdown('<div class="article-rule"></div>', unsafe_allow_html=True)
 
     else:
         head = None
 
-    if show_main_article:
+    if not show_main_article:
+        return
+
+    # Two ways to read the same run. "Article" is the page the app has always
+    # drawn — sidebar contents, references, the interviews underneath. "Report"
+    # is the file the download button hands over, shown here rather than only
+    # after a round trip through the reader's Downloads folder.
+    view = st.segmented_control(
+        t("article.view_label"),
+        ["article", "report"],
+        format_func=lambda name: t(f"article.view_{name}"),
+        default="article",
+        key=f"view_{selected_article_name}",
+        label_visibility="collapsed",
+    )
+    if view == "report":
+        _display_report_view(selected_article_name, selected_article_file_path_dict)
+    else:
         _display_main_article(selected_article_file_path_dict, head=head)
+
+
+def _display_report_view(article_name, file_path_dict):
+    """The interactive report, embedded rather than downloaded.
+
+    Through an iframe rather than `st.html`: the report is a small application
+    — tabbed views, a source filter, citations that open what they cite — and
+    none of that survives having its scripts stripped. The HTML is this app's
+    own output, not anything a reader supplied.
+    """
+    try:
+        html = _report_bytes(
+            article_name,
+            file_path_dict,
+            os.path.getmtime(
+                file_path_dict.get("storm_gen_article_polished.txt")
+                or file_path_dict["storm_gen_article.txt"]
+            ),
+            ui_language.current(),
+        ).decode("utf-8")
+    except (ValueError, OSError, KeyError) as error:
+        st.warning(t("article.view_failed"), icon=":material/warning:")
+        st.code(str(error), language=None)
+        return
+    st.iframe(html, height=900)
 
 
 def _in_script_run_ctx(method):

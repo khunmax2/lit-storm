@@ -63,10 +63,6 @@ PURPOSES = (
 # in the reader's language.
 _WARM_STEP = re.compile(r"Step (\d) / 4")
 
-# A run of asterisks opening a line: a bold marker the model started and never
-# closed. Two or more, so a real "**bold**" mid-sentence is left alone.
-_UNCLOSED_BOLD = re.compile(r"^\s*\*{2,}\s*", re.MULTILINE)
-
 
 class RoundTableStatus(BaseCallbackHandler):
     """Co-STORM's progress, written into whichever status box is on screen.
@@ -402,16 +398,6 @@ def _speaker(turn):
     return False, role or "assistant", turn.role_description, None
 
 
-def _clean(text):
-    """Tidy an utterance on its way to the screen.
-
-    Only the marks that are nobody's meaning: a bold marker the model opened
-    and never closed, which otherwise reads as four literal asterisks in front
-    of the first sentence.
-    """
-    return _UNCLOSED_BOLD.sub("", text).strip()
-
-
 def _transcript(runner):
     citations = costorm.citation_dict(runner)
     for turn in runner.conversation_history:
@@ -423,7 +409,7 @@ def _transcript(runner):
                     st.caption(description.strip())
             # "$" would otherwise open a LaTeX block halfway through a
             # sentence about money.
-            text = _clean(
+            text = costorm.clean_utterance(
                 ui_language.localize_engine_reply(turn.utterance)
             ).replace("$", "\\$")
             st.markdown(

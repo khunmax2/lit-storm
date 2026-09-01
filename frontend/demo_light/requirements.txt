@@ -6,4 +6,5 @@ streamlit_extras
 deprecation==2.1.0
 st-pages==0.4.5
 ddgs
+tavily-python
 supabase

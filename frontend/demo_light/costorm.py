@@ -132,6 +132,20 @@ def build_runner(topic, callback_handler=None):
     )
 
 
+# A run of asterisks opening a line: a bold marker the model started and never
+# closed. Two or more, so a real "**bold**" mid-sentence is left alone.
+_UNCLOSED_BOLD = re.compile(r"^\s*\*{2,}\s*", re.MULTILINE)
+
+
+def clean_utterance(text):
+    """Tidy an utterance of what nobody meant to write.
+
+    Applied both on the way to the screen and on the way to disk, so a saved
+    transcript does not carry marks the live one hides.
+    """
+    return _UNCLOSED_BOLD.sub("", text or "").strip()
+
+
 def citation_dict(runner):
     """{citation number: {url, title, snippets}} for everything collected.
 
@@ -179,6 +193,10 @@ def save_report(runner, report, topic):
         # show up in the library as a run that had worked.
         raise EmptyReport("refusing to save an empty report")
 
+    citations = citation_dict(runner)
+    canonical = _merge_by_url(citations)
+    renumber = _renumberer(canonical)
+
     folder = truncate(topic)
     directory = os.path.join(demo_util.working_dir(), folder)
     os.makedirs(directory, exist_ok=True)
@@ -188,38 +206,78 @@ def save_report(runner, report, topic):
         "w",
         encoding="utf-8",
     ) as handle:
-        handle.write(report)
+        handle.write(renumber(report))
 
-    citations = citation_dict(runner)
-    url_to_info = {
-        "url_to_unified_index": {
-            entry["url"]: index for index, entry in citations.items()
-        },
-        "url_to_info": {
-            entry["url"]: {
-                "url": entry["url"],
-                "title": entry["title"],
-                "snippets": entry["snippets"],
-                "description": "",
-            }
-            for entry in citations.values()
-        },
-    }
     with open(
         os.path.join(directory, "url_to_info.json"), "w", encoding="utf-8"
     ) as handle:
-        json.dump(url_to_info, handle, indent=2, ensure_ascii=False)
-
-    with open(
-        os.path.join(directory, "costorm_conversation.json"), "w", encoding="utf-8"
-    ) as handle:
         json.dump(
-            [turn.to_dict() for turn in runner.conversation_history],
+            {
+                "url_to_unified_index": {
+                    entry["url"]: index
+                    for index, entry in citations.items()
+                    if canonical[index] == index
+                },
+                "url_to_info": {
+                    entry["url"]: {
+                        "url": entry["url"],
+                        "title": entry["title"],
+                        "snippets": entry["snippets"],
+                        "description": "",
+                    }
+                    for entry in citations.values()
+                },
+            },
             handle,
             indent=2,
             ensure_ascii=False,
         )
+
+    with open(
+        os.path.join(directory, "costorm_conversation.json"), "w", encoding="utf-8"
+    ) as handle:
+        turns = []
+        for turn in runner.conversation_history:
+            row = turn.to_dict()
+            row["utterance"] = renumber(clean_utterance(row.get("utterance")))
+            row["raw_utterance"] = renumber(
+                clean_utterance(row.get("raw_utterance"))
+            )
+            turns.append(row)
+        json.dump(turns, handle, indent=2, ensure_ascii=False)
     return folder
+
+
+def _merge_by_url(citations):
+    """{citation number: the number that speaks for its URL}.
+
+    Co-STORM gives two snippets from the same page two citation numbers.
+    STORM's `url_to_info.json` is keyed by URL, so inverting it drops every
+    number but one and leaves the rest citing nothing — six of them on the
+    first run this was tried on, three of them actually cited. The lowest
+    number wins and the others point at it.
+    """
+    first = {}
+    canonical = {}
+    for index in sorted(citations):
+        url = citations[index]["url"]
+        canonical[index] = first.setdefault(url, index)
+    return canonical
+
+
+def _renumberer(canonical):
+    """A function that rewrites `[n]` markers onto their canonical number."""
+    if all(index == target for index, target in canonical.items()):
+        return lambda text: text or ""
+
+    def rewrite(text):
+        return re.sub(
+            r"\[(\d+)\]",
+            lambda m: f"[{canonical.get(int(m.group(1)), int(m.group(1)))}]",
+            text or "",
+        )
+
+    return rewrite
 
 
 def truncate(topic):

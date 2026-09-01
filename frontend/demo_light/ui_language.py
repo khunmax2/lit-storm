@@ -385,6 +385,27 @@ _STRINGS = {
         "English": "Download as Markdown",
         "ไทย": "ดาวน์โหลดเป็น Markdown",
     },
+    # The interactive export. "Report" rather than "HTML" because what the
+    # button hands over is the whole run — article, evidence and interviews —
+    # not a change of file format.
+    "article.download_report": {
+        "English": "Download interactive report",
+        "ไทย": "ดาวน์โหลดรายงานแบบโต้ตอบ",
+    },
+    # Short forms for the pair of buttons under the article title, where the
+    # body column is half the page: at that width "Download interactive
+    # report" broke mid-word. The icon and the tooltip carry the verb.
+    "article.download_report_short": {
+        "English": "Interactive report",
+        "ไทย": "รายงานแบบโต้ตอบ",
+    },
+    "article.download_short": {"English": "Markdown", "ไทย": "Markdown"},
+    "article.report_help": {
+        "English": "One HTML file with the article, every source behind it and "
+        "the interviews that produced it. Opens in any browser, no internet needed.",
+        "ไทย": "ไฟล์ HTML ไฟล์เดียว รวมบทความ แหล่งอ้างอิงทุกแหล่ง "
+        "และบทสัมภาษณ์ที่ใช้เขียน เปิดได้ในเบราว์เซอร์ทุกตัว ไม่ต้องต่อเน็ต",
+    },
     "article.toc": {"English": "Table of contents", "ไทย": "สารบัญ"},
     "article.view_all_references": {
         "English": "View all references",
@@ -678,6 +699,13 @@ _STRINGS = {
         "needs an embedding model the current settings do not provide.",
         "ไทย": "Co-STORM ต้องจัดกลุ่มแหล่งข้อมูลด้วยความคล้ายกัน "
         "ซึ่งต้องใช้โมเดล embedding ที่การตั้งค่าปัจจุบันยังไม่มี",
+    },
+    "article.view_label": {"English": "How to read this", "ไทย": "รูปแบบการแสดงผล"},
+    "article.view_article": {"English": "Article", "ไทย": "แบบเดิม"},
+    "article.view_report": {"English": "Report", "ไทย": "แบบรายงาน"},
+    "article.view_failed": {
+        "English": "The report could not be built for this run.",
+        "ไทย": "สร้างรายงานสำหรับงานชิ้นนี้ไม่สำเร็จ",
     },
     # -- dates and lengths -------------------------------------------------
     "date.today": {"English": "{time} today", "ไทย": "{time} วันนี้"},

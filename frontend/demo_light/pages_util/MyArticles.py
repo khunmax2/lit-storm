@@ -17,7 +17,7 @@ def _load_articles():
     return st.session_state["page2_user_articles_file_path_dict"]
 
 
-def _card_menu(article_name, article_path):
+def _card_menu(article_name, article_path, file_path_dict):
     """The quiet menu in a card's top corner.
 
     Only what there is actually a file for: the article itself. A menu whose
@@ -27,6 +27,12 @@ def _card_menu(article_name, article_path):
     if not (article_path and os.path.exists(article_path)):
         return
     with st.popover("", icon=":material/more_vert:"):
+        demo_util.download_report_button(
+            article_name,
+            file_path_dict,
+            article_path,
+            key=f"card_report_{article_name}",
+        )
         st.download_button(
             t("article.download"),
             data=ui_theme.read_text(article_path, os.path.getmtime(article_path)),
@@ -75,7 +81,7 @@ def _article_card(article_name, file_path_dict):
         st.markdown(body, unsafe_allow_html=True)
         # Drawn after the body and lifted into the corner by CSS, so it needs
         # no row of its own to sit in.
-        _card_menu(article_name, article_path)
+        _card_menu(article_name, article_path, file_path_dict)
         return st.button(
             t("articles.read") if ready else t("articles.inspect"),
             icon=":material/description:" if ready else ":material/search:",

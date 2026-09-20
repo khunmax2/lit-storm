@@ -13,8 +13,8 @@ Read once on mount, so a change to either reloads the frame — a research run
 in progress at that moment is lost. Accepted: changing language or theme is a
 deliberate, infrequent act.
 
-Upstream ignores parameters it does not know, so this works against the
-publisher's image today and improves when the fork's image replaces it.
+The fork honours all three; upstream ignores what it does not know, so the
+publisher's image still works in a pinch — it just shows its own controls.
 """
 
 from urllib.parse import urlencode
@@ -27,9 +27,9 @@ from ui_language import t
 # Where the container answers. Overridable the way every other address is.
 DEFAULT_URL = "http://localhost:3100"
 
-# The frame's language codes for this app's language names. Upstream has no
-# Thai locale yet; until the fork adds one it falls back to English, which is
-# what it would have shown anyway.
+# The frame's language codes for this app's language names. The fork ships
+# a Thai locale and its server-side schema accepts `th`; against upstream's
+# image this falls back to English, which is what it would have shown anyway.
 LANG_CODES = {"English": "en", "ไทย": "th"}
 
 # A pixel height is what st.iframe actually honours: "stretch" fills the

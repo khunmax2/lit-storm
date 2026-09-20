@@ -111,6 +111,83 @@ def _write(values):
     os.chmod(SETTINGS_PATH, 0o600)
 
 
+# Not a setting name, so `save` refuses it and `setting` never returns it:
+# the list of models a member may pick lives beside the settings, not among them.
+PRESETS_KEY = "_presets"
+
+
+def presets():
+    """Models the admin has put on offer for the strong role, in order.
+
+    Each is {"id", "label", "provider", "model"}. The id is what a run
+    remembers; the label is what the picker shows. Only the strong role is
+    offered — it is the one that writes, and the one a person has an
+    opinion about. The fast role keeps the admin's choice.
+    """
+    saved = load().get(PRESETS_KEY, [])
+    clean = []
+    for entry in saved if isinstance(saved, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("id") and entry.get("provider") and entry.get("model"):
+            clean.append(
+                {
+                    "id": str(entry["id"]),
+                    "label": str(entry.get("label") or entry["model"]),
+                    "provider": str(entry["provider"]).strip().lower(),
+                    "model": str(entry["model"]).strip(),
+                }
+            )
+    return clean
+
+
+def set_presets(entries):
+    """Replace the offered list. Ids are made from the label if missing."""
+    import re
+
+    current = load()
+    clean = []
+    seen = set()
+    for entry in entries or []:
+        provider = str(entry.get("provider") or "").strip().lower()
+        model = str(entry.get("model") or "").strip()
+        label = str(entry.get("label") or model).strip()
+        if not (provider and model):
+            continue
+        base = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-") or "model"
+        ident = base
+        n = 2
+        while ident in seen:
+            ident = f"{base}-{n}"
+            n += 1
+        seen.add(ident)
+        clean.append({"id": ident, "label": label, "provider": provider, "model": model})
+    current[PRESETS_KEY] = clean
+    _write(current)
+
+
+def preset_lookup(preset_id):
+    """A `lookup` for `demo_util.resolve_role` that answers the strong role
+    from a preset and everything else from the saved settings.
+
+    None when the id is unknown — a preset removed by the admin after
+    someone picked it — so the run quietly uses the default rather than
+    failing on a choice that no longer exists.
+    """
+    chosen = next((p for p in presets() if p["id"] == preset_id), None)
+    if not chosen:
+        return None
+
+    def lookup(name):
+        if name == "LLM_STRONG_PROVIDER":
+            return chosen["provider"]
+        if name == "LLM_STRONG_MODEL":
+            return chosen["model"]
+        return setting(name)
+
+    return lookup
+
+
 def setting(name):
     """A saved value, else whatever `auth.setting` finds.
 

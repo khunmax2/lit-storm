@@ -252,5 +252,71 @@ def model_settings_page():
             _role_card(role)
 
     _encoder_card()
+    _presets_card()
 
     st.caption(t("models.where_saved"))
+
+
+def _presets_card():
+    """Models a member may pick for the strong role, one run at a time.
+
+    The default stays whatever the cards above say; these are the
+    alternatives on offer. A preset is a label, a provider and a model name
+    — the provider's key comes from the settings above, so a preset on a
+    provider with no key saved will fail the same way any run on it would,
+    and the admin is the one who sees that, on Test, before offering it.
+    """
+    presets = model_settings.presets()
+    with st.container(border=True, key="role_presets"):
+        st.markdown(
+            f'<div class="src-head"><span class="name">{t("models.presets")}</span>'
+            f'<span class="tags">{ui_theme.badge(str(len(presets)), tone="info")}</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(t("models.presets_what"))
+
+        for index, preset in enumerate(presets):
+            row, remove = st.columns([5, 1], vertical_alignment="center")
+            with row:
+                st.markdown(
+                    f"**{preset['label']}** — `{preset['provider']}` · `{preset['model']}`"
+                )
+            with remove:
+                if st.button(
+                    t("models.preset_remove"),
+                    key=f"preset_rm_{preset['id']}",
+                    type="tertiary",
+                    icon=":material/delete:",
+                ):
+                    model_settings.set_presets(presets[:index] + presets[index + 1 :])
+                    st.rerun()
+
+        st.markdown(f"**{t('models.preset_add')}**")
+        label_col, provider_col, model_col = st.columns([2, 1.4, 2])
+        with label_col:
+            label = st.text_input(t("models.preset_label"), key="preset_new_label",
+                                  placeholder="Pathumma LLM 27B")
+        with provider_col:
+            provider = st.selectbox(t("models.provider"), sorted(demo_util.PROVIDERS),
+                                    key="preset_new_provider")
+        with model_col:
+            model = st.text_input(t("models.model_name"), key="preset_new_model",
+                                  placeholder=demo_util.PROVIDERS[provider].get("strong") or "")
+        left, right = st.columns(2)
+        with left:
+            if st.button(t("models.test"), key="preset_new_test",
+                         icon=":material/wifi_tethering:", width="stretch"):
+                with st.spinner(t("models.testing")):
+                    _remember("preset_new", model_settings.check("STRONG", overrides={
+                        "LLM_STRONG_PROVIDER": provider, "LLM_STRONG_MODEL": model,
+                    }))
+        with right:
+            if st.button(t("models.preset_save"), key="preset_new_save", type="primary",
+                         width="stretch", disabled=not model):
+                model_settings.set_presets(presets + [{
+                    "label": label or model, "provider": provider, "model": model,
+                }])
+                for key in ("preset_new_label", "preset_new_model"):
+                    st.session_state.pop(key, None)
+                st.rerun()
+        _show_test("preset_new")

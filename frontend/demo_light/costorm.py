@@ -22,6 +22,7 @@ import auth
 import dspy
 import demo_util
 import model_settings
+import run_options
 import search_sources
 from demo_util import LMConfigError
 
@@ -112,7 +113,9 @@ def build_runner(topic, callback_handler=None):
     """
     _prepare_encoder()
 
-    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = demo_util.lm_settings()
+    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = demo_util.lm_settings(
+        run_options.model()
+    )
     # 3000 rather than the paper's 1000, because a reasoning model spends part
     # of this budget thinking before it writes a word — Gemini 3.6 Flash burns
     # about 600 tokens on that — and whatever is left is what the reader sees.
@@ -128,12 +131,18 @@ def build_runner(topic, callback_handler=None):
     lm_config.set_question_asking_lm(fast_lm)
     lm_config.set_knowledge_base_lm(strong_lm)
 
-    argument = RunnerArgument(topic=topic, retrieve_top_k=RETRIEVE_TOP_K)
+    knobs = run_options.knobs()
+    argument = RunnerArgument(
+        topic=topic,
+        retrieve_top_k=RETRIEVE_TOP_K,
+        warmstart_max_num_experts=knobs["warmstart_max_num_experts"],
+        max_search_queries_per_turn=knobs["max_search_queries_per_turn"],
+    )
     return CoStormRunner(
         lm_config=lm_config,
         runner_argument=argument,
         logging_wrapper=LoggingWrapper(lm_config),
-        rm=search_sources.build(k=argument.retrieve_top_k),
+        rm=search_sources.build_many(run_options.sources(), k=argument.retrieve_top_k),
         callback_handler=callback_handler,
     )
 

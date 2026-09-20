@@ -15,6 +15,7 @@ import article_store
 import auth
 import html_report
 import model_settings
+import run_options
 import search_sources
 import ui_language
 import ui_theme
@@ -694,15 +695,21 @@ def resolve_role(role, default_provider, lookup=None):
     return provider["prefix"] + model, kwargs
 
 
-def lm_settings():
+def lm_settings(preset_id=None):
     """The two models to call, from secrets or the environment.
 
     Only LLM_PROVIDER has to be set, and only if it is not Gemini. Each role
     can override the provider as well as the model, so the questions can be
     asked somewhere cheap while the writing happens somewhere strong.
+
+    `preset_id` names a model the admin put on offer and this run picked;
+    it moves the strong role only. An id that no longer exists is ignored
+    rather than failed on, so a preset withdrawn after someone chose it does
+    not stop their next run.
     """
+    lookup = model_settings.preset_lookup(preset_id) if preset_id else None
     default = (model_settings.setting("LLM_PROVIDER") or "gemini").strip().lower()
-    return tuple(resolve_role(role, default) for role in ROLES)
+    return tuple(resolve_role(role, default, lookup=lookup) for role in ROLES)
 
 
 def _settings_fingerprint(*calls):
@@ -735,10 +742,17 @@ def set_storm_runner():
     provider's own error message.
     """
     llm_configs = STORMWikiLMConfigs()
-    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = lm_settings()
+    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = lm_settings(
+        run_options.model()
+    )
 
-    fingerprint = _settings_fingerprint(
-        (fast_model, fast_kwargs), (strong_model, strong_kwargs)
+    # The run's own choices are part of what the runner was built from, so a
+    # change of depth or sources between two runs rebuilds it the way a
+    # change of provider does.
+    fingerprint = (
+        _settings_fingerprint((fast_model, fast_kwargs), (strong_model, strong_kwargs))
+        + "|"
+        + run_options.fingerprint()
     )
     current_working_dir = working_dir()
     if (
@@ -757,15 +771,16 @@ def set_storm_runner():
     llm_configs.set_article_gen_lm(strong_lm)
     llm_configs.set_article_polish_lm(strong_lm)
 
+    knobs = run_options.knobs()
     engine_args = STORMWikiRunnerArguments(
         output_dir=current_working_dir,
-        max_conv_turn=3,
-        max_perspective=3,
-        search_top_k=3,
-        retrieve_top_k=5,
+        max_conv_turn=knobs["max_conv_turn"],
+        max_perspective=knobs["max_perspective"],
+        search_top_k=knobs["search_top_k"],
+        retrieve_top_k=knobs["retrieve_top_k"],
     )
 
-    rm = search_sources.build(k=engine_args.search_top_k)
+    rm = search_sources.build_many(run_options.sources(), k=engine_args.search_top_k)
 
     st.session_state["runner"] = STORMWikiRunner(engine_args, llm_configs, rm)
     st.session_state["runner_settings"] = fingerprint

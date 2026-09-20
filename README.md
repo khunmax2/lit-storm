@@ -29,6 +29,7 @@ Diffed against upstream `fb951af` (2025-09-30), where upstream stopped. This for
 - **Accounts on Supabase** — `member` / `admin` roles, monthly research quotas, suspension, and an audit log recording who changed what with before and after values. Row-level security keeps one account's reports out of another's reach.
 - **Co-STORM as a first-class engine** — a round table where experts talk in the open and you can interrupt at any point.
 - **Search sources chosen from a page** — test the key before saving; a saved key is never sent back to the browser. Upstream requires a code edit.
+- **Per-run options** — depth (fast / standard / deep), which of the admin-offered sources to search, and which admin-offered model writes. Untouched, a run is exactly what the admin configured.
 - **Self-contained HTML reports** — the article, its live citations, the evidence behind each one, and the interviews that produced it, in one file that opens with no server and no network.
 - **Thai and English**, for both the interface and the generated article.
 - **Provider-agnostic models** — Gemini, OpenRouter, Groq, OpenAI, or anything speaking the OpenAI API.
@@ -128,7 +129,7 @@ The default is DuckDuckGo via `ddgs`, which needs no key. Admins change the sour
 | You.com | `YDC_API_KEY` |
 | SearXNG | `SEARXNG_URL` — an instance address, see [deploy/searxng](deploy/searxng/README.md) |
 
-STORM takes one retriever, so this is a choice between sources, not a row of switches. DuckDuckGo rate-limits aggressively; the app backs off and skips a query that keeps failing rather than ending the run. If search quality matters, a Tavily or Serper key is the cheapest improvement available.
+STORM takes one retriever, so the admin's page picks one — but a run can tick several from the list the admin has put on offer, and a `MultiRM` fans each query out to all of them and merges the results by URL. `SearXNG — academic` is the same instance restricted to its scholarly engines via `engines=`, not a second deployment. DuckDuckGo rate-limits aggressively; the app backs off and skips a query that keeps failing rather than ending the run. If search quality matters, a Tavily or Serper key is the cheapest improvement available.
 
 ### Sessions
 

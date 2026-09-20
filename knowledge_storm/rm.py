@@ -657,6 +657,7 @@ class SearXNG(dspy.Retrieve):
         searxng_api_key=None,
         k=3,
         is_valid_source: Callable = None,
+        engines=None,
     ):
         """Initialize the SearXNG search retriever.
         Please set up SearXNG according to https://docs.searxng.org/index.html.
@@ -667,8 +668,14 @@ class SearXNG(dspy.Retrieve):
             k (int, optional): The number of top passages to retrieve. Defaults to 3.
             is_valid_source (Callable, optional): A function that takes a URL and returns a boolean indicating if the
             source is valid. Defaults to None.
+            engines (str | list, optional): Restrict the search to these SearXNG engines, e.g.
+            "arxiv,pubmed". One instance can then serve as several sources — a general one and
+            an academic one — without a second deployment.
         """
         super().__init__(k=k)
+        if isinstance(engines, (list, tuple)):
+            engines = ",".join(engines)
+        self.engines = engines or None
         if not searxng_api_url:
             raise RuntimeError("You must supply searxng_api_url")
         # The JSON endpoint is /search. People hand over the instance's root
@@ -719,6 +726,8 @@ class SearXNG(dspy.Retrieve):
         for query in queries:
             try:
                 params = {"q": query, "format": "json"}
+                if self.engines:
+                    params["engines"] = self.engines
                 # A timeout, because an instance that has stopped answering
                 # would otherwise hold the whole run open for as long as it
                 # liked. SearXNG fans a query out to many engines and waits
@@ -770,6 +779,63 @@ class SearXNG(dspy.Retrieve):
                 logging.error(f"Error occurs when searching query {query}: {e}")
 
         return collected_results
+
+
+class MultiRM(dspy.Retrieve):
+    """Several retrievers, presented to STORM as one.
+
+    STORM takes exactly one retriever. Letting a person tick more than one
+    source therefore means something has to stand in front of them, fan each
+    query out, and hand back the union. That is all this does.
+
+    A URL two sources both return is kept once, from whichever source came
+    first in the list — so order the list by how much you trust the snippet.
+    Each child keeps its own `k`; the union can be up to `k` times the number
+    of sources, which is what asking for more sources means.
+
+    A source that fails is logged and skipped, not fatal: the run still has
+    the others. Whether a source is configured at all is the settings page's
+    question, asked with its Test button before a run ever starts.
+    """
+
+    def __init__(self, retrievers, k=3):
+        super().__init__(k=k)
+        retrievers = [rm for rm in retrievers if rm is not None]
+        if not retrievers:
+            raise RuntimeError("MultiRM needs at least one retriever")
+        self.retrievers = retrievers
+
+    def get_usage_and_reset(self):
+        usage = {}
+        for rm in self.retrievers:
+            if hasattr(rm, "get_usage_and_reset"):
+                usage.update(rm.get_usage_and_reset())
+        return usage
+
+    def forward(
+        self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []
+    ):
+        queries = (
+            [query_or_queries]
+            if isinstance(query_or_queries, str)
+            else query_or_queries
+        )
+        seen = set(exclude_urls)
+        collected = []
+        for rm in self.retrievers:
+            try:
+                results = rm.forward(queries, exclude_urls=list(seen))
+            except Exception as e:  # noqa: BLE001 - one source down is not a run lost
+                logging.error(
+                    f"{type(rm).__name__} failed and was skipped for this query: {e}"
+                )
+                continue
+            for r in results or []:
+                url = r.get("url")
+                if url and url not in seen:
+                    seen.add(url)
+                    collected.append(r)
+        return collected
 
 
 def duckduckgo_giveup_hdlr(err: Exception) -> bool:

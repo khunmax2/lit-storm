@@ -117,6 +117,73 @@ _STRINGS = {
     "search.url_needed": {"English": "Instance address", "ไทย": "ที่อยู่ instance"},
     "search.host_one": {"English": "How to host one", "ไทย": "วิธีติดตั้ง instance"},
     "search.forget_url": {"English": "Forget this address", "ไทย": "ลบที่อยู่นี้"},
+    "search.shares_address": {
+        "English": "Uses the address saved for {name}.",
+        "ไทย": "ใช้ที่อยู่เดียวกับที่บันทึกไว้สำหรับ {name}",
+    },
+    "searxng_academic_note": {
+        "English": "The same SearXNG instance, restricted to its scholarly "
+        "engines: arXiv, PubMed, Semantic Scholar, CrossRef, OpenAlex, Google "
+        "Scholar, CORE, BASE and PDBe.",
+        "ไทย": "SearXNG instance เดียวกัน แต่จำกัดเฉพาะ engine งานวิชาการ: arXiv, PubMed, "
+        "Semantic Scholar, CrossRef, OpenAlex, Google Scholar, CORE, BASE และ PDBe",
+    },
+    "search.offer_title": {
+        "English": "Sources members may pick",
+        "ไทย": "แหล่งที่ให้สมาชิกเลือกได้",
+    },
+    "search.offer_note": {
+        "English": "Each run can tick any of these on the Home page. The source "
+        "in use is always included — it is what a run gets when nothing is "
+        "ticked. Only sources with their key or address set are listed.",
+        "ไทย": "สมาชิกติ๊กเลือกได้จากรายการนี้ที่หน้าแรกก่อนเริ่มค้นคว้า แหล่งที่ใช้อยู่จะรวมอยู่เสมอ "
+        "เพราะเป็นค่าที่ได้เมื่อไม่ติ๊กอะไร แสดงเฉพาะแหล่งที่ตั้งคีย์หรือที่อยู่ไว้แล้ว",
+    },
+    "search.offer_save": {"English": "Save offer", "ไทย": "บันทึกรายการ"},
+    # -- run options (the picker on Home) ----------------------------------
+    "run.options": {"English": "Research options", "ไทย": "ตัวเลือกการค้นคว้า"},
+    "run.options_changed": {
+        "English": "Research options — changed",
+        "ไทย": "ตัวเลือกการค้นคว้า — ปรับแล้ว",
+    },
+    "run.depth": {"English": "Depth", "ไทย": "ความลึก"},
+    "run.depth_fast": {"English": "Fast", "ไทย": "เร็ว"},
+    "run.depth_fast_note": {
+        "English": "Two perspectives, two rounds each. About two minutes.",
+        "ไทย": "2 มุมมอง มุมมองละ 2 รอบ ประมาณ 2 นาที",
+    },
+    "run.depth_standard": {"English": "Standard", "ไทย": "มาตรฐาน"},
+    "run.depth_standard_note": {
+        "English": "Three perspectives, three rounds each. About four minutes.",
+        "ไทย": "3 มุมมอง มุมมองละ 3 รอบ ประมาณ 4 นาที",
+    },
+    "run.depth_deep": {"English": "Deep", "ไทย": "ลึก"},
+    "run.depth_deep_note": {
+        "English": "Five perspectives, four rounds each, more sources per "
+        "question. Ten minutes or more.",
+        "ไทย": "5 มุมมอง มุมมองละ 4 รอบ และค้นแหล่งต่อคำถามมากขึ้น 10 นาทีขึ้นไป",
+    },
+    "run.model": {"English": "Writing model", "ไทย": "โมเดลที่ใช้เขียน"},
+    "run.model_default": {"English": "Default", "ไทย": "ค่าเริ่มต้น"},
+    "run.sources": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
+    "run.sources_note": {
+        "English": "Tick more than one and every question is searched in all "
+        "of them. Nothing ticked uses the default source.",
+        "ไทย": "ติ๊กมากกว่าหนึ่งแหล่ง ทุกคำถามจะถูกค้นในทุกแหล่งที่เลือก ไม่ติ๊กเลยจะใช้แหล่งเริ่มต้น",
+    },
+    "run.reset": {"English": "Back to defaults", "ไทย": "กลับเป็นค่าเริ่มต้น"},
+    # -- model presets (admin) ---------------------------------------------
+    "models.presets": {"English": "Models on offer", "ไทย": "โมเดลที่เปิดให้เลือก"},
+    "models.presets_what": {
+        "English": "Alternatives a member may pick for the writing model, one "
+        "run at a time. The default stays what the cards above say.",
+        "ไทย": "โมเดลทางเลือกที่สมาชิกเลือกใช้เขียนได้ต่อการค้นคว้าหนึ่งครั้ง "
+        "ค่าเริ่มต้นยังเป็นตามที่ตั้งไว้ด้านบน",
+    },
+    "models.preset_add": {"English": "Add one", "ไทย": "เพิ่มโมเดล"},
+    "models.preset_label": {"English": "Shown as", "ไทย": "ชื่อที่แสดง"},
+    "models.preset_save": {"English": "Offer it", "ไทย": "เพิ่มในรายการ"},
+    "models.preset_remove": {"English": "Remove", "ไทย": "ลบ"},
     "search.needs_endpoint": {
         "English": "Marked internal-only in the library, and needs a private "
         "Stanford endpoint that is not published.",

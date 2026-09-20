@@ -8,11 +8,12 @@ A deployable research assistant built on [stanford-oval/storm](https://github.co
 
 Upstream is a research codebase you drive from Python. This fork turns it into something a team can sign in to and use: accounts and per-member quotas, a settings UI instead of code edits, two research engines behind one door, and a self-contained HTML report you can mail to someone.
 
-| | STORM | Co-STORM |
-| --- | --- | --- |
-| How it runs | Start to finish on its own | A panel discusses, one turn at a time |
-| Your role | Give a topic, wait | Watch, interrupt, steer |
-| Report | Handed back at the end | Written when you decide the table has covered enough |
+| | STORM | Co-STORM | Deep Research |
+| --- | --- | --- | --- |
+| How it runs | Start to finish on its own | A panel discusses, one turn at a time | Iterates: search, read, ask, search again |
+| Your role | Give a topic, wait | Watch, interrupt, steer | Answer its clarifying questions, watch the tree grow |
+| Report | Handed back at the end | Written when you decide the table has covered enough | Written from the tree when it stops |
+| What it is | This app | This app | A sibling application, framed — [deploy/research-ui](deploy/research-ui/README.md) |
 
 <p align="center">
 | <a href="https://arxiv.org/abs/2402.14207"><b>STORM paper</b></a> | <a href="https://www.arxiv.org/abs/2408.15232"><b>Co-STORM paper</b></a> | <a href="https://storm-project.stanford.edu/"><b>Upstream project site</b></a> |
@@ -216,6 +217,7 @@ The rest of the diff against upstream is Black formatting and line-ending normal
 | [docs/supabase-schema.sql](docs/supabase-schema.sql) | Schema and row-level security policies |
 | [deploy/supabase](deploy/supabase/README.md) | Self-hosted Supabase in four containers |
 | [deploy/searxng](deploy/searxng/README.md) | Self-hosted metasearch, and why there is no academic fork |
+| [deploy/research-ui](deploy/research-ui/README.md) | deep-research-web-ui as a framed sibling application |
 
 ---
 

@@ -141,6 +141,25 @@ _STRINGS = {
     },
     "search.offer_save": {"English": "Save offer", "ไทย": "บันทึกรายการ"},
     # -- run options (the picker on Home) ----------------------------------
+    # -- the framed research UI ---------------------------------------------
+    "home.engine_research": {"English": "Deep Research", "ไทย": "Deep Research"},
+    "home.engine_research_note": {
+        "English": "An iterative researcher with a live research tree. "
+        "A separate application, framed here; its settings are its own.",
+        "ไทย": "ผู้ช่วยค้นคว้าแบบวนซ้ำพร้อมแผนผังการค้นคว้าสด "
+        "เป็นแอปแยกที่นำมาแสดงในกรอบ ค่าตั้งค่าเป็นของมันเอง",
+    },
+    "research.not_configured": {
+        "English": "Deep Research is not running. Start it with "
+        "`docker compose up -d` in deploy/research-ui, or set RESEARCH_UI_URL.",
+        "ไทย": "Deep Research ยังไม่ได้รัน เริ่มด้วย `docker compose up -d` ใน "
+        "deploy/research-ui หรือตั้งค่า RESEARCH_UI_URL",
+    },
+    "research.frame_note": {
+        "English": "Runs in its own window below. Its history stays in this browser.",
+        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง ประวัติจะอยู่ในเบราว์เซอร์นี้",
+    },
+    "research.open_tab": {"English": "Open in a tab", "ไทย": "เปิดในแท็บใหม่"},
     "run.options": {"English": "Research options", "ไทย": "ตัวเลือกการค้นคว้า"},
     "run.options_changed": {
         "English": "Research options — changed",

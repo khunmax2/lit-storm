@@ -1,0 +1,34 @@
+# deep-research-web-ui as a sibling application, the shape ADR-0005 in
+# Upstream_Deeptutor settled on for OpenMAIC after a git-subtree attempt was
+# torn out: its own container, coupled to the main app by a URL and nothing
+# else. The main app frames it in a tab.
+#
+# This runs the publisher's image as-is. The fork with `?embed=1`, `?lang=`,
+# `?theme=` and a Thai locale — the same accommodations OpenMAIC's fork
+# needed — replaces the image tag here once it exists; see README.md.
+#
+# Start:  docker compose --env-file .env up -d
+
+name: lit-storm-research-ui
+
+services:
+  research-ui:
+    image: anotia/deep-research-web:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # Loopback only, like every other sibling here. Reaching it from a
+      # browser goes through the main app's frame, or through whatever
+      # reverse proxy fronts a deployment.
+      - "127.0.0.1:3100:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"

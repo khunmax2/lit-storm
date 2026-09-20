@@ -78,12 +78,13 @@ cp frontend/demo_light/.streamlit/secrets.toml.example \
    frontend/demo_light/.streamlit/secrets.toml
 ```
 
-Windows (PowerShell) — ใช้เครื่องหมาย backtick ขึ้นบรรทัดใหม่แทน backslash:
+Windows (PowerShell):
 
-```bash
-Copy-Item frontend\demo_light\.streamlit\secrets.toml.example `
-          frontend\demo_light\.streamlit\secrets.toml
+```powershell
+Copy-Item frontend\demo_light\.streamlit\secrets.toml.example frontend\demo_light\.streamlit\secrets.toml
 ```
+
+> อย่าคัดลอกคำสั่งรูปแบบ macOS มาวางใน PowerShell **เครื่องหมาย `\` ท้ายบรรทัดคือการขึ้นบรรทัดใหม่ของ bash เท่านั้น** PowerShell จะอ่านมันเป็นส่วนหนึ่งของ path ถัดไป กลายเป็น `\frontend\...` ซึ่งชี้ไปรากของไดรฟ์ แล้วแจ้ง `Could not find a part of the path 'D:\frontend\...'`
 
 จากนั้นกรอกค่าในไฟล์ `secrets.toml` ที่ได้มา ทุกค่ามีคำอธิบายกำกับไว้ในไฟล์แล้ว อย่างน้อยที่สุดต้องมีสามค่านี้จึงจะใช้งานได้:
 

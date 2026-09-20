@@ -43,19 +43,36 @@ Diffed against upstream `fb951af` (2025-09-30), where upstream stopped. This for
 
 Requires Python 3.11–3.14. From the project root:
 
+macOS and Linux:
+
 ```bash
-python3.14 -m venv .venv                    # Windows: uv venv --python 3.14
-.venv/bin/pip install -e .                  # Windows: .venv\Scripts\pip
+python3.14 -m venv .venv
+.venv/bin/pip install -e .
 .venv/bin/pip install -r requirements.txt -r frontend/demo_light/requirements.txt watchdog
 cp frontend/demo_light/.streamlit/secrets.toml.example \
    frontend/demo_light/.streamlit/secrets.toml
 ```
 
-Fill in the settings file, then:
+Windows (PowerShell):
+
+```powershell
+uv venv --python 3.14
+.venv\Scripts\pip install -e .
+.venv\Scripts\pip install -r requirements.txt -r frontend\demo_light\requirements.txt watchdog
+Copy-Item frontend\demo_light\.streamlit\secrets.toml.example frontend\demo_light\.streamlit\secrets.toml
+```
+
+Fill in the settings file, then run — macOS and Linux:
 
 ```bash
 cd frontend/demo_light
 ../../.venv/bin/streamlit run storm.py --server.runOnSave true
+```
+
+Windows (PowerShell), from the project root:
+
+```powershell
+.venv\Scripts\streamlit run frontend\demo_light\storm.py --server.runOnSave true
 ```
 
 `-e .` is not optional — the app runs from inside `frontend/demo_light`, where Python cannot otherwise see `knowledge_storm`.

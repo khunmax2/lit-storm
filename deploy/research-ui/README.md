@@ -101,6 +101,17 @@ docker build -t lit-storm/research-ui:latest ../../../deep-research-web-ui
 RESEARCH_UI_IMAGE=lit-storm/research-ui:latest docker compose --env-file .env up -d
 ```
 
+## It shares the main app's model key, and that has a cost
+
+`.env` carries the same `GOOGLE_API_KEY` the main app uses, because it is
+the key this deployment has. On Gemini's free tier that is one quota for
+both applications, and Deep Research spends it fast: every research node
+is several model calls, and a depth-1 breadth-1 run was enough to take the
+key to `429 You exceeded your current quota` — which then stops the main
+app too, on its next run, for a reason that has nothing to do with it.
+
+Give this a key of its own, or a paid one, before anyone relies on both.
+
 ## Search: the same SearXNG the main app uses
 
 Upstream searches with tavily, firecrawl, crw, google-pse, youcom or

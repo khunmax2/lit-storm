@@ -1156,131 +1156,79 @@ class TogetherClient(dspy.HFModel):
             return response
 
 
-class GoogleModel(dspy.dsp.modules.lm.LM):
-    """A wrapper class for Google Gemini API."""
+class GoogleModel(LM):
+    """Gemini adapter for DSPy's list-of-completions LM interface."""
 
-    def __init__(
-        self,
-        model: str,
-        api_key: Optional[str] = None,
-        **kwargs,
-    ):
-        """You can use `genai.list_models()` to get a list of available models."""
-        super().__init__(model)
+    def __init__(self, model: str, api_key: Optional[str] = None, **kwargs):
         try:
-            import google.generativeai as genai
+            from google import genai
         except ImportError as err:
-            raise ImportError(
-                "GoogleModel requires `pip install google-generativeai`."
-            ) from err
+            raise ImportError("GoogleModel requires `pip install google-genai`.") from err
 
-        api_key = os.environ.get("GOOGLE_API_KEY") if api_key is None else api_key
-        genai.configure(api_key=api_key)
-
-        kwargs = {
-            "candidate_count": 1,  # Caveat: Gemini API supports only one candidate for now.
-            "temperature": (
-                0.0 if "temperature" not in kwargs else kwargs["temperature"]
-            ),
-            "max_output_tokens": kwargs["max_tokens"],
-            "top_p": 1,
-            "top_k": 1,
-            **kwargs,
-        }
-
-        kwargs.pop("max_tokens", None)  # GenerationConfig cannot accept max_tokens
-
-        self.model = model
-        self.config = genai.GenerationConfig(**kwargs)
-        self.llm = genai.GenerativeModel(
-            model_name=model, generation_config=self.config
-        )
-
-        self.kwargs = {
-            "n": 1,
-            **kwargs,
-        }
-
-        self.history: list[dict[str, Any]] = []
-
+        api_key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        # This is a LiteLLM option; Google retries are handled by request().
+        kwargs.pop("num_retries", None)
+        super().__init__(model=model.removeprefix("gemini/"), **kwargs)
+        self.client = genai.Client(api_key=api_key)
         self._token_usage_lock = threading.Lock()
         self.prompt_tokens = 0
         self.completion_tokens = 0
 
     def log_usage(self, response):
-        """Log the total tokens from the Google API response."""
-        usage_data = response.usage_metadata
-        if usage_data:
+        usage = response.usage_metadata
+        if usage:
             with self._token_usage_lock:
-                self.prompt_tokens += usage_data.prompt_token_count
-                self.completion_tokens += usage_data.candidates_token_count
+                self.prompt_tokens += usage.prompt_token_count or 0
+                self.completion_tokens += usage.candidates_token_count or 0
 
     def get_usage_and_reset(self):
-        """Get the total tokens used and reset the token usage."""
-        usage = {
-            self.model: {
+        with self._token_usage_lock:
+            usage = {self.model: {
                 "prompt_tokens": self.prompt_tokens,
                 "completion_tokens": self.completion_tokens,
-            }
-        }
-        self.prompt_tokens = 0
-        self.completion_tokens = 0
-
+            }}
+            self.prompt_tokens = 0
+            self.completion_tokens = 0
         return usage
 
     def basic_request(self, prompt: str, **kwargs):
-        raw_kwargs = kwargs
-        kwargs = {
-            **self.kwargs,
-            **kwargs,
-        }
+        from google.genai import types
 
-        # Google disallows "n" arguments.
-        n = kwargs.pop("n", None)
-
-        response = self.llm.generate_content(prompt, generation_config=kwargs)
-
-        history = {
-            "prompt": prompt,
-            "response": [response.to_dict()],
-            "kwargs": kwargs,
-            "raw_kwargs": raw_kwargs,
-        }
-        self.history.append(history)
-
+        options = {**self.kwargs, **kwargs}
+        options.pop("n", None)
+        options.pop("cache", None)
+        if "max_tokens" in options:
+            options["max_output_tokens"] = options.pop("max_tokens")
+        if "stop" in options:
+            options["stop_sequences"] = options.pop("stop")
+        config = types.GenerateContentConfig(candidate_count=1, **options)
+        response = self.client.models.generate_content(
+            model=self.model, contents=prompt, config=config,
+        )
+        self.log_usage(response)
+        self.history.append({
+            "prompt": prompt, "messages": None, "outputs": [response.text or ""],
+            "usage": {
+                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0) or 0,
+                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0) or 0,
+            },
+        })
         return response
 
     @backoff.on_exception(
-        backoff.expo,
-        (Exception,),
-        max_time=1000,
-        max_tries=8,
-        on_backoff=backoff_hdlr,
-        giveup=giveup_hdlr,
+        backoff.expo, Exception, max_time=1000, max_tries=8,
+        on_backoff=backoff_hdlr, giveup=giveup_hdlr,
     )
     def request(self, prompt: str, **kwargs):
-        """Handles retrieval of completions from Google whilst handling API errors"""
         return self.basic_request(prompt, **kwargs)
 
-    def __call__(
-        self,
-        prompt: str,
-        only_completed: bool = True,
-        return_sorted: bool = False,
-        **kwargs,
-    ):
-        assert only_completed, "for now"
-        assert return_sorted is False, "for now"
-
-        n = kwargs.pop("n", 1)
-
-        completions = []
-        for _ in range(n):
-            response = self.request(prompt, **kwargs)
-            self.log_usage(response)
-            completions.append(response.parts[0].text)
-
-        return completions
+    def __call__(self, prompt=None, messages=None, only_completed=True,
+                 return_sorted=False, **kwargs):
+        assert only_completed and not return_sorted
+        if messages is not None:
+            prompt = "\n\n".join(str(message.get("content", "")) for message in messages)
+        count = kwargs.pop("n", 1)
+        return [self.request(prompt, **kwargs).text or "" for _ in range(count)]
 
 
 # ========================================================================

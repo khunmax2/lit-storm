@@ -111,8 +111,8 @@ def build_runner(topic, callback_handler=None):
     # of this budget thinking before it writes a word — Gemini 3.6 Flash burns
     # about 600 tokens on that — and whatever is left is what the reader sees.
     # At 1000 the answers came back cut off mid-sentence, or empty.
-    fast_lm = LitellmModel(model=fast_model, max_tokens=500, **fast_kwargs)
-    strong_lm = LitellmModel(model=strong_model, max_tokens=3000, **strong_kwargs)
+    fast_lm = demo_util._build_lm(fast_model, 500, fast_kwargs)
+    strong_lm = demo_util._build_lm(strong_model, 3000, strong_kwargs)
 
     lm_config = CollaborativeStormLMConfigs()
     lm_config.set_question_answering_lm(strong_lm)

@@ -11,6 +11,7 @@ from typing import Optional
 import markdown
 import pytz
 import streamlit as st
+import article_store
 import auth
 import html_report
 import search_sources
@@ -28,7 +29,7 @@ from knowledge_storm import (
     STORMWikiRunner,
     STORMWikiLMConfigs,
 )
-from knowledge_storm.lm import LitellmModel
+from knowledge_storm.lm import GoogleModel, LitellmModel
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 from knowledge_storm.utils import truncate_filename
 from stoc import stoc
@@ -85,17 +86,7 @@ class DemoFileIOHelper:
             dict: A dictionary where each key is an article name, and each value is a dictionary
                 of file names and their absolute paths within that article's directory.
         """
-        articles_dict = {}
-        for topic_name in os.listdir(articles_root_path):
-            topic_path = os.path.join(articles_root_path, topic_name)
-            if os.path.isdir(topic_path):
-                # Initialize or update the dictionary for the topic
-                articles_dict[topic_name] = {}
-                # Iterate over all files within a topic directory
-                for file_name in os.listdir(topic_path):
-                    file_path = os.path.join(topic_path, file_name)
-                    articles_dict[topic_name][file_name] = os.path.abspath(file_path)
-        return articles_dict
+        return article_store.list_articles(articles_root_path)
 
     @staticmethod
     def read_txt_file(file_path):
@@ -570,7 +561,7 @@ def _display_main_article(
             elif st.button(
                 t("article.view_all_references"),
                 icon=":material/open_in_new:",
-                use_container_width=True,
+                width="stretch",
                 key="refs_open",
             ):
                 _references_dialog(citations)
@@ -593,10 +584,7 @@ def working_dir():
     disk as well as in the database.
     """
     root = os.path.join(get_demo_dir(), "DEMO_WORKING_DIR")
-    owner = auth.user_id()
-    path = os.path.join(root, owner) if owner else root
-    os.makedirs(path, exist_ok=True)
-    return path
+    return article_store.workspace(root, auth.user_id())
 
 
 def get_demo_dir():
@@ -620,8 +608,8 @@ class LMConfigError(RuntimeError):
     """The language model settings do not describe a model we can call."""
 
 
-# What each provider needs and what its ids look like. The wrapper underneath
-# is litellm, which speaks to a hundred of these; the entries here are the
+# What each provider needs and what its ids look like. Gemini uses Google's
+# SDK; the remaining providers use LiteLLM. The entries here are the
 # ones with a key name of their own. Anything else that speaks the OpenAI API
 # — z.ai, Together, a model served on your own machine — goes through
 # "openai-compatible" with its own base URL.
@@ -723,6 +711,13 @@ def _settings_fingerprint(*calls):
     return "|".join(parts)
 
 
+def _build_lm(model, max_tokens, kwargs):
+    """Use Google's current SDK for Gemini; keep LiteLLM for other providers."""
+    if model.startswith("gemini/"):
+        return GoogleModel(model=model.removeprefix("gemini/"), max_tokens=max_tokens, **kwargs)
+    return LitellmModel(model=model, max_tokens=max_tokens, **kwargs)
+
+
 def set_storm_runner():
     """Put a runner in session state, built from the current settings.
 
@@ -738,15 +733,16 @@ def set_storm_runner():
     fingerprint = _settings_fingerprint(
         (fast_model, fast_kwargs), (strong_model, strong_kwargs)
     )
+    current_working_dir = working_dir()
     if (
         "runner" in st.session_state
         and st.session_state.get("runner_settings") == fingerprint
+        and st.session_state.get("runner_workspace") == current_working_dir
     ):
         return
 
-    current_working_dir = working_dir()
-    fast_lm = LitellmModel(model=fast_model, max_tokens=500, **fast_kwargs)
-    strong_lm = LitellmModel(model=strong_model, max_tokens=3000, **strong_kwargs)
+    fast_lm = _build_lm(fast_model, 500, fast_kwargs)
+    strong_lm = _build_lm(strong_model, 3000, strong_kwargs)
 
     llm_configs.set_conv_simulator_lm(fast_lm)
     llm_configs.set_question_asker_lm(fast_lm)
@@ -766,6 +762,7 @@ def set_storm_runner():
 
     st.session_state["runner"] = STORMWikiRunner(engine_args, llm_configs, rm)
     st.session_state["runner_settings"] = fingerprint
+    st.session_state["runner_workspace"] = current_working_dir
 
 
 @st.cache_data(show_spinner=False)
@@ -805,7 +802,7 @@ def download_report_button(article_name, file_path_dict, article_path, key, shor
         icon=":material/find_in_page:",
         help=t("article.report_help"),
         key=key,
-        use_container_width=True,
+        width="stretch",
     )
 
 
@@ -859,7 +856,7 @@ def display_article_page(
                         file_name=f"{selected_article_name}.md",
                         mime="text/markdown",
                         icon=":material/download:",
-                        use_container_width=True,
+                        width="stretch",
                     )
             st.markdown('<div class="article-rule"></div>', unsafe_allow_html=True)
 

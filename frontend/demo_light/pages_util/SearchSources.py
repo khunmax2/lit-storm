@@ -41,7 +41,7 @@ def _source_card(name, chosen):
     is_set, last4 = search_sources.hint(name)
     unavailable = "unavailable" in source
 
-    with st.container(border=True, key=f"src_{name}"):
+    with st.container(border=True, key=f"src_{name}_{'chosen' if name == chosen else 'other'}"):
         badge = ui_theme.badge(
             t("search.free") if source["free"] else t("search.paid"),
             tone="positive" if source["free"] else "info",
@@ -83,7 +83,7 @@ def _source_card(name, chosen):
                 t("search.test"),
                 key=f"test_{name}",
                 icon=":material/wifi_tethering:",
-                use_container_width=True,
+                width="stretch",
             ):
                 with st.spinner(t("search.testing")):
                     _test(name, typed)
@@ -94,7 +94,7 @@ def _source_card(name, chosen):
                 key=f"use_{name}",
                 type="primary" if name != chosen else "secondary",
                 disabled=not can_use or name == chosen,
-                use_container_width=True,
+                width="stretch",
             ):
                 search_sources.save(name, {source["key"]: typed} if source["key"] else {})
                 st.rerun()

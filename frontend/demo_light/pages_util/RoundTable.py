@@ -14,8 +14,10 @@ walking over to the library and back should not throw it away —
 
 import re
 import threading
+from html import escape
 
 import article_language
+import article_store
 import auth
 import costorm
 import demo_util
@@ -212,29 +214,21 @@ def _opening():
             topic = st.text_input(
                 t("create.topic"),
                 placeholder=t("table.topic_placeholder"),
-                label_visibility="collapsed",
             )
             st.selectbox(
                 t("create.article_language"),
                 list(article_language.LANGUAGES),
                 key="costorm_language",
-                label_visibility="collapsed",
             )
 
             # The purpose sits between the topic and the button, so it reads
             # as part of asking rather than as a setting to go back for.
-            st.markdown(
-                f'<div class="side-label" style="margin-top:1rem">'
-                f'{t("table.purpose_label")}</div>',
-                unsafe_allow_html=True,
-            )
             labels = dict((value, label) for value, label, _ in PURPOSES)
             purpose = st.radio(
                 t("table.purpose_label"),
                 [value for value, _, _ in PURPOSES],
                 captions=[t(note) for _, _, note in PURPOSES],
                 format_func=lambda value: t(labels[value]),
-                label_visibility="collapsed",
             )
             typed_purpose = st.text_input(
                 t("table.purpose_own"),
@@ -264,6 +258,11 @@ def _open_discussion(topic, purpose, typed_purpose):
     topic = topic.strip()
     if not topic:
         st.warning(t("create.needs_topic"), icon=":material/warning:")
+        return
+    try:
+        article_store.validate_name(costorm.truncate(topic))
+    except ValueError:
+        st.warning(t("create.invalid_topic"), icon=":material/warning:")
         return
     if not auth.may_run():
         _, limit = auth.quota()
@@ -296,7 +295,7 @@ def _header():
             t("articles.sources", n=len(runner.knowledge_base.info_uuid_to_info_dict)),
         ]
     st.markdown(
-        f'<div class="article-head"><h1>{st.session_state["costorm_topic"]}</h1>'
+        f'<div class="article-head"><h1>{escape(st.session_state["costorm_topic"])}</h1>'
         f'<div class="meta">{ui_theme.chips(chips)}</div></div>',
         unsafe_allow_html=True,
     )

@@ -1,54 +1,50 @@
-# STORM — minimal user interface
+# STORM — คู่มือใช้งานและตั้งค่าระบบ
 
-A Streamlit app for `STORMWikiRunner`: give it a topic, it researches the topic
-from several perspectives, gathers sources from the web, and writes a cited,
-Wikipedia-style article.
+แอป Streamlit สำหรับ `STORMWikiRunner` เมื่อระบุหัวข้อ ระบบจะค้นคว้าจากหลายมุมมอง รวบรวมข้อมูลจากเว็บ และเรียบเรียงเป็นบทความรูปแบบสารานุกรมพร้อมแหล่งอ้างอิง
 
-This is a fork of [stanford-oval/storm](https://github.com/stanford-oval/storm).
-Upstream stopped receiving commits in September 2025 and several of its pinned
-dependencies have since gone stale, so the setup below differs from the
-instructions in the upstream README. See **Differences from upstream** at the
-end for what changed and why.
+โครงการนี้พัฒนาต่อจาก [stanford-oval/storm](https://github.com/stanford-oval/storm) โครงการต้นฉบับหยุดรับ commit ในเดือนกันยายน 2025 และไลบรารีบางตัวที่กำหนดเวอร์ชันไว้เริ่มล้าสมัย ขั้นตอนติดตั้งจึงต่างจาก README ต้นฉบับ ดูรายละเอียดในหัวข้อ **สิ่งที่เปลี่ยนจากโครงการต้นฉบับ** ท้ายเอกสาร
 
-Features:
+ความสามารถหลัก:
 
-1. Create an article from a topic, in **English or Thai**.
-2. Watch STORM's research happen — perspectives, questions, pages visited.
-3. Read the article beside its table of contents and references.
-4. Browse and search previously created articles.
-5. Light and dark themes, following your system or the Streamlit settings menu.
+1. สร้างบทความจากหัวข้อได้ทั้ง **ภาษาไทยและภาษาอังกฤษ**
+2. ติดตามการค้นคว้า เช่น มุมมอง คำถาม และเว็บไซต์ที่ระบบเปิดอ่าน
+3. อ่านบทความพร้อมสารบัญและแหล่งอ้างอิง
+4. เปิดดูและค้นหาบทความที่เคยสร้าง
+5. รองรับธีมสว่างและมืด ตามระบบหรือเมนูตั้งค่าของ Streamlit
+6. ลบและกู้คืนรายงาน รวมถึงงานที่สร้างไม่สำเร็จ และเปิดดูข้อมูลการค้นคว้าที่บันทึกไว้ได้แม้ยังไม่มีบทความฉบับสมบูรณ์
+7. จัดการสมาชิกด้วย dropdown สำหรับบทบาทและสถานะ ป้องกันการลดสิทธิ์บัญชีที่กำลังใช้งาน แสดงข้อมูลที่ยังไม่ได้บันทึก และดูประวัติการจัดการสมาชิก
 
-## Setup
+## การติดตั้งและตั้งค่า
 
-Everything below is run from the repository root unless stated otherwise.
+ให้เรียกใช้คำสั่งจากโฟลเดอร์หลักของโครงการ เว้นแต่ขั้นตอนนั้นระบุให้เปลี่ยนโฟลเดอร์
 
-### 1. Create a virtual environment
+### 1. สร้างสภาพแวดล้อม Python แยกสำหรับโครงการ
 
 ```bash
 python3.14 -m venv .venv
 ```
 
-Python 3.11–3.14 all work. The upstream README suggests conda; a plain venv is
-enough, since nothing here needs conda's non-Python packages.
+รองรับ Python 3.11–3.14 คู่มือต้นฉบับแนะนำ conda แต่โครงการนี้ใช้ `venv` ได้ เพราะไม่ต้องพึ่งแพ็กเกจนอก Python ของ conda
 
-### 2. Install the library and the interface
+### 2. ติดตั้งไลบรารีและส่วนติดต่อผู้ใช้
 
 ```bash
 .venv/bin/pip install -e .
 .venv/bin/pip install -r requirements.txt -r frontend/demo_light/requirements.txt
 ```
 
-`-e .` is what puts `knowledge_storm` on the path. Skipping it is the usual
-cause of `ModuleNotFoundError: No module named 'knowledge_storm'`.
+คำสั่ง `-e .` ทำให้ Python มองเห็น `knowledge_storm` หากข้ามขั้นตอนนี้ อาจพบข้อผิดพลาด `ModuleNotFoundError: No module named 'knowledge_storm'`
 
-### 3. Add your keys
+### 3. ตั้งค่า API key
+
+คัดลอกไฟล์ตัวอย่าง:
 
 ```bash
 cp frontend/demo_light/.streamlit/secrets.toml.example \
    frontend/demo_light/.streamlit/secrets.toml
 ```
 
-Then fill it in:
+จากนั้นกรอกค่าในไฟล์ `frontend/demo_light/.streamlit/secrets.toml`:
 
 ```toml
 GOOGLE_API_KEY    = "..."   # https://ai.google.dev/gemini-api/docs/api-key
@@ -56,121 +52,164 @@ SUPABASE_URL      = "..."   # Supabase -> Project Settings -> Data API
 SUPABASE_ANON_KEY = "..."   # the anon public key, never service_role
 ```
 
-The quotes are required — TOML rejects a bare unquoted value, and Streamlit
-reports it as a missing key rather than a syntax error.
+- `GOOGLE_API_KEY`: คีย์สำหรับเรียกใช้งาน Gemini
+- `SUPABASE_URL`: URL ของโครงการ Supabase
+- `SUPABASE_ANON_KEY`: คีย์ `anon public` สำหรับระบบเข้าสู่ระบบ ห้ามนำคีย์ `service_role` มาใส่ช่องนี้
 
-`secrets.toml` is gitignored and must stay that way; only the `.example` is
-tracked. Every one of these is also read from the environment when it is
-absent from the file, which is how they reach a container.
+ค่าข้อความต้องมีเครื่องหมายคำพูดตามตัวอย่าง เพราะ TOML ไม่รองรับข้อความที่ไม่มีเครื่องหมายคำพูด ในกรณีนี้ Streamlit อาจแจ้งว่าขาดคีย์แทนการแจ้งข้อผิดพลาดรูปแบบไฟล์
 
-Leave the Supabase pair empty to run without accounts — the sign-in screen
-will say what is missing instead of failing.
+ไฟล์ `secrets.toml` ถูกยกเว้นจาก Git และต้องคงไว้เช่นนั้น ให้เก็บใน Git เฉพาะไฟล์ `.example` ที่ไม่มีคีย์จริง หากไม่มีค่าในไฟล์ ระบบจะอ่านจากตัวแปรสภาพแวดล้อมแทน เหมาะสำหรับการติดตั้งผ่าน container
 
-### 3b. Set up accounts
+หากเว้นค่า Supabase ทั้งสองรายการไว้ หน้าลงชื่อเข้าใช้จะแจ้งว่าตั้งค่าไม่ครบ โดยยังไม่อนุญาตให้เข้าใช้งานส่วนที่ต้องมีบัญชี
 
-Accounts, roles and the per-person run quota live in Supabase.
+### 3b. ตั้งค่าบัญชีและสิทธิ์ผู้ใช้
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Paste [docs/supabase-schema.sql](../../docs/supabase-schema.sql) into the
-   SQL editor and run it once. It creates `profiles` and `runs`, the
-   row-level policies, and a trigger that gives every sign-up a profile.
-3. While testing locally, turn off e-mail confirmation under
-   Authentication → Providers → Email, or no one can sign in until they open
-   a confirmation link.
-4. Sign up through the app, then make yourself an admin:
+ระบบเก็บข้อมูลบัญชี บทบาท และโควตาค้นคว้ารายเดือนของแต่ละคนใน Supabase
+
+1. สร้างโครงการที่ [supabase.com](https://supabase.com)
+2. เปิด **SQL Editor** ใน Supabase วางเนื้อหาทั้งหมดจาก [docs/supabase-schema.sql](../../docs/supabase-schema.sql) แล้วรัน ระบบจะสร้างตารางโปรไฟล์ ประวัติการค้นคว้า ประวัติการจัดการสมาชิก และนโยบายสิทธิ์เข้าถึงข้อมูล โปรไฟล์ผู้ใช้จะถูกสร้างเมื่อเข้าสู่ระบบครั้งแรก หรือเมื่อระบบสร้างบัญชีพร้อมบันทึกที่มาได้
+3. หากทดสอบในเครื่อง สามารถปิดการยืนยันอีเมลที่ **Authentication → Providers → Email** ได้ หากเปิดไว้ ผู้สมัครต้องเปิดลิงก์ยืนยันอีเมลก่อนเข้าสู่ระบบ
+4. สมัครและเข้าสู่ระบบผ่านแอปก่อน จากนั้นรัน SQL ต่อไปนี้เพื่อกำหนดผู้ดูแลระบบคนแรก โดยเปลี่ยน `you@example.com` เป็นอีเมลของคุณ:
 
    ```sql
    update public.profiles set role = 'admin' where email = 'you@example.com';
    ```
 
-There are two roles. A `member` signs up and creates reports — that is what
-the app is for. An `admin` does that and also sees everyone's runs and manages
-the roster under **Members**.
+ระบบมีสองบทบาท:
 
-Spending is not a role: every member can create reports, and what keeps one
-shared API key from paying for all of it is `monthly_run_limit` on each
-profile, which an admin changes per person. Failed runs count against it.
+- `member` — สมาชิก สร้างรายงานและดูรายงานของตนเองได้
+- `admin` — ผู้ดูแลระบบ มีความสามารถของสมาชิก และดูประวัติการค้นคว้าของทุกคน รวมถึงจัดการบัญชีผ่านหน้า **สมาชิก** ได้
 
-Sessions live in Streamlit's session state, so reloading the page signs you
-out. Streamlit has no cookie API; this is a limitation of running auth inside
-it rather than a missing feature here.
+โควตาค้นคว้าแยกจากบทบาท ค่า `monthly_run_limit` ในโปรไฟล์กำหนดจำนวนครั้งที่แต่ละคนค้นคว้าได้ต่อเดือน ผู้ดูแลปรับได้เป็นรายบัญชี งานที่สร้างไม่สำเร็จยังนับโควตา เพราะอาจใช้ทรัพยากร API ไปแล้ว
 
-### 4. Run
+แต่ละเซสชัน Streamlit มี Supabase client และสถานะการค้นคว้าของตนเอง เมื่อโหลดหน้าใหม่ ระบบกู้คืนการเข้าสู่ระบบจากคุกกี้ refresh token ตามเวลาที่กำหนด เมื่อออกจากระบบจะล้างข้อมูลหน้าจอและตัวประมวลผลของบัญชีนั้นก่อนให้บัญชีอื่นเข้าสู่ระบบ
+
+### 3c. เปิดใช้ระบบจัดการสมาชิกที่อัปเดต
+
+**สำหรับโครงการที่ตั้งค่า Supabase ไว้แล้ว:** ให้นำเนื้อหาทั้งหมดของ [docs/supabase-schema.sql](../../docs/supabase-schema.sql) ไปรันอีกครั้งใน **SQL Editor** เพื่อเปิดใช้การบันทึกสมาชิกทั้งชุด การป้องกันลดสิทธิ์หรือระงับบัญชีตนเอง การตรวจสถานะบัญชี และประวัติการจัดการสมาชิก
+
+คำสั่งนี้คงข้อมูลโปรไฟล์และประวัติการค้นคว้าเดิมไว้ บัญชีเก่าที่ไม่เคยบันทึกที่มาจะระบุว่าไม่ทราบที่มา โดยไม่เดาว่าใครเป็นผู้สร้าง
+
+หากต้องการให้ admin เพิ่มสมาชิกได้ ให้ตั้งค่าคีย์ **ฝั่งเซิร์ฟเวอร์เท่านั้น** ในไฟล์ `frontend/demo_light/.streamlit/secrets.toml` หรือระบบจัดเก็บ secrets ของเซิร์ฟเวอร์ที่ใช้งานจริง:
+
+```toml
+SUPABASE_SECRET_KEY = "..."  # Supabase -> Settings -> API Keys -> Secret keys
+```
+
+หาคีย์ได้จาก **Supabase → Settings → API Keys → Secret keys** ระบบรองรับคีย์แบบเดิมผ่านชื่อ `SUPABASE_SERVICE_ROLE_KEY` ด้วย
+
+ห้ามนำคีย์นี้ไปใส่แทน `SUPABASE_ANON_KEY` ส่งให้เบราว์เซอร์ หรือบันทึกลง Git หากยังไม่ได้ตั้งค่า ฟอร์มเพิ่มสมาชิกจะยังใช้งานไม่ได้ ส่วนการแก้ไขสมาชิกเดิมใช้ token ของ admin ที่เข้าสู่ระบบ จึงไม่ต้องใช้คีย์พิเศษนี้ แต่ต้องอัปเดตฐานข้อมูลก่อน
+
+#### เพิ่มสมาชิกโดยผู้ดูแลระบบ
+
+1. เข้าสู่ระบบด้วยบัญชี admin แล้วเปิดหน้า **สมาชิก**
+2. เลือก **เพิ่มสมาชิก**
+3. กรอกชื่อ อีเมล และรหัสผ่าน เช่นเดียวกับการสมัครสมาชิก
+4. ตรวจสอบว่าอีเมลเป็นของสมาชิกที่จะเพิ่ม แล้วเลือกช่องยืนยัน
+5. กด **เพิ่มสมาชิก**
+
+บัญชีใหม่จะมีบทบาท `member` และสถานะ **ใช้งานได้** สามารถเข้าสู่ระบบด้วยรหัสผ่านที่กำหนดได้ทันที ระบบไม่ส่งอีเมลต้อนรับหรืออีเมลยืนยัน การสร้างสมาชิกไม่เปลี่ยนบัญชี admin ที่กำลังเข้าสู่ระบบอยู่
+
+หากบันทึกโปรไฟล์หรือประวัติการสร้างบัญชีไม่สำเร็จ ระบบจะลบบัญชี Auth ที่เพิ่งสร้างเพื่อย้อนกลับการทำงาน หากย้อนกลับหรือบันทึกประวัติข้อผิดพลาดไม่ได้ จะแจ้งให้ตรวจสอบและแก้ไขบัญชีที่ค้างใน Supabase ก่อนลองใหม่
+
+#### แก้ไขบทบาท สถานะ และโควตา
+
+บัญชีที่เข้าสู่ระบบอยู่มีป้าย **บัญชีที่คุณกำลังใช้งาน** และล็อกช่องบทบาทกับสถานะไว้ ฐานข้อมูลป้องกันการลดสิทธิ์หรือระงับบัญชีตนเองด้วย แอปไม่มีฟังก์ชันลบบัญชีสมาชิก และผู้ใช้ที่เข้าสู่ระบบไม่มีสิทธิ์ `DELETE` โปรไฟล์
+
+หากต้องการหยุดการใช้งานของบัญชีอื่น ให้เลือกสถานะ **ระงับการใช้งาน** หากต้องการคืนสิทธิ์ ให้เปลี่ยนกลับเป็น **ใช้งานได้** รายงานและประวัติการค้นคว้าของบัญชีนั้นจะยังอยู่
+
+การบันทึกหลายบัญชีจะสำเร็จพร้อมกันทั้งชุด พร้อมบันทึกค่าเดิมและค่าใหม่ หากผู้ดูแลคนอื่นเปลี่ยนข้อมูลไปแล้ว ระบบจะปฏิเสธการบันทึกข้อมูลชุดเก่าเพื่อป้องกันการเขียนทับ
+
+- **บันทึกการแก้ไข**: สีจางและกดไม่ได้เมื่อไม่มีการแก้ไข เปิดใช้งานและสีเข้มขึ้นเมื่อมีข้อมูลรอบันทึก
+- **ยกเลิกการแก้ไข**: ทิ้งการแก้ไขที่ยังไม่บันทึก แล้วโหลดค่าล่าสุดจากฐานข้อมูล
+
+ระบบตรวจสิทธิ์ใหม่เมื่อผู้ใช้โต้ตอบกับหน้าแอปครั้งถัดไป การเปลี่ยนบทบาทหรือระงับบัญชีจึงมีผลในการใช้งานครั้งถัดไป
+
+#### ตรวจสอบที่มาของบัญชีและประวัติการแก้ไข
+
+เปิดแท็บ **ประวัติการจัดการสมาชิก** เพื่อดูผู้ดำเนินการ บัญชีที่เกี่ยวข้อง ช่องทาง เวลา และผลการดำเนินการ ข้อมูลอยู่ในตาราง `member_audit_log` ผู้ดูแลอ่านได้ แต่สมาชิกทั่วไปเพิ่ม แก้ไข หรือลบประวัตินี้ไม่ได้ ระบบไม่เก็บรหัสผ่านหรือ API key ในประวัติ
+
+ที่มาของบัญชีแบ่งเป็น:
+
+- `self_signup` — สมัครผ่านแอปด้วยตนเอง โดยระบบตั้งค่าคีย์ฝั่งเซิร์ฟเวอร์ไว้แล้ว
+- `admin_create` — ผู้ดูแลสร้างให้ พร้อมระบุผู้ดูแลที่ยืนยันตัวตนแล้ว
+- `first_sign_in` — สร้างโปรไฟล์เมื่อเข้าสู่ระบบครั้งแรก แต่ไม่ทราบช่องทางที่สร้างบัญชี Auth เช่น กรณีไม่มีคีย์ฝั่งเซิร์ฟเวอร์
+- `legacy_unknown` — บัญชีเดิมที่ไม่มีข้อมูลที่มา
+
+ประวัตินี้ไม่ครอบคลุมการเปลี่ยนข้อมูลโดยตรงจาก Supabase dashboard นอกแอป
+
+การทดสอบฐานข้อมูลใช้ PostgreSQL ชั่วคราวในเครื่อง ผ่าน Unix socket และปิดการรับเชื่อมต่อ TCP โดยไม่เชื่อมต่อ Supabase ให้ติดตั้ง PostgreSQL หรือกำหนด `STORM_POSTGRES_BIN` เป็นโฟลเดอร์ `bin` ของ PostgreSQL หากไม่มี โปรแกรมทดสอบจะข้ามส่วนนี้ ก่อนตรวจสิทธิ์บัญชีจริง ให้ปิดโหมดบัญชีจำลองของแอป
+
+### 4. เปิดแอป
 
 ```bash
 cd frontend/demo_light
 ../../.venv/bin/streamlit run storm.py
 ```
 
-Then open http://localhost:8501.
+จากนั้นเปิด [http://localhost:8501](http://localhost:8501)
 
-Call the venv's `streamlit` by path as shown, or activate the venv first
-(`source .venv/bin/activate`) — a bare `streamlit run` uses whatever is on your
-system PATH, which is usually nothing at all.
+ให้เรียก `streamlit` ผ่านเส้นทางของ `.venv` ตามตัวอย่าง หรือเปิดใช้งาน venv ด้วย `source .venv/bin/activate` ก่อน หากใช้ `streamlit run` โดยตรง ระบบจะค้นหาโปรแกรมจาก PATH ของเครื่อง ซึ่งอาจไม่มีโปรแกรมนี้หรือเป็นคนละเวอร์ชัน
 
-Articles are written to `frontend/demo_light/DEMO_WORKING_DIR/`, which is
-gitignored.
+รายงานเก็บใน `frontend/demo_light/DEMO_WORKING_DIR/<user-id>/` ซึ่งถูกยกเว้นจาก Git ผู้ใช้ต้องเข้าสู่ระบบก่อนอ่านหรือเขียน workspace ระบบไม่ใช้โฟลเดอร์รวมเดิมเป็นพื้นที่สำหรับผู้ที่ยังไม่เข้าสู่ระบบ
 
-### Working on the interface without signing in every time
+ผู้ดูแลเห็นคลังบทความของตนเอง ส่วนหน้า **สมาชิก** แสดงข้อมูลประวัติการค้นคว้าของทุกบัญชีได้ตามสิทธิ์ฐานข้อมูล การตั้งค่าโมเดลและแหล่งค้นคว้ายังใช้ร่วมกันทั้งระบบ
 
-Streamlit keeps the session in memory, so saving a file restarts the script and
-puts you back at the sign-in screen. While building a page that lives behind
-that screen, run with the bypass on:
+### การจัดการรายงาน
+
+เปิดเมนู **⋮** บนการ์ดรายงานเพื่อลบ รายงานจะย้ายไปยังโฟลเดอร์ `.trash/` ของบัญชีที่เข้าสู่ระบบ สามารถกู้คืนจากส่วนรายงานที่ลบแล้วได้ แม้โหลดแอปใหม่ การกู้คืนจะไม่เขียนทับรายงานชื่อเดียวกันที่มีอยู่
+
+ประวัติการค้นคว้าในฐานข้อมูลยังคงอยู่ การลบรายงานจึงไม่คืนโควตาที่ใช้ไป
+
+ปุ่ม **ดูรายละเอียด** เปิดโครงร่าง บันทึกบทสนทนา และข้อมูลแหล่งอ้างอิงที่บันทึกไว้ของงานที่สร้างไม่สำเร็จ หากไฟล์ว่างหรือเสียหายจะแจ้งว่าไม่มีข้อมูล โดยไม่แสดงไฟล์ตั้งค่าผู้ให้บริการ
+
+ขณะนี้ยังไม่มีปุ่มรันซ้ำหรือทำต่อจากรายงานเดิมในคลัง ปุ่มเริ่มใหม่บนหน้าสร้างไม่สำเร็จจะกลับไปยังแบบฟอร์มหัวข้อ ไม่ได้ทำต่อจากงานที่บันทึกไว้
+
+ทดสอบการจัดเก็บรายงาน หน้าคลัง การแยกบัญชี และการจัดการสมาชิก โดยเรียกคำสั่งนี้จากโฟลเดอร์หลักของโครงการ:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+### พัฒนาหน้าจอด้วยบัญชีจำลอง
+
+Streamlit เก็บเซสชันในหน่วยความจำ เมื่อสคริปต์เริ่มทำงานใหม่อาจต้องเข้าสู่ระบบอีกครั้ง หากต้องการพัฒนาหน้าจอที่อยู่หลังระบบเข้าสู่ระบบ ให้เปิดโหมดบัญชีจำลองจากโฟลเดอร์ `frontend/demo_light`:
 
 ```bash
 STORM_DEV_USER=1 ../../.venv/bin/streamlit run storm.py
 ```
 
-A stand-in account is signed in — admin by default, so the roster is reachable;
-`STORM_DEV_ROLE=member` to see the app as everyone else sees it. An
-undismissable strip across the top says the build is not asking anyone to sign
-in, and **Sign out** stands the bypass down so the real sign-in screen can be
-looked at too (reload to get back in).
+บัญชีจำลองมีบทบาท admin โดยค่าเริ่มต้น จึงเปิดหน้าสมาชิกได้ หากต้องการดูหน้าจอแบบสมาชิก ให้ตั้ง `STORM_DEV_ROLE=member` แถบด้านบนจะแจ้งชัดเจนว่ากำลังใช้โหมดนี้และปิดแถบไม่ได้ ปุ่ม **ออกจากระบบ** จะหยุดใช้บัญชีจำลองเพื่อให้ดูหน้าเข้าสู่ระบบจริงได้ โหลดหน้าใหม่เพื่อกลับเข้าโหมดจำลอง
 
-Three things fence it off, because an auth bypass that reaches a deployment is
-the whole system gone:
+โหมดนี้มีข้อจำกัดสามชั้น:
 
-- it is off unless the variable is set, and the variable belongs in the
-  environment or in `secrets.toml`, neither of which is committed;
-- it is refused unless the browser asked for the page over loopback, so it does
-  nothing on the network URL, behind a proxy, or in a container people can
-  reach;
-- it never touches Supabase. The profile, the roster and the run ledger are all
-  fabricated in memory, so a stray flag can neither read nor write real rows —
-  which also means the roster you see is made up, and saving it saves nothing.
+- ไม่ทำงานจนกว่าจะตั้งตัวแปรในสภาพแวดล้อมหรือ `secrets.toml` ซึ่งไม่ควรเก็บลง Git
+- ทำงานเฉพาะเมื่อเบราว์เซอร์เรียกผ่าน localhost หรือ loopback ไม่ทำงานผ่าน URL เครือข่ายหรือ proxy ที่ผู้ใช้ทั่วไปเข้าถึง
+- ไม่เชื่อมต่อ Supabase โปรไฟล์ รายชื่อสมาชิก และประวัติการค้นคว้าเป็นข้อมูลจำลองในหน่วยความจำ การแก้ไขรายชื่อจึงไม่บันทึกข้อมูลจริง
 
-The stand-in account gets its own folder under `DEMO_WORKING_DIR/`, like any
-other account, so the library starts empty. Copy an article folder into it if
-you need cards on the page.
+บัญชีจำลองมีโฟลเดอร์ของตนเองใน `DEMO_WORKING_DIR/` เช่นเดียวกับบัญชีทั่วไป คลังจะเริ่มว่าง สามารถคัดลอกโฟลเดอร์บทความเข้าไปเพื่อทดสอบการ์ดรายงานได้
 
-Runs are real: the bypass skips sign-in, not the API bill.
+**การค้นคว้ายังเรียก API จริงและอาจมีค่าใช้จ่าย** โหมดนี้ข้ามเฉพาะการเข้าสู่ระบบ
 
-## Models and quota
+## โมเดลและโควตา API
 
-Two models, named by the work they do rather than by their size:
+ระบบใช้โมเดลสองหน้าที่:
 
-| Stage | Model |
+| ขั้นตอน | โมเดล |
 | --- | --- |
-| Asking questions, simulating the conversation | the **fast** one |
-| Outline, article, polish | the **strong** one |
+| ตั้งคำถามและจำลองบทสนทนา | โมเดลเร็ว (**fast**) |
+| สร้างโครงร่าง เขียนบทความ และปรับภาษา | โมเดลหลัก (**strong**) |
 
-Which provider serves them is a setting, not a code change. The wrapper
-underneath is litellm, so a hundred providers are reachable; these are the
-ones with a key name of their own:
+เลือกผู้ให้บริการได้ผ่านค่าตั้งค่าโดยไม่ต้องแก้โค้ด Gemini เรียกผ่าน `google-genai` SDK ส่วนผู้ให้บริการอื่นเรียกผ่าน LiteLLM ตัวอย่างการตั้งค่า Gemini:
 
 ```toml
 LLM_PROVIDER = "gemini"        # or openrouter, groq, openai, openai-compatible
 GOOGLE_API_KEY = "..."
 ```
 
-Gemini ships defaults — `gemini/gemini-flash-lite-latest` and
-`gemini/gemini-flash-latest`. Use those `-latest` aliases rather than a pinned
-id such as `gemini-2.5-flash`: Google returns 404 — *"no longer available to
-new users"* — for pinned 2.x ids on keys created recently, even though
-`list_models()` still lists them.
+ค่าเริ่มต้นในโครงการคือ `gemini/gemini-flash-lite-latest` และ `gemini/gemini-flash-latest` คู่มือเดิมแนะนำชื่อแบบ `-latest` เนื่องจากเคยพบข้อผิดพลาด 404 และข้อความ *"no longer available to new users"* เมื่อใช้ชื่อรุ่น 2.x ที่ระบุเวอร์ชันตายตัว เช่น `gemini-2.5-flash` กับคีย์ใหม่ แม้ `list_models()` ยังแสดงชื่ออยู่ การเปิดให้ใช้โมเดลขึ้นอยู่กับผู้ให้บริการและบัญชีของคุณ
 
-Every other provider needs its models named, because an id guessed here would
-fail in the middle of a run rather than at startup:
+ผู้ให้บริการอื่นต้องระบุชื่อโมเดลเอง ตัวอย่าง OpenRouter:
 
 ```toml
 LLM_PROVIDER     = "openrouter"
@@ -179,13 +218,9 @@ LLM_FAST_MODEL   = "google/gemini-2.5-flash-lite"
 LLM_STRONG_MODEL = "anthropic/claude-sonnet-4"
 ```
 
-Model ids are written the way the provider writes them; the provider part is
-added for you. That matters for OpenRouter, whose own ids contain a slash —
-`anthropic/claude-sonnet-4` is an OpenRouter id, not an instruction to call
-Anthropic directly.
+ใช้ชื่อโมเดลตามที่ผู้ให้บริการกำหนด ระบบจะเติมส่วนระบุผู้ให้บริการให้เอง ชื่อ OpenRouter อาจมี `/` อยู่แล้ว เช่น `anthropic/claude-sonnet-4` เป็นชื่อโมเดลบน OpenRouter ไม่ใช่คำสั่งให้เรียก Anthropic โดยตรง
 
-Either role can sit on a different provider than the other, which is how you
-put the questions somewhere cheap and fast and the writing somewhere strong:
+โมเดลแต่ละหน้าที่ใช้คนละผู้ให้บริการได้ เช่น ใช้โมเดลที่เร็วและราคาต่ำสำหรับตั้งคำถาม และโมเดลที่เหมาะกับการเขียนสำหรับสร้างบทความ:
 
 ```toml
 LLM_FAST_PROVIDER   = "groq"
@@ -197,8 +232,7 @@ OPENROUTER_API_KEY  = "..."
 LLM_STRONG_MODEL    = "anthropic/claude-sonnet-4"
 ```
 
-Anything else that speaks the OpenAI API — z.ai, Together, a model served on
-your own machine — goes through `openai-compatible` with its own base URL:
+บริการที่รองรับรูปแบบ OpenAI API เช่น z.ai, Together หรือโมเดลที่เปิดบนเครื่องของคุณ ใช้ `openai-compatible` พร้อม URL ของบริการ:
 
 ```toml
 LLM_PROVIDER = "openai-compatible"
@@ -208,105 +242,70 @@ LLM_FAST_MODEL   = "glm-4-flash"
 LLM_STRONG_MODEL = "glm-4-plus"
 ```
 
-Settings that do not describe a model we can call are reported on the page
-before the run starts, rather than as a traceback partway through it.
+หากค่าตั้งค่าไม่ครบ ระบบจะแจ้งก่อนเริ่มค้นคว้า ชื่อโมเดลในตัวอย่างเป็นตัวอย่างการตั้งค่า ให้เลือกชื่อที่บัญชีของคุณเรียกใช้ได้
 
-## Staying signed in
+## ระยะเวลาการเข้าสู่ระบบ
 
-A refresh used to cost a password: the session lived in `st.session_state`,
-which dies with the page. It now survives in a cookie, on two clocks:
+เซสชันใน `st.session_state` หายเมื่อโหลดหน้าใหม่ ระบบจึงใช้คุกกี้เพื่อกู้คืนการเข้าสู่ระบบ โดยกำหนดเวลาสองแบบ:
 
-| | default | setting |
+| ประเภท | ค่าเริ่มต้น | ค่าตั้งค่า |
 | --- | --- | --- |
-| Idle — nothing touched for this long | 30 minutes | `SESSION_IDLE_MINUTES` |
-| Absolute — however busy, from signing in | 12 hours | `SESSION_MAX_HOURS` |
+| เวลาที่ไม่มีการใช้งาน | 30 นาที | `SESSION_IDLE_MINUTES` |
+| เวลาสูงสุดนับจากเข้าสู่ระบบ แม้ยังใช้งานอยู่ | 12 ชั่วโมง | `SESSION_MAX_HOURS` |
 
-Only Supabase's refresh token is stored, never the password, and the cookie
-is `SameSite=Strict` — `Secure` as well once the app is served over https.
+คุกกี้เก็บเฉพาะ refresh token ของ Supabase ไม่เก็บรหัสผ่าน ตั้งค่า `SameSite=Strict` และใช้ `Secure` เมื่อให้บริการผ่าน HTTPS
 
-Streamlit gives you half a cookie API, so the two halves come from different
-places. `st.context.cookies` reads the cookies the browser sent with the
-request, which is the only reader available early enough to matter on a
-refresh; there is no `set_cookie`, so writing goes through the `CookieManager`
-component in `extra-streamlit-components`. Its `get()` is not used: it returns
-None on the first render of a page load, which is exactly when a refreshed
-page needs the answer.
+`st.context.cookies` อ่านคุกกี้ที่เบราว์เซอร์ส่งมากับคำขอ จึงอ่านได้ตั้งแต่เริ่มโหลดหน้า ส่วนการเขียนคุกกี้ใช้ `CookieManager` ใน `extra-streamlit-components` เพราะ Streamlit ไม่มี `set_cookie` ไม่ใช้ `get()` ของ component สำหรับกู้คืนเซสชัน เพราะครั้งแรกที่แสดงหน้าจะยังคืนค่า `None`
 
-The engine ships configured for a **paid key**:
+### ปรับความเร็วให้เหมาะกับโควตา
+
+ค่าตั้งค่าตัวประมวลผลในโครงการออกแบบสำหรับ **API key แบบชำระเงิน**:
 
 ```python
 max_conv_turn=3, max_perspective=3, num_retries=6   # max_thread_num defaults to 10
 ```
 
-**On the free tier** Gemini allows 15 requests per minute per model, and STORM
-bursts straight past that when it researches perspectives in parallel. Lower
-them in `set_storm_runner()`:
+การค้นคว้าหลายมุมมองพร้อมกันอาจเกินอัตราการเรียก API โดยเฉพาะบัญชีใช้ฟรี คู่มือเดิมอ้างอิงโควตา Gemini ที่ 15 คำขอต่อนาทีต่อโมเดล แต่โควตาจริงขึ้นอยู่กับรุ่นและบัญชี หากพบข้อจำกัด ให้ลดค่าที่ `set_storm_runner()`:
 
 ```python
 max_conv_turn=2, max_perspective=2, max_thread_num=1
 ```
 
-Keep `num_retries` either way; paid keys still see the occasional 429. In our
-testing the parallel settings produced twice the research in half the
-wall-clock time, so raise them again as soon as the quota allows.
+ควรคง `num_retries` ไว้ เพราะบัญชีชำระเงินก็อาจได้รับข้อผิดพลาด 429 ผลทดสอบเดิมพบว่าการทำงานพร้อมกันให้ข้อมูลค้นคว้ามากขึ้นและใช้เวลาน้อยลง จึงเพิ่มค่าได้เมื่อโควตารองรับ
 
-If every model suddenly returns `RateLimitError`, read the message body before
-touching the code — *"Your prepayment credits are depleted"* is a billing
-state, not a bug.
+หากทุกโมเดลแจ้ง `RateLimitError` พร้อมกัน ให้อ่านรายละเอียดก่อนแก้โค้ด เช่น ข้อความ *"Your prepayment credits are depleted"* หมายถึงเครดิตชำระล่วงหน้าหมด เป็นปัญหายอดเงิน ไม่ใช่ข้อผิดพลาดของโปรแกรม
 
-## Search
+## แหล่งค้นคว้า
 
-Sources come from DuckDuckGo via the `ddgs` package, so no second API key is
-needed. DuckDuckGo rate-limits aggressively; the retriever retries with backoff
-and skips a query it cannot complete rather than failing the whole run.
+ค่าเริ่มต้นค้นหาผ่าน DuckDuckGo ด้วยแพ็กเกจ `ddgs` จึงไม่ต้องใช้ API key เพิ่ม DuckDuckGo จำกัดอัตราการเรียกค่อนข้างเข้มงวด ระบบจะลองใหม่โดยเพิ่มระยะรอ และข้ามคำค้นที่ยังทำงานไม่สำเร็จแทนการหยุดงานทั้งหมด
 
-For source quality closer to academic work, `knowledge_storm/rm.py` also ships
-`StanfordOvalArxivRM`, `SerperRM`, `BraveRM` and `TavilySearchRM`. Swapping the
-retriever is a one-line change in `set_storm_runner()`; all but arXiv need
-their own API key.
+ไฟล์ `knowledge_storm/rm.py` ยังมี `StanfordOvalArxivRM`, `SerperRM`, `BraveRM` และ `TavilySearchRM` หากต้องการแหล่งข้อมูลอื่น สามารถเปลี่ยนตัวค้นหาที่ `set_storm_runner()` ได้ บริการเหล่านี้ต้องใช้ API key ของตนเอง ยกเว้น arXiv
 
-## Languages
+## ภาษา
 
-Two separate choices:
+การเลือกภาษาแยกเป็นสองส่วน:
 
-- **Interface language** — the sidebar picker. Adds strings in
-  [ui_language.py](ui_language.py).
-- **Article language** — the dropdown on the create page. Implemented in
-  [article_language.py](article_language.py), which appends a language
-  directive to the docstrings of the DSPy signatures whose output a reader
-  sees. Search queries are deliberately left alone: query wording decides which
-  sources are found, and pinning it to one language shrinks the evidence the
-  article is built from.
+- **ภาษาของระบบ** — เลือกจากแถบด้านข้าง ข้อความอยู่ใน [ui_language.py](ui_language.py)
+- **ภาษาบทความ** — เลือกในหน้าสร้างบทความ การทำงานอยู่ใน [article_language.py](article_language.py) โดยเพิ่มคำสั่งภาษาให้ DSPy signatures ที่สร้างข้อความสำหรับผู้อ่าน ไม่บังคับภาษาของคำค้น เพราะภาษาคำค้นมีผลต่อแหล่งข้อมูลที่ค้นพบ
 
-Adding a language means adding one entry to `LANGUAGES` in each file.
+หากต้องการเพิ่มภาษา ให้เพิ่มรายการใน `LANGUAGES` ของทั้งสองไฟล์ พร้อมข้อความและคำสั่งภาษาที่เกี่ยวข้อง
 
-## Customization
+## การปรับแต่งระบบ
 
-`STORMWikiRunner` is built in `set_storm_runner()` in [demo_util.py](demo_util.py).
-Change `STORMWikiRunnerArguments`, the per-stage models in `STORMWikiLMConfigs`,
-or the retriever there. The upstream
-[customization guide](https://github.com/stanford-oval/storm?tab=readme-ov-file#customize-storm)
-still applies.
+ระบบสร้าง `STORMWikiRunner` ในฟังก์ชัน `set_storm_runner()` ของ [demo_util.py](demo_util.py) สามารถปรับ `STORMWikiRunnerArguments` โมเดลแต่ละขั้นตอนใน `STORMWikiLMConfigs` หรือตัวค้นหาได้ที่นั่น ดูแนวทางเพิ่มเติมจาก [คู่มือปรับแต่งของโครงการต้นฉบับ](https://github.com/stanford-oval/storm?tab=readme-ov-file#customize-storm)
 
-## Differences from upstream
+## สิ่งที่เปลี่ยนจากโครงการต้นฉบับ
 
-Fixes, all of which upstream still has:
+การแก้ไขที่บันทึกไว้ในโครงการนี้:
 
-- `duckduckgo_search` was renamed to `ddgs`. The old package imports fine and
-  returns HTTP 200 but yields zero results, so STORM appeared to work while
-  researching nothing.
-- STORM calls its progress callbacks from worker threads. On Streamlit 1.5x and
-  later, writing to a container from a thread with no script context raises
-  instead of warning, which ended every run.
-- Table-of-contents links resolved nowhere. Headings with no Latin characters
-  collapsed to an empty anchor, and Streamlit's hash-based heading ids never
-  matched a text slug — broken for English too, not only Thai.
-- `streamlit==1.31.1` cannot be installed alongside NumPy 2.
+- เปลี่ยน `duckduckgo_search` เป็น `ddgs` หลังแพ็กเกจเปลี่ยนชื่อ แพ็กเกจเดิมยัง import ได้และตอบ HTTP 200 แต่ไม่ส่งผลค้นหากลับมา ทำให้ดูเหมือนระบบทำงานทั้งที่ไม่มีข้อมูลค้นคว้า
+- แก้การรายงานความคืบหน้าจาก worker threads ซึ่ง Streamlit รุ่นใหม่อาจแจ้งข้อผิดพลาดเมื่อ thread ไม่มี script context
+- แก้ลิงก์สารบัญที่ไม่ตรงกับหัวข้อ โดยเฉพาะหัวข้อที่ไม่มีอักษรละติน และรหัสหัวข้อแบบ hash ของ Streamlit ที่ไม่ตรงกับชื่อหัวข้อ
+- ปรับไลบรารี เนื่องจาก `streamlit==1.31.1` ใช้ร่วมกับ NumPy 2 ไม่ได้
 
-Additions:
+ความสามารถที่เพิ่ม:
 
-- Rebuilt interface, dark mode, Thai article and interface support.
-- Article length is reported in characters for scripts that do not put spaces
-  between words, where splitting on whitespace counts a sentence as one word.
+- ปรับหน้าจอใหม่ รองรับธีมมืด ภาษาระบบไทย และบทความภาษาไทย
+- แสดงความยาวเป็นจำนวนตัวอักษรสำหรับภาษาที่ไม่ได้เว้นวรรคระหว่างคำ เพราะการนับจากช่องว่างอาจนับทั้งประโยคเป็นเพียงหนึ่งคำ
 
-Tested against Streamlit 1.60 on Python 3.14.
+คู่มือเดิมระบุว่าทดสอบกับ Streamlit 1.60 บน Python 3.14

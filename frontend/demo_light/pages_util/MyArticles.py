@@ -1,5 +1,7 @@
 import os
+import html
 
+import article_store
 import demo_util
 import streamlit as st
 import ui_theme
@@ -9,47 +11,140 @@ from ui_language import t
 
 
 def _load_articles():
-    if "page2_user_articles_file_path_dict" not in st.session_state:
-        local_dir = demo_util.working_dir()
-        st.session_state["page2_user_articles_file_path_dict"] = (
-            DemoFileIOHelper.read_structure_to_dict(local_dir)
-        )
-    return st.session_state["page2_user_articles_file_path_dict"]
+    # A directory scan is cheap and prevents stale entries after deletion,
+    # new runs, or an account change in the same browser session.
+    return DemoFileIOHelper.read_structure_to_dict(demo_util.working_dir())
+
+
+def _delete_article(article_name):
+    try:
+        article_store.trash_article(demo_util.working_dir(), article_name)
+    except (OSError, ValueError):
+        st.error(t("articles.action_failed"))
+        return
+    st.session_state["page2_library_notice"] = ("articles.deleted", article_name)
+    if st.session_state.get("page2_selected_my_article") == article_name:
+        st.session_state.pop("page2_selected_my_article", None)
+    st.rerun()
+
+
+def _deleted_articles():
+    root = demo_util.working_dir()
+    entries = article_store.list_trash(root)
+    if not entries:
+        return
+    with st.expander(t("articles.trash", n=len(entries))):
+        st.caption(t("articles.trash_note"))
+        for entry_id, name in entries.items():
+            with st.container(horizontal=True, vertical_alignment="center"):
+                st.write(name.replace("_", " "))
+                if st.button(
+                    t("articles.restore"),
+                    icon=":material/restore_from_trash:",
+                    key=f"restore_{entry_id}",
+                ):
+                    try:
+                        article_store.restore_article(root, entry_id)
+                    except FileExistsError:
+                        st.error(t("articles.restore_conflict"))
+                    except (OSError, ValueError):
+                        st.error(t("articles.action_failed"))
+                    else:
+                        st.session_state["page2_library_notice"] = (
+                            "articles.restored", name
+                        )
+                        st.rerun()
 
 
 def _card_menu(article_name, article_path, file_path_dict):
-    """The quiet menu in a card's top corner.
+    """Every report, including an interrupted one, can be deleted."""
+    with st.popover(
+        t("articles.actions"), icon=":material/more_vert:",
+        key=f"card_menu_{article_name}"
+    ):
+        if article_path:
+            demo_util.download_report_button(
+                article_name,
+                file_path_dict,
+                article_path,
+                key=f"card_report_{article_name}",
+            )
+            st.download_button(
+                t("article.download"),
+                data=ui_theme.read_text(article_path, os.path.getmtime(article_path)),
+                file_name=f"{article_name}.md",
+                mime="text/markdown",
+                icon=":material/download:",
+                key=f"card_download_{article_name}",
+                width="stretch",
+            )
+        if st.button(
+            t("articles.delete"), icon=":material/delete:",
+            key=f"delete_{article_name}", width="stretch",
+        ):
+            _delete_article(article_name)
+        st.caption(t("articles.delete_note"))
 
-    Only what there is actually a file for: the article itself. A menu whose
-    items do nothing is worse than no menu, so a card with no finished
-    article does not get one.
-    """
-    if not (article_path and os.path.exists(article_path)):
-        return
-    with st.popover("", icon=":material/more_vert:"):
-        demo_util.download_report_button(
-            article_name,
-            file_path_dict,
-            article_path,
-            key=f"card_report_{article_name}",
-        )
-        st.download_button(
-            t("article.download"),
-            data=ui_theme.read_text(article_path, os.path.getmtime(article_path)),
-            file_name=f"{article_name}.md",
-            mime="text/markdown",
-            icon=":material/download:",
-            key=f"card_download_{article_name}",
-            use_container_width=True,
-        )
+
+def _incomplete_details(article_name, files):
+    """Show saved research without needing a finished article or an LLM call."""
+    ui_theme.page_header(article_name.replace("_", " "))
+    st.warning(t("articles.incomplete_body"))
+    st.caption(t("articles.saved_details_note"))
+    found = False
+    for filename, label in (
+        ("storm_gen_outline.txt", "articles.saved_outline"),
+        ("direct_gen_outline.txt", "articles.initial_outline"),
+    ):
+        path = files.get(filename)
+        if path:
+            found = True
+            with st.expander(t(label)):
+                try:
+                    with open(path, encoding="utf-8") as handle:
+                        text = handle.read()
+                    if text.strip():
+                        st.markdown(text)
+                    else:
+                        st.warning(t("articles.saved_details_unreadable"))
+                except (OSError, UnicodeError):
+                    st.warning(t("articles.saved_details_unreadable"))
+
+    for filename, label in (
+        ("conversation_log.json", "articles.saved_interviews"),
+        ("raw_search_results.json", "articles.saved_sources"),
+    ):
+        path = files.get(filename)
+        if not path:
+            continue
+        found = True
+        with st.expander(t(label)):
+            try:
+                data = DemoFileIOHelper.read_json_file(path)
+                if filename == "conversation_log.json":
+                    if data:
+                        demo_util._display_persona_conversations(data)
+                    else:
+                        st.info(t("articles.no_saved_details"))
+                else:
+                    # Only research content, never run_config or API settings.
+                    for source in data.values():
+                        st.write(source.get("title") or source.get("url", ""))
+                        for snippet in source.get("snippets", []):
+                            st.write(snippet)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                st.warning(t("articles.saved_details_unreadable"))
+    if not found:
+        st.info(t("articles.no_saved_details"))
 
 
 def _article_card(article_name, file_path_dict):
     """One card in the grid. Returns True when the user opens the article."""
     title = article_name.replace("_", " ")
-    article_path = file_path_dict.get(
-        "storm_gen_article_polished.txt"
-    ) or file_path_dict.get("storm_gen_article.txt")
+    article_path = article_store.completed_article(file_path_dict)
+    if article_path and article_path != file_path_dict.get("storm_gen_article_polished.txt"):
+        file_path_dict = dict(file_path_dict)
+        file_path_dict.pop("storm_gen_article_polished.txt", None)
     url_info_path = file_path_dict.get("url_to_info.json")
 
     if article_path and os.path.exists(article_path):
@@ -72,12 +167,12 @@ def _article_card(article_name, file_path_dict):
         ready = False
 
     with st.container(border=True):
-        body = f'<div class="acard"><div class="title">{title}</div>'
+        body = f'<div class="acard"><div class="title">{html.escape(title)}</div>'
         if state:
             body += f'<div class="state">{state}</div>'
         if meta:
             body += f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
-        body += f'<div class="excerpt">{excerpt}</div></div>'
+        body += f'<div class="excerpt">{html.escape(excerpt)}</div></div>'
         st.markdown(body, unsafe_allow_html=True)
         # Drawn after the body and lifted into the corner by CSS, so it needs
         # no row of its own to sit in.
@@ -86,8 +181,7 @@ def _article_card(article_name, file_path_dict):
             t("articles.read") if ready else t("articles.inspect"),
             icon=":material/description:" if ready else ":material/search:",
             key=f"open_{article_name}",
-            use_container_width=True,
-            disabled=not ready,
+            width="stretch",
         )
 
 
@@ -107,23 +201,49 @@ def _grid(article_names, articles):
 
 def my_articles_page():
     articles = _load_articles()
+    notice = st.session_state.pop("page2_library_notice", None)
+    if notice:
+        key, name = notice
+        st.success(t(key, name=name.replace("_", " ")))
 
     # ---- reading a single article -------------------------------------
     # The way back to the library is drawn by the shell, with the rest of the
     # navigation — see storm.py.
     if "page2_selected_my_article" in st.session_state:
         selected = st.session_state["page2_selected_my_article"]
-        demo_util.display_article_page(
-            selected_article_name=selected,
-            selected_article_file_path_dict=articles[selected],
-            show_title=True,
-            show_main_article=True,
-        )
+        files = articles.get(selected)
+        if files is None:
+            st.session_state.pop("page2_selected_my_article", None)
+            st.rerun()
+        with st.container(horizontal=True):
+            if st.button(t("articles.back"), icon=":material/arrow_back:"):
+                st.session_state.pop("page2_selected_my_article", None)
+                st.rerun()
+            if st.button(
+                t("articles.delete"), icon=":material/delete:",
+                key=f"delete_selected_{selected}",
+            ):
+                _delete_article(selected)
+        article_path = article_store.completed_article(files)
+        if article_path:
+            # Use the nonempty draft if a failed polish left an empty file.
+            files = dict(files)
+            if article_path != files.get("storm_gen_article_polished.txt"):
+                files.pop("storm_gen_article_polished.txt", None)
+            demo_util.display_article_page(
+                selected_article_name=selected,
+                selected_article_file_path_dict=files,
+                show_title=True,
+                show_main_article=True,
+            )
+        else:
+            _incomplete_details(selected, files)
         return
 
     # ---- the library ---------------------------------------------------
     if not articles:
         ui_theme.page_header(t("nav.articles"))
+        _deleted_articles()
         ui_theme.empty_state(
             "library_books",
             t("articles.empty_title"),
@@ -134,7 +254,7 @@ def my_articles_page():
             if st.button(
                 t("articles.start_first"),
                 type="primary",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state["nav_pending"] = "Create New Article"
                 st.rerun()
@@ -149,6 +269,7 @@ def my_articles_page():
             s="s" if len(article_names) > 1 else "",
         ),
     )
+    _deleted_articles()
 
     search_col, _ = st.columns([2, 3])
     with search_col:

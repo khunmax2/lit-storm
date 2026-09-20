@@ -1163,9 +1163,15 @@ class GoogleModel(LM):
         try:
             from google import genai
         except ImportError as err:
-            raise ImportError("GoogleModel requires `pip install google-genai`.") from err
+            raise ImportError(
+                "GoogleModel requires `pip install google-genai`."
+            ) from err
 
-        api_key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        api_key = (
+            api_key
+            or os.environ.get("GOOGLE_API_KEY")
+            or os.environ.get("GEMINI_API_KEY")
+        )
         # This is a LiteLLM option; Google retries are handled by request().
         kwargs.pop("num_retries", None)
         super().__init__(model=model.removeprefix("gemini/"), **kwargs)
@@ -1183,10 +1189,12 @@ class GoogleModel(LM):
 
     def get_usage_and_reset(self):
         with self._token_usage_lock:
-            usage = {self.model: {
-                "prompt_tokens": self.prompt_tokens,
-                "completion_tokens": self.completion_tokens,
-            }}
+            usage = {
+                self.model: {
+                    "prompt_tokens": self.prompt_tokens,
+                    "completion_tokens": self.completion_tokens,
+                }
+            }
             self.prompt_tokens = 0
             self.completion_tokens = 0
         return usage
@@ -1203,30 +1211,54 @@ class GoogleModel(LM):
             options["stop_sequences"] = options.pop("stop")
         config = types.GenerateContentConfig(candidate_count=1, **options)
         response = self.client.models.generate_content(
-            model=self.model, contents=prompt, config=config,
+            model=self.model,
+            contents=prompt,
+            config=config,
         )
         self.log_usage(response)
-        self.history.append({
-            "prompt": prompt, "messages": None, "outputs": [response.text or ""],
-            "usage": {
-                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0) or 0,
-                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0) or 0,
-            },
-        })
+        self.history.append(
+            {
+                "prompt": prompt,
+                "messages": None,
+                "outputs": [response.text or ""],
+                "usage": {
+                    "prompt_tokens": getattr(
+                        response.usage_metadata, "prompt_token_count", 0
+                    )
+                    or 0,
+                    "completion_tokens": getattr(
+                        response.usage_metadata, "candidates_token_count", 0
+                    )
+                    or 0,
+                },
+            }
+        )
         return response
 
     @backoff.on_exception(
-        backoff.expo, Exception, max_time=1000, max_tries=8,
-        on_backoff=backoff_hdlr, giveup=giveup_hdlr,
+        backoff.expo,
+        Exception,
+        max_time=1000,
+        max_tries=8,
+        on_backoff=backoff_hdlr,
+        giveup=giveup_hdlr,
     )
     def request(self, prompt: str, **kwargs):
         return self.basic_request(prompt, **kwargs)
 
-    def __call__(self, prompt=None, messages=None, only_completed=True,
-                 return_sorted=False, **kwargs):
+    def __call__(
+        self,
+        prompt=None,
+        messages=None,
+        only_completed=True,
+        return_sorted=False,
+        **kwargs,
+    ):
         assert only_completed and not return_sorted
         if messages is not None:
-            prompt = "\n\n".join(str(message.get("content", "")) for message in messages)
+            prompt = "\n\n".join(
+                str(message.get("content", "")) for message in messages
+            )
         count = kwargs.pop("n", 1)
         return [self.request(prompt, **kwargs).text or "" for _ in range(count)]
 

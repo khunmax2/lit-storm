@@ -1377,14 +1377,27 @@ span[class*="material-icons"] {{
 .st-key-admin_dashboard [data-testid="stCaptionContainer"] {{
     color: var(--muted);
 }}
+/* Icon, then label over caption, then the number — one line, three cells.
+   Stacked, these ran to 209px each to show a count and two short strings,
+   mostly Streamlit's 1rem gap between the four elements. A dashboard summary
+   should not push the thing it summarises below the fold. */
 .st-key-admin_stat_total,
 .st-key-admin_stat_active,
 .st-key-admin_stat_suspended {{
     border: 1px solid var(--line);
     border-radius: 13px;
-    padding: 1.1rem 1.2rem;
-    min-height: 9.4rem;
+    padding: .8rem .95rem;
+    display: grid;
+    grid-template-columns: 2.7rem minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: .75rem;
+    row-gap: .05rem;
+    align-items: center;
 }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(1) {{ grid-column: 1; grid-row: 1 / 3; }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(2) {{ grid-column: 2; grid-row: 1; }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(3) {{ grid-column: 3; grid-row: 1 / 3; }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(4) {{ grid-column: 2; grid-row: 2; }}
 .st-key-admin_stat_total {{ background: light-dark(#f7faff, #182843); border-color: light-dark(#dbe8ff, #294267); }}
 .st-key-admin_stat_active {{ background: light-dark(#f4fdfb, #12352f); border-color: light-dark(#ccefe7, #286052); }}
 .st-key-admin_stat_suspended {{ background: light-dark(#fff8f9, #35212b); border-color: light-dark(#ffdde2, #75414d); }}
@@ -1403,10 +1416,10 @@ span[class*="material-icons"] {{
 .st-key-admin_stat_suspended .admin-stat-icon {{ background: light-dark(#ffe6e9, #5e303e); color: light-dark(#e2273a, #ff8998); }}
 .admin-stat-number {{
     display: block;
-    font-size: 1.9rem;
+    font-size: 1.6rem;
     line-height: 1.1;
     color: var(--ink);
-    margin: .18rem 0;
+    margin: 0;
 }}
 .st-key-admin_dashboard [data-testid="stTabs"] {{ margin-top: 1rem; }}
 .st-key-admin_dashboard [data-testid="stTab"] {{ font-weight: 600; }}
@@ -1527,22 +1540,13 @@ span[class*="material-icons"] {{
 }}
 @media (max-width: 760px) {{
     .st-key-admin_dashboard {{ padding: .85rem; }}
+    /* The grid itself is the default now; a phone only wants it tighter. */
     .st-key-admin_stat_total,
     .st-key-admin_stat_active,
     .st-key-admin_stat_suspended {{
-        min-height: 0;
-        padding: .75rem;
-        display: grid;
-        grid-template-columns: 2.7rem minmax(0, 1fr) auto;
-        grid-template-rows: auto auto;
-        column-gap: .7rem;
-        row-gap: .1rem;
-        align-items: center;
+        padding: .7rem .75rem;
+        column-gap: .6rem;
     }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:first-child {{ grid-column: 1; grid-row: 1 / 3; }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(2) {{ grid-column: 2; grid-row: 1; }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(3) {{ grid-column: 3; grid-row: 1 / 3; }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(4) {{ grid-column: 2; grid-row: 2; }}
     .admin-stat-number {{ font-size: 1.45rem; }}
 }}
 

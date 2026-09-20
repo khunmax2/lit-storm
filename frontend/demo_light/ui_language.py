@@ -103,6 +103,20 @@ _STRINGS = {
         "ระบบเว้นระยะการค้นหาอย่างน้อย 3 วินาทีต่อครั้งตามข้อกำหนดของ arXiv "
         "จึงอาจใช้เวลาค้นคว้านานขึ้น",
     },
+    "searxng_note": {
+        "English": "A metasearch engine you host yourself, querying Google, "
+        "Bing, arXiv, PubMed and dozens more at once — no key, no rate limit "
+        "but your own. The instance must allow JSON output: 'json' under "
+        "search.formats in its settings.yml. Public instances almost never do.",
+        "ไทย": "เครื่องมือค้นหารวมที่คุณโฮสต์เอง ค้นจาก Google, Bing, arXiv, PubMed "
+        "และอีกหลายสิบแหล่งพร้อมกัน ไม่ต้องใช้ API key และไม่ถูกจำกัดอัตราจากใครนอกจากตัวเอง "
+        "instance ต้องเปิดผลลัพธ์แบบ JSON ไว้ ('json' ใต้ search.formats ใน settings.yml) "
+        "ซึ่ง instance สาธารณะแทบไม่มีที่เปิด",
+    },
+    "search.url_saved": {"English": "Instance address", "ไทย": "ที่อยู่ instance"},
+    "search.url_needed": {"English": "Instance address", "ไทย": "ที่อยู่ instance"},
+    "search.host_one": {"English": "How to host one", "ไทย": "วิธีติดตั้ง instance"},
+    "search.forget_url": {"English": "Forget this address", "ไทย": "ลบที่อยู่นี้"},
     "search.needs_endpoint": {
         "English": "Marked internal-only in the library, and needs a private "
         "Stanford endpoint that is not published.",

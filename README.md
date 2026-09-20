@@ -126,6 +126,7 @@ The default is DuckDuckGo via `ddgs`, which needs no key. Admins change the sour
 | Serper (Google) | `SERPER_API_KEY` |
 | Brave Search | `BRAVE_API_KEY` |
 | You.com | `YDC_API_KEY` |
+| SearXNG | `SEARXNG_URL` — an instance address, see [deploy/searxng](deploy/searxng/README.md) |
 
 STORM takes one retriever, so this is a choice between sources, not a row of switches. DuckDuckGo rate-limits aggressively; the app backs off and skips a query that keeps failing rather than ending the run. If search quality matters, a Tavily or Serper key is the cheapest improvement available.
 
@@ -189,11 +190,12 @@ All local to the vendored `knowledge_storm` package. Upstream does not have them
 
 **`dataclass.py` — `[-1]` markers reaching readers.** `replace("[-1]", "")` was called twice with both results discarded, inside a loop that does not run for a turn citing nothing. The marker for "no source found" survived every time.
 
-**`rm.py` — four fixes.**
+**`rm.py` — five fixes.**
 
 - `TavilySearchRM` named `result` in its own `except` clause, where it is unbound if the *first* result is the one that failed — turning a skippable result into an `UnboundLocalError` that killed the entire search.
 - `TavilySearchRM` built an `args` dict and never passed it, so `k` and `include_raw_content` had never once been honoured.
 - `TavilySearchRM` read `raw_body_content` where Tavily sends `raw_content`.
+- `SearXNG` ignored `k` and collected the whole page — twenty or thirty results per query, all of which STORM went on to read. It also had no timeout, so a hung instance held the run open indefinitely; needed the `/search` path spelled out or `.json()` failed on the HTML front page; and reported a 403 — JSON output is off by default, and public instances almost never enable it — as a generic error indistinguishable from "no results". Now honours `k`, times out at 30s, accepts the instance root, and raises a `SearXNGConfigError` naming the cause for any 4xx.
 - `DuckDuckGoSearchRM` used `dsp`'s shared `giveup_hdlr`, which reads `err.message` — an attribute only Mistral's SDK exceptions carry. On a DuckDuckGo rate limit it raised `AttributeError` from inside backoff, and *that* is what surfaced, killing the run and hiding the real cause.
 
 **`requirements.txt` — two package changes.** `duckduckgo_search` → `ddgs`: the old package still imports and still answers HTTP 200, but returns no results, so the system looks like it is working while gathering nothing. And a floor of `sentence-transformers>=3`, because unpinned it resolves to 2.2.2, which calls `cached_download` — removed from `huggingface_hub` in 0.26 — and the resulting `ImportError` stops the app from starting at all. That one bites any fresh install on any OS.
@@ -211,6 +213,8 @@ The rest of the diff against upstream is Black formatting and line-ending normal
 | [frontend/demo_light/README.md](frontend/demo_light/README.md) | Full usage guide (Thai) — install, member management, Co-STORM, reports |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptom-to-fix guide (Thai) |
 | [docs/supabase-schema.sql](docs/supabase-schema.sql) | Schema and row-level security policies |
+| [deploy/supabase](deploy/supabase/README.md) | Self-hosted Supabase in four containers |
+| [deploy/searxng](deploy/searxng/README.md) | Self-hosted metasearch, and why there is no academic fork |
 
 ---
 

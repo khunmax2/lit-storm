@@ -61,6 +61,18 @@ SOURCES = {
         "signup": "",
         "note": "arxiv_note",
     },
+    # A SearXNG instance is configured by address, not by secret. The address
+    # goes through the same saved-keys machinery — it is deployment state that
+    # should not be in the database for the same reason the keys are not —
+    # but the page shows it in full and asks for it in a plain box.
+    "searxng": {
+        "label": "SearXNG",
+        "key": "SEARXNG_URL",
+        "kind": "url",
+        "free": True,
+        "signup": "https://docs.searxng.org/admin/installation.html",
+        "note": "searxng_note",
+    },
     # Present in the library, not offerable from here.
     "vector": {
         "label": "Your own documents",
@@ -176,6 +188,11 @@ def _construct(name, secret, k):
         from arxiv_rm import ArxivRM
 
         return ArxivRM(k=k)
+    if name == "searxng":
+        from knowledge_storm.rm import SearXNG
+
+        # `secret` is the instance URL here; see SOURCES.
+        return SearXNG(searxng_api_url=secret, k=k)
     raise SearchConfigError(f"{name} cannot be built from this page.")
 
 

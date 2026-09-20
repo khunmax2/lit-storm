@@ -62,7 +62,19 @@ def _source_card(name, chosen):
             return
 
         typed = ""
-        if source["key"]:
+        if source.get("kind") == "url":
+            # An address, not a secret: shown in full, edited in the open.
+            # A blank box still means "keep what is saved", as with keys.
+            saved_url = search_sources.secret_for(name) or ""
+            typed = st.text_input(
+                t("search.url_saved") if is_set else t("search.url_needed"),
+                key=f"key_{name}",
+                placeholder=saved_url or "https://searx.example.org",
+            )
+            st.caption(t(source["note"]))
+            if source["signup"]:
+                st.caption(f"[{t('search.host_one')}]({source['signup']})")
+        elif source["key"]:
             label = (
                 t("search.key_saved", last4=last4) if is_set else t("search.key_needed")
             )
@@ -100,9 +112,10 @@ def _source_card(name, chosen):
                 st.rerun()
 
         if is_set and typed == "":
-            if st.button(
-                t("search.forget_key"), key=f"forget_{name}", type="tertiary"
-            ):
+            forget_label = (
+                t("search.forget_url") if source.get("kind") == "url" else t("search.forget_key")
+            )
+            if st.button(forget_label, key=f"forget_{name}", type="tertiary"):
                 search_sources.forget(source["key"])
                 st.rerun()
 

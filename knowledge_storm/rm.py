@@ -641,6 +641,15 @@ class BraveRM(dspy.Retrieve):
         return collected_results
 
 
+class SearXNGConfigError(RuntimeError):
+    """The instance is reachable but not set up for this client.
+
+    Raised out of `forward` rather than logged and skipped like a transient
+    failure, because every query will fail the same way and a caller shown
+    "no results" would have no way to tell.
+    """
+
+
 class SearXNG(dspy.Retrieve):
     def __init__(
         self,
@@ -662,7 +671,13 @@ class SearXNG(dspy.Retrieve):
         super().__init__(k=k)
         if not searxng_api_url:
             raise RuntimeError("You must supply searxng_api_url")
-        self.searxng_api_url = searxng_api_url
+        # The JSON endpoint is /search. People hand over the instance's root
+        # URL, which serves the HTML front page — and `.json()` on that fails
+        # with a message about the page, not the mistake. Accept either.
+        url = searxng_api_url.rstrip("/")
+        if not url.endswith("/search"):
+            url += "/search"
+        self.searxng_api_url = url
         self.searxng_api_key = searxng_api_key
         self.usage = 0
 
@@ -704,12 +719,41 @@ class SearXNG(dspy.Retrieve):
         for query in queries:
             try:
                 params = {"q": query, "format": "json"}
+                # A timeout, because an instance that has stopped answering
+                # would otherwise hold the whole run open for as long as it
+                # liked. SearXNG fans a query out to many engines and waits
+                # on the slow ones, so this is generous.
                 response = requests.get(
-                    self.searxng_api_url, headers=headers, params=params
+                    self.searxng_api_url, headers=headers, params=params, timeout=30
                 )
+                if response.status_code == 403:
+                    # The most common failure by far, and the least obvious:
+                    # JSON is switched off by default, and a public instance
+                    # almost always leaves it off. Say so, rather than let
+                    # `.json()` complain about the HTML it was handed.
+                    raise SearXNGConfigError(
+                        "SearXNG returned 403 — the instance does not allow "
+                        "format=json. Its settings.yml needs 'json' under "
+                        "search.formats, or use an instance that has it."
+                    )
+                if 400 <= response.status_code < 500:
+                    # Any other 4xx is the address being wrong — a typo, a
+                    # path that is not /search — and will be wrong for every
+                    # query. Not something to log and move on from.
+                    raise SearXNGConfigError(
+                        f"SearXNG returned {response.status_code} for "
+                        f"{self.searxng_api_url} — check the instance address."
+                    )
+                response.raise_for_status()
                 results = response.json()
 
-                for r in results["results"]:
+                # Every other retriever here honours k. This one collected the
+                # whole page — twenty or thirty results per query — and STORM
+                # went on to read all of them.
+                added = 0
+                for r in results.get("results", []):
+                    if added >= self.k:
+                        break
                     if self.is_valid_source(r["url"]) and r["url"] not in exclude_urls:
                         collected_results.append(
                             {
@@ -719,6 +763,9 @@ class SearXNG(dspy.Retrieve):
                                 "url": r["url"],
                             }
                         )
+                        added += 1
+            except SearXNGConfigError:
+                raise
             except Exception as e:
                 logging.error(f"Error occurs when searching query {query}: {e}")
 

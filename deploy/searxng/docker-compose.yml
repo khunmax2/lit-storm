@@ -1,0 +1,47 @@
+# A SearXNG instance for the app to research with.
+#
+# Upstream STORM ships a SearXNG retriever; this gives it something to talk
+# to. It needs nothing but the official image and one settings file — the
+# academic fork this was going to be built on turned out to enable engines
+# upstream already has, so there is no fork here.
+#
+# Start:  docker compose up -d
+# Then on the Search sources page, enter http://localhost:8080 and Test.
+
+name: lit-storm-searxng
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+      - searxng-cache:/var/cache/searxng
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+      # Signs sessions and CSRF tokens. Generated once here rather than kept
+      # in settings.yml, so the file can be committed.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-lit-storm-local-dev-not-for-production}
+    ports:
+      # Loopback only. Exposing a metasearch instance to a network invites
+      # abuse, and the app is the only client here.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+volumes:
+  searxng-cache:

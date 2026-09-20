@@ -339,6 +339,7 @@ max_conv_turn=2, max_perspective=2, max_thread_num=1
 | Serper (Google) | `SERPER_API_KEY` |
 | Brave Search | `BRAVE_API_KEY` |
 | You.com | `YDC_API_KEY` |
+| SearXNG | ที่อยู่ instance (`SEARXNG_URL`) — ดู [deploy/searxng](../../deploy/searxng/README.md) |
 
 STORM รับตัวค้นหาได้ครั้งละหนึ่งตัว หน้านี้จึงเป็นการ**เลือก**แหล่ง ไม่ใช่เปิดปิดหลายแหล่งพร้อมกัน ทดสอบคีย์ได้ก่อนบันทึก และคีย์ที่บันทึกแล้วจะแสดงเพียงสี่ตัวท้าย ไม่ถูกส่งกลับไปยังเบราว์เซอร์
 

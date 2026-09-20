@@ -646,6 +646,19 @@ span[class*="material-icons"] {{
     border-color: var(--brand);
     box-shadow: 0 0 0 3px var(--brand-soft);
 }}
+/* The select box had no rule of its own and fell back to Streamlit's
+   default border, which on the dark surface is all but invisible — next
+   to a text input and a popover button that both draw `--line`, it read
+   as a bare label. Same radius, same line, same focus ring. */
+[data-baseweb="select"] > div:first-child {{
+    border-radius: 10px;
+    border-color: var(--line);
+    background: var(--surface);
+}}
+[data-baseweb="select"] > div:first-child:focus-within {{
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+}}
 /* Keyboard focus must remain visible on every action, including compact
    menus and controls inside dialogs. */
 .stApp button:focus-visible,

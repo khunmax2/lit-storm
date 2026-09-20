@@ -1,0 +1,135 @@
+# Supabase, cut down to what this app actually calls.
+#
+# The full self-hosted stack is ten containers. Grepping the app for what it
+# uses finds GoTrue (sign up, sign in, sign out, refresh, get user) and
+# PostgREST (`table` and `rpc`) — no Storage, no Realtime, no Edge Functions,
+# no Studio. So those are the containers here, plus Postgres under them and a
+# gateway in front presenting the two paths supabase-py expects.
+#
+# Nothing in the application changes. `SUPABASE_URL` points at the gateway and
+# the keys come from `.env`; the client cannot tell the difference.
+#
+# Start:  docker compose --env-file .env up -d
+# Reset:  docker compose down -v      (deletes the database)
+
+name: lit-storm-supabase
+
+services:
+  db:
+    image: supabase/postgres:15.8.1.060
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory: the roles GoTrue and PostgREST
+      # sign in as, then the app's own schema.
+      - ./init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Exposed so the schema and a restore can be driven from the host. Bound
+      # to loopback: nothing outside this machine should reach the database.
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth:
+    image: supabase/gotrue:v2.177.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${SUPABASE_PUBLIC_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SUPABASE_PUBLIC_URL}
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DISABLE_SIGNUP: "false"
+      # No SMTP here, so a confirmation mail could never arrive and every
+      # sign-up would stall at an unconfirmed account. Turn this off and wire
+      # GOTRUE_SMTP_* before exposing this to anyone outside the machine.
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      # The claims RLS reads. `auth.uid()` is (request.jwt.claims->>'sub'),
+      # so without this every policy sees a null user and denies everything.
+      PGRST_JWT_ROLE_CLAIM_KEY: ".role"
+      PGRST_DB_MAX_ROWS: "10000"
+
+  # One shot, then gone. The app's schema references auth.users and auth.uid(),
+  # which do not exist until GoTrue has run its migrations — so it cannot go in
+  # the init directory, which runs before any other container starts.
+  # Re-running it is safe: the schema file is written to be applied twice.
+  schema:
+    image: postgres:15-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ../../docs/supabase-schema.sql:/schema.sql:ro
+    # The NOTIFY is not optional. PostgREST reads the schema once at startup,
+    # and it starts before this runs — so without it every `rpc()` comes back
+    # "Could not find the function … in the schema cache" even though the
+    # function is there. The tables are found because PostgREST falls back to
+    # querying them, but functions live only in the cache.
+    command:
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -h
+      - db
+      - -U
+      - postgres
+      - -d
+      - postgres
+      - -f
+      - /schema.sql
+      - -c
+      - "notify pgrst, 'reload schema';"
+    restart: "no"
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - rest
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:${SUPABASE_PORT:-8000}:8000"
+
+volumes:
+  db-data:

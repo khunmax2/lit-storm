@@ -1473,11 +1473,15 @@ span[class*="material-icons"] {{
 @media (max-width: 1450px) {{
     .st-key-admin_dashboard {{ padding: 1rem; }}
     .st-key-admin_roster_header {{ display: none; }}
-    [class*="st-key-admin_roster_row_"] {{ position: relative; padding: 1.05rem; }}
+    [class*="st-key-admin_roster_row_"] {{ position: relative; padding: .85rem 1rem; }}
+    /* Three columns, not two. The five cells after the name are all one short
+       line, so two columns spent four stacked rows on them — a member card
+       ran to 392px for six fields. Three fits role, status and joined on one
+       line and brings the card to 247px. */
     [class*="st-key-admin_roster_row_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {{
         display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: .85rem 1.15rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .55rem .9rem;
         align-items: start;
     }}
     [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
@@ -1485,9 +1489,32 @@ span[class*="material-icons"] {{
         min-width: 0 !important;
         flex: none !important;
     }}
-    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child,
+    /* DOM order is name, role, status, usage, quota, joined, actions. Usage
+       carries a progress bar and wants the full width, so it is ordered after
+       joined rather than splitting the three short cells across two rows. */
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {{
+        grid-column: 1 / -1;
+        order: 1;
+    }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {{ order: 2; }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {{ order: 3; }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(6) {{ order: 4; }}
     [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) {{
         grid-column: 1 / -1;
+        order: 5;
+    }}
+    /* The monthly quota repeats the denominator of "used / limit" two cells
+       earlier. Editing it happens in the Actions popover either way. */
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
+        display: none;
+    }}
+    /* Streamlit puts a 1rem gap between the elements of a column, which is
+       generous for a label sitting above one short value. Not applied to the
+       name cell: its avatar makes `.member-identity` taller than the markdown
+       box Streamlit sizes for it, and that gap is what absorbs the overflow —
+       tighten it there and the "signed-in account" badge lands on the email. */
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(n+2) > [data-testid="stVerticalBlock"] {{
+        gap: .15rem;
     }}
     [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {{
         position: absolute;

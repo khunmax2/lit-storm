@@ -57,11 +57,11 @@ class GoogleGenAITests(unittest.TestCase):
         with patch.object(demo_util, "GoogleModel") as google_model, patch.object(
             demo_util, "LitellmModel"
         ) as litellm_model:
-            demo_util._build_lm("gemini/gemini-flash-latest", 500, {"api_key": "key"})
+            demo_util.build_lm("gemini/gemini-flash-latest", 500, {"api_key": "key"})
             google_model.assert_called_once_with(
                 model="gemini-flash-latest", max_tokens=500, api_key="key"
             )
-            demo_util._build_lm("openai/gpt-4o-mini", 500, {"api_key": "key"})
+            demo_util.build_lm("openai/gpt-4o-mini", 500, {"api_key": "key"})
             litellm_model.assert_called_once_with(
                 model="openai/gpt-4o-mini", max_tokens=500, api_key="key"
             )

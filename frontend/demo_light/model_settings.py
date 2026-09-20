@@ -1,0 +1,218 @@
+"""Which models the app calls, and the keys they need — saved, not deployed.
+
+`secrets.toml` is read once at startup and lives on the server's disk. That is
+fine while someone can reach that disk; on a hosted deployment, changing a
+model means editing a file and restarting, and finding out whether the new one
+answers means starting a real run and waiting.
+
+So the same shape as `search_sources`: a JSON file beside secrets.toml, read
+through a lookup that falls back to `auth.setting`. A deployment that already
+configures everything in the environment keeps working untouched, and nothing
+written here has to be redeployed to take effect.
+
+Two things this deliberately does not do:
+
+* It will not shadow a setting outside `managed()`. The lookup is a whitelist,
+  so no amount of typing on the settings page can redirect `SUPABASE_URL`,
+  hand out `SUPABASE_SECRET_KEY`, or switch on `STORM_DEV_USER`.
+* It keeps the keys out of the database, for the reason `search_sources` gives:
+  the app reads Supabase as the signed-in member, so a key any member's session
+  can read is a key any member can take.
+"""
+
+import json
+import os
+import time
+
+import auth
+
+SETTINGS_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), ".streamlit", "model_settings.json"
+)
+
+# The two model roles, and the per-role settings each one accepts.
+ROLES = ("FAST", "STRONG")
+
+# A prompt whose right answer is one word, so the reply says "the model is
+# reachable and talking" without a token bill worth mentioning.
+PROBE = "Reply with the single word: ready"
+
+# Generous for a one-word answer, and deliberately so. A reasoning model
+# spends part of its budget thinking before it writes anything — Gemini 3.6
+# Flash burns around 600 tokens on that — so a tight budget is consumed
+# entirely by reasoning and the model returns an empty string. At 64 this
+# probe reported every healthy Gemini model as "replied with nothing", which
+# is a broken test, not a broken model. Unused budget is not billed.
+PROBE_TOKENS = 1000
+
+
+def managed():
+    """Setting names this page is allowed to answer for.
+
+    Derived from the provider table rather than listed again here, so a
+    provider added to `demo_util.PROVIDERS` is configurable from the page
+    without a second edit. Imported inside the function because `demo_util`
+    imports this module: by the time anything calls this, both are loaded.
+    """
+    import demo_util
+
+    names = {"LLM_PROVIDER", "ENCODER_PROVIDER", "LLM_API_BASE", "LLM_API_KEY"}
+    for role in ROLES:
+        names.add(f"LLM_{role}_PROVIDER")
+        names.add(f"LLM_{role}_MODEL")
+    names.update(provider["key"] for provider in demo_util.PROVIDERS.values())
+    names.update(provider.get("base") for provider in demo_util.PROVIDERS.values())
+    # Embeddings can sit on Azure even when no chat role does.
+    names.add("AZURE_API_KEY")
+    names.discard(None)
+    return names
+
+
+def load():
+    """Everything saved. Never leaves the server."""
+    try:
+        with open(SETTINGS_PATH, encoding="utf-8") as handle:
+            saved = json.load(handle)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return saved if isinstance(saved, dict) else {}
+
+
+def save(values):
+    """Write the settings given. A blank value leaves the old one alone.
+
+    Blank means "I did not retype the key", not "clear it" — the page shows a
+    saved key as four characters, so an empty box is the normal state for a
+    key that is already set. `forget` is how a value is removed.
+    """
+    merged = load()
+    allowed = managed()
+    for name, value in values.items():
+        if name not in allowed:
+            raise KeyError(f"{name} is not a setting this page manages")
+        value = (value or "").strip()
+        if value:
+            merged[name] = value
+    _write(merged)
+
+
+def forget(name):
+    """Drop one setting, falling back to the environment again."""
+    saved = load()
+    saved.pop(name, None)
+    _write(saved)
+
+
+def _write(values):
+    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
+    with open(SETTINGS_PATH, "w", encoding="utf-8") as handle:
+        json.dump(values, handle, indent=2)
+    # Model keys, same as search_sources.json. Readable by the owner only.
+    os.chmod(SETTINGS_PATH, 0o600)
+
+
+def setting(name):
+    """A saved value, else whatever `auth.setting` finds.
+
+    This is the lookup `demo_util` uses in place of `auth.setting`, so the
+    resolution order becomes: saved on this page, then secrets.toml, then the
+    environment.
+    """
+    if name in managed():
+        saved = load().get(name)
+        if saved:
+            return saved
+    return auth.setting(name)
+
+
+def hint(name):
+    """(is set, last four) for showing a key without showing it."""
+    value = setting(name)
+    if not value:
+        return False, ""
+    return True, str(value)[-4:]
+
+
+def is_saved_here(name):
+    """Whether the value in use came from this page rather than the server.
+
+    Worth drawing differently: a key from the environment cannot be forgotten
+    from here, and saying so is kinder than a button that does nothing.
+    """
+    return bool(load().get(name))
+
+
+def check(role, overrides=None):
+    """Call one role's model once. Returns (ok, message, seconds, reply).
+
+    `overrides` lets a key or model be tried before it is saved, the way the
+    search page tests a key. Caching is switched off for the call: a cached
+    answer would prove the model replied once, which is not the question.
+    """
+    import demo_util
+
+    overrides = {name: value for name, value in (overrides or {}).items() if value}
+
+    def lookup(name):
+        return overrides.get(name) or setting(name)
+
+    started = time.monotonic()
+    try:
+        default = (lookup("LLM_PROVIDER") or "gemini").strip().lower()
+        model, kwargs = demo_util.resolve_role(role, default, lookup=lookup)
+    except demo_util.LMConfigError as error:
+        return False, str(error), 0.0, ""
+    try:
+        lm = demo_util.build_lm(model, PROBE_TOKENS, kwargs)
+        answers = lm(prompt=PROBE, cache=False)
+    except Exception as error:  # noqa: BLE001 - any provider, any failure
+        return False, f"{type(error).__name__}: {error}", time.monotonic() - started, ""
+    elapsed = time.monotonic() - started
+    reply = (answers[0] if answers else "").strip()
+    if not reply:
+        # Reachable but silent. With PROBE_TOKENS this is the model's own
+        # behaviour rather than a budget we set too low — the same shape of
+        # failure Co-STORM hit at max_tokens=1000.
+        return False, "empty_reply", elapsed, ""
+    return True, model, elapsed, reply
+
+
+def check_encoder(overrides=None):
+    """Embed one short string. Returns (ok, message, seconds, dimensions).
+
+    Co-STORM needs embeddings and STORM does not, so this is a separate test:
+    a deployment can be perfectly healthy for one engine and unusable for the
+    other, and one green tick covering both would hide that.
+    """
+    import costorm
+
+    overrides = {name: value for name, value in (overrides or {}).items() if value}
+    saved_env = {}
+    started = time.monotonic()
+    try:
+        name, key = costorm.encoder_settings(
+            lookup=lambda setting_name: overrides.get(setting_name) or setting(setting_name)
+        )
+    except Exception as error:  # noqa: BLE001 - config errors carry their own text
+        return False, str(error), 0.0, 0
+    try:
+        from knowledge_storm.encoder import Encoder
+
+        # The encoder reads its own configuration from the environment, with
+        # no way to hand one in, so the choice is published there and put back
+        # afterwards rather than left changed for the rest of the process.
+        for variable, value in (("ENCODER_API_TYPE", name), (costorm.ENCODERS[name], key)):
+            saved_env[variable] = os.environ.get(variable)
+            os.environ[variable] = value
+        vector = Encoder().encode(PROBE)
+    except Exception as error:  # noqa: BLE001 - any provider, any failure
+        return False, f"{type(error).__name__}: {error}", time.monotonic() - started, 0
+    finally:
+        for variable, value in saved_env.items():
+            if value is None:
+                os.environ.pop(variable, None)
+            else:
+                os.environ[variable] = value
+    elapsed = time.monotonic() - started
+    size = len(vector[0]) if len(vector) and hasattr(vector[0], "__len__") else len(vector)
+    return True, name, elapsed, size

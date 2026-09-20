@@ -52,6 +52,7 @@ _STRINGS = {
     "lang.label": {"English": "Interface language", "ไทย": "ภาษาของระบบ"},
     "nav.sources": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
     "nav.roundtable": {"English": "Round table", "ไทย": "สนทนาเพื่อค้นคว้า"},
+    "nav.models": {"English": "Models", "ไทย": "โมเดล"},
     # -- search sources ---------------------------------------------------
     "search.title": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
     "search.using": {"English": "researching with {name}", "ไทย": "แหล่งค้นคว้าที่ใช้: {name}"},
@@ -118,6 +119,107 @@ _STRINGS = {
     "search.failed_config": {
         "English": "The search source is not configured, so no run was started.",
         "ไทย": "ยังตั้งค่าแหล่งค้นคว้าไม่ครบ จึงยังไม่ได้เริ่มค้นคว้า",
+    },
+    # -- model settings ---------------------------------------------------
+    "models.title": {"English": "Models", "ไทย": "โมเดล"},
+    "models.using": {"English": "calling {name}", "ไทย": "ผู้ให้บริการที่ใช้: {name}"},
+    "models.intro": {
+        "English": "Saved here, these take effect on the next run — no file "
+        "to edit and no restart. A deployment that sets them in the "
+        "environment keeps working until something is saved over it.",
+        "ไทย": "ค่าที่บันทึกที่นี่มีผลกับการค้นคว้าครั้งถัดไปทันที ไม่ต้องแก้ไฟล์หรือรีสตาร์ต "
+        "หากการติดตั้งใดตั้งค่าไว้ในสภาพแวดล้อมอยู่แล้ว ระบบจะใช้ค่านั้นต่อไปจนกว่าจะมีการบันทึกทับ",
+    },
+    "models.default_provider": {"English": "Default provider", "ไทย": "ผู้ให้บริการหลัก"},
+    "models.default_what": {
+        "English": "Both roles use this unless one of them names another.",
+        "ไทย": "ทั้งสองหน้าที่จะใช้ผู้ให้บริการนี้ เว้นแต่จะระบุผู้ให้บริการเฉพาะของตนเอง",
+    },
+    "models.role_fast": {"English": "Fast model", "ไทย": "โมเดลเร็ว"},
+    "models.role_fast_what": {
+        "English": "Asks the questions and plays the interviews.",
+        "ไทย": "ใช้ตั้งคำถามและจำลองบทสนทนา",
+    },
+    "models.role_strong": {"English": "Strong model", "ไทย": "โมเดลหลัก"},
+    "models.role_strong_what": {
+        "English": "Writes the outline, the article and the polish.",
+        "ไทย": "ใช้สร้างโครงร่าง เขียนบทความ และปรับภาษา",
+    },
+    "models.encoder": {"English": "Embeddings", "ไทย": "โมเดล embedding"},
+    "models.encoder_what": {
+        "English": "Co-STORM sorts every source it finds by similarity, so it "
+        "needs these. STORM does not.",
+        "ไทย": "Co-STORM จัดทุกแหล่งข้อมูลที่พบด้วยความคล้าย จึงต้องใช้ส่วนนี้ ส่วน STORM ไม่ต้องใช้",
+    },
+    "models.encoder_unavailable": {
+        "English": "{name} sells chat completions but no embeddings, so "
+        "Co-STORM cannot run on it. Pick a service for embeddings here.",
+        "ไทย": "{name} ขายเฉพาะ chat completions ไม่มี embeddings ทำให้ Co-STORM ทำงานไม่ได้ "
+        "ให้เลือกบริการสำหรับ embeddings ที่นี่",
+    },
+    "models.provider": {"English": "Provider", "ไทย": "ผู้ให้บริการ"},
+    "models.inherit": {
+        "English": "Same as the default",
+        "ไทย": "ใช้ตามผู้ให้บริการหลัก",
+    },
+    "models.model_name": {"English": "Model name", "ไทย": "ชื่อโมเดล"},
+    "models.model_default": {
+        "English": "Leave empty to use {name}.",
+        "ไทย": "เว้นว่างไว้เพื่อใช้ {name}",
+    },
+    "models.model_no_default": {
+        "English": "This provider ships no default, so a name is required.",
+        "ไทย": "ผู้ให้บริการนี้ไม่มีชื่อโมเดลเริ่มต้น จึงต้องระบุเอง",
+    },
+    "models.model_required": {"English": "required", "ไทย": "ต้องระบุ"},
+    "models.api_base": {"English": "API base URL", "ไทย": "API base URL"},
+    "models.key_saved": {
+        "English": "{name} — saved, ending {last4}",
+        "ไทย": "{name} — บันทึกแล้ว ลงท้าย {last4}",
+    },
+    "models.key_needed": {"English": "{name}", "ไทย": "{name}"},
+    "models.from_server": {
+        "English": "Set on the server, not here — it cannot be removed from "
+        "this page, and saving a key here would take its place.",
+        "ไทย": "ค่านี้ตั้งไว้ที่เซิร์ฟเวอร์ ไม่ได้ตั้งจากหน้านี้ จึงลบจากหน้านี้ไม่ได้ "
+        "การบันทึกคีย์ที่นี่จะถูกใช้แทนค่าดังกล่าว",
+    },
+    "models.forget_key": {"English": "Forget this key", "ไทย": "ลบคีย์นี้"},
+    "models.test": {"English": "Test", "ไทย": "ทดสอบ"},
+    "models.testing": {"English": "Calling the model…", "ไทย": "กำลังเรียกโมเดล…"},
+    "models.save": {"English": "Save", "ไทย": "บันทึก"},
+    "models.test_ok": {
+        "English": "{model} answered in {seconds}s: “{reply}”",
+        "ไทย": "{model} ตอบกลับใน {seconds} วินาที: “{reply}”",
+    },
+    "models.encoder_ok": {
+        "English": "Embeddings answered in {seconds}s, {dimensions} dimensions.",
+        "ไทย": "embeddings ตอบกลับใน {seconds} วินาที ขนาด {dimensions} มิติ",
+    },
+    "models.test_failed": {
+        "English": "The model could not be reached.",
+        "ไทย": "เรียกโมเดลไม่สำเร็จ",
+    },
+    "models.empty_reply": {
+        "English": "The model replied with nothing. It is reachable, but it is "
+        "not answering — often a token budget spent on reasoning before any "
+        "text is written.",
+        "ไทย": "โมเดลตอบกลับมาเป็นค่าว่าง แปลว่าติดต่อได้แต่ไม่ตอบ "
+        "สาเหตุที่พบบ่อยคือโควตา token ถูกใช้ไปกับการคิดจนหมดก่อนจะเขียนข้อความออกมา",
+    },
+    "models.slow": {
+        "English": "That took {seconds}s for one word. A healthy model answers "
+        "this in one to eight. A full run makes thousands of calls, so check "
+        "the model name before using it.",
+        "ไทย": "ใช้เวลา {seconds} วินาทีสำหรับคำเดียว ซึ่งโมเดลปกติจะตอบใน 1–8 วินาที "
+        "การค้นคว้าหนึ่งครั้งเรียกโมเดลหลายพันครั้ง จึงควรตรวจสอบชื่อโมเดลก่อนใช้งาน",
+    },
+    "models.where_saved": {
+        "English": "Keys are written to a file on this server, readable by its "
+        "owner only, and never to the database — anything a member's session "
+        "can read is something that member can take.",
+        "ไทย": "คีย์ถูกบันทึกเป็นไฟล์บนเซิร์ฟเวอร์นี้ อ่านได้เฉพาะเจ้าของไฟล์ และไม่ถูกเก็บลงฐานข้อมูล "
+        "เพราะสิ่งที่เซสชันของสมาชิกอ่านได้ ย่อมเป็นสิ่งที่สมาชิกคนนั้นนำออกไปได้",
     },
     # -- creating an article --------------------------------------------
     "create.eyebrow": {"English": "Powered by STORM", "ไทย": "ขับเคลื่อนด้วย STORM"},

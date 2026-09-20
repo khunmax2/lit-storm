@@ -21,6 +21,7 @@ import re
 import auth
 import dspy
 import demo_util
+import model_settings
 import search_sources
 from demo_util import LMConfigError
 
@@ -60,16 +61,21 @@ class EmptyReport(RuntimeError):
 RETRIEVE_TOP_K = 5
 
 
-def encoder_settings():
+def encoder_settings(lookup=None):
     """(service, key) for the embedding model, or raise `LMConfigError`.
 
     Defaults to the chat provider, because for Gemini and OpenAI the same key
     buys both. Providers that only resell chat completions — OpenRouter, Groq —
     have no embedding endpoint at all, so those deployments have to name a
     service of their own in ENCODER_PROVIDER.
+
+    `lookup` is where settings come from, as in `demo_util.resolve_role`: the
+    settings page passes its own so a choice can be tested before it is saved.
     """
+    if lookup is None:
+        lookup = model_settings.setting
     name = (
-        auth.setting("ENCODER_PROVIDER") or auth.setting("LLM_PROVIDER") or "gemini"
+        lookup("ENCODER_PROVIDER") or lookup("LLM_PROVIDER") or "gemini"
     ).strip().lower()
     if name not in ENCODERS:
         raise LMConfigError(
@@ -77,7 +83,7 @@ def encoder_settings():
             "sorts every source it finds by similarity. Set ENCODER_PROVIDER "
             "to one of: " + ", ".join(sorted(ENCODERS))
         )
-    key = auth.setting(ENCODERS[name])
+    key = lookup(ENCODERS[name])
     if not key:
         raise LMConfigError(
             f"{ENCODERS[name]} is missing, and embeddings are set to {name!r}, "
@@ -111,8 +117,8 @@ def build_runner(topic, callback_handler=None):
     # of this budget thinking before it writes a word — Gemini 3.6 Flash burns
     # about 600 tokens on that — and whatever is left is what the reader sees.
     # At 1000 the answers came back cut off mid-sentence, or empty.
-    fast_lm = demo_util._build_lm(fast_model, 500, fast_kwargs)
-    strong_lm = demo_util._build_lm(strong_model, 3000, strong_kwargs)
+    fast_lm = demo_util.build_lm(fast_model, 500, fast_kwargs)
+    strong_lm = demo_util.build_lm(strong_model, 3000, strong_kwargs)
 
     lm_config = CollaborativeStormLMConfigs()
     lm_config.set_question_answering_lm(strong_lm)

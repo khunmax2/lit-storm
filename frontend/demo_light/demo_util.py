@@ -14,6 +14,7 @@ import streamlit as st
 import article_store
 import auth
 import html_report
+import model_settings
 import search_sources
 import ui_language
 import ui_theme
@@ -636,7 +637,7 @@ PROVIDERS = {
 ROLES = ("FAST", "STRONG")
 
 
-def _resolve_role(role, default_provider):
+def resolve_role(role, default_provider, lookup=None):
     """(model id, call arguments) for one of the two roles.
 
     The provider's prefix is always applied. It is tempting to leave a name
@@ -644,8 +645,14 @@ def _resolve_role(role, default_provider):
     "anthropic/claude-sonnet-4" — under that rule the call would go straight
     to Anthropic, with an OpenRouter key. A role that belongs somewhere else
     says so in LLM_<ROLE>_PROVIDER instead.
+
+    `lookup` is where settings come from. It defaults to the saved settings,
+    falling back to secrets and the environment; the settings page passes one
+    of its own so a key can be tried before it is saved.
     """
-    name = (auth.setting(f"LLM_{role}_PROVIDER") or default_provider).strip().lower()
+    if lookup is None:
+        lookup = model_settings.setting
+    name = (lookup(f"LLM_{role}_PROVIDER") or default_provider).strip().lower()
     if name not in PROVIDERS:
         raise LMConfigError(
             f"{name!r} is not a provider this app knows. Choose one of: "
@@ -653,14 +660,14 @@ def _resolve_role(role, default_provider):
         )
     provider = PROVIDERS[name]
 
-    api_key = auth.setting(provider["key"])
+    api_key = lookup(provider["key"])
     if not api_key:
         raise LMConfigError(
             f"{provider['key']} is missing, and the {role.lower()} model is "
             f"set to {name!r}, which reads its key from there."
         )
 
-    model = auth.setting(f"LLM_{role}_MODEL") or provider.get(role.lower())
+    model = lookup(f"LLM_{role}_MODEL") or provider.get(role.lower())
     if not model:
         raise LMConfigError(
             f"{name!r} ships no default models, so LLM_{role}_MODEL has to "
@@ -676,7 +683,7 @@ def _resolve_role(role, default_provider):
         "num_retries": 6,
     }
     if "base" in provider:
-        base = auth.setting(provider["base"])
+        base = lookup(provider["base"])
         if not base:
             raise LMConfigError(
                 f"{provider['base']} is missing. {name!r} is any endpoint that "
@@ -694,8 +701,8 @@ def lm_settings():
     can override the provider as well as the model, so the questions can be
     asked somewhere cheap while the writing happens somewhere strong.
     """
-    default = (auth.setting("LLM_PROVIDER") or "gemini").strip().lower()
-    return tuple(_resolve_role(role, default) for role in ROLES)
+    default = (model_settings.setting("LLM_PROVIDER") or "gemini").strip().lower()
+    return tuple(resolve_role(role, default) for role in ROLES)
 
 
 def _settings_fingerprint(*calls):
@@ -711,7 +718,7 @@ def _settings_fingerprint(*calls):
     return "|".join(parts)
 
 
-def _build_lm(model, max_tokens, kwargs):
+def build_lm(model, max_tokens, kwargs):
     """Use Google's current SDK for Gemini; keep LiteLLM for other providers."""
     if model.startswith("gemini/"):
         return GoogleModel(model=model.removeprefix("gemini/"), max_tokens=max_tokens, **kwargs)
@@ -741,8 +748,8 @@ def set_storm_runner():
     ):
         return
 
-    fast_lm = _build_lm(fast_model, 500, fast_kwargs)
-    strong_lm = _build_lm(strong_model, 3000, strong_kwargs)
+    fast_lm = build_lm(fast_model, 500, fast_kwargs)
+    strong_lm = build_lm(strong_model, 3000, strong_kwargs)
 
     llm_configs.set_conv_simulator_lm(fast_lm)
     llm_configs.set_question_asker_lm(fast_lm)

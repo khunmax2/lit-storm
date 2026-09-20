@@ -75,20 +75,15 @@ Supabase's admin API does not return `encrypted_password`, and the hosted
 project's database password is not among the app's settings. Accounts brought
 over keep their id, email and confirmation state, so every profile, run and
 audit row still points at the right person — but each account needs its
-password set once on this side:
+password set once on this side. From the project root:
 
-```bash
-docker compose --env-file .env exec auth \
-  /usr/local/bin/gotrue admin createuser --help
+```
+.venv/Scripts/python deploy/supabase/set_password.py admin@example.com
 ```
 
-Or, more simply, from the host with the service key from `.env`:
-
-```python
-from supabase import create_client
-c = create_client("http://localhost:8000", "<SUPABASE_SERVICE_ROLE_KEY>")
-c.auth.admin.update_user_by_id("<user id>", {"password": "<your choice>"})
-```
+Leave the email off and it lists the accounts and asks. The password is
+typed at a prompt, not passed as an argument, so it stays out of shell
+history and the process list.
 
 ## Before this faces anyone but you
 

@@ -2,6 +2,7 @@ import os
 from html import escape
 
 import article_language
+import run_options
 import article_store
 import auth
 import demo_util
@@ -154,25 +155,35 @@ def handle_not_started():
         subtitle=t("create.subtitle"),
     )
 
-    _, form_column, _ = st.columns([1, 3, 1])
+    # Wider than the hero's column: this row now carries the language, the
+    # run options and the button side by side, and at 3/5 of the page the
+    # three fought for room.
+    _, form_column, _ = st.columns([1, 4, 1])
     with form_column:
         with st.form(key="search_form"):
             topic = st.text_input(
                 t("create.topic"),
                 placeholder=t("create.topic_placeholder"),
             )
-            language_column, button_column = st.columns([1, 2], vertical_alignment="bottom")
+            language_column, options_column, button_column = st.columns(
+                [1.1, 1.3, 1.6], vertical_alignment="bottom"
+            )
             with language_column:
                 st.selectbox(
                     t("create.article_language"),
                     list(article_language.LANGUAGES),
                     key="page3_language",
                 )
+            with options_column:
+                # A popover is allowed in a form; its widgets are held until
+                # submit, which is when the choice is read.
+                run_options.popover()
             with button_column:
                 submitted = st.form_submit_button(
                     t("create.submit"), type="primary", width="stretch"
                 )
             st.caption(t("create.caption"))
+        run_options.reset_button()
         if submitted:
             _start_research(topic)
             if st.session_state["page3_write_article_state"] == "initiated":

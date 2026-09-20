@@ -17,6 +17,7 @@ import threading
 from html import escape
 
 import article_language
+import run_options
 import article_store
 import auth
 import costorm
@@ -208,18 +209,22 @@ def _opening():
         subtitle=t("table.subtitle"),
     )
 
-    _, form_column, _ = st.columns([1, 3, 1])
+    _, form_column, _ = st.columns([1, 4, 1])
     with form_column:
         with st.form(key="round_table_form"):
             topic = st.text_input(
                 t("create.topic"),
                 placeholder=t("table.topic_placeholder"),
             )
-            st.selectbox(
-                t("create.article_language"),
-                list(article_language.LANGUAGES),
-                key="costorm_language",
-            )
+            language_column, options_column = st.columns([1, 1], vertical_alignment="bottom")
+            with language_column:
+                st.selectbox(
+                    t("create.article_language"),
+                    list(article_language.LANGUAGES),
+                    key="costorm_language",
+                )
+            with options_column:
+                run_options.popover()
 
             # The purpose sits between the topic and the button, so it reads
             # as part of asking rather than as a setting to go back for.
@@ -240,6 +245,7 @@ def _opening():
             )
             st.caption(t("table.caption"))
 
+        run_options.reset_button()
         if submitted:
             _open_discussion(topic, purpose, typed_purpose)
 

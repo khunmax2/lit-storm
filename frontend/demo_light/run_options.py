@@ -17,6 +17,7 @@ import streamlit as st
 
 import model_settings
 import search_sources
+from ui_language import t
 
 # The knobs behind each level, for both engines. "standard" is exactly what
 # the app has always used; the others are the same knobs moved.
@@ -105,3 +106,96 @@ def fingerprint():
 def is_customised():
     """Whether anything differs from the admin's settings — for the badge."""
     return depth() != DEFAULT_DEPTH or bool(sources()) or model() is not None
+
+
+def popover():
+    """The picker, drawn wherever it is called — inside a form, beside the
+    language box, on both engines' pages.
+
+    Inside a form, Streamlit holds widget values until the form is
+    submitted, which is the right behaviour here: the choice belongs to the
+    submission. It also means the button's own label cannot say "changed"
+    until the next rerun; the badge under the form does that instead.
+
+    No buttons in here — a form forbids them — so resetting lives in
+    `reset_button`, drawn outside the form.
+    """
+    offered = offered_sources()
+    presets = model_settings.presets()
+
+    with st.popover(t("run.options"), icon=":material/tune:", width="stretch"):
+        # Widgets read their value from session state when given a key;
+        # handing them a default as well makes Streamlit warn and pick one.
+        # So the state is seeded first and the widgets carry no defaults.
+        st.session_state.setdefault(DEPTH_KEY, depth())
+        st.markdown(f"**{t('run.depth')}**")
+        st.radio(
+            t("run.depth"),
+            list(DEPTHS),
+            key=DEPTH_KEY,
+            format_func=lambda d: t(f"run.depth_{d}"),
+            captions=[t(f"run.depth_{d}_note") for d in DEPTHS],
+            label_visibility="collapsed",
+        )
+
+        # One preset is already a choice: it or the default.
+        if presets:
+            st.markdown(f"**{t('run.model')}**")
+            ids = [None] + [p["id"] for p in presets]
+            labels = {None: t("run.model_default")}
+            labels.update({p["id"]: p["label"] for p in presets})
+            st.session_state.setdefault(MODEL_KEY, model())
+            if st.session_state[MODEL_KEY] not in ids:
+                st.session_state[MODEL_KEY] = None
+            st.radio(
+                t("run.model"),
+                ids,
+                key=MODEL_KEY,
+                format_func=labels.__getitem__,
+                label_visibility="collapsed",
+            )
+
+        if len(offered) > 1:
+            st.markdown(f"**{t('run.sources')}**")
+            st.caption(t("run.sources_note"))
+            chosen = set(sources())
+            picked = []
+            for name in offered:
+                source = search_sources.SOURCES[name]
+                note_key = source.get("note")
+                st.session_state.setdefault(f"run_source_{name}", name in chosen)
+                if st.checkbox(
+                    source["label"],
+                    key=f"run_source_{name}",
+                    help=t(note_key) if note_key else None,
+                ):
+                    picked.append(name)
+            st.session_state[SOURCES_KEY] = picked
+
+
+def reset_button():
+    """A line under the form saying what was changed, with a way back.
+
+    Drawn only when something differs from the admin's settings, so a run
+    started with the defaults has nothing here at all.
+    """
+    if not is_customised():
+        return
+    parts = [t(f"run.depth_{depth()}")]
+    chosen = model()
+    if chosen:
+        label = next((p["label"] for p in model_settings.presets() if p["id"] == chosen), chosen)
+        parts.append(label)
+    picked = sources()
+    if picked:
+        parts.append(", ".join(search_sources.SOURCES[n]["label"] for n in picked))
+    summary, action = st.columns([4, 1], vertical_alignment="center")
+    with summary:
+        st.caption(f"{t('run.options_changed')}: " + " · ".join(parts))
+    with action:
+        if st.button(t("run.reset"), type="tertiary", key="run_reset", width="stretch"):
+            for key in (DEPTH_KEY, MODEL_KEY, SOURCES_KEY):
+                st.session_state.pop(key, None)
+            for name in offered_sources():
+                st.session_state.pop(f"run_source_{name}", None)
+            st.rerun()

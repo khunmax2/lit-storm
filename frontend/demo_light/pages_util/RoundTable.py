@@ -278,6 +278,11 @@ def _open_discussion(topic, purpose, typed_purpose):
             "table.purpose_said",
             purpose=t(dict((v, label) for v, label, _ in PURPOSES)[purpose]).lower(),
         )
+    # A new discussion is a new row in the ledger. `_reset` clears this on the
+    # way out of the last one, but clearing it on the way in is what makes the
+    # rule above safe to read: an id in session state always belongs to the
+    # discussion on screen.
+    st.session_state.pop("costorm_run_id", None)
     st.session_state["costorm_topic"] = topic
     st.session_state["costorm_state"] = "warming"
     st.rerun()
@@ -325,9 +330,16 @@ def _warm_start():
         _abandon(status, t("create.failed_generic"), error)
         return
 
-    st.session_state["costorm_run_id"] = auth.record_run_start(
-        st.session_state["costorm_topic"], _language()
-    )
+    # Recorded once per discussion rather than once per attempt. "warming" is
+    # the state for the whole ten-minute warm start, so any rerun inside that
+    # window — a saved file, a reconnected browser, a stray click — re-enters
+    # here from the top. Opening a new row each time it did so cost one reader
+    # seventeen runs of quota for a single topic, and left sixteen rows stuck
+    # at "running" that nothing would ever close.
+    if "costorm_run_id" not in st.session_state:
+        st.session_state["costorm_run_id"] = auth.record_run_start(
+            st.session_state["costorm_topic"], _language()
+        )
     try:
         runner.warm_start()
     except Exception as error:  # noqa: BLE001 - any failure ends the warm start

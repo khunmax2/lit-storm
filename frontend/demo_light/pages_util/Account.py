@@ -1,9 +1,11 @@
 """The sign-in gate and the account block in the sidebar."""
 
 import auth
+from html import escape
 import streamlit as st
 import ui_theme
 from ui_language import t
+from member_management import MemberManagementError
 
 MIN_PASSWORD = 8
 
@@ -21,7 +23,7 @@ def _sign_in_form():
             t("auth.password"), type="password", key="signin_password"
         )
         submitted = st.form_submit_button(
-            t("auth.do_signin"), type="primary", use_container_width=True
+            t("auth.do_signin"), type="primary", width="stretch"
         )
     if not submitted:
         return
@@ -44,7 +46,7 @@ def _sign_up_form():
             t("auth.password"), type="password", key="signup_password"
         )
         submitted = st.form_submit_button(
-            t("auth.do_signup"), type="primary", use_container_width=True
+            t("auth.do_signup"), type="primary", width="stretch"
         )
     if not submitted:
         return
@@ -56,6 +58,9 @@ def _sign_up_form():
         return
     try:
         result = auth.sign_up(email.strip(), password, name.strip() or None)
+    except MemberManagementError as error:
+        st.warning(t(f"admin.error_{error}"), icon=":material/warning:")
+        return
     except Exception as error:  # noqa: BLE001 - the provider's message varies
         _report_provider_error(error)
         return
@@ -70,7 +75,17 @@ def _sign_up_form():
 def gate():
     """Draw the sign-in screen. Returns True when the caller may continue."""
     if auth.signed_in():
-        return True
+        current = auth.profile(refresh=True)
+        if not current:
+            st.error(t("auth.no_profile"))
+        elif current.get("is_active", True):
+            return True
+        else:
+            st.error(t("auth.suspended"))
+        if st.button(t("auth.signout"), key="signin_suspended_signout"):
+            auth.sign_out()
+            st.rerun()
+        return False
 
     ui_theme.hero(
         eyebrow=t("create.eyebrow"),
@@ -115,18 +130,18 @@ def sidebar_account():
             name = auth.display_name()
             st.markdown(
                 f'<div class="side-account">'
-                f'<span class="avatar">{name.strip()[:1].upper()}</span>'
-                f'<span class="who"><span class="name">{name}</span>'
-                f'<span class="meta">{role_label}'
+                f'<span class="avatar">{escape(name.strip()[:1].upper())}</span>'
+                f'<span class="who"><span class="name">{escape(name)}</span>'
+                f'<span class="meta">{escape(role_label)}'
                 f'<span class="sep"> · </span>'
-                f'{t("auth.quota", used=used, limit=limit)}</span></span></div>',
+                f'{escape(t("auth.quota", used=used, limit=limit))}</span></span></div>',
                 unsafe_allow_html=True,
             )
         if st.button(
             t("auth.signout"),
             icon=":material/logout:",
             type="tertiary",
-            use_container_width=True,
+            width="stretch",
         ):
             auth.sign_out()
             st.rerun()

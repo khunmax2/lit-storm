@@ -1,6 +1,8 @@
 import os
+from html import escape
 
 import article_language
+import article_store
 import auth
 import demo_util
 import search_sources
@@ -64,6 +66,11 @@ def _start_research(topic):
         st.warning(t("auth.quota_spent", limit=limit), icon=":material/warning:")
         return
     cleaned = topic.replace(" ", "_").replace("/", "_")
+    try:
+        article_store.validate_name(truncate_filename(cleaned))
+    except ValueError:
+        st.warning(t("create.invalid_topic"), icon=":material/warning:")
+        return
     st.session_state["page3_topic"] = topic
     st.session_state["page3_topic_name_cleaned"] = cleaned
     st.session_state["page3_topic_name_truncated"] = truncate_filename(cleaned)
@@ -79,12 +86,10 @@ def _recent_articles(limit=3):
     """
     root = demo_util.working_dir()
     found = []
-    for name in os.listdir(root):
-        for filename in ("storm_gen_article_polished.txt", "storm_gen_article.txt"):
-            path = os.path.join(root, name, filename)
-            if os.path.exists(path):
-                found.append((name, path, os.path.getmtime(path)))
-                break
+    for name, files in DemoFileIOHelper.read_structure_to_dict(root).items():
+        path = article_store.completed_article(files)
+        if path:
+            found.append((name, path, os.path.getmtime(path)))
     return sorted(found, key=lambda row: row[2], reverse=True)[:limit]
 
 
@@ -126,13 +131,13 @@ def _recent_work():
             with st.container(border=True):
                 st.markdown(
                     f'<div class="acard">'
-                    f'<div class="title">{name.replace("_", " ")}</div>'
+                    f'<div class="title">{escape(name.replace("_", " "))}</div>'
                     f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
-                    f'<div class="excerpt">{excerpt}</div></div>',
+                    f'<div class="excerpt">{escape(excerpt)}</div></div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(
-                    t("articles.read"), key=f"recent_{name}", use_container_width=True
+                    t("articles.read"), key=f"recent_{name}", width="stretch"
                 ):
                     _open_in_library(name)
 
@@ -155,19 +160,17 @@ def handle_not_started():
             topic = st.text_input(
                 t("create.topic"),
                 placeholder=t("create.topic_placeholder"),
-                label_visibility="collapsed",
             )
-            language_column, button_column = st.columns([1, 2])
+            language_column, button_column = st.columns([1, 2], vertical_alignment="bottom")
             with language_column:
                 st.selectbox(
                     t("create.article_language"),
                     list(article_language.LANGUAGES),
                     key="page3_language",
-                    label_visibility="collapsed",
                 )
             with button_column:
                 submitted = st.form_submit_button(
-                    t("create.submit"), type="primary", use_container_width=True
+                    t("create.submit"), type="primary", width="stretch"
                 )
             st.caption(t("create.caption"))
         if submitted:
@@ -184,7 +187,7 @@ def handle_not_started():
         example_columns = st.columns(len(examples))
         for column, example in zip(example_columns, examples):
             with column:
-                if st.button(example, key=f"eg_{example}", use_container_width=True):
+                if st.button(example, key=f"eg_{example}", width="stretch"):
                     _start_research(example)
                     st.rerun()
 
@@ -227,7 +230,7 @@ def handle_initiated():
 
 def _running_header():
     st.markdown(
-        f'<div class="article-head"><h1>{st.session_state["page3_topic"]}</h1>'
+        f'<div class="article-head"><h1>{escape(st.session_state["page3_topic"])}</h1>'
         f'<div class="meta">{ui_theme.chips([t("create.in_progress")])}</div></div>',
         unsafe_allow_html=True,
     )
@@ -332,7 +335,7 @@ def handle_prepare_to_show_result():
         _, button_column, _ = st.columns([3, 2, 3])
         with button_column:
             if st.button(
-                t("create.read_article"), type="primary", use_container_width=True
+                t("create.read_article"), type="primary", width="stretch"
             ):
                 st.session_state["page3_write_article_state"] = "completed"
                 st.rerun()

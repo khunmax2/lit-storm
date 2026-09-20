@@ -37,6 +37,20 @@ PAGE_LABELS = {
 }
 
 
+def _select_main_page():
+    chosen = st.session_state.get("nav_main")
+    if chosen:
+        st.session_state["nav_page"] = chosen
+        st.session_state["nav_manage"] = None
+
+
+def _select_management_page():
+    chosen = st.session_state.get("nav_manage")
+    if chosen:
+        st.session_state["nav_page"] = chosen
+        st.session_state["nav_main"] = None
+
+
 def main():
     st.set_page_config(
         page_title="STORM",
@@ -76,8 +90,7 @@ def main():
             if type(value) == str:
                 os.environ[key] = value
 
-    # `nav_page` is the segmented control's own state, so other pages can
-    # navigate simply by assigning to it before the widget is drawn.
+    # nav_page is the canonical destination; the two sidebar groups mirror it.
     if "nav_page" not in st.session_state:
         st.session_state["nav_page"] = CREATE_PAGE
 
@@ -100,14 +113,30 @@ def main():
     if st.session_state["nav_page"] not in pages:
         st.session_state["nav_page"] = CREATE_PAGE
 
+    main_pages = [CREATE_PAGE, ARTICLES_PAGE]
+    management_pages = [ADMIN_PAGE, SOURCES_PAGE] if auth.is_admin() else []
+    selected_page = st.session_state["nav_page"]
+    st.session_state["nav_main"] = selected_page if selected_page in main_pages else None
+    st.session_state["nav_manage"] = (
+        selected_page if selected_page in management_pages else None
+    )
     with st.sidebar:
+        st.markdown(f'<div class="side-label">{t("nav.main_group")}</div>',
+                    unsafe_allow_html=True)
         st.segmented_control(
-            t("nav.label"),
-            pages,
+            t("nav.main_group"), main_pages,
             format_func=lambda page: f"{PAGE_ICONS[page]} {t(PAGE_LABELS[page])}",
-            key="nav_page",
-            label_visibility="collapsed",
+            key="nav_main", label_visibility="collapsed", on_change=_select_main_page,
         )
+        if management_pages:
+            st.markdown(f'<div class="side-label side-group-management">{t("nav.manage_group")}</div>',
+                        unsafe_allow_html=True)
+            st.segmented_control(
+                t("nav.manage_group"), management_pages,
+                format_func=lambda page: f"{PAGE_ICONS[page]} {t(PAGE_LABELS[page])}",
+                key="nav_manage", label_visibility="collapsed",
+                on_change=_select_management_page,
+            )
 
     # A segmented control can be deselected by clicking the active option.
     selection = st.session_state["nav_page"] or CREATE_PAGE

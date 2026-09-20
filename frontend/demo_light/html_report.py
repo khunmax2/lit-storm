@@ -67,36 +67,36 @@ LABELS = {
     },
     "ไทย": {
         "lead": "บทสรุป",
-        "views": "มุมมองของรายงาน",
+        "views": "ส่วนต่าง ๆ ของรายงาน",
         "article": "บทความ",
         "evidence": "หลักฐาน",
         "interviews": "บทสัมภาษณ์",
         "contents": "สารบัญ",
         "sources": "แหล่งอ้างอิง",
         "perspectives": "มุมมอง",
-        "questions": "คำถามที่ถาม",
+        "questions": "คำถาม",
         "sections": "หัวข้อ",
         "words": "คำ",
         "chars": "ตัวอักษร",
-        "cited": "ถูกอ้างอิง",
+        "cited": "อ้างอิง",
         "times": "ครั้ง",
-        "uncited": "ไม่ได้ถูกอ้างอิงในบทความ",
+        "uncited": "ไม่ได้อ้างอิงในบทความ",
         "found_by": "พบจากการค้นหา",
         "highlights": "ข้อความสำคัญ",
         "filter_sources": "กรองแหล่งอ้างอิงจากชื่อ เว็บไซต์ หรือคำค้น",
-        "no_match": "ไม่พบแหล่งอ้างอิงที่ตรงกับคำกรอง",
+        "no_match": "ไม่พบแหล่งอ้างอิงที่ตรงกับคำค้น",
         "cited_in": "อ้างอิงในหัวข้อ",
-        "see_evidence": "ดูในหน้าหลักฐาน",
+        "see_evidence": "ดูข้อมูลในส่วนหลักฐาน",
         "asked": "ถาม",
         "answered": "ตอบ",
         "theme": "สลับธีม",
         "generated": "สร้างเมื่อ",
         "no_sources": "การค้นคว้าครั้งนี้ไม่ได้บันทึกแหล่งอ้างอิงไว้",
         "no_interviews": "การค้นคว้าครั้งนี้ไม่ได้บันทึกบทสัมภาษณ์ไว้",
-        "discussion": "วงสนทนา",
-        "speakers": "ผู้ร่วมวง",
-        "said": "ตาที่พูด",
-        "no_discussion": "การค้นคว้าครั้งนี้ไม่ได้บันทึกวงสนทนาไว้",
+        "discussion": "บันทึกการสนทนา",
+        "speakers": "ผู้ร่วมสนทนา",
+        "said": "จำนวนรอบที่ร่วมสนทนา",
+        "no_discussion": "ไม่มีบันทึกการสนทนาสำหรับการค้นคว้าครั้งนี้",
         "you": "คุณ",
         "turn": "รอบ",
         "turns": "รอบ",
@@ -327,8 +327,8 @@ def _source_cards(sources, xref, counts, labels):
         ).lower()
 
         badge = (
-            f'<span class="pill pill--used">{used}{_esc(labels["times"])} '
-            f'{_esc(labels["cited"])}</span>'
+            f'<span class="pill pill--used">{_esc(labels["cited"])} '
+            f'{used} {_esc(labels["times"])}</span>'
             if used
             else f'<span class="pill pill--unused">{_esc(labels["uncited"])}</span>'
         )

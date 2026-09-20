@@ -13,18 +13,22 @@ to draw.
 """
 
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
 from urllib.parse import unquote
+from uuid import uuid4
 
 import streamlit as st
+from member_management import MemberManagementError, validate_account, validate_changes
 
 SESSION_KEY = "auth_session"
 PROFILE_KEY = "auth_profile"
 STARTED_KEY = "auth_started"
 SEEN_KEY = "auth_seen"
 WROTE_KEY = "auth_cookie_written"
+CLIENT_KEY = "auth_client"
 
 # ------------------------------------------------------------- dev bypass
 # Streamlit keeps the session in memory, so every code edit restarts the
@@ -140,9 +144,14 @@ def setting(name):
     return os.environ.get(name)
 
 
-@st.cache_resource(show_spinner=False)
 def _client():
-    """The Supabase client, built once per process."""
+    """One Supabase client per browser session.
+
+    Auth and PostgREST tokens are mutable. A process-wide cached client would
+    let concurrent users replace each other's credentials.
+    """
+    if CLIENT_KEY in st.session_state:
+        return st.session_state[CLIENT_KEY]
     from supabase import create_client
 
     url = setting("SUPABASE_URL")
@@ -152,7 +161,9 @@ def _client():
             "SUPABASE_URL and SUPABASE_ANON_KEY are missing from "
             ".streamlit/secrets.toml and from the environment"
         )
-    return create_client(url, key)
+    client = create_client(url, key)
+    st.session_state[CLIENT_KEY] = client
+    return client
 
 
 def configured():
@@ -304,12 +315,27 @@ def remember_preference(name, value, *, key, max_age):
     )
 
 
+def _clear_workspace_state():
+    """Discard account-owned data while keeping language and cookie widgets."""
+    prefixes = (
+        "page", "costorm_", "runner", "nav_", "home_", "view_", "open_",
+        "card_", "delete_", "restore_", "admin_", "key_", "test_", "use_",
+        "forget_", "signin_", "signup_",
+    )
+    for key in list(st.session_state):
+        if key.startswith(prefixes):
+            st.session_state.pop(key, None)
+
+
 def _remember(session):
     """Hold the session for this tab, and leave a crumb for the next load.
 
     Only the refresh token is kept. It is what Supabase issues for exactly
     this purpose, it expires, and it is not the password.
     """
+    previous = st.session_state.get(SESSION_KEY)
+    if previous is None or previous.user.id != session.user.id:
+        _clear_workspace_state()
     st.session_state[SESSION_KEY] = session
     st.session_state[STARTED_KEY] = time.time()
     st.session_state[SEEN_KEY] = time.time()
@@ -346,6 +372,7 @@ def restore():
         _clear_cookie()
         return False
 
+    _clear_workspace_state()
     st.session_state[SESSION_KEY] = result.session
     st.session_state[STARTED_KEY] = crumb["start"]
     st.session_state[SEEN_KEY] = now
@@ -380,16 +407,39 @@ def touch():
 
 
 def sign_up(email, password, display_name):
+    email, password, display_name = validate_account(email, password, display_name)
+    request_id = str(uuid4())
+    started = datetime.now(timezone.utc)
     result = _client().auth.sign_up(
         {
             "email": email,
             "password": password,
-            "options": {"data": {"display_name": display_name}},
+            "options": {"data": {"display_name": display_name,
+                                   "registration_request": request_id}},
         }
     )
     # With e-mail confirmation on, Supabase returns a user but no session.
     if result.session:
         _remember(result.session)
+    # With no backend key, profile insertion still records first_sign_in.
+    # Never infer signup provenance from editable user metadata at login.
+    if admin_creation_configured() and result.user:
+        try:
+            backend = _service_client()
+            identity = backend.auth.admin.get_user_by_id(result.user.id).user
+            created = datetime.fromisoformat(identity.created_at.isoformat())
+            if (identity.user_metadata or {}).get("registration_request") == request_id and created >= started:
+                backend.rpc("register_account_creation", {
+                    "created_user": identity.id, "creation_source": "self_signup",
+                    "creator": None,
+                }).execute()
+        except Exception:  # noqa: BLE001 - Auth signup already completed
+            # Do not falsely report signup failed, or label an existing account
+            # as self-registered. The fallback audit explicitly says first login.
+            logging.getLogger(__name__).warning(
+                "Signup provenance was not recorded; first sign-in will record "
+                "profile creation with registration origin unknown."
+            )
     return result
 
 
@@ -407,13 +457,15 @@ def sign_out():
         # screen can be looked at too. Reloading the page brings it back.
         st.session_state[DEV_SIGNED_OUT] = True
         st.session_state.pop(PROFILE_KEY, None)
+        _clear_workspace_state()
         return
     try:
         _client().auth.sign_out()
     except Exception:  # noqa: BLE001 - signing out must not raise at the user
         pass
     _clear_cookie()
-    for key in (SESSION_KEY, PROFILE_KEY, STARTED_KEY, SEEN_KEY, WROTE_KEY):
+    _clear_workspace_state()
+    for key in (SESSION_KEY, PROFILE_KEY, STARTED_KEY, SEEN_KEY, WROTE_KEY, CLIENT_KEY):
         st.session_state.pop(key, None)
 
 
@@ -433,9 +485,9 @@ def user_id():
 
 
 # --------------------------------------------------------------- profile
-def profile():
-    """The signed-in user's row from `profiles`, fetched once per session."""
-    if PROFILE_KEY in st.session_state:
+def profile(*, refresh=False):
+    """Refresh at the page gate so suspension and role changes take effect."""
+    if not refresh and PROFILE_KEY in st.session_state:
         return st.session_state[PROFILE_KEY]
     if dev_mode():
         return _dev_profile()
@@ -486,7 +538,7 @@ def _create_profile(client):
 
 def is_admin():
     current = profile()
-    return bool(current and current.get("role") == "admin")
+    return bool(current and current.get("role") == "admin" and current.get("is_active", True))
 
 
 def display_name():
@@ -532,6 +584,9 @@ def quota():
 
 
 def may_run():
+    current = profile(refresh=True)
+    if not current or not current.get("is_active", True):
+        return False
     used, limit = quota()
     return used < limit
 
@@ -603,6 +658,9 @@ def update_profile(profile_id, **fields):
     promote themselves through the same policy that lets them rename
     themselves. The admin check lives inside the function.
     """
+    validate_changes(profile_id, user_id(), fields)
+    if not signed_in() or not is_admin():
+        raise MemberManagementError("denied")
     if dev_mode():
         st.toast("Dev mode: the roster is fabricated, so nothing was saved.")
         return
@@ -619,6 +677,103 @@ def update_profile(profile_id, **fields):
     ).execute()
     # The signed-in user may have just changed their own row.
     st.session_state.pop(PROFILE_KEY, None)
+
+
+def update_profiles(edits):
+    """Save the complete batch in one database transaction, including audit."""
+    if not signed_in() or not is_admin():
+        raise MemberManagementError("denied")
+    for edit in edits:
+        validate_changes(edit["target"], user_id(), edit["changes"])
+    if dev_mode():
+        raise MemberManagementError("dev_readonly")
+    client = _client()
+    client.postgrest.auth(session().access_token)
+    result = client.rpc("admin_set_profiles", {"edits": edits}).execute()
+    st.session_state.pop(PROFILE_KEY, None)
+    return result.data
+
+
+def admin_creation_configured():
+    return bool(setting("SUPABASE_URL") and (
+        setting("SUPABASE_SECRET_KEY") or setting("SUPABASE_SERVICE_ROLE_KEY")
+    ))
+
+
+def _service_client():
+    """A short-lived backend client; never holds a user's login session."""
+    from supabase import ClientOptions, create_client
+    key = setting("SUPABASE_SECRET_KEY") or setting("SUPABASE_SERVICE_ROLE_KEY")
+    if not key or not setting("SUPABASE_URL"):
+        raise MemberManagementError("setup_required")
+    return create_client(setting("SUPABASE_URL"), key, options=ClientOptions(
+        auto_refresh_token=False, persist_session=False,
+    ))
+
+
+def create_member(email, password, display_name):
+    """Create a default member without replacing the admin's session.
+
+    Auth and Postgres cannot share a transaction. If profile/audit registration
+    fails, remove only the newly-created identity. Never silently leave an
+    untracked account after a failed operation.
+    """
+    email, password, display_name = validate_account(email, password, display_name)
+    if dev_mode():
+        raise MemberManagementError("dev_readonly")
+    current = session()
+    if current is None:
+        raise MemberManagementError("denied")
+    # Server-verified identity, not a caller-supplied creator UUID or cached role.
+    verified = _client().auth.get_user(current.access_token).user
+    if not verified or verified.id != user_id():
+        raise MemberManagementError("denied")
+    actor = verified.id
+    backend = _service_client()
+    # Check permissions and migration BEFORE writing an Auth account.
+    backend.rpc("admin_creation_ready", {"actor": actor}).execute()
+    identity = None
+    reason = "auth_rejected"
+    try:
+        identity = backend.auth.admin.create_user({
+            "email": email, "password": password, "email_confirm": True,
+            "user_metadata": {"display_name": display_name},
+        }).user
+        if identity is None or identity.id == actor:
+            raise MemberManagementError("create_failed")
+        reason = "profile_registration_failed"
+        backend.rpc("register_account_creation", {
+            "created_user": identity.id, "creation_source": "admin_create",
+            "creator": actor,
+        }).execute()
+    except Exception as error:  # noqa: BLE001 - failure compensation
+        rollback_failed = False
+        if identity is not None and identity.id != actor:
+            try:
+                backend.auth.admin.delete_user(identity.id)
+            except Exception:  # noqa: BLE001 - must report manual reconciliation
+                rollback_failed = True
+        audit_failed = False
+        try:
+            backend.rpc("record_account_creation_failure", {
+                "actor": actor, "target_email": email,
+                "reason": "rollback_failed" if rollback_failed else reason,
+            }).execute()
+        except Exception:  # noqa: BLE001 - do not claim a log was saved
+            audit_failed = True
+        code = "rollback_failed" if rollback_failed else "audit_failed" if audit_failed else "create_failed"
+        raise MemberManagementError(code) from error
+    return identity
+
+
+def recent_member_events(limit=50):
+    if dev_mode():
+        return []
+    client = _client()
+    client.postgrest.auth(session().access_token)
+    return client.table("member_audit_log").select("*").order(
+        "occurred_at", desc=True
+    ).limit(limit).execute().data or []
 
 
 def usage_since_month_start():
@@ -659,4 +814,4 @@ def recent_runs(limit=25):
 
 
 def admin_count(profiles):
-    return sum(1 for row in profiles if row.get("role") == "admin")
+    return sum(1 for row in profiles if row.get("role") == "admin" and row.get("is_active", True))

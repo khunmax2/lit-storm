@@ -8,6 +8,7 @@ consistent.
 
 import os
 from datetime import datetime
+from html import escape
 
 import streamlit as st
 import ui_language
@@ -424,30 +425,29 @@ span[class*="material-icons"] {{
        the label, which is what knocked one card's button off its row's line. */
     display: flex;
 }}
-/* The menu sits in the corner rather than in a row of its own, so a card
-   without one is the same shape as a card with one. */
+/* Keep the title fully readable; the secondary menu gets its own short row. */
 [data-testid="stVerticalBlock"]:has(
     > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
 )
     :is(
         [data-testid="stElementContainer"], [data-testid="stLayoutWrapper"]
     ):has([data-testid="stPopover"]) {{
-    position: absolute;
-    top: 0.75rem;
-    right: 0.7rem;
-    width: auto;
+    position: static;
+    width: fit-content;
+    margin-left: auto;
     z-index: 2;
 }}
 [data-testid="stVerticalBlock"]:has(
     > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
 )
     [data-testid="stPopover"] button {{
-    border: none !important;
-    background: transparent !important;
+    border: 1px solid var(--line) !important;
+    background: var(--surface) !important;
     color: var(--muted) !important;
-    padding: 0.2rem !important;
-    min-height: 0 !important;
-    opacity: 0.55;
+    padding: .35rem .55rem !important;
+    min-height: 2.75rem !important;
+    opacity: 1;
+    font-size: .78rem !important;
 }}
 [data-testid="stVerticalBlock"]:has(
     > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
@@ -486,8 +486,6 @@ span[class*="material-icons"] {{
     font-weight: 600;
     line-height: 1.35;
     color: var(--ink);
-    /* Clear of the menu in the corner. */
-    padding-right: 1.6rem;
     margin-bottom: 0.5rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -550,6 +548,10 @@ span[class*="material-icons"] {{
 }}
 
 /* ---------- a search source's card ---------- */
+[class*="st-key-src_"][class*="_chosen"] {{
+    border-color: var(--brand) !important;
+    box-shadow: 0 0 0 2px var(--brand-soft);
+}}
 .src-head {{
     display: flex;
     align-items: center;
@@ -621,11 +623,18 @@ span[class*="material-icons"] {{
     border-color: var(--brand) !important;
     color: var(--on-brand) !important;
 }}
-[data-testid="stBaseButton-primary"]:hover,
-[data-testid="stBaseButton-primaryFormSubmit"]:hover {{
+[data-testid="stBaseButton-primary"]:hover:not(:disabled),
+[data-testid="stBaseButton-primaryFormSubmit"]:hover:not(:disabled) {{
     background: var(--brand-hover) !important;
     border-color: var(--brand-hover) !important;
     color: var(--on-brand) !important;
+}}
+[data-testid="stBaseButton-primary"]:disabled,
+[data-testid="stBaseButton-primaryFormSubmit"]:disabled {{
+    background: var(--brand-soft) !important;
+    border-color: var(--line) !important;
+    color: var(--muted) !important;
+    cursor: not-allowed;
 }}
 
 /* ---------- inputs ---------- */
@@ -637,6 +646,16 @@ span[class*="material-icons"] {{
     border-color: var(--brand);
     box-shadow: 0 0 0 3px var(--brand-soft);
 }}
+/* Keyboard focus must remain visible on every action, including compact
+   menus and controls inside dialogs. */
+.stApp button:focus-visible,
+.stApp a:focus-visible,
+.stApp [role="tab"]:focus-visible,
+.stApp [role="radio"]:focus-visible {{
+    outline: 3px solid var(--brand) !important;
+    outline-offset: 2px;
+}}
+.stApp button:not(:disabled) {{ cursor: pointer; }}
 [data-testid="stForm"] {{
     border: 1px solid var(--line);
     border-radius: 16px;
@@ -856,81 +875,80 @@ span[class*="material-icons"] {{
 }}
 .ref-card .ref-url a {{ color: var(--brand); text-decoration: none; }}
 
-/* ---------- top navigation ---------- */
-/* st.segmented_control, centred and dressed as a pill switcher. Deliberately
-   a native widget rather than a custom component: components render inside an
-   iframe that this stylesheet cannot reach, so their colours would have to be
-   resolved in Python and would lag a theme change by one rerun. */
-/* `.st-key-nav_page` is Streamlit's per-widget class, derived from the
-   segmented control's key in storm.py. */
-/* A vertical list, not a pill bar: two destinations do not warrant a bar of
-   their own, and the sidebar has to exist regardless — it is where the
-   article page puts its contents and references. */
-.st-key-nav_page {{
+/* ---------- grouped sidebar navigation ---------- */
+.st-key-nav_main, .st-key-nav_manage {{
     width: 100% !important;
-    margin: 0.2rem 0 1.5rem 0;
+    margin: 0 0 1.1rem;
 }}
-/* The icon carries as much of the row as the word does, so it is set at
-   reading size rather than at the caption size Streamlit gives it. */
-.st-key-nav_page button[data-variant="segmented_control"] [data-testid*="Icon"] {{
-    font-size: 1.35rem !important;
-    width: 1.35rem;
-}}
-/* A flex parent stretches the wrapper; setting a width on the wrapper
-   directly loses to a Streamlit rule that sizes it to its content. */
-.st-key-nav_page [data-testid="stButtonGroup"] {{
+.st-key-nav_main [data-testid="stButtonGroup"],
+.st-key-nav_manage [data-testid="stButtonGroup"] {{
     display: flex;
     width: 100%;
 }}
-.st-key-nav_page [data-testid="stButtonGroup"] > div {{
+.st-key-nav_main [data-testid="stButtonGroup"] > div,
+.st-key-nav_manage [data-testid="stButtonGroup"] > div {{
     display: flex;
     flex-direction: column;
-    /* The wrapper carries `max-width: fit-content`, which is what actually
-       pins the rows to their label width — width alone never wins. */
     max-width: none;
     flex: 1 1 auto;
     align-items: stretch;
-    gap: 0.65rem;
+    gap: 0.45rem;
     background: transparent;
     border: none;
     padding: 0;
 }}
-.st-key-nav_page button[data-variant="segmented_control"] {{
-    border: none !important;
-    background: transparent !important;
-    color: var(--muted) !important;
-    font-weight: 550 !important;
+.st-key-nav_main button[data-variant="segmented_control"],
+.st-key-nav_manage button[data-variant="segmented_control"] {{
+    border: 0 !important;
     border-radius: 10px !important;
-    font-size: 0.95rem !important;
-    /* Streamlit sets a height on these, so padding alone left the rows two
-       thirds of the height the reference gives them. */
+    background: transparent !important;
+    color: var(--rail-nav) !important;
+    min-height: 3.2rem !important;
     height: auto !important;
-    min-height: 3rem !important;
-    /* Taller rows with a wider gutter: a rail of destinations reads as a
-       list, not as a row of buttons that happen to be stacked. */
-    padding: 0.72rem 1.05rem !important;
+    padding: 0.72rem 1rem !important;
     width: 100% !important;
+    font-size: 0.98rem !important;
+    font-weight: 550 !important;
     justify-content: flex-start !important;
 }}
-.st-key-nav_page button[data-variant="segmented_control"] > div {{
-    gap: 0.9rem !important;
-}}
-/* The button's own content wrapper centres its children, so left-aligning
-   the button alone leaves the label in the middle of the row. */
-.st-key-nav_page button[data-variant="segmented_control"] > div {{
+.st-key-nav_main button[data-variant="segmented_control"] > div,
+.st-key-nav_manage button[data-variant="segmented_control"] > div {{
     justify-content: flex-start !important;
     width: 100%;
+    gap: 0.9rem !important;
 }}
-.st-key-nav_page button[data-variant="segmented_control"]:hover {{
-    background: var(--nav-hover) !important;
-    color: var(--ink) !important;
+.st-key-nav_main button[data-variant="segmented_control"] [data-testid*="Icon"],
+.st-key-nav_manage button[data-variant="segmented_control"] [data-testid*="Icon"] {{
+    font-size: 1.35rem !important;
+    width: 1.35rem;
 }}
-/* The active row is a filled pill in the brand, as in the reference: on a
-   dark rail a tint of the brand is too quiet to find at a glance. */
-.st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
-    background: var(--brand) !important;
-    color: var(--on-brand) !important;
-    font-weight: 600 !important;
+.st-key-nav_main button[data-variant="segmented_control"]:hover,
+.st-key-nav_manage button[data-variant="segmented_control"]:hover {{
+    background: var(--rail-hover) !important;
+    color: var(--rail-ink) !important;
+}}
+.st-key-nav_main button[data-variant="segmented_control"][data-selected="true"],
+.st-key-nav_manage button[data-variant="segmented_control"][data-selected="true"] {{
+    background: #f8fbff !important;
+    color: #1651d6 !important;
+    font-weight: 700 !important;
+    box-shadow: inset 4px 0 #2461e9, 0 4px 16px rgba(0,0,0,.1);
+}}
+.st-key-nav_main button[data-variant="segmented_control"][data-selected="true"] [data-testid*="Icon"],
+.st-key-nav_manage button[data-variant="segmented_control"][data-selected="true"] [data-testid*="Icon"] {{
+    color: #1651d6 !important;
+}}
+[data-testid="stSidebar"] .side-label {{
+    color: var(--rail-muted);
+    font-size: 0.8rem;
+    font-weight: 650;
+    letter-spacing: .03em;
+    padding: .35rem .8rem .45rem;
+}}
+[data-testid="stSidebar"] .side-group-management {{
+    border-top: 1px solid var(--rail-line-soft);
+    margin-top: .3rem;
+    padding-top: 1.3rem;
 }}
 
 /* ---------- top bar ---------- */
@@ -1142,17 +1160,6 @@ span[class*="material-icons"] {{
 [data-testid="stSidebar"] .side-brand .name {{ color: var(--rail-ink); }}
 [data-testid="stSidebar"] .side-brand .tag {{ color: var(--rail-muted); }}
 [data-testid="stSidebar"] .side-label {{ color: var(--rail-muted); }}
-.st-key-nav_page button[data-variant="segmented_control"] {{
-    color: var(--rail-nav) !important;
-}}
-.st-key-nav_page button[data-variant="segmented_control"]:hover {{
-    background: var(--rail-hover) !important;
-    color: var(--rail-ink) !important;
-}}
-.st-key-nav_page button[data-variant="segmented_control"][data-selected="true"] {{
-    background: var(--rail-active) !important;
-    color: var(--rail-active-ink) !important;
-}}
 /* Everything the article page puts in the rail has to be legible on it. */
 [data-testid="stSidebar"] [data-testid="stExpander"] details {{
     background: transparent;
@@ -1353,13 +1360,173 @@ span[class*="material-icons"] {{
     display: none !important;
 }}
 
+/* ---------- member management dashboard ---------- */
+.st-key-admin_dashboard {{
+    padding: 1.35rem 1.45rem 1.7rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 10px 36px -30px var(--shadow-soft);
+}}
+.st-key-admin_dashboard h1 {{
+    font-size: 2rem;
+    letter-spacing: -.025em;
+    margin: 0;
+    color: var(--ink);
+}}
+.st-key-admin_dashboard [data-testid="stCaptionContainer"] {{
+    color: var(--muted);
+}}
+.st-key-admin_stat_total,
+.st-key-admin_stat_active,
+.st-key-admin_stat_suspended {{
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 1.1rem 1.2rem;
+    min-height: 9.4rem;
+}}
+.st-key-admin_stat_total {{ background: light-dark(#f7faff, #182843); border-color: light-dark(#dbe8ff, #294267); }}
+.st-key-admin_stat_active {{ background: light-dark(#f4fdfb, #12352f); border-color: light-dark(#ccefe7, #286052); }}
+.st-key-admin_stat_suspended {{ background: light-dark(#fff8f9, #35212b); border-color: light-dark(#ffdde2, #75414d); }}
+.admin-stat-icon {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.7rem;
+    height: 2.7rem;
+    border-radius: 10px;
+    font-size: 1.45rem !important;
+    background: light-dark(#e7efff, #234171);
+    color: light-dark(#1651d6, #8fbaff);
+}}
+.st-key-admin_stat_active .admin-stat-icon {{ background: light-dark(#dcf8ef, #174d3d); color: light-dark(#07936a, #56dab0); }}
+.st-key-admin_stat_suspended .admin-stat-icon {{ background: light-dark(#ffe6e9, #5e303e); color: light-dark(#e2273a, #ff8998); }}
+.admin-stat-number {{
+    display: block;
+    font-size: 1.9rem;
+    line-height: 1.1;
+    color: var(--ink);
+    margin: .18rem 0;
+}}
+.st-key-admin_dashboard [data-testid="stTabs"] {{ margin-top: 1rem; }}
+.st-key-admin_dashboard [data-testid="stTab"] {{ font-weight: 600; }}
+.st-key-admin_roster_table {{
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+}}
+.st-key-admin_roster_header {{
+    background: light-dark(#f8fbff, #1a2940);
+    border-bottom: 1px solid var(--line);
+    padding: .35rem .85rem;
+}}
+.st-key-admin_roster_header [data-testid="stCaptionContainer"] {{
+    color: var(--muted);
+    font-weight: 700;
+}}
+.mobile-cell-label {{ display: none; }}
+[class*="st-key-admin_roster_row_"] {{
+    border-bottom: 1px solid var(--line);
+    padding: .72rem .85rem;
+}}
+[class*="st-key-admin_roster_row_"]:last-child {{ border-bottom: 0; }}
+[class*="st-key-admin_roster_row_"] [data-testid="stProgress"] {{ margin-top: -.35rem; }}
+[class*="st-key-admin_roster_row_"] [data-testid="stProgress"] > div {{ height: .42rem; }}
+.member-identity {{
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    min-width: 0;
+}}
+.member-identity > span:last-child {{ min-width: 0; }}
+.member-identity strong {{
+    display: block;
+    color: var(--ink);
+    font-size: .94rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+.member-identity small {{
+    display: block;
+    color: var(--muted);
+    font-size: .77rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+.member-avatar {{
+    display: grid;
+    place-items: center;
+    flex: 0 0 2.4rem;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    background: #1d4ed8;
+    color: white;
+    font-weight: 700;
+}}
+[class*="st-key-admin_roster_row_"] [data-testid="stPopover"] button {{
+    min-height: 2.75rem;
+    padding: .35rem .5rem;
+    font-size: .82rem;
+}}
+@media (max-width: 1450px) {{
+    .st-key-admin_dashboard {{ padding: 1rem; }}
+    .st-key-admin_roster_header {{ display: none; }}
+    [class*="st-key-admin_roster_row_"] {{ position: relative; padding: 1.05rem; }}
+    [class*="st-key-admin_roster_row_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {{
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .85rem 1.15rem;
+        align-items: start;
+    }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+        width: auto !important;
+        min-width: 0 !important;
+        flex: none !important;
+    }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child,
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) {{
+        grid-column: 1 / -1;
+    }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {{
+        position: absolute;
+        right: 0;
+        top: 0;
+    }}
+    .member-identity {{ padding-right: 6rem; }}
+    .mobile-cell-label {{ display: block; color: var(--muted); font-size: .78rem; font-weight: 600; margin-bottom: .2rem; }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stProgress"] {{ margin-top: 0; }}
+}}
+@media (max-width: 760px) {{
+    .st-key-admin_dashboard {{ padding: .85rem; }}
+    .st-key-admin_stat_total,
+    .st-key-admin_stat_active,
+    .st-key-admin_stat_suspended {{
+        min-height: 0;
+        padding: .75rem;
+        display: grid;
+        grid-template-columns: 2.7rem minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        column-gap: .7rem;
+        row-gap: .1rem;
+        align-items: center;
+    }}
+    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:first-child {{ grid-column: 1; grid-row: 1 / 3; }}
+    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(2) {{ grid-column: 2; grid-row: 1; }}
+    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(3) {{ grid-column: 3; grid-row: 1 / 3; }}
+    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(4) {{ grid-column: 2; grid-row: 2; }}
+    .admin-stat-number {{ font-size: 1.45rem; }}
+}}
+
 /* ---------- print ---------- */
 /* Printing is the article, not the application around it. */
 @media print {{
     [data-testid="stSidebar"],
     [data-testid="stHeader"],
     .st-key-lang_selector,
-    .st-key-nav_page,
+    .st-key-nav_main,
+    .st-key-nav_manage,
     [data-testid="stDownloadButton"] {{
         display: none !important;
     }}
@@ -1428,11 +1595,12 @@ def top_bar(trail, name="", role=""):
                 clicked = index
 
     if name:
-        role_part = f'<span class="role">{role}</span>' if role else ""
+        role_part = f'<span class="role">{escape(role)}</span>' if role else ""
+        safe_name = escape(name)
         st.markdown(
             f'<div class="topbar"><div class="topbar-user">'
-            f'<span class="initial">{name.strip()[:1].upper()}</span>'
-            f'<span class="who"><span class="name">{name}</span>'
+            f'<span class="initial">{escape(name.strip()[:1].upper())}</span>'
+            f'<span class="who"><span class="name">{safe_name}</span>'
             f"{role_part}</span></div></div>",
             unsafe_allow_html=True,
         )
@@ -1441,7 +1609,7 @@ def top_bar(trail, name="", role=""):
 
 def dev_banner(who=""):
     """Say, on every page, that this build is not asking anyone to sign in."""
-    detail = f'<span class="who">signed in as {who}</span>' if who else ""
+    detail = f'<span class="who">signed in as {escape(who)}</span>' if who else ""
     st.markdown(
         f'<div class="dev-strip"><span>DEV MODE — sign-in bypassed</span>'
         f"{detail}</div>",
@@ -1452,18 +1620,18 @@ def dev_banner(who=""):
 def aside_title(text, icon=""):
     """Heading for one of the panels in the right-hand column."""
     mark = (
-        f'<span class="material-symbols-rounded">{icon}</span>' if icon else ""
+        f'<span class="material-symbols-rounded">{escape(icon)}</span>' if icon else ""
     )
     st.markdown(
-        f'<div class="aside-title">{mark}{text}</div>', unsafe_allow_html=True
+        f'<div class="aside-title">{mark}{escape(text)}</div>', unsafe_allow_html=True
     )
 
 
 def section_label(text, aside=""):
     """The hairline section marker the landing page is divided by."""
-    right = f"<span>{aside}</span>" if aside else ""
+    right = f"<span>{escape(aside)}</span>" if aside else ""
     st.markdown(
-        f'<div class="lp-label"><span>{text}</span>{right}</div>',
+        f'<div class="lp-label"><span>{escape(text)}</span>{right}</div>',
         unsafe_allow_html=True,
     )
 
@@ -1472,23 +1640,23 @@ def steps(items):
     """`items` is a sequence of (title, body); numbering is added here."""
     cells = "".join(
         f'<div class="lp-step"><span class="n">{index:02d}</span>'
-        f'<div class="t">{title}</div><div class="b">{body}</div></div>'
+        f'<div class="t">{escape(title)}</div><div class="b">{escape(body)}</div></div>'
         for index, (title, body) in enumerate(items, start=1)
     )
     st.markdown(f'<div class="lp-steps">{cells}</div>', unsafe_allow_html=True)
 
 
 def page_header(title, subtitle=""):
-    sub = f'<span class="sub">{subtitle}</span>' if subtitle else ""
+    sub = f'<span class="sub">{escape(subtitle)}</span>' if subtitle else ""
     st.markdown(
-        f'<div class="page-head"><h1>{title}</h1>{sub}</div>', unsafe_allow_html=True
+        f'<div class="page-head"><h1>{escape(title)}</h1>{sub}</div>', unsafe_allow_html=True
     )
 
 
 def hero(title, subtitle, eyebrow=""):
-    brow = f'<span class="eyebrow">{eyebrow}</span>' if eyebrow else ""
+    brow = f'<span class="eyebrow">{escape(eyebrow)}</span>' if eyebrow else ""
     st.markdown(
-        f'<div class="hero">{brow}<h1>{title}</h1><p>{subtitle}</p></div>',
+        f'<div class="hero">{brow}<h1>{escape(title)}</h1><p>{escape(subtitle)}</p></div>',
         unsafe_allow_html=True,
     )
 
@@ -1497,8 +1665,8 @@ def empty_state(icon, title, body):
     """`icon` is a Material Symbols name, e.g. "library_books"."""
     st.markdown(
         f'<div class="empty">'
-        f'<span class="material-symbols-rounded icon">{icon}</span>'
-        f"<h3>{title}</h3><p>{body}</p></div>",
+        f'<span class="material-symbols-rounded icon">{escape(icon)}</span>'
+        f"<h3>{escape(title)}</h3><p>{escape(body)}</p></div>",
         unsafe_allow_html=True,
     )
 
@@ -1515,10 +1683,10 @@ def chips(items):
             icon, label = item
             out.append(
                 f'<span class="chip">'
-                f'<span class="material-symbols-rounded">{icon}</span>{label}</span>'
+                f'<span class="material-symbols-rounded">{escape(icon)}</span>{escape(label)}</span>'
             )
         else:
-            out.append(f'<span class="chip">{item}</span>')
+            out.append(f'<span class="chip">{escape(item)}</span>')
     return "".join(out)
 
 
@@ -1534,7 +1702,7 @@ def badge(text, tone="info"):
     """
     if tone not in BADGE_TONES:
         raise ValueError(f"unknown badge tone: {tone}")
-    return f'<span class="badge is-{tone}">{text}</span>'
+    return f'<span class="badge is-{tone}">{escape(text)}</span>'
 
 
 @st.cache_data(show_spinner=False)
@@ -1551,7 +1719,7 @@ def read_text(path, mtime):
 
 def meta_line(items):
     """Single-line 'a · b · c' metadata, used on the article cards."""
-    return '<span class="sep">·</span>'.join(items)
+    return '<span class="sep">·</span>'.join(escape(item) for item in items)
 
 
 def humanize_date(timestamp):

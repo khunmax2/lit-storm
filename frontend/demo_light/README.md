@@ -175,7 +175,9 @@ LLM_STRONG_MODEL = "gemini-3.6-flash"
 
 เพราะเทสต์ปั้น cluster ของตัวเอง การเปิด PostgreSQL ไว้ใน Docker จึงไม่ช่วยให้เทสต์ชุดนี้รันได้ — เทสต์ไม่ได้ต่อเข้า server ที่มีอยู่
 
-> **บน Windows เทสต์ชุดนี้ยังรันไม่ได้** [tests/test_member_database.py](../../tests/test_member_database.py) กำหนด `dir='/tmp'` ไว้ตายตัว และ PostgreSQL บน Windows ไม่รองรับ Unix socket หากเครื่องมี `initdb` อยู่บน PATH เทสต์จะผ่านด่านตรวจไบนารีแล้วไป **error ที่ `setUpClass` แทนการข้าม** ทำให้เห็นเป็นความล้มเหลว 1 รายการและเทสต์ 7 ตัวไม่ได้รัน ระหว่างที่ยังไม่ได้แก้ ให้รันชุดนี้ใน WSL หรือใน container Linux
+cluster ฟังที่ `127.0.0.1` บนพอร์ตว่างที่หาให้ตอนเริ่ม ใช้ scram-sha-256 กับรหัสผ่านที่สุ่มใหม่ทุกครั้ง ไม่ได้ใช้ Unix socket เพราะ Windows ไม่มี และการมีเส้นทางเดียวทำให้ทั้งสองแพลตฟอร์มรันเทสต์ชุดเดียวกัน
+
+> **เหลือเทสต์ตัวเดียวที่ยังรันบน Windows ไม่ได้** [tests/test_article_store.py](../../tests/test_article_store.py) มีการตรวจการหนีออกจากโฟลเดอร์ด้วย symlink ซึ่งต้องมีสิทธิ์สร้าง symlink จะได้ `WinError 1314` หากไม่ได้เปิด Developer Mode คาดว่าจะเห็น 41 ผ่าน 1 error
 
 ### 4. เปิดแอป
 

@@ -171,7 +171,9 @@ A discussion lives in Streamlit session state and **does not survive a browser r
 
 `tests/test_member_database.py` checks the database's own rules — that an admin cannot demote or suspend themselves, that members cannot touch the audit log — by standing up a **temporary PostgreSQL cluster of its own** with `initdb`. It never touches Supabase, so running PostgreSQL in Docker does not help; install PostgreSQL or set `STORM_POSTGRES_BIN`, or these tests skip.
 
-> **Two files do not yet run on Windows.** `test_member_database.py` hardcodes `dir='/tmp'` and uses a Unix socket, so with `initdb` on PATH it **errors in `setUpClass` instead of skipping**. `test_article_store.py` has a symlink-escape check needing symlink privileges (`WinError 1314` without Developer Mode). Expect 33 passing, 2 errors, 7 tests never run. Use WSL or a Linux container until they are ported.
+The cluster listens on 127.0.0.1 on a free port, with scram auth and a password generated per run, rather than on a Unix socket — Windows has none, and one code path keeps both platforms running the same test.
+
+> **One test still does not run on Windows.** `test_article_store.py` has a symlink-escape check that needs symlink privileges and errors with `WinError 1314` unless Developer Mode is on. Expect 41 passing and 1 error.
 
 ---
 

@@ -52,32 +52,53 @@ arrangement OpenMAIC's fork honours and this one's will:
   change reloads the frame and a run in progress is lost. Accepted: changing
   either is a deliberate, infrequent act.
 
-Upstream ignores parameters it does not know, so the publisher's image works
-today and simply shows its own controls. The fork is where they go away.
+## The fork it runs from
 
-## The fork this will run from
-
-Following `Ups_openMAIC`: an own repository rather than a GitHub fork (a
+[khunmax2/lit_deep-research-web](https://github.com/khunmax2/lit_deep-research-web),
+following `Ups_openMAIC`: an own repository rather than a GitHub fork (a
 repository GitHub classes as a fork does not run Actions until someone
 enables them, and upstream's workflow triggers name upstream's branches),
-with an `upstream` remote so a rebase can reach real history, and a pin file
-here recording which upstream commit the work sits on.
+with an `upstream` remote so a rebase can reach real history.
 
-What the fork has to add, in order of size:
+`research-ui-pin.json` records the fork commit this repo expects, the
+upstream commit it is level with, and the image. `check_research_ui_contract.py`
+compares a checkout against it and **reports** the distance — it does not
+force a move:
 
-1. `?embed=1` — a query flag read on mount that hides `LangSwitcher`,
-   `ColorModeButton`, `GitHubButton` and `ConfigManager`.
-2. `?lang=` and `?theme=` — set the locale and colour mode from the query
-   instead of the visitor's stored preference.
-3. `i18n/th.json` — the app ships en, ko, nl, zh.
-4. `app.baseURL` — to sit under a path beside the main app, since a
-   deployment host opens 443 and nothing else.
+```
+python deploy/research-ui/check_research_ui_contract.py ../deep-research-web-ui
+```
 
-Until the fork's image exists, `image:` in the compose file is the
-publisher's `anotia/deep-research-web:latest`.
+What the fork adds over upstream, in one commit:
 
-## Search will fail until a Tavily key is set
+- `app/composables/useEmbed.ts` — reads `?embed`, `?lang`, `?theme` once on
+  mount.
+- `?embed=1` hides `LangSwitcher`, `ColorModeButton`, `GitHubButton` and
+  `ConfigManager`. History stays; it is the page's own.
+- `i18n/th.json` — 194 strings, key-for-key with `en.json`.
 
-`NUXT_TAVILY_API_KEY` in `.env` is blank: the key was typed into the Search
-sources page's test box but never saved. Paste it there, or save it on that
-page and regenerate `.env`.
+Base path needs no code: Nuxt reads `NUXT_APP_BASE_URL` at runtime, and the
+compose file exposes it as `RESEARCH_UI_BASE_PATH`.
+
+## Building the image
+
+```
+docker build -t lit-storm/research-ui:<commit> -t lit-storm/research-ui:latest ../../../deep-research-web-ui
+```
+
+The compose file runs `lit-storm/research-ui:latest` (override with
+`RESEARCH_UI_IMAGE`). Until an image is pushed to a registry, this is a
+local build and the pin carries no digest; the publisher's
+`anotia/deep-research-web:latest` still works as a fallback — it just shows
+its own controls in the frame.
+
+## Search needs a provider both apps have
+
+This app searches with tavily, firecrawl, crw, google-pse, youcom or serply.
+The main app's saved source is Brave, which this one does not speak — so
+`NUXT_TAVILY_API_KEY` in `.env` is blank and search fails until one of:
+
+- a Tavily key is saved on the main app's Search sources page (press **Use
+  this**, not just **Test**) and `.env` is regenerated from it;
+- `NUXT_PUBLIC_WEB_SEARCH_PROVIDER=youcom`, which works with no key on a
+  daily quota.

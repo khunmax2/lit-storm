@@ -3,9 +3,15 @@
 # torn out: its own container, coupled to the main app by a URL and nothing
 # else. The main app frames it in a tab.
 #
-# This runs the publisher's image as-is. The fork with `?embed=1`, `?lang=`,
-# `?theme=` and a Thai locale — the same accommodations OpenMAIC's fork
-# needed — replaces the image tag here once it exists; see README.md.
+# The image is our fork's — `?embed=1`, `?lang=`, `?theme=` and a Thai
+# locale, the same accommodations OpenMAIC's fork needed. Which commit it
+# was built from is research-ui-pin.json; build it with
+#
+#     docker build -t lit-storm/research-ui:<commit> ../../../deep-research-web-ui
+#
+# Until an image is pushed to a registry, this is a local build and the pin
+# carries no digest. Fall back to the publisher's `anotia/deep-research-web`
+# if there is no local build yet: it works, it just shows its own controls.
 #
 # Start:  docker compose --env-file .env up -d
 
@@ -13,10 +19,15 @@ name: lit-storm-research-ui
 
 services:
   research-ui:
-    image: anotia/deep-research-web:latest
+    image: ${RESEARCH_UI_IMAGE:-lit-storm/research-ui:latest}
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # To sit under a path beside the main app — a deployment host opens
+      # 443 and nothing else, so the sibling lives at a path, never a port.
+      # Nuxt reads this at runtime; leave it unset for the root.
+      NUXT_APP_BASE_URL: ${RESEARCH_UI_BASE_PATH:-/}
     ports:
       # Loopback only, like every other sibling here. Reaching it from a
       # browser goes through the main app's frame, or through whatever

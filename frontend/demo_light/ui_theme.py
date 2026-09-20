@@ -329,6 +329,7 @@ span[class*="material-icons"] {{
         min-height: 44px;
     }}
     [data-testid="stTextInputRootElement"],
+    [data-testid="stSelectbox"] .react-aria-ComboBox [role="group"],
     [data-baseweb="select"] > div {{
         min-height: 44px;
     }}
@@ -646,16 +647,22 @@ span[class*="material-icons"] {{
     border-color: var(--brand);
     box-shadow: 0 0 0 3px var(--brand-soft);
 }}
-/* The select box had no rule of its own and fell back to Streamlit's
-   default border, which on the dark surface is all but invisible — next
-   to a text input and a popover button that both draw `--line`, it read
-   as a bare label. Same radius, same line, same focus ring. */
-[data-baseweb="select"] > div:first-child {{
+/* The select box draws its border in the background colour — a 1px line
+   you cannot see — so beside a text input and a popover button that both
+   draw `--line` it read as a bare label with a caret. Same radius, same
+   line, same focus ring as the input.
+
+   Streamlit 1.64 rebuilt the select on React Aria; the bordered element is
+   the [role="group"] inside .react-aria-ComboBox. The data-baseweb selector
+   is the pre-1.64 structure, kept so the rule survives a downgrade. */
+[data-testid="stSelectbox"] .react-aria-ComboBox [role="group"],
+[data-testid="stSelectbox"] [data-baseweb="select"] > div {{
     border-radius: 10px;
     border-color: var(--line);
     background: var(--surface);
 }}
-[data-baseweb="select"] > div:first-child:focus-within {{
+[data-testid="stSelectbox"] .react-aria-ComboBox [role="group"]:focus-within,
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {{
     border-color: var(--brand);
     box-shadow: 0 0 0 3px var(--brand-soft);
 }}

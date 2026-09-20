@@ -9,9 +9,10 @@
 #
 #     docker build -t lit-storm/research-ui:<commit> ../../../deep-research-web-ui
 #
-# Until an image is pushed to a registry, this is a local build and the pin
-# carries no digest. Fall back to the publisher's `anotia/deep-research-web`
-# if there is no local build yet: it works, it just shows its own controls.
+# The fork's own workflow publishes to GHCR on every push to main; the pin
+# records the digest of the one this expects. A local `docker build` of the
+# fork works as an override (RESEARCH_UI_IMAGE=lit-storm/research-ui:latest)
+# while the package is private or when working on the fork itself.
 #
 # Start:  docker compose --env-file .env up -d
 
@@ -19,7 +20,7 @@ name: lit-storm-research-ui
 
 services:
   research-ui:
-    image: ${RESEARCH_UI_IMAGE:-lit-storm/research-ui:latest}
+    image: ${RESEARCH_UI_IMAGE:-ghcr.io/khunmax2/lit_deep-research-web@sha256:931aaf8da5b2f229814d17414ac5a1f5e9eb49c0e107bd817183b51ab717e3c9}
     restart: unless-stopped
     env_file:
       - .env

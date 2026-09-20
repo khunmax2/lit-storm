@@ -17,7 +17,7 @@
   "fork": {
     "repo": "https://github.com/khunmax2/lit_deep-research-web",
     "branch": "main",
-    "commit": "2e4743e",
+    "commit": "db59261",
     "note": "Not a GitHub fork, on purpose: a repository GitHub classes as a fork does not run Actions until someone enables them by hand, and upstream's workflow triggers name upstream's branches. Every commit descends from AnotiaWang/deep-research-web-ui's real history, and the `upstream` remote is how a rebase reaches it."
   },
   "upstream": {
@@ -25,17 +25,28 @@
     "commit": "d981f9c",
     "commit_date": "2026-09-18",
     "level_with": true,
-    "note": "fork/main descends from upstream d981f9c with 1 fork commit on top (?embed/?lang/?theme, Thai locale) as of 2026-09-21"
+    "note": "fork/main descends from upstream d981f9c with 4 fork commits on top (?embed/?lang/?theme + Thai locale; server-side locale schema and prompt map taught Thai; inherited Docker Hub and nightly-sync workflows replaced by a GHCR publish) as of 2026-09-21"
   },
   "image": {
-    "tag": "lit-storm/research-ui:2e4743e",
-    "digest": null,
-    "note": "Built locally from the fork with `docker build`. digest is null until an image is pushed to a registry; a deploy must not proceed on a null."
+    "registry": "ghcr.io/khunmax2/lit_deep-research-web",
+    "tag": "db59261",
+    "digest": "sha256:931aaf8da5b2f229814d17414ac5a1f5e9eb49c0e107bd817183b51ab717e3c9",
+    "note": "Published by the fork's image.yml on push to main; the digest is in that run's summary. This is what a deploy pulls. The package is private until its visibility is set to public in GitHub, after which it pulls without a login."
   },
   "verified": "2026-09-21",
   "verified_against": {
     "locale_keys_en": 194,
     "locale_keys_th": 194,
-    "frame_params": ["embed", "lang", "theme"]
+    "frame_params": [
+      "embed",
+      "lang",
+      "theme"
+    ],
+    "locale_lists_agree": [
+      "nuxt.config.ts",
+      "i18n/i18n.config.ts",
+      "shared/utils/research-input.ts",
+      "lib/prompt.ts"
+    ]
   }
 }

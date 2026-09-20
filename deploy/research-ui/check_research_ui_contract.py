@@ -15,6 +15,7 @@ locale is zh.
 
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -86,6 +87,34 @@ def main():
     else:
         print("locale: th.json is absent")
         status = max(status, 1)
+
+    # The locale list lives in more than one place, and only some of them are
+    # the UI. The first build that added Thai updated nuxt.config.ts and the
+    # i18n config and shipped — then every research request came back 400,
+    # because the server's zod schema had its own copy of the list. So:
+    # every copy must name every locale the UI offers.
+    ui = set(re.findall(r"'([a-z]{2})'", re.search(
+        r"locales:\s*\[([^\]]*)\]", (checkout / "nuxt.config.ts").read_text(encoding="utf-8")
+    ).group(1)))
+    copies = {
+        "shared/utils/research-input.ts": r"SUPPORTED_LOCALES\s*=\s*\[([^\]]*)\]",
+        "i18n/i18n.config.ts": r"availableLocales:\s*\[([^\]]*)\]",
+        "lib/prompt.ts": r"LANGUAGE_NAMES[^{]*\{([^}]*)\}",
+    }
+    for rel, pattern in copies.items():
+        text = (checkout / rel).read_text(encoding="utf-8")
+        found = re.search(pattern, text)
+        # Two shapes: a quoted list ('en', 'zh') or an object's keys (en: …).
+        listed = (
+            set(re.findall(r"'([a-z]{2})'", found.group(1)))
+            | set(re.findall(r"^\s*([a-z]{2}):", found.group(1), re.M))
+        ) if found else set()
+        missing = sorted(ui - listed)
+        if missing:
+            print(f"locale: {rel} lacks {', '.join(missing)} that the UI offers")
+            status = max(status, 1)
+    if status == 0:
+        print(f"locale: every copy of the list names all of {', '.join(sorted(ui))}")
 
     for param in PIN["verified_against"]["frame_params"]:
         source = (checkout / "app" / "composables" / "useEmbed.ts")

@@ -80,17 +80,26 @@ What the fork adds over upstream, in one commit:
 Base path needs no code: Nuxt reads `NUXT_APP_BASE_URL` at runtime, and the
 compose file exposes it as `RESEARCH_UI_BASE_PATH`.
 
-## Building the image
+## The image
+
+The fork's own workflow (`.github/workflows/image.yml`) builds and pushes
+`ghcr.io/khunmax2/lit_deep-research-web` on every push to main, tagged by
+short sha and `latest`, and prints the digest in the run summary. The
+compose file pins that digest; `research-ui-pin.json` records it.
+
+The inherited upstream workflows are gone: one pushed to the author's
+Docker Hub with secrets this repository does not have and failed on every
+push, the other would have merged upstream into main nightly.
+
+**The package is private until its visibility is set to public** — GitHub
+creates it that way. Until then `docker compose pull` gets `unauthorized`.
+Fix once, in the browser: the package's settings → Danger Zone → Change
+visibility → Public. Or build locally and override:
 
 ```
-docker build -t lit-storm/research-ui:<commit> -t lit-storm/research-ui:latest ../../../deep-research-web-ui
+docker build -t lit-storm/research-ui:latest ../../../deep-research-web-ui
+RESEARCH_UI_IMAGE=lit-storm/research-ui:latest docker compose --env-file .env up -d
 ```
-
-The compose file runs `lit-storm/research-ui:latest` (override with
-`RESEARCH_UI_IMAGE`). Until an image is pushed to a registry, this is a
-local build and the pin carries no digest; the publisher's
-`anotia/deep-research-web:latest` still works as a fallback — it just shows
-its own controls in the frame.
 
 ## Search needs a provider both apps have
 

@@ -32,9 +32,12 @@ DEFAULT_URL = "http://localhost:3100"
 # what it would have shown anyway.
 LANG_CODES = {"English": "en", "ไทย": "th"}
 
-# The frame takes the height that is left, so the research tree and the
-# report scroll inside it rather than fighting the page's own scrollbar.
-FRAME_HEIGHT = "stretch"
+# A pixel height is what st.iframe actually honours: "stretch" fills the
+# parent, and the parent here has no height of its own, so the frame came
+# out at 180px with the page empty beneath it. The CSS in ui_theme raises
+# this to the viewport's remaining height; this is the floor it falls back
+# to, and what a browser without CSS variables would see.
+FRAME_HEIGHT = 900
 
 
 def frame_url():
@@ -73,4 +76,5 @@ def research_ui_page():
             t("research.open_tab"), url, icon=":material/open_in_new:", width="stretch"
         )
 
-    st.iframe(url, height=FRAME_HEIGHT)
+    with st.container(key="research_frame"):
+        st.iframe(url, height=FRAME_HEIGHT)

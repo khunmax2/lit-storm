@@ -638,6 +638,18 @@ span[class*="material-icons"] {{
     cursor: not-allowed;
 }}
 
+/* ---------- the framed sibling ---------- */
+/* Fill what is left of the viewport under the top bar, the engine switch and
+   the caption line, so the research tree scrolls inside the frame rather
+   than the frame scrolling inside the page. The pixel height st.iframe was
+   given is the floor. */
+.st-key-research_frame iframe {{
+    height: max(640px, calc(100vh - 17rem)) !important;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+}}
+
 /* ---------- inputs ---------- */
 [data-testid="stTextInputRootElement"] {{
     border-radius: 10px;

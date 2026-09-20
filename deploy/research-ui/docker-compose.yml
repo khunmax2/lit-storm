@@ -20,7 +20,7 @@ name: lit-storm-research-ui
 
 services:
   research-ui:
-    image: ${RESEARCH_UI_IMAGE:-ghcr.io/khunmax2/lit_deep-research-web@sha256:931aaf8da5b2f229814d17414ac5a1f5e9eb49c0e107bd817183b51ab717e3c9}
+    image: ${RESEARCH_UI_IMAGE:-ghcr.io/khunmax2/lit_deep-research-web@sha256:f7cf1ae8958d1cb34399048fd3ac7c5bff4d40ed1f4e650dd3360a571af6cd45}
     restart: unless-stopped
     env_file:
       - .env
@@ -29,6 +29,13 @@ services:
       # 443 and nothing else, so the sibling lives at a path, never a port.
       # Nuxt reads this at runtime; leave it unset for the root.
       NUXT_APP_BASE_URL: ${RESEARCH_UI_BASE_PATH:-/}
+    networks:
+      # Its own, plus the SearXNG stack's: this searches through that
+      # instance, and reaching it by service name beats host.docker.internal,
+      # which does not resolve from a Linux container without a host-gateway
+      # entry and points at the host rather than at the service either way.
+      - default
+      - searxng
     ports:
       # Loopback only, like every other sibling here. Reaching it from a
       # browser goes through the main app's frame, or through whatever
@@ -44,3 +51,9 @@ services:
       options:
         max-size: "2m"
         max-file: "2"
+
+networks:
+  searxng:
+    # Created by deploy/searxng; start that stack first.
+    name: lit-storm-searxng_default
+    external: true

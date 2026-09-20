@@ -217,7 +217,7 @@ The rest of the diff against upstream is Black formatting and line-ending normal
 | [docs/supabase-schema.sql](docs/supabase-schema.sql) | Schema and row-level security policies |
 | [deploy/supabase](deploy/supabase/README.md) | Self-hosted Supabase in four containers |
 | [deploy/searxng](deploy/searxng/README.md) | Self-hosted metasearch, and why there is no academic fork |
-| [deploy/research-ui](deploy/research-ui/README.md) | deep-research-web-ui as a framed sibling application |
+| [deploy/research-ui](deploy/research-ui/README.md) | deep-research-web-ui as a framed sibling application, searching the same SearXNG |
 
 ---
 

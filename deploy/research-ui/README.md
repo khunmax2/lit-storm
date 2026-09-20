@@ -101,13 +101,25 @@ docker build -t lit-storm/research-ui:latest ../../../deep-research-web-ui
 RESEARCH_UI_IMAGE=lit-storm/research-ui:latest docker compose --env-file .env up -d
 ```
 
-## Search needs a provider both apps have
+## Search: the same SearXNG the main app uses
 
-This app searches with tavily, firecrawl, crw, google-pse, youcom or serply.
-The main app's saved source is Brave, which this one does not speak — so
-`NUXT_TAVILY_API_KEY` in `.env` is blank and search fails until one of:
+Upstream searches with tavily, firecrawl, crw, google-pse, youcom or
+serply — every one either a paid key or a daily quota, and none of them
+what the main app is configured with. So the fork adds SearXNG as a
+seventh provider, and this stack points at the instance `deploy/searxng`
+already runs: no key, no quota, and one search service for both
+applications instead of two bills.
 
-- a Tavily key is saved on the main app's Search sources page (press **Use
-  this**, not just **Test**) and `.env` is regenerated from it;
-- `NUXT_PUBLIC_WEB_SEARCH_PROVIDER=youcom`, which works with no key on a
-  daily quota.
+```
+NUXT_PUBLIC_WEB_SEARCH_PROVIDER=searxng
+NUXT_WEB_SEARCH_API_BASE=http://host.docker.internal:8080
+NUXT_PUBLIC_SEARXNG_ENGINES=          # optional: arxiv,pubmed,… to narrow it
+```
+
+`host.docker.internal` because the instance is published on the host's
+loopback, not on this compose network. On a deployment where both sit on
+one network, use the service name.
+
+The address is an address, not a secret, so it goes in `NUXT_WEB_SEARCH_API_BASE`
+and the API-key box stays empty. An instance behind a token can still use
+one: it is sent as a bearer header.

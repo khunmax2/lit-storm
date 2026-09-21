@@ -40,11 +40,20 @@ from knowledge_storm.utils import truncate_filename
 
 # Embedding services this app knows how to reach, and the key each reads.
 # The names are `knowledge_storm.encoder`'s own ENCODER_API_TYPE values.
+# Embedding services this app knows how to reach, and the key each reads.
+# The names are `knowledge_storm.encoder`'s own ENCODER_API_TYPE values.
+# `None` means the service needs no key — Ollama runs on this machine.
 ENCODERS = {
     "gemini": "GOOGLE_API_KEY",
     "openai": "OPENAI_API_KEY",
     "azure": "AZURE_API_KEY",
+    "ollama": None,
 }
+
+# Ollama is addressed, not authenticated. Both have defaults that are right
+# for a local install, so a deployment that has one running needs to set
+# neither — but a remote host or a different model can say so.
+OLLAMA_SETTINGS = ("OLLAMA_API_BASE", "OLLAMA_EMBEDDING_MODEL")
 
 
 class EmptyReport(RuntimeError):
@@ -84,10 +93,13 @@ def encoder_settings(lookup=None):
             "sorts every source it finds by similarity. Set ENCODER_PROVIDER "
             "to one of: " + ", ".join(sorted(ENCODERS))
         )
-    key = lookup(ENCODERS[name])
+    key_name = ENCODERS[name]
+    if key_name is None:
+        return name, None
+    key = lookup(key_name)
     if not key:
         raise LMConfigError(
-            f"{ENCODERS[name]} is missing, and embeddings are set to {name!r}, "
+            f"{key_name} is missing, and embeddings are set to {name!r}, "
             "which reads its key from there."
         )
     return name, key
@@ -101,7 +113,12 @@ def _prepare_encoder():
     """
     name, key = encoder_settings()
     os.environ["ENCODER_API_TYPE"] = name
-    os.environ[ENCODERS[name]] = key
+    if key is not None:
+        os.environ[ENCODERS[name]] = key
+    for setting_name in OLLAMA_SETTINGS:
+        value = model_settings.setting(setting_name)
+        if value:
+            os.environ[setting_name] = value
 
 
 def build_runner(topic, callback_handler=None):

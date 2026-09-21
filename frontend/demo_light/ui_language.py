@@ -203,6 +203,15 @@ _STRINGS = {
     "models.preset_label": {"English": "Shown as", "ไทย": "ชื่อที่แสดง"},
     "models.preset_save": {"English": "Offer it", "ไทย": "เพิ่มในรายการ"},
     "models.preset_remove": {"English": "Remove", "ไทย": "ลบ"},
+    "models.ollama_what": {
+        "English": "Embeddings from a model on this machine — no key, no "
+        "quota, and nothing leaves the host. Both boxes are optional; the "
+        "placeholders are what is used when they are empty. The model has "
+        "to be one Ollama has already pulled.",
+        "ไทย": "ใช้โมเดลบนเครื่องนี้สร้าง embedding ไม่ต้องใช้คีย์ ไม่มีโควตา "
+        "และข้อมูลไม่ออกจากเครื่อง ทั้งสองช่องไม่บังคับ เว้นว่างแล้วจะใช้ค่าในช่องจาง "
+        "โมเดลต้องเป็นตัวที่ Ollama ดาวน์โหลดไว้แล้ว",
+    },
     "models.slot_primary": {"English": "Primary provider", "ไทย": "ผู้ให้บริการหลัก"},
     "models.slot_primary_what": {
         "English": "Both roles use this unless one names the other.",

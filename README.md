@@ -112,10 +112,12 @@ Co-STORM files every snippet it collects into a mind map by **similarity**, not 
 It defaults to your chat provider, because for Gemini and OpenAI the same key buys both. But **OpenRouter and Groq have no embedding endpoint at all**, so those deployments must name a service of their own:
 
 ```toml
-ENCODER_PROVIDER = "gemini"     # gemini, openai, or azure
+ENCODER_PROVIDER = "gemini"     # gemini, openai, azure, or ollama
 ```
 
-The key comes from that provider's usual variable. If it is missing, the app says so before the discussion starts rather than failing partway through. STORM does not need this; Co-STORM cannot run without it.
+The key comes from that provider's usual variable. `ollama` needs none: it embeds with a model on the machine itself, so nothing leaves the host and there is no quota. It reads `OLLAMA_EMBEDDING_MODEL` (default `bge-m3:latest`, which has to be a model Ollama has pulled) and `OLLAMA_API_BASE` (default `http://localhost:11434`).
+
+If a key is missing, the app says so before the discussion starts rather than failing partway through. STORM does not need this; Co-STORM cannot run without it.
 
 ### Search sources
 

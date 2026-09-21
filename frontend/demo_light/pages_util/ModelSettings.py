@@ -223,7 +223,7 @@ def _role_card(role):
 def _encoder_card():
     """Embeddings, which only Co-STORM needs and only some providers sell."""
     current = (model_settings.setting("ENCODER_PROVIDER") or "").strip().lower()
-    default = (model_settings.setting("LLM_PROVIDER") or "gemini").strip().lower()
+    default = model_settings.default_provider()
 
     with st.container(border=True, key="role_encoder"):
         effective = current or default
@@ -235,10 +235,15 @@ def _encoder_card():
         )
         st.caption(t("models.encoder_what"))
 
-        # Embedding services with a key saved. The chat pickers filter the
-        # same way, and for the same reason; the set differs because Azure
-        # sells embeddings here without being a chat provider.
-        usable = [n for n, key in costorm.ENCODERS.items() if model_settings.setting(key)]
+        # Embedding services that can be called: a key saved, or no key
+        # needed at all. The chat pickers filter the same way and for the
+        # same reason; the set differs because Azure sells embeddings here
+        # without being a chat provider, and Ollama runs on this machine.
+        usable = [
+            name
+            for name, key in costorm.ENCODERS.items()
+            if key is None or model_settings.setting(key)
+        ]
         options = [""] + sorted(usable)
         index = options.index(current) if current in options else 0
         provider = st.selectbox(
@@ -249,14 +254,32 @@ def _encoder_card():
             format_func=lambda name: t("models.inherit") if name == "" else name,
         )
         chosen = (provider or default).strip().lower()
+        typed_key = ""
+        typed_ollama = {}
         if chosen not in costorm.ENCODERS:
             st.warning(t("models.encoder_unavailable", name=chosen))
-            typed_key = ""
+        elif costorm.ENCODERS[chosen] is None:
+            # Addressed, not authenticated. Both boxes are optional: the
+            # defaults are right for an Ollama on this machine, and the
+            # placeholders say what they are.
+            st.caption(t("models.ollama_what"))
+            typed_ollama["OLLAMA_EMBEDDING_MODEL"] = st.text_input(
+                t("models.model_name"),
+                value=model_settings.setting("OLLAMA_EMBEDDING_MODEL") or "",
+                key="encoder_ollama_model",
+                placeholder="bge-m3:latest",
+            )
+            typed_ollama["OLLAMA_API_BASE"] = st.text_input(
+                t("models.api_base"),
+                value=model_settings.setting("OLLAMA_API_BASE") or "",
+                key="encoder_ollama_base",
+                placeholder="http://localhost:11434",
+            )
         else:
             typed_key = _key_box(costorm.ENCODERS[chosen], "encoder")
 
-        pending = {"ENCODER_PROVIDER": provider}
-        if chosen in costorm.ENCODERS:
+        pending = {"ENCODER_PROVIDER": provider, **typed_ollama}
+        if costorm.ENCODERS.get(chosen):
             pending[costorm.ENCODERS[chosen]] = typed_key
 
         left, right = st.columns(2)

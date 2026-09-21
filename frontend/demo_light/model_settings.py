@@ -68,8 +68,9 @@ def managed():
         names.add(f"LLM_{role}_MODEL")
     names.update(provider["key"] for provider in demo_util.PROVIDERS.values())
     names.update(provider.get("base") for provider in demo_util.PROVIDERS.values())
-    # Embeddings can sit on Azure even when no chat role does.
-    names.add("AZURE_API_KEY")
+    # Embeddings can sit on Azure even when no chat role does, and on an
+    # Ollama this machine runs, which is addressed rather than keyed.
+    names.update(("AZURE_API_KEY", "OLLAMA_API_BASE", "OLLAMA_EMBEDDING_MODEL"))
     names.discard(None)
     return names
 
@@ -340,13 +341,21 @@ def check_encoder(overrides=None):
         )
     except Exception as error:  # noqa: BLE001 - config errors carry their own text
         return False, str(error), 0.0, 0
+    env_extra = {
+        n: overrides.get(n) or setting(n)
+        for n in costorm.OLLAMA_SETTINGS
+        if overrides.get(n) or setting(n)
+    }
     try:
         from knowledge_storm.encoder import Encoder
 
         # The encoder reads its own configuration from the environment, with
         # no way to hand one in, so the choice is published there and put back
         # afterwards rather than left changed for the rest of the process.
-        for variable, value in (("ENCODER_API_TYPE", name), (costorm.ENCODERS[name], key)):
+        published = {"ENCODER_API_TYPE": name, **env_extra}
+        if key is not None:
+            published[costorm.ENCODERS[name]] = key
+        for variable, value in published.items():
             saved_env[variable] = os.environ.get(variable)
             os.environ[variable] = value
         vector = Encoder().encode(PROBE)

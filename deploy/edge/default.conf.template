@@ -43,10 +43,25 @@ server {
     proxy_read_timeout 900s;
     proxy_send_timeout 900s;
 
+    # All of these live here, at the server level, and no `location` below
+    # may add a proxy_set_header of its own — nginx does not merge them. A
+    # location that sets one replaces the whole inherited set, so putting
+    # `Upgrade` in a location silently dropped Host and all three
+    # X-Forwarded headers with it. The app then saw `Host: app:8501`, the
+    # upstream's own name, and its loopback check — the fence around the
+    # sign-in bypass — refused a request that really did come from
+    # localhost.
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Here too, for the same reason. `$connection_upgrade` is "close" when a
+    # request is not a WebSocket handshake, which is what a plain proxied
+    # request wants anyway, so this is safe for every location.
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
 
     # Nothing is served at the root: the app has a name here, so someone
     # typing the bare address is sent to it rather than met with a 404.
@@ -65,9 +80,6 @@ server {
     # it. Strip the prefix and all three 404.
     location /${LIT_STORM_BASE_PATH}/ {
         proxy_pass http://app:8501;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
         # Streamlit's own reconnect handles a dropped socket; buffering the
         # stream here would delay every rerun by nginx's buffer rather than
         # by the app's own speed.
@@ -82,16 +94,12 @@ server {
     # builds its pages and asset URLs under it; handed "/" it answers 500.
     location /research/ {
         proxy_pass http://research-ui:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
     }
 
     # Stripped. Our own page is told nothing and needs nothing: it fetches
     # "api/runs" relative, so it works at whatever path it is mounted.
     location /agents/ {
         proxy_pass http://agents-research:3000/;
-        proxy_http_version 1.1;
     }
 
     location = /healthz {

@@ -21,10 +21,32 @@ from ui_language import t
 
 TEST_RESULT = "page6_model_test"
 
+# What was just saved, carried across the rerun that a save triggers.
+SAVED = "page6_saved"
+
 # Anything slower than this on a one-word prompt is a problem worth naming.
 # `gemini-flash-latest` resolving to a 30-57s model is the case in mind; the
 # healthy providers answered the same prompt in one to eight seconds.
 SLOW_SECONDS = 15.0
+
+
+def _saved_and_rerun(what):
+    """Record what was saved, then rerun.
+
+    The toast cannot simply be raised here: every save ends in a rerun, and
+    a rerun discards the render the toast would have appeared in. So it is
+    left in session state and shown by the next run — which is also the run
+    that draws the saved value, so the two agree.
+    """
+    st.session_state[SAVED] = what
+    st.rerun()
+
+
+def _show_saved():
+    """Announce the last save, once."""
+    what = st.session_state.pop(SAVED, None)
+    if what:
+        st.toast(t("models.saved", what=what), icon=":material/check_circle:")
 
 
 def _remember(scope, outcome):
@@ -106,7 +128,7 @@ def _key_box(key_name, prefix):
     if is_set and not typed and model_settings.is_saved_here(key_name):
         if st.button(t("models.forget_key"), key=f"forget_{prefix}_{key_name}", type="tertiary"):
             model_settings.forget(key_name)
-            st.rerun()
+            _saved_and_rerun(t("models.saved_key_forgotten", name=key_name))
     elif is_set and not model_settings.is_saved_here(key_name):
         st.caption(t("models.from_server"))
     return typed
@@ -147,7 +169,7 @@ def _provider_slot(slot, chosen, other):
         if not provider:
             if st.button(t("models.save"), key=f"slot_save_{slot}", width="stretch"):
                 model_settings.forget(model_settings.SECONDARY)
-                st.rerun()
+                _saved_and_rerun(t(f"models.slot_{slot}"))
             return
 
         details = demo_util.PROVIDERS[provider]
@@ -167,7 +189,7 @@ def _provider_slot(slot, chosen, other):
             model_settings.save({k: v for k, v in pending.items() if v})
             name = "LLM_PROVIDER" if slot == "primary" else model_settings.SECONDARY
             model_settings.save({name: provider})
-            st.rerun()
+            _saved_and_rerun(f"{t(f'models.slot_{slot}')} — {provider}")
 
 
 def _provider_slots():
@@ -366,7 +388,7 @@ def _role_card(role):
                 if not pending[f"LLM_{role}_REASONING"]:
                     model_settings.forget(f"LLM_{role}_REASONING")
                 model_settings.save({k: v for k, v in pending.items() if v})
-                st.rerun()
+                _saved_and_rerun(t(f"models.role_{role.lower()}"))
 
         _show_test(role)
 
@@ -445,7 +467,7 @@ def _encoder_card():
                 if not provider:
                     model_settings.forget("ENCODER_PROVIDER")
                 model_settings.save({k: v for k, v in pending.items() if v})
-                st.rerun()
+                _saved_and_rerun(t("models.encoder"))
 
         _show_test("encoder")
 
@@ -454,6 +476,10 @@ def model_settings_page():
     if not auth.is_admin():
         st.error(t("admin.not_admin"))
         return
+
+    # Before anything is drawn, so the confirmation of the save that caused
+    # this run appears with the values it saved.
+    _show_saved()
 
     default = (model_settings.setting("LLM_PROVIDER") or "gemini").strip().lower()
     ui_theme.page_header(t("models.title"), t("models.using", name=default))
@@ -519,7 +545,7 @@ def _presets_card():
                     icon=":material/delete:",
                 ):
                     model_settings.set_presets(presets[:index] + presets[index + 1 :])
-                    st.rerun()
+                    _saved_and_rerun(t("models.saved_preset_removed", name=preset.get("label") or preset.get("model", "")))
 
         st.markdown(f"**{t('models.preset_add')}**")
         label_col, provider_col, model_col = st.columns([2, 1.4, 2])
@@ -549,5 +575,5 @@ def _presets_card():
                 }])
                 for key in ("preset_new_label", "preset_new_model"):
                     st.session_state.pop(key, None)
-                st.rerun()
+                _saved_and_rerun(t("models.saved_preset_added", name=label or model))
         _show_test("preset_new")

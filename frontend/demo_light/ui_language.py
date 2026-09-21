@@ -422,6 +422,19 @@ _STRINGS = {
     "models.forget_key": {"English": "Forget this key", "ไทย": "ลบคีย์นี้"},
     "models.test": {"English": "Test", "ไทย": "ทดสอบ"},
     "models.testing": {"English": "Calling the model…", "ไทย": "กำลังเรียกโมเดล…"},
+    "models.saved": {"English": "Saved — {what}", "ไทย": "บันทึกแล้ว — {what}"},
+    "models.saved_key_forgotten": {
+        "English": "Removed {name}",
+        "ไทย": "ลบ {name} แล้ว",
+    },
+    "models.saved_preset_added": {
+        "English": "Added {name} to the list",
+        "ไทย": "เพิ่ม {name} ในรายการแล้ว",
+    },
+    "models.saved_preset_removed": {
+        "English": "Removed {name} from the list",
+        "ไทย": "นำ {name} ออกจากรายการแล้ว",
+    },
     "models.save": {"English": "Save", "ไทย": "บันทึก"},
     "models.test_ok": {
         "English": "{model} answered in {seconds}s: “{reply}”",

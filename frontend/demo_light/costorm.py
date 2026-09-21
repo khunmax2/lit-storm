@@ -76,7 +76,7 @@ def encoder_settings(lookup=None):
     if lookup is None:
         lookup = model_settings.setting
     name = (
-        lookup("ENCODER_PROVIDER") or lookup("LLM_PROVIDER") or "gemini"
+        lookup("ENCODER_PROVIDER") or model_settings.default_provider()
     ).strip().lower()
     if name not in ENCODERS:
         raise LMConfigError(

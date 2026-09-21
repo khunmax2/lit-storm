@@ -116,6 +116,43 @@ def _write(values):
 PRESETS_KEY = "_presets"
 
 
+def configured_providers():
+    """Providers that have everything needed to call them, in table order.
+
+    A key, and a base URL for the one provider that is an endpoint rather
+    than a service. This is the list the pickers offer: choosing a provider
+    with no key saves a setting that fails when a run starts, in front of
+    whoever pressed the button rather than the admin who chose it.
+    """
+    import demo_util
+
+    ready = []
+    for name, provider in demo_util.PROVIDERS.items():
+        if not setting(provider["key"]):
+            continue
+        if provider.get("base") and not setting(provider["base"]):
+            continue
+        ready.append(name)
+    return ready
+
+
+def default_provider():
+    """The provider both roles use unless one names another.
+
+    LLM_PROVIDER when it is set and usable. Failing that, the only
+    configured provider — filling in one key is a clear enough statement of
+    intent that it should not also need choosing from a list of one. Failing
+    that, gemini, which is what the app has always defaulted to.
+    """
+    chosen = (setting("LLM_PROVIDER") or "").strip().lower()
+    ready = configured_providers()
+    if chosen and chosen in ready:
+        return chosen
+    if len(ready) == 1:
+        return ready[0]
+    return chosen or "gemini"
+
+
 def presets():
     """Models the admin has put on offer for the strong role, in order.
 

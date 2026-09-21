@@ -48,8 +48,14 @@ def _show_test(scope):
 
 
 def _provider_picker(label, key, current, allow_inherit):
-    """A provider dropdown. `allow_inherit` adds "same as the default"."""
-    names = sorted(demo_util.PROVIDERS)
+    """A provider dropdown, offering only providers with a key saved.
+
+    Streamlit cannot grey out one option of a selectbox, so a provider
+    without a key is absent rather than dimmed. Nothing is hidden by that:
+    the keys card above lists every provider the app knows, which is where
+    you find out one exists and give it a key.
+    """
+    names = model_settings.configured_providers()
     options = ([""] if allow_inherit else []) + names
     index = options.index(current) if current in options else 0
     return st.selectbox(
@@ -84,6 +90,52 @@ def _key_box(key_name, prefix):
     return typed
 
 
+def _keys_card():
+    """Every provider the app knows, and the key each one needs.
+
+    One place for keys rather than a box on each card that picked a
+    provider: a key belongs to the provider, and the same key drawn three
+    times read as three keys to fill in. Fill in as many as you like; the
+    pickers below offer exactly the ones that are filled.
+    """
+    ready = set(model_settings.configured_providers())
+    with st.container(border=True, key="role_keys"):
+        st.markdown(
+            f'<div class="src-head"><span class="name">{t("models.keys")}</span>'
+            f'<span class="tags">{ui_theme.badge(str(len(ready)), tone="info")}</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(t("models.keys_what"))
+
+        for name, details in demo_util.PROVIDERS.items():
+            with st.container(border=True, key=f"provkey_{name}"):
+                state = (
+                    ui_theme.badge(t("models.key_ready"), tone="positive")
+                    if name in ready
+                    else ui_theme.badge(t("models.key_missing"), tone="warning")
+                )
+                st.markdown(
+                    f'<div class="src-head"><span class="name">{name}</span>'
+                    f'<span class="tags">{state}</span></div>',
+                    unsafe_allow_html=True,
+                )
+                typed_key = _key_box(details["key"], f"keys_{name}")
+                typed_base = ""
+                if details.get("base"):
+                    typed_base = st.text_input(
+                        t("models.api_base"),
+                        value=model_settings.setting(details["base"]) or "",
+                        key=f"keys_base_{name}",
+                        placeholder="https://api.example.com/v1",
+                    )
+                if st.button(t("models.save"), key=f"keys_save_{name}", width="stretch"):
+                    pending = {details["key"]: typed_key}
+                    if details.get("base"):
+                        pending[details["base"]] = typed_base
+                    model_settings.save({k: v for k, v in pending.items() if v})
+                    st.rerun()
+
+
 def _role_card(role):
     """One of the two model roles: provider, model name, key, test, save."""
     saved_provider = (model_settings.setting(f"LLM_{role}_PROVIDER") or "").strip().lower()
@@ -116,33 +168,13 @@ def _role_card(role):
         elif not model:
             st.caption(t("models.model_no_default"))
 
-        # The key belongs to the provider, not to the role. A role that
-        # inherits the default provider therefore inherits its key, and
-        # drawing the box again here offered three edits of one value —
-        # which read as three keys to fill in.
-        typed_key = ""
-        if details.get("key"):
-            if provider:
-                typed_key = _key_box(details["key"], f"role_{role}")
-            else:
-                st.caption(t("models.key_from_default", name=details["key"]))
-        typed_base = ""
-        if details.get("base"):
-            typed_base = st.text_input(
-                t("models.api_base"),
-                value=model_settings.setting(details["base"]) or "",
-                key=f"base_{role}",
-                placeholder="https://api.example.com/v1",
-            )
-
+        # No key box here. A key belongs to a provider, and every provider
+        # the dropdown above offers already has one — the keys card is where
+        # they are entered, once each.
         pending = {
             f"LLM_{role}_PROVIDER": provider,
             f"LLM_{role}_MODEL": model,
         }
-        if details.get("key"):
-            pending[details["key"]] = typed_key
-        if details.get("base"):
-            pending[details["base"]] = typed_base
 
         left, right = st.columns(2)
         with left:
@@ -181,7 +213,11 @@ def _encoder_card():
         )
         st.caption(t("models.encoder_what"))
 
-        options = [""] + sorted(costorm.ENCODERS)
+        # Embedding services with a key saved. The chat pickers filter the
+        # same way, and for the same reason; the set differs because Azure
+        # sells embeddings here without being a chat provider.
+        usable = [n for n, key in costorm.ENCODERS.items() if model_settings.setting(key)]
+        options = [""] + sorted(usable)
         index = options.index(current) if current in options else 0
         provider = st.selectbox(
             t("models.provider"),
@@ -238,33 +274,28 @@ def model_settings_page():
         st.error(t("models.cannot_run"))
         st.code(str(error), language=None)
 
-    with st.container(border=True, key="role_default"):
-        st.markdown(
-            f'<div class="src-head"><span class="name">{t("models.default_provider")}</span></div>',
-            unsafe_allow_html=True,
-        )
-        st.caption(t("models.default_what"))
-        provider = _provider_picker(
-            t("models.provider"), "prov_default", default, allow_inherit=False
-        )
-        details = demo_util.PROVIDERS.get(provider, {})
-        typed_key = _key_box(details["key"], "default") if details.get("key") else ""
-        typed_base = ""
-        if details.get("base"):
-            typed_base = st.text_input(
-                t("models.api_base"),
-                value=model_settings.setting(details["base"]) or "",
-                key="base_default",
-                placeholder="https://api.example.com/v1",
+    _keys_card()
+
+    ready = model_settings.configured_providers()
+    if not ready:
+        st.info(t("models.no_keys"))
+        return
+
+    # Only worth asking when there is a choice: one configured provider is
+    # already the default, and `default_provider` says so without being told.
+    if len(ready) > 1:
+        with st.container(border=True, key="role_default"):
+            st.markdown(
+                f'<div class="src-head"><span class="name">{t("models.default_provider")}</span></div>',
+                unsafe_allow_html=True,
             )
-        if st.button(t("models.save"), key="save_default", type="primary"):
-            pending = {"LLM_PROVIDER": provider}
-            if details.get("key"):
-                pending[details["key"]] = typed_key
-            if details.get("base"):
-                pending[details["base"]] = typed_base
-            model_settings.save({k: v for k, v in pending.items() if v})
-            st.rerun()
+            st.caption(t("models.default_what"))
+            provider = _provider_picker(
+                t("models.provider"), "prov_default", default, allow_inherit=False
+            )
+            if st.button(t("models.save"), key="save_default", type="primary"):
+                model_settings.save({"LLM_PROVIDER": provider})
+                st.rerun()
 
     columns = st.columns(2, gap="medium")
     for column, role in zip(columns, model_settings.ROLES):
@@ -317,7 +348,8 @@ def _presets_card():
             label = st.text_input(t("models.preset_label"), key="preset_new_label",
                                   placeholder="Pathumma LLM 27B")
         with provider_col:
-            provider = st.selectbox(t("models.provider"), sorted(demo_util.PROVIDERS),
+            provider = st.selectbox(t("models.provider"),
+                                    model_settings.configured_providers(),
                                     key="preset_new_provider")
         with model_col:
             model = st.text_input(t("models.model_name"), key="preset_new_model",

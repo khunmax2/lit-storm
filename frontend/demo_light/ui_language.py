@@ -203,6 +203,21 @@ _STRINGS = {
     "models.preset_label": {"English": "Shown as", "ไทย": "ชื่อที่แสดง"},
     "models.preset_save": {"English": "Offer it", "ไทย": "เพิ่มในรายการ"},
     "models.preset_remove": {"English": "Remove", "ไทย": "ลบ"},
+    "models.keys": {"English": "Provider keys", "ไทย": "คีย์ของผู้ให้บริการ"},
+    "models.keys_what": {
+        "English": "Fill in as many as you like. The pickers below offer "
+        "exactly the providers that have one — a provider with no key cannot "
+        "be chosen, because choosing it would fail when a run starts.",
+        "ไทย": "กรอกกี่รายก็ได้ ตัวเลือกด้านล่างจะเสนอเฉพาะรายที่มีคีย์แล้ว "
+        "ผู้ให้บริการที่ยังไม่มีคีย์จะเลือกไม่ได้ เพราะเลือกไปก็จะล้มตอนเริ่มค้นคว้า",
+    },
+    "models.key_ready": {"English": "ready", "ไทย": "พร้อมใช้"},
+    "models.key_missing": {"English": "no key", "ไทย": "ยังไม่มีคีย์"},
+    "models.no_keys": {
+        "English": "No provider has a key yet. Fill one in above and the "
+        "pickers appear.",
+        "ไทย": "ยังไม่มีผู้ให้บริการรายใดมีคีย์ กรอกสักรายด้านบนแล้วตัวเลือกจะปรากฏ",
+    },
     "models.key_from_default": {
         "English": "Uses the default provider's {name}.",
         "ไทย": "ใช้ {name} ของผู้ให้บริการหลัก",

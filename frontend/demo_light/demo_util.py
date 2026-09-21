@@ -708,7 +708,7 @@ def lm_settings(preset_id=None):
     not stop their next run.
     """
     lookup = model_settings.preset_lookup(preset_id) if preset_id else None
-    default = (model_settings.setting("LLM_PROVIDER") or "gemini").strip().lower()
+    default = model_settings.default_provider()
     return tuple(resolve_role(role, default, lookup=lookup) for role in ROLES)
 
 

@@ -700,6 +700,53 @@ span[class*="material-icons"] {{
     outline-offset: 2px;
 }}
 .stApp button:not(:disabled) {{ cursor: pointer; }}
+
+/* ---------- touch targets ---------- */
+/* Measured on a 375px viewport: 13 of 23 controls were under 44px tall —
+   the engine switch and the language tray at 32, the sidebar's collapse at
+   28. That is comfortable with a mouse and a miss with a thumb.
+   `pointer: coarse` is the right question to ask: it means the primary
+   input is a finger, whatever the window happens to be, so a narrow desktop
+   window keeps its dense layout and a tablet does not. */
+@media (pointer: coarse) {{
+    .stApp button,
+    .stApp [role="radio"],
+    .stApp [role="tab"],
+    .stApp [role="checkbox"],
+    .stApp [data-testid="stBaseButton-headerNoPadding"] {{
+        min-height: 44px !important;
+    }}
+    /* Icon-only controls need the width as well; the ones with labels are
+       already wide enough and should not be stretched into squares. */
+    .stApp button:not(:has(> div > span:not([data-testid*="Icon"]))) {{
+        min-width: 44px;
+    }}
+    /* Fields are tapped into as often as buttons are pressed. */
+    .stApp input:not([type="checkbox"]):not([type="radio"]),
+    .stApp select,
+    .stApp textarea,
+    .stApp [data-testid="stTextInputRootElement"] {{
+        min-height: 44px !important;
+    }}
+    /* The gap matters as much as the size: 44px targets touching each other
+       are still one 88px mistake. */
+    .st-key-lang_selector div[data-baseweb="button-group"],
+    .st-key-lang_selector [role="group"] {{
+        gap: 4px !important;
+    }}
+}}
+
+/* Streamlit puts a 16x16 anchor link beside every heading, for linking to a
+   section of a document. This is an application, not a document: nothing
+   here is deep-linked to a heading, and the link is both a tab stop that
+   goes nowhere useful and the only target on the page below even the 24px
+   pointer minimum. */
+.stApp [data-testid="stHeaderActionElements"],
+.stApp h1 > a[href^="#"],
+.stApp h2 > a[href^="#"],
+.stApp h3 > a[href^="#"] {{
+    display: none !important;
+}}
 [data-testid="stForm"] {{
     border: 1px solid var(--line);
     border-radius: 16px;
@@ -1095,6 +1142,18 @@ span[class*="material-icons"] {{
     font-weight: 600 !important;
     opacity: 1 !important;
     cursor: default !important;
+}}
+/* The breadcrumb is a link back, and a 29px one is hard to take with a
+   thumb. This sits after the rules above rather than with the other touch
+   sizing, because it has the same specificity as they do and both carry
+   !important — so the later rule wins, and declared earlier it simply did
+   not apply. */
+@media (pointer: coarse) {{
+    .st-key-crumbs .stButton > button {{
+        min-height: 44px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+    }}
 }}
 .topbar .crumb {{
     white-space: nowrap;

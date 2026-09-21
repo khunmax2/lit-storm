@@ -6,14 +6,13 @@ host: no image to pin, no healthcheck, no restart policy, and a 1.3GB
 virtualenv to rebuild on a new machine. This is the missing piece.
 
 ```
-docker build -t lit-storm/app:dev ../..
-cp .env.example .env          # then fill it in
-docker compose --env-file .env up -d
+cd ..
+cp .env.example .env     # then fill it in
+docker compose up -d --build
 ```
 
-It listens on `127.0.0.1:8501`. Start `deploy/supabase` and `deploy/searxng`
-first: this joins their networks by name, the way `deploy/research-ui`
-already reaches SearXNG.
+It listens on `127.0.0.1:8501`. It is one service of the stack in
+`deploy/docker-compose.yml`, on one network with the rest.
 
 ## No secrets.toml, on purpose
 
@@ -85,8 +84,6 @@ Against this machine's stacks, on the image built from this Dockerfile:
 - settings write to `/data/state/model_settings.json` and read back
 - `STORM_DEV_USER` unset, so sign-in is required
 
-## Not done here
-
-The three stacks are still three compose projects, which is why this file
-declares two `external` networks. Merging them is the next step; that is
-what removes these declarations.
+Those checks were run again after the four compose projects became one,
+against the merged stack, and the row counts in every table matched what
+they were before it.

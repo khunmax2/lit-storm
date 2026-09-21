@@ -1,0 +1,262 @@
+# Everything this deployment runs, in one stack.
+#
+# It was four: deploy/supabase, deploy/searxng, deploy/research-ui and
+# deploy/app, each its own compose project. That shape cost two things that
+# both showed up as bugs rather than as inconvenience — the app and the
+# research UI had to declare each other's networks as `external`, and each
+# stack carried its own .env, so a key changed in one place stayed stale in
+# another with no sign that it had.
+#
+#     cp .env.example .env     # then fill it in
+#     docker compose up -d
+#
+# Reset, which deletes the database:  docker compose down -v
+
+name: lit-storm
+
+services:
+  # ------------------------------------------------------------ Supabase
+  # Cut down to what the app actually calls: GoTrue (sign up, sign in, sign
+  # out, refresh, get user) and PostgREST (`table` and `rpc`). No Storage,
+  # Realtime, Edge Functions or Studio — grepping the app finds no caller.
+  db:
+    image: supabase/postgres:15.8.1.060
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory: the roles GoTrue and PostgREST
+      # sign in as, then the app's own schema.
+      - ./supabase/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Exposed so the schema and a restore can be driven from the host. Bound
+      # to loopback: nothing outside this machine should reach the database.
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth:
+    image: supabase/gotrue:v2.177.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${SUPABASE_PUBLIC_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SUPABASE_PUBLIC_URL}
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DISABLE_SIGNUP: "false"
+      # No SMTP here, so a confirmation mail could never arrive and every
+      # sign-up would stall at an unconfirmed account. Turn this off and wire
+      # GOTRUE_SMTP_* before exposing this to anyone outside the machine.
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      # The claims RLS reads. `auth.uid()` is (request.jwt.claims->>'sub'),
+      # so without this every policy sees a null user and denies everything.
+      PGRST_JWT_ROLE_CLAIM_KEY: ".role"
+      PGRST_DB_MAX_ROWS: "10000"
+
+  # One shot, then gone. The app's schema references auth.users and auth.uid(),
+  # which do not exist until GoTrue has run its migrations — so it cannot go in
+  # the init directory, which runs before any other container starts.
+  # Re-running it is safe: the schema file is written to be applied twice.
+  schema:
+    image: postgres:15-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ../docs/supabase-schema.sql:/schema.sql:ro
+    # The NOTIFY is not optional. PostgREST reads the schema once at startup,
+    # and it starts before this runs — so without it every `rpc()` comes back
+    # "Could not find the function … in the schema cache" even though the
+    # function is there. The tables are found because PostgREST falls back to
+    # querying them, but functions live only in the cache.
+    command:
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -h
+      - db
+      - -U
+      - postgres
+      - -d
+      - postgres
+      - -f
+      - /schema.sql
+      - -c
+      - "notify pgrst, 'reload schema';"
+    restart: "no"
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - rest
+    volumes:
+      - ./supabase/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:${SUPABASE_PORT:-8000}:8000"
+
+  # ------------------------------------------------------------- SearXNG
+  # One metasearch instance for both applications: no key, no quota, and one
+  # service rather than two bills.
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng-cache:/var/cache/searxng
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+      # Signs sessions and CSRF tokens. Generated once in .env rather than
+      # kept in settings.yml, so the file can be committed.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-lit-storm-local-dev-not-for-production}
+    ports:
+      # Loopback only. Exposing a metasearch instance to a network invites
+      # abuse, and these two applications are the only clients.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+  # ------------------------------------------------- Deep Research UI
+  # A sibling application, the shape ADR-0005 settled on: its own container,
+  # coupled to the main app by a URL and nothing else. The main app frames it
+  # in a tab. Which commit the image was built from is
+  # research-ui/research-ui-pin.json.
+  research-ui:
+    image: ${RESEARCH_UI_IMAGE:-ghcr.io/khunmax2/lit_deep-research-web@sha256:f7cf1ae8958d1cb34399048fd3ac7c5bff4d40ed1f4e650dd3360a571af6cd45}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # To sit under a path beside the main app — a deployment host opens
+      # 443 and nothing else, so the sibling lives at a path, never a port.
+      # Nuxt reads this at runtime; leave it unset for the root.
+      NUXT_APP_BASE_URL: ${RESEARCH_UI_BASE_PATH:-/}
+      # Reached by service name, which is what being one stack buys: this
+      # used to need `searxng` declared as an external network.
+      NUXT_WEB_SEARCH_API_BASE: ${NUXT_WEB_SEARCH_API_BASE:-http://searxng:8080}
+    depends_on:
+      searxng:
+        condition: service_healthy
+    ports:
+      # Loopback only, like every other service here. Reaching it from a
+      # browser goes through the main app's frame, or through whatever
+      # reverse proxy fronts a deployment.
+      - "127.0.0.1:3100:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"
+
+  # ----------------------------------------------------------------- app
+  app:
+    image: ${LIT_STORM_IMAGE:-lit-storm/app:dev}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Supabase by service name. `localhost:8000` is what a host run uses
+      # and cannot work here: inside a container localhost is the container.
+      SUPABASE_URL: ${SUPABASE_URL:-http://gateway:8000}
+    volumes:
+      # The settings the admin pages write, and Streamlit's own scratch space
+      # — HOME is /data in the image. Not the source tree: a mount over
+      # .streamlit would take config.toml, and the theme, with it.
+      - app-state:/data
+      # Members' reports. The one piece of data here that is theirs.
+      - app-reports:/app/frontend/demo_light/DEMO_WORKING_DIR
+    depends_on:
+      gateway:
+        condition: service_started
+      searxng:
+        condition: service_healthy
+    extra_hosts:
+      # Ollama runs on the host, not in this stack, so host.docker.internal
+      # has to resolve. Docker Desktop provides it; a Linux host does not
+      # without this line.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${LIT_STORM_PORT:-8501}:8501"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named explicitly rather than left to the project prefix. These volumes were
+# filled while the stacks were separate, under names like
+# `lit-storm-supabase_db-data`; letting compose derive them from the new
+# project name would have pointed the database at an empty volume and looked
+# exactly like losing the data. Explicit names also mean renaming the project
+# later cannot do it either.
+volumes:
+  db-data:
+    name: lit-storm-supabase_db-data
+  searxng-cache:
+    name: lit-storm-searxng_searxng-cache
+  app-state:
+    name: lit-storm-app_app-state
+  app-reports:
+    name: lit-storm-app_app-reports

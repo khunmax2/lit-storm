@@ -7,7 +7,7 @@ and comes back as one list. No key, and no rate limit but your own.
 ## Running it
 
 ```bash
-docker compose up -d
+cd deploy && docker compose up -d
 ```
 
 Then on the app's **Search sources** page, enter `http://localhost:8080`,

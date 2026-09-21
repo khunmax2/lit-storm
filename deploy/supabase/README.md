@@ -23,7 +23,7 @@ keys come from `.env`; the client cannot tell the difference.
 ## Running it
 
 ```bash
-docker compose --env-file .env up -d
+cd deploy && docker compose up -d
 ```
 
 `.env` is gitignored and holds the database password, the JWT secret and the

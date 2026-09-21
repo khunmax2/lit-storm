@@ -19,7 +19,7 @@ main app frames it with `st.iframe`.
 ## Running it
 
 ```bash
-docker compose --env-file .env up -d
+cd .. && docker compose up -d      # the whole stack, this included
 ```
 
 `.env` is gitignored. It carries the Gemini key through Gemini's
@@ -98,7 +98,7 @@ visibility → Public. Or build locally and override:
 
 ```
 docker build -t lit-storm/research-ui:latest ../../../deep-research-web-ui
-RESEARCH_UI_IMAGE=lit-storm/research-ui:latest docker compose --env-file .env up -d
+RESEARCH_UI_IMAGE=lit-storm/research-ui:latest docker compose up -d
 ```
 
 ## Its model settings do not follow the main app's
@@ -109,7 +109,7 @@ whatever it was started with, and the symptom is a stale key failing in a
 tab that looks like part of the same application. After editing `.env`:
 
 ```
-RESEARCH_UI_IMAGE=lit-storm/research-ui:searxng docker compose --env-file .env up -d --force-recreate
+RESEARCH_UI_IMAGE=lit-storm/research-ui:searxng docker compose up -d --force-recreate research-ui
 ```
 
 (the override is only needed while the GHCR package is private.)

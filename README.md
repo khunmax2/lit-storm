@@ -91,8 +91,8 @@ process with nothing to pin.
 
 ```
 docker build -t lit-storm/app:dev .
-cd deploy/app && cp .env.example .env    # then fill it in
-docker compose --env-file .env up -d
+cd deploy && cp .env.example .env    # then fill it in
+docker compose up -d --build
 ```
 
 The image carries **no `secrets.toml`**, deliberately: a value in that file

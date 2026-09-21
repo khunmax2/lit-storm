@@ -15,9 +15,7 @@ import os
 
 import auth
 
-SETTINGS_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), ".streamlit", "search_sources.json"
-)
+SETTINGS_PATH = os.path.join(auth.state_dir(), "search_sources.json")
 
 # Everything knowledge_storm/rm.py offers, and what it takes to run it.
 #   key      the secret it needs, or None when it needs none
@@ -61,6 +59,32 @@ SOURCES = {
         "signup": "",
         "note": "arxiv_note",
     },
+    # A SearXNG instance is configured by address, not by secret. The address
+    # goes through the same saved-keys machinery — it is deployment state that
+    # should not be in the database for the same reason the keys are not —
+    # but the page shows it in full and asks for it in a plain box.
+    "searxng": {
+        "label": "SearXNG",
+        "key": "SEARXNG_URL",
+        "kind": "url",
+        "free": True,
+        "signup": "https://docs.searxng.org/admin/installation.html",
+        "note": "searxng_note",
+    },
+    # The same instance, asked to use only its scholarly engines. SearXNG
+    # takes an `engines=` filter per query, so an academic source is a second
+    # entry here rather than a second deployment — and not the "academic
+    # fork" either, which turned out to enable these same stock engines.
+    "searxng_academic": {
+        "label": "SearXNG — academic",
+        "key": "SEARXNG_URL",
+        "kind": "url",
+        "shares": "searxng",
+        "engines": "arxiv,pubmed,semantic scholar,crossref,openalex,google scholar,core.ac.uk,base,pdbe",
+        "free": True,
+        "signup": "",
+        "note": "searxng_academic_note",
+    },
     # Present in the library, not offerable from here.
     "vector": {
         "label": "Your own documents",
@@ -84,6 +108,11 @@ def load():
     if saved.get("source") not in OFFERED:
         saved["source"] = DEFAULT
     saved.setdefault("keys", {})
+    # Which sources a member may tick for their own run. Absent — every
+    # deployment before this existed — it is the one source in use, so the
+    # picker offers exactly what the run would have used anyway.
+    offered = [n for n in saved.get("offered", []) if n in OFFERED]
+    saved["offered"] = offered or [saved["source"]]
     return saved
 
 
@@ -97,7 +126,23 @@ def save(source, keys):
             merged[name] = value
     os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
     with open(SETTINGS_PATH, "w", encoding="utf-8") as handle:
-        json.dump({"source": source, "keys": merged}, handle, indent=2)
+        json.dump(
+            {"source": source, "offered": current["offered"], "keys": merged},
+            handle,
+            indent=2,
+        )
+    os.chmod(SETTINGS_PATH, 0o600)
+
+
+def set_offered(names):
+    """Which sources members may pick from. The one in use is always in."""
+    current = load()
+    wanted = [n for n in names if n in OFFERED]
+    if current["source"] not in wanted:
+        wanted.insert(0, current["source"])
+    current["offered"] = wanted
+    with open(SETTINGS_PATH, "w", encoding="utf-8") as handle:
+        json.dump(current, handle, indent=2)
     os.chmod(SETTINGS_PATH, 0o600)
 
 
@@ -121,6 +166,14 @@ def secret_for(source_name):
     if not key_name:
         return None
     return load()["keys"].get(key_name) or auth.setting(key_name)
+
+
+def ready(source_name):
+    """Whether a source can be built right now — key or address present."""
+    source = SOURCES[source_name]
+    if "unavailable" in source:
+        return False
+    return not source["key"] or bool(secret_for(source_name))
 
 
 def hint(source_name):
@@ -176,6 +229,11 @@ def _construct(name, secret, k):
         from arxiv_rm import ArxivRM
 
         return ArxivRM(k=k)
+    if name in ("searxng", "searxng_academic"):
+        from knowledge_storm.rm import SearXNG
+
+        # `secret` is the instance URL here; see SOURCES.
+        return SearXNG(searxng_api_url=secret, k=k, engines=source.get("engines"))
     raise SearchConfigError(f"{name} cannot be built from this page.")
 
 
@@ -183,6 +241,26 @@ def build(k=3):
     """The retriever STORM should research with, from what is saved."""
     name = load()["source"]
     return _construct(name, secret_for(name), k)
+
+
+def build_many(names, k=3):
+    """One retriever standing for several sources, for a run that ticked them.
+
+    Only sources the admin has offered are honoured, in the order they were
+    offered — that order decides which source's snippet wins for a URL two
+    of them return. Nothing ticked, or nothing offered, falls back to the
+    single source in use, so a run started without touching the picker is
+    the run it always was.
+    """
+    from knowledge_storm.rm import MultiRM
+
+    settings = load()
+    wanted = [n for n in settings["offered"] if n in (names or [])]
+    if not wanted:
+        return build(k)
+    if len(wanted) == 1:
+        return _construct(wanted[0], secret_for(wanted[0]), k)
+    return MultiRM([_construct(n, secret_for(n), k) for n in wanted], k=k)
 
 
 def check(source_name, secret=None, query="Songkran festival traditions"):

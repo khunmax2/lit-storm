@@ -12,6 +12,7 @@ from pages_util import (
     Account,
     Admin,
     Home,
+    ModelSettings,
     MyArticles,
     SearchSources,
 )
@@ -23,17 +24,20 @@ ARTICLES_PAGE = "My Articles"
 CREATE_PAGE = "Create New Article"
 ADMIN_PAGE = "Members"
 SOURCES_PAGE = "Search sources"
+MODELS_PAGE = "Models"
 PAGE_ICONS = {
     ARTICLES_PAGE: ":material/description:",
     CREATE_PAGE: ":material/home:",
     ADMIN_PAGE: ":material/group:",
     SOURCES_PAGE: ":material/travel_explore:",
+    MODELS_PAGE: ":material/network_intelligence:",
 }
 PAGE_LABELS = {
     ARTICLES_PAGE: "nav.articles",
     CREATE_PAGE: "nav.home",
     ADMIN_PAGE: "nav.admin",
     SOURCES_PAGE: "nav.sources",
+    MODELS_PAGE: "nav.models",
 }
 
 
@@ -84,9 +88,20 @@ def main():
     if "first_run" not in st.session_state:
         st.session_state["first_run"] = True
 
-    # set api keys from secrets
+    # Publish secrets.toml into the environment, for the code that reads
+    # os.environ directly rather than going through `auth.setting`.
+    #
+    # Guarded because a container has no secrets.toml — `auth.setting` says
+    # so in as many words — and iterating one that is not there raises
+    # instead of coming back empty. Nothing is lost when it does: what this
+    # loop would have published is what such a deployment already passes in
+    # as environment variables.
     if st.session_state["first_run"]:
-        for key, value in st.secrets.items():
+        try:
+            carried = list(st.secrets.items())
+        except FileNotFoundError:
+            carried = []
+        for key, value in carried:
             if type(value) == str:
                 os.environ[key] = value
 
@@ -110,11 +125,12 @@ def main():
     if auth.is_admin():
         pages.append(ADMIN_PAGE)
         pages.append(SOURCES_PAGE)
+        pages.append(MODELS_PAGE)
     if st.session_state["nav_page"] not in pages:
         st.session_state["nav_page"] = CREATE_PAGE
 
     main_pages = [CREATE_PAGE, ARTICLES_PAGE]
-    management_pages = [ADMIN_PAGE, SOURCES_PAGE] if auth.is_admin() else []
+    management_pages = [ADMIN_PAGE, SOURCES_PAGE, MODELS_PAGE] if auth.is_admin() else []
     selected_page = st.session_state["nav_page"]
     st.session_state["nav_main"] = selected_page if selected_page in main_pages else None
     st.session_state["nav_manage"] = (
@@ -161,7 +177,10 @@ def main():
         st.session_state.pop("page2_selected_my_article", None)
         st.rerun()
 
-    if selection == SOURCES_PAGE:
+    if selection == MODELS_PAGE:
+        demo_util.clear_other_page_session_state(page_index=6)
+        ModelSettings.model_settings_page()
+    elif selection == SOURCES_PAGE:
         demo_util.clear_other_page_session_state(page_index=5)
         SearchSources.search_sources_page()
     elif selection == ADMIN_PAGE:

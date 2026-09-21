@@ -20,7 +20,9 @@ build/
 .venv
 
 # Project-specific
-secrets.toml
+# Matches secrets.toml and any copy beside it — a ".backup" holding live
+# keys is exactly as dangerous as the original.
+secrets.toml*
 *.log
 */assertion.log
 *results/

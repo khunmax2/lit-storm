@@ -472,10 +472,33 @@ class LMConfigs(ABC):
 
         return model_name_to_usage
 
+    # Argument names whose value is a credential rather than a setting. The
+    # log below goes into the run's own folder, beside the article, which is
+    # a file a researcher can download, attach to a ticket or hand to a
+    # colleague — so the key cannot travel in it.
+    # api_base is not among them: it is an endpoint, not a credential, and
+    # it is the first thing worth knowing when a run behaved oddly.
+    SECRET_KWARGS = ("api_key", "aws_secret_access_key", "aws_access_key_id")
+
+    @classmethod
+    def _redact(cls, kwargs):
+        """kwargs with credentials replaced by their last four characters.
+
+        Enough to tell two keys apart when reading back which one a run used,
+        and not enough to make a call with.
+        """
+        safe = {}
+        for name, value in kwargs.items():
+            if name in cls.SECRET_KWARGS and isinstance(value, str) and value:
+                safe[name] = f"…{value[-4:]}"
+            else:
+                safe[name] = value
+        return safe
+
     def log(self):
         return OrderedDict(
             {
-                attr_name: getattr(self, attr_name).kwargs
+                attr_name: self._redact(getattr(self, attr_name).kwargs)
                 for attr_name in self.__dict__
                 if "_lm" in attr_name and hasattr(getattr(self, attr_name), "kwargs")
             }

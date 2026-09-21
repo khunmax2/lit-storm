@@ -13,7 +13,7 @@ cost ten minutes and a good deal of API credit.
 
 import demo_util
 import streamlit as st
-from pages_util import CreateNewArticle, RoundTable
+from pages_util import AgentsResearch, CreateNewArticle, ResearchUI, RoundTable
 from ui_language import t
 
 # Not prefixed with "page", so the choice survives a walk to the library and
@@ -22,11 +22,18 @@ ENGINE_KEY = "home_engine"
 
 STORM = "storm"
 COSTORM = "costorm"
+RESEARCH = "research"
+AGENTS = "agents"
 
 # icon, label, and the line under the switch that says what you are choosing.
 ENGINES = {
     STORM: (":material/auto_stories:", "home.engine_storm", "home.engine_storm_note"),
     COSTORM: (":material/forum:", "home.engine_costorm", "home.engine_costorm_note"),
+    # Sibling applications framed in, not engines of this app's: each has
+    # its own models, its own search and its own history. See ResearchUI and
+    # AgentsResearch.
+    RESEARCH: (":material/travel_explore:", "home.engine_research", "home.engine_research_note"),
+    AGENTS: (":material/account_tree:", "home.engine_agents", "home.engine_agents_note"),
 }
 
 
@@ -72,7 +79,12 @@ def home_page():
         return
 
     _switch()
-    if _engine() == COSTORM:
+    engine = _engine()
+    if engine == COSTORM:
         RoundTable.round_table_page()
+    elif engine == RESEARCH:
+        ResearchUI.research_ui_page()
+    elif engine == AGENTS:
+        AgentsResearch.agents_research_page()
     else:
         CreateNewArticle.create_new_article_page()

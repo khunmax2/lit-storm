@@ -1,11 +1,19 @@
 """Run RLS/RPC checks in a disposable local PostgreSQL cluster, never Supabase.
 
-Requires initdb/pg_ctl/psql on PATH, STORM_POSTGRES_BIN, or a local EDB install.
-Uses a temporary Unix socket and disables TCP listeners.
+Requires initdb/pg_ctl/psql on PATH, STORM_POSTGRES_BIN, or a local install.
+
+Listens on 127.0.0.1 on a port picked free at startup, rather than on a Unix
+socket: Windows has no Unix sockets, and a single path keeps the two platforms
+running the same test. A loopback listener is reachable by anything else on
+the machine, so `trust` would be too loose here — the cluster is created with
+scram-sha-256 and a password generated per run, handed to psql through the
+environment and never written to the command line.
 """
 import json
 import os
+import secrets
 import shutil
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -19,29 +27,61 @@ OTHER = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 MEMBER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 NEW = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
 
+
+def _postgres_bin():
+    """The directory holding initdb, or None when there is no install to use."""
+    directory = os.getenv('STORM_POSTGRES_BIN')
+    if not directory and shutil.which('initdb'):
+        directory = str(Path(shutil.which('initdb')).parent)
+    if not directory:
+        # Installers that do not put themselves on PATH: EDB on macOS, and the
+        # same installer's default location on Windows.
+        for candidate in sorted(Path('/Library/PostgreSQL').glob('*/bin/initdb'), reverse=True):
+            directory = str(candidate.parent)
+            break
+    if not directory:
+        for root in (Path('C:/Program Files/PostgreSQL'), Path('C:/Program Files (x86)/PostgreSQL')):
+            for candidate in sorted(root.glob('*/bin/initdb.exe'), reverse=True):
+                directory = str(candidate.parent)
+                break
+            if directory:
+                break
+    return directory
+
+
+def _free_port():
+    """A port nothing is listening on, released before postgres claims it."""
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        return probe.getsockname()[1]
+
+
 class MemberDatabaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        directory = os.getenv('STORM_POSTGRES_BIN')
-        if not directory and shutil.which('initdb'):
-            directory = str(Path(shutil.which('initdb')).parent)
-        if not directory and Path('/Library/PostgreSQL/18/bin/initdb').exists():
-            directory = '/Library/PostgreSQL/18/bin'
+        directory = _postgres_bin()
         if not directory:
             raise unittest.SkipTest('PostgreSQL binaries are not installed')
         cls.bin = Path(directory)
-        cls.temp = tempfile.TemporaryDirectory(prefix='storm-db-', dir='/tmp')
+        # ignore_cleanup_errors: Windows refuses to unlink a file another
+        # process still holds, and a slow postgres shutdown would otherwise
+        # turn a passing run into an error raised from the teardown.
+        cls.temp = tempfile.TemporaryDirectory(prefix='storm-db-', ignore_cleanup_errors=True)
         cls.addClassCleanup(cls.temp.cleanup)
         cls.base = Path(cls.temp.name)
         cls.data = cls.base/'data'
-        cls.socket = cls.base/'socket'
-        cls.socket.mkdir()
+        cls.port = _free_port()
+        cls.password = secrets.token_urlsafe(24)
+        cls.env = {**os.environ, 'PGPASSWORD': cls.password}
+        pwfile = cls.base/'pwfile'
+        pwfile.write_text(cls.password, encoding='utf-8')
         subprocess.run([str(cls.bin/'initdb'), '-D', str(cls.data), '-U', 'storm_test',
-            '-A', 'trust', '--no-locale', '--encoding=UTF8'], check=True, capture_output=True)
-        subprocess.run([str(cls.bin/'pg_ctl'), '-D', str(cls.data), '-l', str(cls.base/'postgres.log'),
-            '-o', f"-F -k {cls.socket} -h '' -p 15438", '-w', 'start'], check=True, capture_output=True)
-        cls.addClassCleanup(lambda: subprocess.run([str(cls.bin/'pg_ctl'), '-D', str(cls.data),
-            '-m', 'immediate', '-w', 'stop'], check=True, capture_output=True))
+            '-A', 'scram-sha-256', f'--pwfile={pwfile}', '--no-locale', '--encoding=UTF8'],
+            check=True, capture_output=True)
+        pwfile.unlink()
+        cls.pg_ctl('-l', str(cls.base/'postgres.log'),
+            '-o', f'-F -h 127.0.0.1 -p {cls.port}', '-w', 'start')
+        cls.addClassCleanup(lambda: cls.pg_ctl('-m', 'immediate', '-w', 'stop'))
         cls.sql('''
 create role anon;
 create role authenticated;
@@ -59,10 +99,31 @@ alter default privileges in schema public grant all on tables to anon, authentic
         cls.sql(schema)  # An existing deployment can rerun the migration.
 
     @classmethod
+    def pg_ctl(cls, *arguments):
+        """Run pg_ctl without holding a pipe open for the server's lifetime.
+
+        `pg_ctl start` hands the server its own stdout and stderr. Captured
+        through a pipe, that pipe stays open for as long as postgres runs, and
+        the caller waits on EOF that only arrives when the cluster shuts down
+        — so `capture_output=True` here hangs on Windows rather than starting
+        a database. Output goes to a file instead, quoted back on failure.
+        """
+        log = cls.base/'pg_ctl.log'
+        with open(log, 'w', encoding='utf-8') as handle:
+            result = subprocess.run([str(cls.bin/'pg_ctl'), '-D', str(cls.data), *arguments],
+                stdin=subprocess.DEVNULL, stdout=handle, stderr=subprocess.STDOUT)
+        if result.returncode:
+            detail = log.read_text(encoding='utf-8', errors='replace').strip()
+            server = cls.base/'postgres.log'
+            if server.exists():
+                detail += '\n' + server.read_text(encoding='utf-8', errors='replace').strip()
+            raise AssertionError(f'pg_ctl {" ".join(arguments)} failed:\n{detail}')
+
+    @classmethod
     def sql(cls, statement, ok=True):
         result = subprocess.run([str(cls.bin/'psql'), '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
-            '-h', str(cls.socket), '-p', '15438', '-U', 'storm_test', '-d', 'postgres', '-c', statement],
-            text=True, capture_output=True)
+            '-h', '127.0.0.1', '-p', str(cls.port), '-U', 'storm_test', '-d', 'postgres', '-c', statement],
+            text=True, capture_output=True, env=cls.env, stdin=subprocess.DEVNULL)
         if ok and result.returncode:
             raise AssertionError(result.stderr)
         if not ok and not result.returncode:

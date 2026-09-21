@@ -14,6 +14,8 @@ import streamlit as st
 import article_store
 import auth
 import html_report
+import model_settings
+import run_options
 import search_sources
 import ui_language
 import ui_theme
@@ -635,8 +637,68 @@ PROVIDERS = {
 # Two models, named for the work they do rather than for their size.
 ROLES = ("FAST", "STRONG")
 
+# What each role is allowed to spend on one reply. The fast role runs
+# hundreds of times in a run and answers in a sentence; the strong role
+# writes sections. The settings page probes a role with the same budget,
+# so a model that cannot answer inside it fails the test rather than the
+# run — a reasoning model can spend the whole of 500 on thinking and
+# return an empty string, which is a working call that said nothing.
+ROLE_TOKENS = {"FAST": 500, "STRONG": 3000}
 
-def _resolve_role(role, default_provider):
+# What LLM_<ROLE>_REASONING may say:
+#
+#   ""            leave the model alone — send nothing
+#   "off"         do not think
+#   "effort:high" think this hard, in the provider's own words
+#   "budget:800"  think for at most this many tokens
+#
+# Thinking is spent from the same budget as the answer, so on the fast
+# role's 500 tokens a model can use the lot and return nothing — billed,
+# and silent. Turning it off, or down, is the fix.
+#
+# Unset is its own answer and not the same as "off": it sends no parameter
+# at all, which is what a model with nothing to turn off needs, and what
+# leaves a thinking model at its own default.
+REASONING_OFF = "off"
+
+
+def reasoning_kwargs(setting_value, provider):
+    """The call argument for a saved setting, or {} for unset.
+
+    The shape depends on who is being called, and getting that wrong is
+    silent rather than loud. litellm does not list `reasoning_effort` as
+    supported for OpenRouter and `litellm.drop_params` is on, so sending it
+    there is dropped without a word: measured, `reasoning_effort="none"`
+    still spent 584 reasoning tokens, where OpenRouter's own `reasoning`
+    object spent 0. So OpenRouter is sent its object, and everyone else is
+    sent litellm's parameter for litellm to translate.
+    """
+    value = (setting_value or "").strip().lower()
+    if not value:
+        return {}
+
+    kind, _, detail = value.partition(":")
+    openrouter = (provider or "").strip().lower() == "openrouter"
+
+    if value == REASONING_OFF:
+        # "none" is a real effort level in both vocabularies; `enabled:
+        # False` is OpenRouter's own spelling and the one measured to work.
+        return {"reasoning": {"enabled": False}} if openrouter else {"reasoning_effort": "none"}
+
+    if kind == "effort" and detail:
+        return {"reasoning": {"effort": detail}} if openrouter else {"reasoning_effort": detail}
+
+    if kind == "budget" and detail.isdigit():
+        # Only OpenRouter takes a raw token budget here. litellm expresses
+        # the same idea as an effort level, and picking one for a number
+        # would be inventing a mapping the page never promised.
+        return {"reasoning": {"max_tokens": int(detail)}} if openrouter else {}
+
+    return {}
+
+
+
+def resolve_role(role, default_provider, lookup=None):
     """(model id, call arguments) for one of the two roles.
 
     The provider's prefix is always applied. It is tempting to leave a name
@@ -644,8 +706,14 @@ def _resolve_role(role, default_provider):
     "anthropic/claude-sonnet-4" — under that rule the call would go straight
     to Anthropic, with an OpenRouter key. A role that belongs somewhere else
     says so in LLM_<ROLE>_PROVIDER instead.
+
+    `lookup` is where settings come from. It defaults to the saved settings,
+    falling back to secrets and the environment; the settings page passes one
+    of its own so a key can be tried before it is saved.
     """
-    name = (auth.setting(f"LLM_{role}_PROVIDER") or default_provider).strip().lower()
+    if lookup is None:
+        lookup = model_settings.setting
+    name = (lookup(f"LLM_{role}_PROVIDER") or default_provider).strip().lower()
     if name not in PROVIDERS:
         raise LMConfigError(
             f"{name!r} is not a provider this app knows. Choose one of: "
@@ -653,14 +721,14 @@ def _resolve_role(role, default_provider):
         )
     provider = PROVIDERS[name]
 
-    api_key = auth.setting(provider["key"])
+    api_key = lookup(provider["key"])
     if not api_key:
         raise LMConfigError(
             f"{provider['key']} is missing, and the {role.lower()} model is "
             f"set to {name!r}, which reads its key from there."
         )
 
-    model = auth.setting(f"LLM_{role}_MODEL") or provider.get(role.lower())
+    model = lookup(f"LLM_{role}_MODEL") or provider.get(role.lower())
     if not model:
         raise LMConfigError(
             f"{name!r} ships no default models, so LLM_{role}_MODEL has to "
@@ -675,8 +743,9 @@ def _resolve_role(role, default_provider):
         # Ride out the occasional 429 rather than failing the whole run.
         "num_retries": 6,
     }
+    kwargs.update(reasoning_kwargs(lookup(f"LLM_{role}_REASONING"), name))
     if "base" in provider:
-        base = auth.setting(provider["base"])
+        base = lookup(provider["base"])
         if not base:
             raise LMConfigError(
                 f"{provider['base']} is missing. {name!r} is any endpoint that "
@@ -687,15 +756,21 @@ def _resolve_role(role, default_provider):
     return provider["prefix"] + model, kwargs
 
 
-def lm_settings():
+def lm_settings(preset_id=None):
     """The two models to call, from secrets or the environment.
 
     Only LLM_PROVIDER has to be set, and only if it is not Gemini. Each role
     can override the provider as well as the model, so the questions can be
     asked somewhere cheap while the writing happens somewhere strong.
+
+    `preset_id` names a model the admin put on offer and this run picked;
+    it moves the strong role only. An id that no longer exists is ignored
+    rather than failed on, so a preset withdrawn after someone chose it does
+    not stop their next run.
     """
-    default = (auth.setting("LLM_PROVIDER") or "gemini").strip().lower()
-    return tuple(_resolve_role(role, default) for role in ROLES)
+    lookup = model_settings.preset_lookup(preset_id) if preset_id else None
+    default = model_settings.default_provider()
+    return tuple(resolve_role(role, default, lookup=lookup) for role in ROLES)
 
 
 def _settings_fingerprint(*calls):
@@ -707,11 +782,27 @@ def _settings_fingerprint(*calls):
     parts = []
     for model, kwargs in calls:
         secret = f"{kwargs.get('api_key', '')}|{kwargs.get('api_base', '')}"
-        parts.append(f"{model}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}")
+        # Named, not just present: "medium" and "high" are different runs
+        # and a runner built for one must not be reused for the other. Both
+        # wire formats are read, because which one was used depends on the
+        # provider and the fingerprint must not depend on that.
+        reasoning = kwargs.get("reasoning") or {}
+        effort = kwargs.get("reasoning_effort")
+        if reasoning.get("enabled") is False or effort == "none":
+            thinking = "-think"
+        elif reasoning.get("effort") or effort:
+            thinking = "+" + str(reasoning.get("effort") or effort)
+        elif reasoning.get("max_tokens"):
+            thinking = f"+{reasoning['max_tokens']}tok"
+        else:
+            thinking = "+think"
+        parts.append(
+            f"{model}{thinking}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}"
+        )
     return "|".join(parts)
 
 
-def _build_lm(model, max_tokens, kwargs):
+def build_lm(model, max_tokens, kwargs):
     """Use Google's current SDK for Gemini; keep LiteLLM for other providers."""
     if model.startswith("gemini/"):
         return GoogleModel(model=model.removeprefix("gemini/"), max_tokens=max_tokens, **kwargs)
@@ -728,10 +819,17 @@ def set_storm_runner():
     provider's own error message.
     """
     llm_configs = STORMWikiLMConfigs()
-    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = lm_settings()
+    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = lm_settings(
+        run_options.model()
+    )
 
-    fingerprint = _settings_fingerprint(
-        (fast_model, fast_kwargs), (strong_model, strong_kwargs)
+    # The run's own choices are part of what the runner was built from, so a
+    # change of depth or sources between two runs rebuilds it the way a
+    # change of provider does.
+    fingerprint = (
+        _settings_fingerprint((fast_model, fast_kwargs), (strong_model, strong_kwargs))
+        + "|"
+        + run_options.fingerprint()
     )
     current_working_dir = working_dir()
     if (
@@ -741,8 +839,8 @@ def set_storm_runner():
     ):
         return
 
-    fast_lm = _build_lm(fast_model, 500, fast_kwargs)
-    strong_lm = _build_lm(strong_model, 3000, strong_kwargs)
+    fast_lm = build_lm(fast_model, ROLE_TOKENS["FAST"], fast_kwargs)
+    strong_lm = build_lm(strong_model, ROLE_TOKENS["STRONG"], strong_kwargs)
 
     llm_configs.set_conv_simulator_lm(fast_lm)
     llm_configs.set_question_asker_lm(fast_lm)
@@ -750,15 +848,16 @@ def set_storm_runner():
     llm_configs.set_article_gen_lm(strong_lm)
     llm_configs.set_article_polish_lm(strong_lm)
 
+    knobs = run_options.knobs()
     engine_args = STORMWikiRunnerArguments(
         output_dir=current_working_dir,
-        max_conv_turn=3,
-        max_perspective=3,
-        search_top_k=3,
-        retrieve_top_k=5,
+        max_conv_turn=knobs["max_conv_turn"],
+        max_perspective=knobs["max_perspective"],
+        search_top_k=knobs["search_top_k"],
+        retrieve_top_k=knobs["retrieve_top_k"],
     )
 
-    rm = search_sources.build(k=engine_args.search_top_k)
+    rm = search_sources.build_many(run_options.sources(), k=engine_args.search_top_k)
 
     st.session_state["runner"] = STORMWikiRunner(engine_args, llm_configs, rm)
     st.session_state["runner_settings"] = fingerprint

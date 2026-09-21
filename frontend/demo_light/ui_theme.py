@@ -329,6 +329,7 @@ span[class*="material-icons"] {{
         min-height: 44px;
     }}
     [data-testid="stTextInputRootElement"],
+    [data-testid="stSelectbox"] .react-aria-ComboBox [role="group"],
     [data-baseweb="select"] > div {{
         min-height: 44px;
     }}
@@ -637,12 +638,43 @@ span[class*="material-icons"] {{
     cursor: not-allowed;
 }}
 
+/* ---------- the framed sibling ---------- */
+/* Fill what is left of the viewport under the top bar, the engine switch and
+   the caption line, so the research tree scrolls inside the frame rather
+   than the frame scrolling inside the page. The pixel height st.iframe was
+   given is the floor. */
+.st-key-research_frame iframe {{
+    height: max(640px, calc(100vh - 17rem)) !important;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+}}
+
 /* ---------- inputs ---------- */
 [data-testid="stTextInputRootElement"] {{
     border-radius: 10px;
     border-color: var(--line);
 }}
 [data-testid="stTextInputRootElement"]:focus-within {{
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+}}
+/* The select box draws its border in the background colour — a 1px line
+   you cannot see — so beside a text input and a popover button that both
+   draw `--line` it read as a bare label with a caret. Same radius, same
+   line, same focus ring as the input.
+
+   Streamlit 1.64 rebuilt the select on React Aria; the bordered element is
+   the [role="group"] inside .react-aria-ComboBox. The data-baseweb selector
+   is the pre-1.64 structure, kept so the rule survives a downgrade. */
+[data-testid="stSelectbox"] .react-aria-ComboBox [role="group"],
+[data-testid="stSelectbox"] [data-baseweb="select"] > div {{
+    border-radius: 10px;
+    border-color: var(--line);
+    background: var(--surface);
+}}
+[data-testid="stSelectbox"] .react-aria-ComboBox [role="group"]:focus-within,
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {{
     border-color: var(--brand);
     box-shadow: 0 0 0 3px var(--brand-soft);
 }}
@@ -1377,14 +1409,27 @@ span[class*="material-icons"] {{
 .st-key-admin_dashboard [data-testid="stCaptionContainer"] {{
     color: var(--muted);
 }}
+/* Icon, then label over caption, then the number — one line, three cells.
+   Stacked, these ran to 209px each to show a count and two short strings,
+   mostly Streamlit's 1rem gap between the four elements. A dashboard summary
+   should not push the thing it summarises below the fold. */
 .st-key-admin_stat_total,
 .st-key-admin_stat_active,
 .st-key-admin_stat_suspended {{
     border: 1px solid var(--line);
     border-radius: 13px;
-    padding: 1.1rem 1.2rem;
-    min-height: 9.4rem;
+    padding: .8rem .95rem;
+    display: grid;
+    grid-template-columns: 2.7rem minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: .75rem;
+    row-gap: .05rem;
+    align-items: center;
 }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(1) {{ grid-column: 1; grid-row: 1 / 3; }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(2) {{ grid-column: 2; grid-row: 1; }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(3) {{ grid-column: 3; grid-row: 1 / 3; }}
+[class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(4) {{ grid-column: 2; grid-row: 2; }}
 .st-key-admin_stat_total {{ background: light-dark(#f7faff, #182843); border-color: light-dark(#dbe8ff, #294267); }}
 .st-key-admin_stat_active {{ background: light-dark(#f4fdfb, #12352f); border-color: light-dark(#ccefe7, #286052); }}
 .st-key-admin_stat_suspended {{ background: light-dark(#fff8f9, #35212b); border-color: light-dark(#ffdde2, #75414d); }}
@@ -1403,10 +1448,10 @@ span[class*="material-icons"] {{
 .st-key-admin_stat_suspended .admin-stat-icon {{ background: light-dark(#ffe6e9, #5e303e); color: light-dark(#e2273a, #ff8998); }}
 .admin-stat-number {{
     display: block;
-    font-size: 1.9rem;
+    font-size: 1.6rem;
     line-height: 1.1;
     color: var(--ink);
-    margin: .18rem 0;
+    margin: 0;
 }}
 .st-key-admin_dashboard [data-testid="stTabs"] {{ margin-top: 1rem; }}
 .st-key-admin_dashboard [data-testid="stTab"] {{ font-weight: 600; }}
@@ -1473,11 +1518,15 @@ span[class*="material-icons"] {{
 @media (max-width: 1450px) {{
     .st-key-admin_dashboard {{ padding: 1rem; }}
     .st-key-admin_roster_header {{ display: none; }}
-    [class*="st-key-admin_roster_row_"] {{ position: relative; padding: 1.05rem; }}
+    [class*="st-key-admin_roster_row_"] {{ position: relative; padding: .85rem 1rem; }}
+    /* Three columns, not two. The five cells after the name are all one short
+       line, so two columns spent four stacked rows on them — a member card
+       ran to 392px for six fields. Three fits role, status and joined on one
+       line and brings the card to 247px. */
     [class*="st-key-admin_roster_row_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {{
         display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: .85rem 1.15rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .55rem .9rem;
         align-items: start;
     }}
     [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
@@ -1485,9 +1534,32 @@ span[class*="material-icons"] {{
         min-width: 0 !important;
         flex: none !important;
     }}
-    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child,
+    /* DOM order is name, role, status, usage, quota, joined, actions. Usage
+       carries a progress bar and wants the full width, so it is ordered after
+       joined rather than splitting the three short cells across two rows. */
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {{
+        grid-column: 1 / -1;
+        order: 1;
+    }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {{ order: 2; }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {{ order: 3; }}
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(6) {{ order: 4; }}
     [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) {{
         grid-column: 1 / -1;
+        order: 5;
+    }}
+    /* The monthly quota repeats the denominator of "used / limit" two cells
+       earlier. Editing it happens in the Actions popover either way. */
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
+        display: none;
+    }}
+    /* Streamlit puts a 1rem gap between the elements of a column, which is
+       generous for a label sitting above one short value. Not applied to the
+       name cell: its avatar makes `.member-identity` taller than the markdown
+       box Streamlit sizes for it, and that gap is what absorbs the overflow —
+       tighten it there and the "signed-in account" badge lands on the email. */
+    [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(n+2) > [data-testid="stVerticalBlock"] {{
+        gap: .15rem;
     }}
     [class*="st-key-admin_roster_row_"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {{
         position: absolute;
@@ -1500,22 +1572,13 @@ span[class*="material-icons"] {{
 }}
 @media (max-width: 760px) {{
     .st-key-admin_dashboard {{ padding: .85rem; }}
+    /* The grid itself is the default now; a phone only wants it tighter. */
     .st-key-admin_stat_total,
     .st-key-admin_stat_active,
     .st-key-admin_stat_suspended {{
-        min-height: 0;
-        padding: .75rem;
-        display: grid;
-        grid-template-columns: 2.7rem minmax(0, 1fr) auto;
-        grid-template-rows: auto auto;
-        column-gap: .7rem;
-        row-gap: .1rem;
-        align-items: center;
+        padding: .7rem .75rem;
+        column-gap: .6rem;
     }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:first-child {{ grid-column: 1; grid-row: 1 / 3; }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(2) {{ grid-column: 2; grid-row: 1; }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(3) {{ grid-column: 3; grid-row: 1 / 3; }}
-    [class*="st-key-admin_stat_"] > [data-testid="stElementContainer"]:nth-child(4) {{ grid-column: 2; grid-row: 2; }}
     .admin-stat-number {{ font-size: 1.45rem; }}
 }}
 

@@ -21,6 +21,8 @@ import re
 import auth
 import dspy
 import demo_util
+import model_settings
+import run_options
 import search_sources
 from demo_util import LMConfigError
 
@@ -38,11 +40,20 @@ from knowledge_storm.utils import truncate_filename
 
 # Embedding services this app knows how to reach, and the key each reads.
 # The names are `knowledge_storm.encoder`'s own ENCODER_API_TYPE values.
+# Embedding services this app knows how to reach, and the key each reads.
+# The names are `knowledge_storm.encoder`'s own ENCODER_API_TYPE values.
+# `None` means the service needs no key — Ollama runs on this machine.
 ENCODERS = {
     "gemini": "GOOGLE_API_KEY",
     "openai": "OPENAI_API_KEY",
     "azure": "AZURE_API_KEY",
+    "ollama": None,
 }
+
+# Ollama is addressed, not authenticated. Both have defaults that are right
+# for a local install, so a deployment that has one running needs to set
+# neither — but a remote host or a different model can say so.
+OLLAMA_SETTINGS = ("OLLAMA_API_BASE", "OLLAMA_EMBEDDING_MODEL")
 
 
 class EmptyReport(RuntimeError):
@@ -60,16 +71,21 @@ class EmptyReport(RuntimeError):
 RETRIEVE_TOP_K = 5
 
 
-def encoder_settings():
+def encoder_settings(lookup=None):
     """(service, key) for the embedding model, or raise `LMConfigError`.
 
     Defaults to the chat provider, because for Gemini and OpenAI the same key
     buys both. Providers that only resell chat completions — OpenRouter, Groq —
     have no embedding endpoint at all, so those deployments have to name a
     service of their own in ENCODER_PROVIDER.
+
+    `lookup` is where settings come from, as in `demo_util.resolve_role`: the
+    settings page passes its own so a choice can be tested before it is saved.
     """
+    if lookup is None:
+        lookup = model_settings.setting
     name = (
-        auth.setting("ENCODER_PROVIDER") or auth.setting("LLM_PROVIDER") or "gemini"
+        lookup("ENCODER_PROVIDER") or model_settings.default_provider()
     ).strip().lower()
     if name not in ENCODERS:
         raise LMConfigError(
@@ -77,10 +93,13 @@ def encoder_settings():
             "sorts every source it finds by similarity. Set ENCODER_PROVIDER "
             "to one of: " + ", ".join(sorted(ENCODERS))
         )
-    key = auth.setting(ENCODERS[name])
+    key_name = ENCODERS[name]
+    if key_name is None:
+        return name, None
+    key = lookup(key_name)
     if not key:
         raise LMConfigError(
-            f"{ENCODERS[name]} is missing, and embeddings are set to {name!r}, "
+            f"{key_name} is missing, and embeddings are set to {name!r}, "
             "which reads its key from there."
         )
     return name, key
@@ -94,7 +113,12 @@ def _prepare_encoder():
     """
     name, key = encoder_settings()
     os.environ["ENCODER_API_TYPE"] = name
-    os.environ[ENCODERS[name]] = key
+    if key is not None:
+        os.environ[ENCODERS[name]] = key
+    for setting_name in OLLAMA_SETTINGS:
+        value = model_settings.setting(setting_name)
+        if value:
+            os.environ[setting_name] = value
 
 
 def build_runner(topic, callback_handler=None):
@@ -106,13 +130,15 @@ def build_runner(topic, callback_handler=None):
     """
     _prepare_encoder()
 
-    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = demo_util.lm_settings()
+    (fast_model, fast_kwargs), (strong_model, strong_kwargs) = demo_util.lm_settings(
+        run_options.model()
+    )
     # 3000 rather than the paper's 1000, because a reasoning model spends part
     # of this budget thinking before it writes a word — Gemini 3.6 Flash burns
     # about 600 tokens on that — and whatever is left is what the reader sees.
     # At 1000 the answers came back cut off mid-sentence, or empty.
-    fast_lm = demo_util._build_lm(fast_model, 500, fast_kwargs)
-    strong_lm = demo_util._build_lm(strong_model, 3000, strong_kwargs)
+    fast_lm = demo_util.build_lm(fast_model, 500, fast_kwargs)
+    strong_lm = demo_util.build_lm(strong_model, 3000, strong_kwargs)
 
     lm_config = CollaborativeStormLMConfigs()
     lm_config.set_question_answering_lm(strong_lm)
@@ -122,12 +148,18 @@ def build_runner(topic, callback_handler=None):
     lm_config.set_question_asking_lm(fast_lm)
     lm_config.set_knowledge_base_lm(strong_lm)
 
-    argument = RunnerArgument(topic=topic, retrieve_top_k=RETRIEVE_TOP_K)
+    knobs = run_options.knobs()
+    argument = RunnerArgument(
+        topic=topic,
+        retrieve_top_k=RETRIEVE_TOP_K,
+        warmstart_max_num_experts=knobs["warmstart_max_num_experts"],
+        max_search_queries_per_turn=knobs["max_search_queries_per_turn"],
+    )
     return CoStormRunner(
         lm_config=lm_config,
         runner_argument=argument,
         logging_wrapper=LoggingWrapper(lm_config),
-        rm=search_sources.build(k=argument.retrieve_top_k),
+        rm=search_sources.build_many(run_options.sources(), k=argument.retrieve_top_k),
         callback_handler=callback_handler,
     )
 

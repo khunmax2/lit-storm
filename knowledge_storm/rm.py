@@ -641,6 +641,15 @@ class BraveRM(dspy.Retrieve):
         return collected_results
 
 
+class SearXNGConfigError(RuntimeError):
+    """The instance is reachable but not set up for this client.
+
+    Raised out of `forward` rather than logged and skipped like a transient
+    failure, because every query will fail the same way and a caller shown
+    "no results" would have no way to tell.
+    """
+
+
 class SearXNG(dspy.Retrieve):
     def __init__(
         self,
@@ -648,6 +657,7 @@ class SearXNG(dspy.Retrieve):
         searxng_api_key=None,
         k=3,
         is_valid_source: Callable = None,
+        engines=None,
     ):
         """Initialize the SearXNG search retriever.
         Please set up SearXNG according to https://docs.searxng.org/index.html.
@@ -658,11 +668,23 @@ class SearXNG(dspy.Retrieve):
             k (int, optional): The number of top passages to retrieve. Defaults to 3.
             is_valid_source (Callable, optional): A function that takes a URL and returns a boolean indicating if the
             source is valid. Defaults to None.
+            engines (str | list, optional): Restrict the search to these SearXNG engines, e.g.
+            "arxiv,pubmed". One instance can then serve as several sources — a general one and
+            an academic one — without a second deployment.
         """
         super().__init__(k=k)
+        if isinstance(engines, (list, tuple)):
+            engines = ",".join(engines)
+        self.engines = engines or None
         if not searxng_api_url:
             raise RuntimeError("You must supply searxng_api_url")
-        self.searxng_api_url = searxng_api_url
+        # The JSON endpoint is /search. People hand over the instance's root
+        # URL, which serves the HTML front page — and `.json()` on that fails
+        # with a message about the page, not the mistake. Accept either.
+        url = searxng_api_url.rstrip("/")
+        if not url.endswith("/search"):
+            url += "/search"
+        self.searxng_api_url = url
         self.searxng_api_key = searxng_api_key
         self.usage = 0
 
@@ -704,12 +726,43 @@ class SearXNG(dspy.Retrieve):
         for query in queries:
             try:
                 params = {"q": query, "format": "json"}
+                if self.engines:
+                    params["engines"] = self.engines
+                # A timeout, because an instance that has stopped answering
+                # would otherwise hold the whole run open for as long as it
+                # liked. SearXNG fans a query out to many engines and waits
+                # on the slow ones, so this is generous.
                 response = requests.get(
-                    self.searxng_api_url, headers=headers, params=params
+                    self.searxng_api_url, headers=headers, params=params, timeout=30
                 )
+                if response.status_code == 403:
+                    # The most common failure by far, and the least obvious:
+                    # JSON is switched off by default, and a public instance
+                    # almost always leaves it off. Say so, rather than let
+                    # `.json()` complain about the HTML it was handed.
+                    raise SearXNGConfigError(
+                        "SearXNG returned 403 — the instance does not allow "
+                        "format=json. Its settings.yml needs 'json' under "
+                        "search.formats, or use an instance that has it."
+                    )
+                if 400 <= response.status_code < 500:
+                    # Any other 4xx is the address being wrong — a typo, a
+                    # path that is not /search — and will be wrong for every
+                    # query. Not something to log and move on from.
+                    raise SearXNGConfigError(
+                        f"SearXNG returned {response.status_code} for "
+                        f"{self.searxng_api_url} — check the instance address."
+                    )
+                response.raise_for_status()
                 results = response.json()
 
-                for r in results["results"]:
+                # Every other retriever here honours k. This one collected the
+                # whole page — twenty or thirty results per query — and STORM
+                # went on to read all of them.
+                added = 0
+                for r in results.get("results", []):
+                    if added >= self.k:
+                        break
                     if self.is_valid_source(r["url"]) and r["url"] not in exclude_urls:
                         collected_results.append(
                             {
@@ -719,10 +772,91 @@ class SearXNG(dspy.Retrieve):
                                 "url": r["url"],
                             }
                         )
+                        added += 1
+
+                # An instance whose engines are all refusing answers 200 with
+                # an empty list, so a run collects nothing and no one is told
+                # why. SearXNG does say why, in a field that was being thrown
+                # away: `[['brave', 'Suspended: too many requests'],
+                # ['duckduckgo', 'timeout']]`. Repeated runs against the same
+                # instance earn exactly that.
+                if not added:
+                    refusing = results.get("unresponsive_engines") or []
+                    if refusing:
+                        named = ", ".join(
+                            f"{engine}: {reason}" for engine, reason in refusing
+                        )
+                        logging.warning(
+                            "SearXNG returned nothing for %r — its engines are "
+                            "not answering (%s)",
+                            query,
+                            named,
+                        )
+                    else:
+                        logging.warning("SearXNG returned nothing for %r", query)
+            except SearXNGConfigError:
+                raise
             except Exception as e:
                 logging.error(f"Error occurs when searching query {query}: {e}")
 
         return collected_results
+
+
+class MultiRM(dspy.Retrieve):
+    """Several retrievers, presented to STORM as one.
+
+    STORM takes exactly one retriever. Letting a person tick more than one
+    source therefore means something has to stand in front of them, fan each
+    query out, and hand back the union. That is all this does.
+
+    A URL two sources both return is kept once, from whichever source came
+    first in the list — so order the list by how much you trust the snippet.
+    Each child keeps its own `k`; the union can be up to `k` times the number
+    of sources, which is what asking for more sources means.
+
+    A source that fails is logged and skipped, not fatal: the run still has
+    the others. Whether a source is configured at all is the settings page's
+    question, asked with its Test button before a run ever starts.
+    """
+
+    def __init__(self, retrievers, k=3):
+        super().__init__(k=k)
+        retrievers = [rm for rm in retrievers if rm is not None]
+        if not retrievers:
+            raise RuntimeError("MultiRM needs at least one retriever")
+        self.retrievers = retrievers
+
+    def get_usage_and_reset(self):
+        usage = {}
+        for rm in self.retrievers:
+            if hasattr(rm, "get_usage_and_reset"):
+                usage.update(rm.get_usage_and_reset())
+        return usage
+
+    def forward(
+        self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []
+    ):
+        queries = (
+            [query_or_queries]
+            if isinstance(query_or_queries, str)
+            else query_or_queries
+        )
+        seen = set(exclude_urls)
+        collected = []
+        for rm in self.retrievers:
+            try:
+                results = rm.forward(queries, exclude_urls=list(seen))
+            except Exception as e:  # noqa: BLE001 - one source down is not a run lost
+                logging.error(
+                    f"{type(rm).__name__} failed and was skipped for this query: {e}"
+                )
+                continue
+            for r in results or []:
+                url = r.get("url")
+                if url and url not in seen:
+                    seen.add(url)
+                    collected.append(r)
+        return collected
 
 
 def duckduckgo_giveup_hdlr(err: Exception) -> bool:

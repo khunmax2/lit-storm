@@ -2,331 +2,301 @@
   <img src="assets/logo.svg" style="width: 25%; height: auto;">
 </p>
 
-# STORM: Synthesis of Topic Outlines through Retrieval and Multi-perspective Question Asking
+# lit-storm
+
+A deployable research assistant built on [stanford-oval/storm](https://github.com/stanford-oval/storm). Give it a topic; it researches from several perspectives, gathers sources from the web, and writes a cited, encyclopedia-style article.
+
+Upstream is a research codebase you drive from Python. This fork turns it into something a team can sign in to and use: accounts and per-member quotas, a settings UI instead of code edits, two research engines behind one door, and a self-contained HTML report you can mail to someone.
+
+| | STORM | Co-STORM | Deep Research |
+| --- | --- | --- | --- |
+| How it runs | Start to finish on its own | A panel discusses, one turn at a time | Iterates: search, read, ask, search again |
+| Your role | Give a topic, wait | Watch, interrupt, steer | Answer its clarifying questions, watch the tree grow |
+| Report | Handed back at the end | Written when you decide the table has covered enough | Written from the tree when it stops |
+| What it is | This app | This app | A sibling application, framed — [deploy/research-ui](deploy/research-ui/README.md) |
 
 <p align="center">
-| <a href="http://storm.genie.stanford.edu"><b>Research preview</b></a> | <a href="https://arxiv.org/abs/2402.14207"><b>STORM Paper</b></a>| <a href="https://www.arxiv.org/abs/2408.15232"><b>Co-STORM Paper</b></a>  | <a href="https://storm-project.stanford.edu/"><b>Website</b></a> |
-</p>
-**Latest News** 🔥
-
-- [2025/01] We add [litellm](https://github.com/BerriAI/litellm) integration for language models and embedding models in `knowledge-storm` v1.1.0.
-
-- [2024/09] Co-STORM codebase is now released and integrated into `knowledge-storm` python package v1.0.0. Run `pip install knowledge-storm --upgrade` to check it out.
-
-- [2024/09] We introduce collaborative STORM (Co-STORM) to support human-AI collaborative knowledge curation! [Co-STORM Paper](https://www.arxiv.org/abs/2408.15232) has been accepted to EMNLP 2024 main conference.
-
-- [2024/07] You can now install our package with `pip install knowledge-storm`!
-- [2024/07] We add `VectorRM` to support grounding on user-provided documents, complementing existing support of search engines (`YouRM`, `BingSearch`). (check out [#58](https://github.com/stanford-oval/storm/pull/58))
-- [2024/07] We release demo light for developers a minimal user interface built with streamlit framework in Python, handy for local development and demo hosting (checkout [#54](https://github.com/stanford-oval/storm/pull/54))
-- [2024/06] We will present STORM at NAACL 2024! Find us at Poster Session 2 on June 17 or check our [presentation material](assets/storm_naacl2024_slides.pdf). 
-- [2024/05] We add Bing Search support in [rm.py](knowledge_storm/rm.py). Test STORM with `GPT-4o` - we now configure the article generation part in our demo using `GPT-4o` model.
-- [2024/04] We release refactored version of STORM codebase! We define [interface](knowledge_storm/interface.py) for STORM pipeline and reimplement STORM-wiki (check out [`src/storm_wiki`](knowledge_storm/storm_wiki)) to demonstrate how to instantiate the pipeline. We provide API to support customization of different language models and retrieval/search integration.
-
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-
-## Overview [(Try STORM now!)](https://storm.genie.stanford.edu/)
-
-<p align="center">
-  <img src="assets/overview.svg" style="width: 90%; height: auto;">
-</p>
-STORM is a LLM system that writes Wikipedia-like articles from scratch based on Internet search. Co-STORM further enhanced its feature by enabling human to collaborative LLM system to support more aligned and preferred information seeking and knowledge curation.
-
-While the system cannot produce publication-ready articles that often require a significant number of edits, experienced Wikipedia editors have found it helpful in their pre-writing stage.
-
-**More than 70,000 people have tried our [live research preview](https://storm.genie.stanford.edu/). Try it out to see how STORM can help your knowledge exploration journey and please provide feedback to help us improve the system 🙏!**
-
-
-
-## How STORM & Co-STORM works
-
-### STORM
-
-STORM breaks down generating long articles with citations into two steps:
-
-1. **Pre-writing stage**: The system conducts Internet-based research to collect references and generates an outline.
-2. **Writing stage**: The system uses the outline and references to generate the full-length article with citations.
-<p align="center">
-  <img src="assets/two_stages.jpg" style="width: 60%; height: auto;">
+| <a href="https://arxiv.org/abs/2402.14207"><b>STORM paper</b></a> | <a href="https://www.arxiv.org/abs/2408.15232"><b>Co-STORM paper</b></a> | <a href="https://storm-project.stanford.edu/"><b>Upstream project site</b></a> |
 </p>
 
-STORM identifies the core of automating the research process as automatically coming up with good questions to ask. Directly prompting the language model to ask questions does not work well. To improve the depth and breadth of the questions, STORM adopts two strategies:
-1. **Perspective-Guided Question Asking**: Given the input topic, STORM discovers different perspectives by surveying existing articles from similar topics and uses them to control the question-asking process.
-2. **Simulated Conversation**: STORM simulates a conversation between a Wikipedia writer and a topic expert grounded in Internet sources to enable the language model to update its understanding of the topic and ask follow-up questions.
+---
 
-### CO-STORM
+## What this fork adds
 
-Co-STORM proposes **a collaborative discourse protocol** which implements a turn management policy to support smooth collaboration among 
+Diffed against upstream `fb951af` (2025-09-30), where upstream stopped. This fork is 50 commits ahead and behind by none.
 
-- **Co-STORM LLM experts**: This type of agent generates answers grounded on external knowledge sources and/or raises follow-up questions based on the discourse history.
-- **Moderator**: This agent generates thought-provoking questions inspired by information discovered by the retriever but not directly used in previous turns. Question generation can also be grounded!
-- **Human user**: The human user will take the initiative to either (1) observe the discourse to gain deeper understanding of the topic, or (2) actively engage in the conversation by injecting utterances to steer the discussion focus.
+**A Streamlit application** (`frontend/demo_light/`, ~8,900 lines) — sign-in, a library, a member roster, settings pages:
 
-<p align="center">
-  <img src="assets/co-storm-workflow.jpg" style="width: 60%; height: auto;">
-</p>
+- **Accounts on Supabase** — `member` / `admin` roles, monthly research quotas, suspension, and an audit log recording who changed what with before and after values. Row-level security keeps one account's reports out of another's reach.
+- **Co-STORM as a first-class engine** — a round table where experts talk in the open and you can interrupt at any point.
+- **Search sources chosen from a page** — test the key before saving; a saved key is never sent back to the browser. Upstream requires a code edit.
+- **Per-run options** — depth (fast / standard / deep), which of the admin-offered sources to search, and which admin-offered model writes. Untouched, a run is exactly what the admin configured.
+- **Self-contained HTML reports** — the article, its live citations, the evidence behind each one, and the interviews that produced it, in one file that opens with no server and no network.
+- **Thai and English**, for both the interface and the generated article.
+- **Provider-agnostic models** — Gemini, OpenRouter, Groq, OpenAI, or anything speaking the OpenAI API.
 
-Co-STORM also maintains a dynamic updated **mind map**, which organize collected information into a hierarchical concept structure, aiming to **build a shared conceptual space between the human user and the system**. The mind map has been proven to help reduce the mental load when the discourse goes long and in-depth. 
+**Fixes to the upstream library** (12 files, +169/−123 excluding formatting) — several are bugs that make upstream unusable on a non-OpenAI deployment. See [below](#changes-to-the-upstream-library).
 
-Both STORM and Co-STORM are implemented in a highly modular way using [dspy](https://github.com/stanfordnlp/dspy).
+**42 tests**, covering article storage, account isolation, member management, and the database's own permission rules. Upstream has none for this surface.
 
-## Installation
+---
 
+## Quick start
 
-To install the knowledge storm library, use `pip install knowledge-storm`. 
+Requires Python 3.11–3.14. From the project root:
 
-You could also install the source code which allows you to modify the behavior of STORM engine directly.
-1. Clone the git repository.
-    ```shell
-    git clone https://github.com/stanford-oval/storm.git
-    cd storm
-    ```
-   
-2. Install the required packages.
-   ```shell
-   conda create -n storm python=3.11
-   conda activate storm
-   pip install -r requirements.txt
+macOS and Linux:
+
+```bash
+python3.14 -m venv .venv
+.venv/bin/pip install -e .
+.venv/bin/pip install -r requirements.txt -r frontend/demo_light/requirements.txt watchdog
+cp frontend/demo_light/.streamlit/secrets.toml.example \
+   frontend/demo_light/.streamlit/secrets.toml
+```
+
+Windows (PowerShell):
+
+```powershell
+uv venv --python 3.14
+.venv\Scripts\pip install -e .
+.venv\Scripts\pip install -r requirements.txt -r frontend\demo_light\requirements.txt watchdog
+Copy-Item frontend\demo_light\.streamlit\secrets.toml.example frontend\demo_light\.streamlit\secrets.toml
+```
+
+Fill in the settings file, then run — macOS and Linux:
+
+```bash
+cd frontend/demo_light
+../../.venv/bin/streamlit run storm.py --server.runOnSave true
+```
+
+Windows (PowerShell), from the project root:
+
+```powershell
+.venv\Scripts\streamlit run frontend\demo_light\storm.py --server.runOnSave true
+```
+
+`-e .` is not optional — the app runs from inside `frontend/demo_light`, where Python cannot otherwise see `knowledge_storm`.
+
+**`--server.runOnSave` is not cosmetic.** Without it Streamlit reloads only the main script, not *imported modules* like `demo_util.py` — so an edit appears to do nothing until you restart. `watchdog` must be installed or file watching does not work at all. The cost of having it on: saving a file while Co-STORM is warming up restarts the script and **destroys the run in progress**, which can be fifteen minutes of work.
+
+**It does not cover `knowledge_storm/`.** Streamlit watches only modules under the folder holding the main script, which is `frontend/demo_light` — so an edit to the engine is loaded when the server starts and never again. The symptom is the confusing one: the page reloads, shows your new UI, and the engine behind it still behaves the old way. Restart the server after touching anything outside `frontend/demo_light`.
+
+### Or run it as a container
+
+The app has an image of its own, which is what a deployment should use — the
+other three services here were always containers and this one was a host
+process with nothing to pin.
+
+```
+docker build -t lit-storm/app:dev .
+cd deploy && cp .env.example .env    # then fill it in
+docker compose up -d --build
+```
+
+The image carries **no `secrets.toml`**, deliberately: a value in that file
+cannot be overridden by an environment variable, so mounting one would make
+the container quietly ignore half of `.env`. Settings come from `.env`, and
+what the admin pages save lives in a volume rather than in `.streamlit`,
+where a mount would take `config.toml` and the theme with it. That is what
+`STORM_STATE_DIR` moves; unset, it is `.streamlit` beside the app as before.
+
+Details, including why the image is 3.2GB and what keeps it from being 5:
+[deploy/app/README.md](deploy/app/README.md).
+
+Full walkthrough, including Windows commands and the Supabase setup: [frontend/demo_light/README.md](frontend/demo_light/README.md) (Thai).
+
+---
+
+## Configuration
+
+[`secrets.toml.example`](frontend/demo_light/.streamlit/secrets.toml.example) is the reference for the settings it carries — providers, model names, Supabase keys, dev flags — each documented in place. This section covers only what that file does not, plus the traps worth knowing before you hit them.
+
+Settings are read by `setting()` in `frontend/demo_light/auth.py`: **`secrets.toml` first, environment second.**
+
+> A value present in `secrets.toml` cannot be overridden by an environment variable. Anything you vary per launch — `STORM_DEV_USER` especially — belongs in the environment only, or you cannot turn it off.
+
+### Gemini's `-latest` aliases move without warning
+
+The shipped defaults are `gemini-flash-lite-latest` and `gemini-flash-latest`, because Google returns 404 for pinned 2.x ids such as `gemini-2.5-flash` on recently created keys, even though `list_models()` still lists them.
+
+But as of 2026-09-20 `gemini-flash-latest` resolved to `gemini-3.7-flash`, which returned frequent 503s and took 30–57 seconds on a one-word prompt where other models answered in 1–8. Pin the strong role off the alias:
+
+```toml
+LLM_STRONG_MODEL = "gemini-3.6-flash"
+```
+
+Measure response times before unpinning. A newer model is not automatically a faster one.
+
+### A thinking model on the fast role can answer nothing at all
+
+The two roles get different budgets, from `ROLE_TOKENS` in
+`frontend/demo_light/demo_util.py`: **500 tokens for the fast role**, which
+runs hundreds of times in a research and answers in a sentence, and **3000
+for the strong one**, which writes the article.
+
+A model that writes out its thinking spends it from that same budget. On 500
+tokens that can be the whole of it: `deepseek/deepseek-v4.1-flash` and
+`qwen/qwen3.7-flash`, asked a real question with a Thai topic in it, both
+used all 500 thinking and returned nothing — `finish_reason: length`, a call
+that succeeded, was billed, and said nothing. The same prompt in English left
+room to answer. Thai makes these models think longer.
+
+So either pick a model that does not think, or switch its thinking off:
+
+```toml
+LLM_FAST_MODEL = "meta-llama/llama-4-scout"    # does not think
+LLM_FAST_REASONING = "off"                     # or tell one not to
+```
+
+`LLM_FAST_REASONING` / `LLM_STRONG_REASONING` send OpenRouter's
+`reasoning: {enabled: false}`. Unset sends nothing at all, which is what a
+model with no thinking to turn off needs — the two are not opposites.
+
+On the Models page the switch is drawn only when a test has **observed** that
+model thinking, so it never appears where it would do nothing. That is
+measured, not looked up: the probe reads `reasoning_tokens` back off the call
+it just made, which works for any provider that reports it, where a
+capability catalogue would only cover OpenRouter and would describe what a
+model can do rather than what it just did.
+
+Measured here, on the fast role's 500 tokens with a Thai prompt:
+
+| model | thinking | result | per call |
+| --- | --- | --- | --- |
+| `qwen/qwen3.7-flash` | on (default) | **nothing, 3/3** | $0.000067 |
+| `qwen/qwen3.7-flash` | off | good Thai, 1.1s | $0.000005 |
+| `meta-llama/llama-4-scout` | none to switch | good Thai, 1.0s | $0.000014 |
+| `deepseek/deepseek-v4.1-flash` | on (default) | **nothing, 3/3** | $0.000622 |
+
+Leave thinking on for the strong role unless you have a reason: 3000 tokens
+is usually room for both, and it tends to improve the writing.
+
+### Embeddings — Co-STORM only
+
+Co-STORM files every snippet it collects into a mind map by **similarity**, not by asking a model where it belongs. That needs an embedding service, separate from chat completions.
+
+It defaults to your chat provider, because for Gemini and OpenAI the same key buys both. But **OpenRouter and Groq have no embedding endpoint at all**, so those deployments must name a service of their own:
+
+```toml
+ENCODER_PROVIDER = "gemini"     # gemini, openai, azure, or ollama
+```
+
+The key comes from that provider's usual variable. `ollama` needs none: it embeds with a model on the machine itself, so nothing leaves the host and there is no quota. It reads `OLLAMA_EMBEDDING_MODEL` (default `bge-m3:latest`, which has to be a model Ollama has pulled) and `OLLAMA_API_BASE` (default `http://localhost:11434`).
+
+If a key is missing, the app says so before the discussion starts rather than failing partway through. STORM does not need this; Co-STORM cannot run without it.
+
+### Search sources
+
+The default is DuckDuckGo via `ddgs`, which needs no key. Admins change the source from the **Search sources** page — no code edit, no restart.
+
+| Source | Key |
+| --- | --- |
+| DuckDuckGo, arXiv | none |
+| Tavily | `TAVILY_API_KEY` |
+| Serper (Google) | `SERPER_API_KEY` |
+| Brave Search | `BRAVE_API_KEY` |
+| You.com | `YDC_API_KEY` |
+| SearXNG | `SEARXNG_URL` — an instance address, see [deploy/searxng](deploy/searxng/README.md) |
+
+STORM takes one retriever, so the admin's page picks one — but a run can tick several from the list the admin has put on offer, and a `MultiRM` fans each query out to all of them and merges the results by URL. `SearXNG — academic` is the same instance restricted to its scholarly engines via `engines=`, not a second deployment. DuckDuckGo rate-limits aggressively; the app backs off and skips a query that keeps failing rather than ending the run. If search quality matters, a Tavily or Serper key is the cheapest improvement available.
+
+### Sessions
+
+Sign-in is restored from a cookie holding only a Supabase refresh token — no password — with `SameSite=Strict`, and `Secure` over HTTPS.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `SESSION_IDLE_MINUTES` | 30 | Idle time before sign-out |
+| `SESSION_MAX_HOURS` | 12 | Absolute lifetime, even if active |
+
+### Database setup
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` alone are not enough — the schema has to be applied:
+
+1. Paste all of [docs/supabase-schema.sql](docs/supabase-schema.sql) into Supabase's **SQL Editor** and run it. This creates the profile, run-history and member-audit tables with their row-level security policies. Re-running it on an existing project is safe and preserves data.
+2. Sign up through the app, then promote yourself:
+
+   ```sql
+   update public.profiles set role = 'admin' where email = 'you@example.com';
    ```
-   
 
-## API
+Quota is separate from role — `monthly_run_limit` on the profile, adjustable per account. Failed runs still count, because they may already have spent API calls.
 
-Currently, our package support:
+---
 
-- Language model components: All language models supported by litellm as listed [here](https://docs.litellm.ai/docs/providers)
-- Embedding model components: All embedding models supported by litellm as listed [here](https://docs.litellm.ai/docs/embedding/supported_embedding)
-- retrieval module components: `YouRM`, `BingSearch`, `VectorRM`, `SerperRM`, `BraveRM`, `SearXNG`, `DuckDuckGoSearchRM`, `TavilySearchRM`, `GoogleSearch`, and `AzureAISearch` as 
+## Running Co-STORM
 
-:star2: **PRs for integrating more search engines/retrievers into [knowledge_storm/rm.py](knowledge_storm/rm.py) are highly appreciated!**
+**A discussion is 70–100 model calls.** Roughly 21 for expert interviews, 2 for the outline, 21–40 to file snippets into the mind map, then one call per mind-map node twice over — once to draft the report, once to turn it into the opening conversation. The last two scale with the map, which is why warm start can take fifteen minutes.
 
-Both STORM and Co-STORM are working in the information curation layer, you need to set up the information retrieval module and language model module to create their `Runner` classes respectively.
+To trim it, pass `warmstart_max_num_experts` (default 3), `max_search_queries_per_turn` (default 3) or `max_search_thread` (default 5) to `RunnerArgument(...)` in `frontend/demo_light/costorm.py`.
 
-### STORM
+A discussion lives in Streamlit session state and **does not survive a browser refresh**. `CoStormRunner.to_dict()` exists upstream, but `from_dict()` carries a FIXME — it ignores the saved `lm_config` and calls `lm_config.init(lm_type=os.getenv("OPENAI_API_TYPE"))`, which fails on Gemini. Persisting a discussion means writing the way back by hand.
 
-The STORM knowledge curation engine is defined as a simple Python `STORMWikiRunner` class. Here is an example of using You.com search engine and OpenAI models.
+---
 
-```python
-import os
-from knowledge_storm import STORMWikiRunnerArguments, STORMWikiRunner, STORMWikiLMConfigs
-from knowledge_storm.lm import LitellmModel
-from knowledge_storm.rm import YouRM
-
-lm_configs = STORMWikiLMConfigs()
-openai_kwargs = {
-    'api_key': os.getenv("OPENAI_API_KEY"),
-    'temperature': 1.0,
-    'top_p': 0.9,
-}
-# STORM is a LM system so different components can be powered by different models to reach a good balance between cost and quality.
-# For a good practice, choose a cheaper/faster model for `conv_simulator_lm` which is used to split queries, synthesize answers in the conversation.
-# Choose a more powerful model for `article_gen_lm` to generate verifiable text with citations.
-gpt_35 = LitellmModel(model='gpt-3.5-turbo', max_tokens=500, **openai_kwargs)
-gpt_4 = LitellmModel(model='gpt-4o', max_tokens=3000, **openai_kwargs)
-lm_configs.set_conv_simulator_lm(gpt_35)
-lm_configs.set_question_asker_lm(gpt_35)
-lm_configs.set_outline_gen_lm(gpt_4)
-lm_configs.set_article_gen_lm(gpt_4)
-lm_configs.set_article_polish_lm(gpt_4)
-# Check out the STORMWikiRunnerArguments class for more configurations.
-engine_args = STORMWikiRunnerArguments(...)
-rm = YouRM(ydc_api_key=os.getenv('YDC_API_KEY'), k=engine_args.search_top_k)
-runner = STORMWikiRunner(engine_args, lm_configs, rm)
-```
-
-The `STORMWikiRunner` instance can be evoked with the simple `run` method:
-```python
-topic = input('Topic: ')
-runner.run(
-    topic=topic,
-    do_research=True,
-    do_generate_outline=True,
-    do_generate_article=True,
-    do_polish_article=True,
-)
-runner.post_run()
-runner.summary()
-```
-- `do_research`: if True, simulate conversations with difference perspectives to collect information about the topic; otherwise, load the results.
-- `do_generate_outline`: if True, generate an outline for the topic; otherwise, load the results.
-- `do_generate_article`: if True, generate an article for the topic based on the outline and the collected information; otherwise, load the results.
-- `do_polish_article`: if True, polish the article by adding a summarization section and (optionally) removing duplicate content; otherwise, load the results.
-
-### Co-STORM
-
-The Co-STORM knowledge curation engine is defined as a simple Python `CoStormRunner` class. Here is an example of using Bing search engine and OpenAI models.
-
-```python
-from knowledge_storm.collaborative_storm.engine import CollaborativeStormLMConfigs, RunnerArgument, CoStormRunner
-from knowledge_storm.lm import LitellmModel
-from knowledge_storm.logging_wrapper import LoggingWrapper
-from knowledge_storm.rm import BingSearch
-
-# Co-STORM adopts the same multi LM system paradigm as STORM 
-lm_config: CollaborativeStormLMConfigs = CollaborativeStormLMConfigs()
-openai_kwargs = {
-    "api_key": os.getenv("OPENAI_API_KEY"),
-    "api_provider": "openai",
-    "temperature": 1.0,
-    "top_p": 0.9,
-    "api_base": None,
-} 
-question_answering_lm = LitellmModel(model=gpt_4o_model_name, max_tokens=1000, **openai_kwargs)
-discourse_manage_lm = LitellmModel(model=gpt_4o_model_name, max_tokens=500, **openai_kwargs)
-utterance_polishing_lm = LitellmModel(model=gpt_4o_model_name, max_tokens=2000, **openai_kwargs)
-warmstart_outline_gen_lm = LitellmModel(model=gpt_4o_model_name, max_tokens=500, **openai_kwargs)
-question_asking_lm = LitellmModel(model=gpt_4o_model_name, max_tokens=300, **openai_kwargs)
-knowledge_base_lm = LitellmModel(model=gpt_4o_model_name, max_tokens=1000, **openai_kwargs)
-
-lm_config.set_question_answering_lm(question_answering_lm)
-lm_config.set_discourse_manage_lm(discourse_manage_lm)
-lm_config.set_utterance_polishing_lm(utterance_polishing_lm)
-lm_config.set_warmstart_outline_gen_lm(warmstart_outline_gen_lm)
-lm_config.set_question_asking_lm(question_asking_lm)
-lm_config.set_knowledge_base_lm(knowledge_base_lm)
-
-# Check out the Co-STORM's RunnerArguments class for more configurations.
-topic = input('Topic: ')
-runner_argument = RunnerArgument(topic=topic, ...)
-logging_wrapper = LoggingWrapper(lm_config)
-bing_rm = BingSearch(bing_search_api_key=os.environ.get("BING_SEARCH_API_KEY"),
-                     k=runner_argument.retrieve_top_k)
-costorm_runner = CoStormRunner(lm_config=lm_config,
-                               runner_argument=runner_argument,
-                               logging_wrapper=logging_wrapper,
-                               rm=bing_rm)
-```
-
-The `CoStormRunner` instance can be evoked with the `warmstart()` and `step(...)` methods.
-
-```python
-# Warm start the system to build shared conceptual space between Co-STORM and users
-costorm_runner.warm_start()
-
-# Step through the collaborative discourse 
-# Run either of the code snippets below in any order, as many times as you'd like
-# To observe the conversation:
-conv_turn = costorm_runner.step()
-# To inject your utterance to actively steer the conversation:
-costorm_runner.step(user_utterance="YOUR UTTERANCE HERE")
-
-# Generate report based on the collaborative discourse
-costorm_runner.knowledge_base.reorganize()
-article = costorm_runner.generate_report()
-print(article)
-```
-
-
-
-## Quick Start with Example Scripts
-
-We provide scripts in our [examples folder](examples) as a quick start to run STORM and Co-STORM with different configurations.
-
-We suggest using `secrets.toml` to set up the API keys. Create a file `secrets.toml` under the root directory and add the following content:
-
-```shell
-# ============ language model configurations ============ 
-# Set up OpenAI API key.
-OPENAI_API_KEY="your_openai_api_key"
-# If you are using the API service provided by OpenAI, include the following line:
-OPENAI_API_TYPE="openai"
-# If you are using the API service provided by Microsoft Azure, include the following lines:
-OPENAI_API_TYPE="azure"
-AZURE_API_BASE="your_azure_api_base_url"
-AZURE_API_VERSION="your_azure_api_version"
-# ============ retriever configurations ============ 
-BING_SEARCH_API_KEY="your_bing_search_api_key" # if using bing search
-# ============ encoder configurations ============ 
-ENCODER_API_TYPE="openai" # if using openai encoder
-```
-
-### STORM examples
-
-**To run STORM with `gpt` family models with default configurations:**
-
-Run the following command.
-```bash
-python examples/storm_examples/run_storm_wiki_gpt.py \
-    --output-dir $OUTPUT_DIR \
-    --retriever bing \
-    --do-research \
-    --do-generate-outline \
-    --do-generate-article \
-    --do-polish-article
-```
-
-**To run STORM using your favorite language models or grounding on your own corpus:** Check out [examples/storm_examples/README.md](examples/storm_examples/README.md).
-
-### Co-STORM examples
-
-To run Co-STORM with `gpt` family models with default configurations,
-
-1. Add `BING_SEARCH_API_KEY="xxx"` and `ENCODER_API_TYPE="xxx"` to `secrets.toml`
-2. Run the following command
+## Tests
 
 ```bash
-python examples/costorm_examples/run_costorm_gpt.py \
-    --output-dir $OUTPUT_DIR \
-    --retriever bing
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
+`tests/test_member_database.py` checks the database's own rules — that an admin cannot demote or suspend themselves, that members cannot touch the audit log — by standing up a **temporary PostgreSQL cluster of its own** with `initdb`. It never touches Supabase, so running PostgreSQL in Docker does not help; install PostgreSQL or set `STORM_POSTGRES_BIN`, or these tests skip.
 
-## Customization of the Pipeline
+The cluster listens on 127.0.0.1 on a free port, with scram auth and a password generated per run, rather than on a Unix socket — Windows has none, and one code path keeps both platforms running the same test.
 
-### STORM
+> **One test still does not run on Windows.** `test_article_store.py` has a symlink-escape check that needs symlink privileges and errors with `WinError 1314` unless Developer Mode is on. Expect 41 passing and 1 error.
 
-If you have installed the source code, you can customize STORM based on your own use case. STORM engine consists of 4 modules:
+---
 
-1. Knowledge Curation Module: Collects a broad coverage of information about the given topic.
-2. Outline Generation Module: Organizes the collected information by generating a hierarchical outline for the curated knowledge.
-3. Article Generation Module: Populates the generated outline with the collected information.
-4. Article Polishing Module: Refines and enhances the written article for better presentation.
+## Changes to the upstream library
 
-The interface for each module is defined in `knowledge_storm/interface.py`, while their implementations are instantiated in `knowledge_storm/storm_wiki/modules/*`. These modules can be customized according to your specific requirements (e.g., generating sections in bullet point format instead of full paragraphs).
+All local to the vendored `knowledge_storm` package. Upstream does not have them.
 
-### Co-STORM
+**`lm.py` — `GoogleModel` rewritten.** Moved off the deprecated `google-generativeai` SDK to `google-genai`, and re-based onto this package's own `LM` class instead of `dspy.dsp.modules.lm.LM`. It now accepts `GEMINI_API_KEY` as well as `GOOGLE_API_KEY`.
 
-If you have installed the source code, you can customize Co-STORM based on your own use case
+**`encoder.py` — Gemini added.** The encoder knew only OpenAI and Azure, so a Gemini deployment could not build a Co-STORM mind map at all.
 
-1. Co-STORM introduces multiple LLM agent types (i.e. Co-STORM experts and Moderator). LLM agent interface is defined in `knowledge_storm/interface.py` , while its implementation is instantiated in `knowledge_storm/collaborative_storm/modules/co_storm_agents.py`. Different LLM agent policies can be customized.
-2. Co-STORM introduces a collaborative discourse protocol, with its core function centered on turn policy management. We provide an example implementation of turn policy management through `DiscourseManager` in `knowledge_storm/collaborative_storm/engine.py`. It can be customized and further improved.
+**`logging_wrapper.py` — stop swallowing exceptions.** `log_pipeline_stage` caught every exception, printed it, and never re-raised. `generate_report` returns from inside such a block: when the exception was eaten, the return never ran and the caller got `None` with the cause reported nowhere.
 
-## Datasets
-To facilitate the study of automatic knowledge curation and complex information seeking, our project releases the following datasets:
+**`dataclass.py` — `[-1]` markers reaching readers.** `replace("[-1]", "")` was called twice with both results discarded, inside a loop that does not run for a turn citing nothing. The marker for "no source found" survived every time.
 
-### FreshWiki
-The FreshWiki Dataset is a collection of 100 high-quality Wikipedia articles focusing on the most-edited pages from February 2022 to September 2023. See Section 2.1 in [STORM paper](https://arxiv.org/abs/2402.14207) for more details.
+**`rm.py` — five fixes.**
 
-You can download the dataset from [huggingface](https://huggingface.co/datasets/EchoShao8899/FreshWiki) directly. To ease the data contamination issue, we archive the [source code](https://github.com/stanford-oval/storm/tree/NAACL-2024-code-backup/FreshWiki) for the data construction pipeline that can be repeated at future dates.
+- `TavilySearchRM` named `result` in its own `except` clause, where it is unbound if the *first* result is the one that failed — turning a skippable result into an `UnboundLocalError` that killed the entire search.
+- `TavilySearchRM` built an `args` dict and never passed it, so `k` and `include_raw_content` had never once been honoured.
+- `TavilySearchRM` read `raw_body_content` where Tavily sends `raw_content`.
+- `SearXNG` ignored `k` and collected the whole page — twenty or thirty results per query, all of which STORM went on to read. It also had no timeout, so a hung instance held the run open indefinitely; needed the `/search` path spelled out or `.json()` failed on the HTML front page; and reported a 403 — JSON output is off by default, and public instances almost never enable it — as a generic error indistinguishable from "no results". Now honours `k`, times out at 30s, accepts the instance root, and raises a `SearXNGConfigError` naming the cause for any 4xx.
+- `DuckDuckGoSearchRM` used `dsp`'s shared `giveup_hdlr`, which reads `err.message` — an attribute only Mistral's SDK exceptions carry. On a DuckDuckGo rate limit it raised `AttributeError` from inside backoff, and *that* is what surfaced, killing the run and hiding the real cause.
 
-### WildSeek
-To study users’ interests in complex information seeking tasks in the wild, we utilized data collected from the web research preview to create the WildSeek dataset. We downsampled the data to ensure the diversity of the topics and the quality of the data. Each data point is a pair comprising a topic and the user’s goal for conducting deep search on the topic.  For more details, please refer to Section 2.2 and Appendix A of [Co-STORM paper](https://www.arxiv.org/abs/2408.15232).
+**`requirements.txt` — two package changes.** `duckduckgo_search` → `ddgs`: the old package still imports and still answers HTTP 200, but returns no results, so the system looks like it is working while gathering nothing. And a floor of `sentence-transformers>=3`, because unpinned it resolves to 2.2.2, which calls `cached_download` — removed from `huggingface_hub` in 0.26 — and the resulting `ImportError` stops the app from starting at all. That one bites any fresh install on any OS.
 
-The WildSeek dataset is available [here](https://huggingface.co/datasets/YuchengJiang/WildSeek).
+The rest of the diff against upstream is Black formatting and line-ending normalization, which accounts for most of the raw line count.
 
-## Replicate STORM & Co-STORM paper result
+---
 
-For STORM paper experiments, please switch to the branch `NAACL-2024-code-backup` [here](https://github.com/stanford-oval/storm/tree/NAACL-2024-code-backup).
+## Documentation
 
-For Co-STORM paper experiments, please switch to the branch `EMNLP-2024-code-backup` (placeholder for now, will be updated soon).
+| Document | Contents |
+| --- | --- |
+| This file | Overview, upstream differences, configuration not covered elsewhere |
+| [`secrets.toml.example`](frontend/demo_light/.streamlit/secrets.toml.example) | Every setting it carries, documented in place |
+| [frontend/demo_light/README.md](frontend/demo_light/README.md) | Full usage guide (Thai) — install, member management, Co-STORM, reports |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptom-to-fix guide (Thai) |
+| [docs/supabase-schema.sql](docs/supabase-schema.sql) | Schema and row-level security policies |
+| [deploy/supabase](deploy/supabase/README.md) | Self-hosted Supabase in four containers |
+| [deploy/searxng](deploy/searxng/README.md) | Self-hosted metasearch, and why there is no academic fork |
+| [deploy/research-ui](deploy/research-ui/README.md) | deep-research-web-ui as a framed sibling application, searching the same SearXNG |
 
-## Roadmap & Contributions
-Our team is actively working on:
-1. Human-in-the-Loop Functionalities: Supporting user participation in the knowledge curation process.
-2. Information Abstraction: Developing abstractions for curated information to support presentation formats beyond the Wikipedia-style report.
+---
 
-If you have any questions or suggestions, please feel free to open an issue or pull request. We welcome contributions to improve the system and the codebase!
+## License and citation
 
-Contact person: [Yijia Shao](mailto:shaoyj@stanford.edu) and [Yucheng Jiang](mailto:yuchengj@stanford.edu)
+MIT, as upstream. See [LICENSE](LICENSE).
 
-## Acknowledgement
-We would like to thank Wikipedia for its excellent open-source content. The FreshWiki dataset is sourced from Wikipedia, licensed under the Creative Commons Attribution-ShareAlike (CC BY-SA) license.
+This fork builds on the work of the Stanford OVAL group. Please cite their papers if you use this code or part of it:
 
-We are very grateful to [Michelle Lam](https://michelle123lam.github.io/) for designing the logo for this project and [Dekun Ma](https://dekun.me) for leading the UI development.
-
-Thanks to Vercel for their support of [open-source software](https://storm.genie.stanford.edu)
-
-## Citation
-Please cite our paper if you use this code or part of it in your work:
 ```bibtex
 @inproceedings{jiang-etal-2024-unknown,
     title = "Into the Unknown Unknowns: Engaged Human Learning through Participation in Language Model Agent Conversations",

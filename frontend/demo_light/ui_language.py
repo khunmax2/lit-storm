@@ -52,6 +52,7 @@ _STRINGS = {
     "lang.label": {"English": "Interface language", "ไทย": "ภาษาของระบบ"},
     "nav.sources": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
     "nav.roundtable": {"English": "Round table", "ไทย": "สนทนาเพื่อค้นคว้า"},
+    "nav.models": {"English": "Models", "ไทย": "โมเดล"},
     # -- search sources ---------------------------------------------------
     "search.title": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
     "search.using": {"English": "researching with {name}", "ไทย": "แหล่งค้นคว้าที่ใช้: {name}"},
@@ -102,6 +103,241 @@ _STRINGS = {
         "ระบบเว้นระยะการค้นหาอย่างน้อย 3 วินาทีต่อครั้งตามข้อกำหนดของ arXiv "
         "จึงอาจใช้เวลาค้นคว้านานขึ้น",
     },
+    "searxng_note": {
+        "English": "A metasearch engine you host yourself, querying Google, "
+        "Bing, arXiv, PubMed and dozens more at once — no key, no rate limit "
+        "but your own. The instance must allow JSON output: 'json' under "
+        "search.formats in its settings.yml. Public instances almost never do.",
+        "ไทย": "เครื่องมือค้นหารวมที่คุณโฮสต์เอง ค้นจาก Google, Bing, arXiv, PubMed "
+        "และอีกหลายสิบแหล่งพร้อมกัน ไม่ต้องใช้ API key และไม่ถูกจำกัดอัตราจากใครนอกจากตัวเอง "
+        "instance ต้องเปิดผลลัพธ์แบบ JSON ไว้ ('json' ใต้ search.formats ใน settings.yml) "
+        "ซึ่ง instance สาธารณะแทบไม่มีที่เปิด",
+    },
+    "search.url_saved": {"English": "Instance address", "ไทย": "ที่อยู่ instance"},
+    "search.url_needed": {"English": "Instance address", "ไทย": "ที่อยู่ instance"},
+    "search.host_one": {"English": "How to host one", "ไทย": "วิธีติดตั้ง instance"},
+    "search.forget_url": {"English": "Forget this address", "ไทย": "ลบที่อยู่นี้"},
+    "search.shares_address": {
+        "English": "Uses the address saved for {name}.",
+        "ไทย": "ใช้ที่อยู่เดียวกับที่บันทึกไว้สำหรับ {name}",
+    },
+    "searxng_academic_note": {
+        "English": "The same SearXNG instance, restricted to its scholarly "
+        "engines: arXiv, PubMed, Semantic Scholar, CrossRef, OpenAlex, Google "
+        "Scholar, CORE, BASE and PDBe.",
+        "ไทย": "SearXNG instance เดียวกัน แต่จำกัดเฉพาะ engine งานวิชาการ: arXiv, PubMed, "
+        "Semantic Scholar, CrossRef, OpenAlex, Google Scholar, CORE, BASE และ PDBe",
+    },
+    "search.offer_title": {
+        "English": "Sources members may pick",
+        "ไทย": "แหล่งที่ให้สมาชิกเลือกได้",
+    },
+    "search.offer_note": {
+        "English": "Each run can tick any of these on the Home page. The source "
+        "in use is always included — it is what a run gets when nothing is "
+        "ticked. Only sources with their key or address set are listed.",
+        "ไทย": "สมาชิกติ๊กเลือกได้จากรายการนี้ที่หน้าแรกก่อนเริ่มค้นคว้า แหล่งที่ใช้อยู่จะรวมอยู่เสมอ "
+        "เพราะเป็นค่าที่ได้เมื่อไม่ติ๊กอะไร แสดงเฉพาะแหล่งที่ตั้งคีย์หรือที่อยู่ไว้แล้ว",
+    },
+    "search.offer_save": {"English": "Save offer", "ไทย": "บันทึกรายการ"},
+    # -- run options (the picker on Home) ----------------------------------
+    # -- the framed research UI ---------------------------------------------
+    "home.engine_research": {"English": "Deep Research", "ไทย": "Deep Research"},
+    "home.engine_research_note": {
+        "English": "An iterative researcher with a live research tree. "
+        "A separate application, framed here; its settings are its own.",
+        "ไทย": "ผู้ช่วยค้นคว้าแบบวนซ้ำพร้อมแผนผังการค้นคว้าสด "
+        "เป็นแอปแยกที่นำมาแสดงในกรอบ ค่าตั้งค่าเป็นของมันเอง",
+    },
+    "research_ui.not_configured": {
+        "English": "Deep Research has no address set. Set RESEARCH_UI_URL, "
+        "or leave it unset to use the stack's own.",
+        "ไทย": "ยังไม่ได้ตั้งที่อยู่ของ Deep Research ตั้งค่า RESEARCH_UI_URL "
+        "หรือเว้นว่างไว้เพื่อใช้ค่าของสแตก",
+    },
+    "research.not_running": {
+        "English": "Deep Research is not answering. Start it with "
+        "`docker compose up -d research-ui` in deploy.",
+        "ไทย": "Deep Research ไม่ตอบสนอง เริ่มด้วย "
+        "`docker compose up -d research-ui` ในโฟลเดอร์ deploy",
+    },
+    "agents_research.not_configured": {
+        "English": "The agents researcher has no address set. Set "
+        "AGENTS_RESEARCH_URL, or leave it unset to use the stack's own.",
+        "ไทย": "ยังไม่ได้ตั้งที่อยู่ของผู้ช่วยค้นคว้าแบบเอเจนต์ ตั้งค่า "
+        "AGENTS_RESEARCH_URL หรือเว้นว่างไว้เพื่อใช้ค่าของสแตก",
+    },
+    "agents.not_running": {
+        "English": "The agents researcher is not answering. Start it with "
+        "`docker compose up -d agents-research` in deploy.",
+        "ไทย": "ผู้ช่วยค้นคว้าแบบเอเจนต์ไม่ตอบสนอง เริ่มด้วย "
+        "`docker compose up -d agents-research` ในโฟลเดอร์ deploy",
+    },
+    "agents.frame_note": {
+        "English": "Runs in its own window below. Its reports are not kept "
+        "in your library.",
+        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานจะไม่ถูกเก็บในคลังบทความของคุณ",
+    },
+    "sibling.probe_said": {
+        "English": "Tried: {detail}",
+        "ไทย": "ลองเรียก: {detail}",
+    },
+    "sibling.retry": {"English": "Check again", "ไทย": "ตรวจอีกครั้ง"},
+    "home.engine_agents": {"English": "Agent Research", "ไทย": "Agent Research"},
+    "home.engine_agents_note": {
+        "English": "Plans a report, then researches each part in a loop "
+        "until it stops finding gaps. A separate application, framed here.",
+        "ไทย": "วางโครงรายงานก่อน แล้วค้นคว้าทีละส่วนวนซ้ำจนไม่เหลือช่องว่าง "
+        "เป็นแอปแยกที่นำมาแสดงในกรอบ",
+    },
+    "research.frame_note": {
+        "English": "Runs in its own window below. Its history stays in this browser.",
+        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง ประวัติจะอยู่ในเบราว์เซอร์นี้",
+    },
+    "research.open_tab": {"English": "Open in a tab", "ไทย": "เปิดในแท็บใหม่"},
+    "run.options": {"English": "Research options", "ไทย": "ตัวเลือกการค้นคว้า"},
+    "run.options_changed": {
+        "English": "Research options — changed",
+        "ไทย": "ตัวเลือกการค้นคว้า — ปรับแล้ว",
+    },
+    "run.depth": {"English": "Depth", "ไทย": "ความลึก"},
+    "run.depth_fast": {"English": "Fast", "ไทย": "เร็ว"},
+    "run.depth_fast_note": {
+        "English": "Two perspectives, two rounds each. About two minutes.",
+        "ไทย": "2 มุมมอง มุมมองละ 2 รอบ ประมาณ 2 นาที",
+    },
+    "run.depth_standard": {"English": "Standard", "ไทย": "มาตรฐาน"},
+    "run.depth_standard_note": {
+        "English": "Three perspectives, three rounds each. About four minutes.",
+        "ไทย": "3 มุมมอง มุมมองละ 3 รอบ ประมาณ 4 นาที",
+    },
+    "run.depth_deep": {"English": "Deep", "ไทย": "ลึก"},
+    "run.depth_deep_note": {
+        "English": "Five perspectives, four rounds each, more sources per "
+        "question. Ten minutes or more.",
+        "ไทย": "5 มุมมอง มุมมองละ 4 รอบ และค้นแหล่งต่อคำถามมากขึ้น 10 นาทีขึ้นไป",
+    },
+    "run.model": {"English": "Writing model", "ไทย": "โมเดลที่ใช้เขียน"},
+    "run.model_default": {"English": "Default", "ไทย": "ค่าเริ่มต้น"},
+    "run.sources": {"English": "Search sources", "ไทย": "แหล่งค้นคว้า"},
+    "run.sources_note": {
+        "English": "Tick more than one and every question is searched in all "
+        "of them. Nothing ticked uses the default source.",
+        "ไทย": "ติ๊กมากกว่าหนึ่งแหล่ง ทุกคำถามจะถูกค้นในทุกแหล่งที่เลือก ไม่ติ๊กเลยจะใช้แหล่งเริ่มต้น",
+    },
+    "run.reset": {"English": "Back to defaults", "ไทย": "กลับเป็นค่าเริ่มต้น"},
+    # -- model presets (admin) ---------------------------------------------
+    "models.presets": {"English": "Models on offer", "ไทย": "โมเดลที่เปิดให้เลือก"},
+    "models.presets_what": {
+        "English": "Alternatives a member may pick for the writing model, one "
+        "run at a time. The default stays what the cards above say.",
+        "ไทย": "โมเดลทางเลือกที่สมาชิกเลือกใช้เขียนได้ต่อการค้นคว้าหนึ่งครั้ง "
+        "ค่าเริ่มต้นยังเป็นตามที่ตั้งไว้ด้านบน",
+    },
+    "models.preset_add": {"English": "Add one", "ไทย": "เพิ่มโมเดล"},
+    "models.preset_label": {"English": "Shown as", "ไทย": "ชื่อที่แสดง"},
+    "models.preset_save": {"English": "Offer it", "ไทย": "เพิ่มในรายการ"},
+    "models.preset_remove": {"English": "Remove", "ไทย": "ลบ"},
+    "models.ollama_what": {
+        "English": "Embeddings from a model on this machine — no key, no "
+        "quota, and nothing leaves the host. Both boxes are optional; the "
+        "placeholders are what is used when they are empty. The model has "
+        "to be one Ollama has already pulled.",
+        "ไทย": "ใช้โมเดลบนเครื่องนี้สร้าง embedding ไม่ต้องใช้คีย์ ไม่มีโควตา "
+        "และข้อมูลไม่ออกจากเครื่อง ทั้งสองช่องไม่บังคับ เว้นว่างแล้วจะใช้ค่าในช่องจาง "
+        "โมเดลต้องเป็นตัวที่ Ollama ดาวน์โหลดไว้แล้ว",
+    },
+    "models.auth_hint": {
+        "English": "The provider rejected the key — this is about the key, not about your account here. Check that it is current, and that it was "
+        "copied whole.",
+        "ไทย": "ผู้ให้บริการปฏิเสธคีย์ เรื่องนี้เกี่ยวกับคีย์ ไม่เกี่ยวกับบัญชีของคุณในระบบนี้ ตรวจว่าคีย์ยังใช้งานได้อยู่ และคัดลอกมาครบทั้งสาย",
+    },
+    "models.pick_fast": {
+        "English": "**Runs hundreds of times in one research, and answers in a sentence.** Speed and price matter more than quality here — it asks the questions, it does not write the article.\n\nPick a small, quick model that answers straight away. It gets 500 tokens per reply.\n\n**A model that thinks before answering needs care here.** Its thinking comes out of the same 500 tokens, so it can spend the lot and return nothing — billed, and silent. Thai prompts make it think longer than English ones. Test the model: if it thinks, a switch appears below to turn that off, and then it is fine.\n\nWorks well: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`.",
+        "ไทย": "**ถูกเรียกหลักร้อยครั้งต่อการค้นคว้าหนึ่งรอบ และตอบสั้นแค่ประโยคเดียว** ความเร็วและราคาสำคัญกว่าคุณภาพ เพราะมันทำหน้าที่ตั้งคำถาม ไม่ได้เขียนบทความ\n\nเลือกโมเดลเล็กที่ตอบทันที ได้งบ 500 token ต่อหนึ่งคำตอบ\n\n**โมเดลที่คิดก่อนตอบต้องระวังในช่องนี้** เพราะความคิดของมันกินงบ 500 token ก้อนเดียวกัน จึงอาจใช้หมดแล้วไม่เหลือที่ให้ตอบ เสียเงินแล้วไม่ได้อะไร และ prompt ภาษาไทยทำให้มันคิดยาวกว่าภาษาอังกฤษ ลองกดทดสอบดู ถ้ามันคิด จะมีสวิตช์ปิดการคิดขึ้นมาข้างล่าง ปิดแล้วก็ใช้ได้\n\nที่ใช้ได้ดี: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`",
+    },
+    "models.pick_strong": {
+        "English": "**Runs a handful of times, and writes the article.** Quality is what you are paying for — the outline, the sections and the language polish all come from here.\n\nPick the best writer the budget allows. It gets 3000 tokens per reply, which is room enough that **a model that thinks before answering suits this box**, unlike the fast one.\n\nWorks well: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`.",
+        "ไทย": "**ถูกเรียกไม่กี่ครั้ง และเป็นตัวเขียนบทความ** คุณภาพคือสิ่งที่จ่ายเงินซื้อ ทั้งโครงร่าง เนื้อหาแต่ละหัวข้อ และการปรับภาษา มาจากตรงนี้\n\nเลือกตัวที่เขียนดีที่สุดเท่าที่งบไหว ได้งบ 3000 token ต่อหนึ่งคำตอบ ซึ่งกว้างพอที่ **โมเดลที่คิดก่อนตอบจะเหมาะกับช่องนี้** ต่างจากโมเดลเร็ว\n\nที่ใช้ได้ดี: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`",
+    },
+    "models.thinking": {"English": "Thinking", "ไทย": "การคิดก่อนตอบ"},
+    "models.thinking_default_named": {
+        "English": "The model's own default ({level})",
+        "ไทย": "ตามค่าเริ่มต้นของโมเดล ({level})",
+    },
+    "models.thinking_mandatory": {
+        "English": "This model cannot be told to stop thinking, only how hard.",
+        "ไทย": "โมเดลนี้สั่งให้หยุดคิดไม่ได้ ตั้งได้แค่ว่าจะให้คิดหนักแค่ไหน",
+    },
+    "models.thinking_budget": {
+        "English": "Thinking budget (tokens)",
+        "ไทย": "งบสำหรับการคิด (token)",
+    },
+    "models.thinking_budget_help": {
+        "English": "This model takes an allowance rather than a level. Zero leaves it at its own default. It comes out of the same budget as the answer, so keep it well under the role's.",
+        "ไทย": "โมเดลนี้รับเป็นจำนวน token ไม่ใช่ระดับ ใส่ 0 คือปล่อยตามค่าเริ่มต้นของมัน งบนี้กินรวมกับคำตอบ จึงควรตั้งให้ต่ำกว่างบของบทบาทนั้นพอสมควร",
+    },
+    "models.thinking_default": {
+        "English": "The model's own default",
+        "ไทย": "ตามค่าเริ่มต้นของโมเดล",
+    },
+    "models.thinking_off": {"English": "Off", "ไทย": "ปิด"},
+    "models.no_thinking_none": {
+        "English": "This model does not think before answering, so there is nothing to set.",
+        "ไทย": "โมเดลนี้ไม่คิดก่อนตอบอยู่แล้ว จึงไม่มีอะไรให้ตั้ง",
+    },
+    "models.no_thinking": {
+        "English": "Do not think before answering",
+        "ไทย": "ไม่ต้องคิดก่อนตอบ",
+    },
+    "models.no_thinking_help": {
+        "English": "Some models write out their thinking before the answer, and that thinking is spent from the same token budget as the answer.\n\nOn the fast role's 500 tokens a model can use all of it thinking and return nothing at all — a call that succeeded, was billed, and said nothing. Turning thinking off fixes that and makes the model faster and cheaper.\n\nOn the strong role there is usually room for both, and the thinking tends to improve the writing. Leave it on there unless you have a reason.\n\nThis box only appears when a test has seen this model think, so it is never offered where it would do nothing.",
+        "ไทย": "โมเดลบางตัวเขียนความคิดออกมาก่อนคำตอบ และความคิดนั้นกินงบ token ก้อนเดียวกับคำตอบ\n\nที่งบ 500 token ของโมเดลเร็ว มันอาจคิดจนหมดงบแล้วไม่เหลือที่ให้ตอบเลย กลายเป็นการเรียกที่สำเร็จ เสียเงินแล้ว แต่ไม่ได้อะไร ปิดการคิดแล้วจะหายปัญหา ทั้งเร็วขึ้นและถูกลง\n\nส่วนโมเดลหลักงบ 3000 token มักมีที่พอให้ทั้งคิดและตอบ และการคิดช่วยให้เขียนดีขึ้น ถ้าไม่มีเหตุผลเป็นพิเศษก็เปิดไว้\n\nช่องนี้จะขึ้นเฉพาะตอนที่การทดสอบเห็นโมเดลตัวนี้คิดจริง จึงไม่มีทางโผล่มาในที่ที่กดแล้วไม่เกิดอะไรขึ้น",
+    },
+    "models.thought_seen": {
+        "English": "The test saw this model spend {tokens} tokens thinking.",
+        "ไทย": "การทดสอบพบว่าโมเดลนี้ใช้ {tokens} token ไปกับการคิด",
+    },
+    "models.thought_none": {
+        "English": "The last test saw no thinking — the switch is taking effect.",
+        "ไทย": "การทดสอบครั้งล่าสุดไม่พบการคิดแล้ว แปลว่าสวิตช์ทำงาน",
+    },
+    "models.slot_primary": {"English": "Primary provider", "ไทย": "ผู้ให้บริการหลัก"},
+    "models.slot_primary_what": {
+        "English": "Both roles use this unless one names the other.",
+        "ไทย": "ทั้งสองหน้าที่จะใช้รายนี้ เว้นแต่จะระบุอีกราย",
+    },
+    "models.slot_secondary": {"English": "Second provider", "ไทย": "ผู้ให้บริการรอง"},
+    "models.slot_secondary_what": {
+        "English": "Optional. Add one to run the two roles on different "
+        "providers — the questions somewhere cheap, the writing somewhere strong.",
+        "ไทย": "ไม่บังคับ เพิ่มไว้เพื่อให้สองหน้าที่ใช้คนละราย เช่น "
+        "ตั้งคำถามที่ราคาถูก ส่วนการเขียนใช้รายที่เขียนดีกว่า",
+    },
+    "models.slot_none": {"English": "Not used", "ไทย": "ไม่ใช้"},
+    "models.keys": {"English": "Provider keys", "ไทย": "คีย์ของผู้ให้บริการ"},
+    "models.keys_what": {
+        "English": "Fill in as many as you like. The pickers below offer "
+        "exactly the providers that have one — a provider with no key cannot "
+        "be chosen, because choosing it would fail when a run starts.",
+        "ไทย": "กรอกกี่รายก็ได้ ตัวเลือกด้านล่างจะเสนอเฉพาะรายที่มีคีย์แล้ว "
+        "ผู้ให้บริการที่ยังไม่มีคีย์จะเลือกไม่ได้ เพราะเลือกไปก็จะล้มตอนเริ่มค้นคว้า",
+    },
+    "models.key_ready": {"English": "ready", "ไทย": "พร้อมใช้"},
+    "models.key_missing": {"English": "no key", "ไทย": "ยังไม่มีคีย์"},
+    "models.no_keys": {
+        "English": "No provider has a key yet. Fill one in above and the "
+        "pickers appear.",
+        "ไทย": "ยังไม่มีผู้ให้บริการรายใดมีคีย์ กรอกสักรายด้านบนแล้วตัวเลือกจะปรากฏ",
+    },
+    "models.key_from_default": {
+        "English": "Uses the default provider's {name}.",
+        "ไทย": "ใช้ {name} ของผู้ให้บริการหลัก",
+    },
+    "models.cannot_run": {
+        "English": "These settings cannot start a run yet:",
+        "ไทย": "ค่าตั้งค่าชุดนี้ยังเริ่มการค้นคว้าไม่ได้:",
+    },
     "search.needs_endpoint": {
         "English": "Marked internal-only in the library, and needs a private "
         "Stanford endpoint that is not published.",
@@ -118,6 +354,120 @@ _STRINGS = {
     "search.failed_config": {
         "English": "The search source is not configured, so no run was started.",
         "ไทย": "ยังตั้งค่าแหล่งค้นคว้าไม่ครบ จึงยังไม่ได้เริ่มค้นคว้า",
+    },
+    # -- model settings ---------------------------------------------------
+    "models.title": {"English": "Models", "ไทย": "โมเดล"},
+    "models.using": {"English": "calling {name}", "ไทย": "ผู้ให้บริการที่ใช้: {name}"},
+    "models.intro": {
+        "English": "Saved here, these take effect on the next run — no file "
+        "to edit and no restart. A deployment that sets them in the "
+        "environment keeps working until something is saved over it.",
+        "ไทย": "ค่าที่บันทึกที่นี่มีผลกับการค้นคว้าครั้งถัดไปทันที ไม่ต้องแก้ไฟล์หรือรีสตาร์ต "
+        "หากการติดตั้งใดตั้งค่าไว้ในสภาพแวดล้อมอยู่แล้ว ระบบจะใช้ค่านั้นต่อไปจนกว่าจะมีการบันทึกทับ",
+    },
+    "models.default_provider": {"English": "Default provider", "ไทย": "ผู้ให้บริการหลัก"},
+    "models.default_what": {
+        "English": "Both roles use this unless one of them names another.",
+        "ไทย": "ทั้งสองหน้าที่จะใช้ผู้ให้บริการนี้ เว้นแต่จะระบุผู้ให้บริการเฉพาะของตนเอง",
+    },
+    "models.role_fast": {"English": "Fast model", "ไทย": "โมเดลเร็ว"},
+    "models.role_fast_what": {
+        "English": "Asks the questions and plays the interviews.",
+        "ไทย": "ใช้ตั้งคำถามและจำลองบทสนทนา",
+    },
+    "models.role_strong": {"English": "Strong model", "ไทย": "โมเดลหลัก"},
+    "models.role_strong_what": {
+        "English": "Writes the outline, the article and the polish.",
+        "ไทย": "ใช้สร้างโครงร่าง เขียนบทความ และปรับภาษา",
+    },
+    "models.encoder": {"English": "Embeddings", "ไทย": "โมเดล embedding"},
+    "models.encoder_what": {
+        "English": "Co-STORM sorts every source it finds by similarity, so it "
+        "needs these. STORM does not.",
+        "ไทย": "Co-STORM จัดทุกแหล่งข้อมูลที่พบด้วยความคล้าย จึงต้องใช้ส่วนนี้ ส่วน STORM ไม่ต้องใช้",
+    },
+    "models.encoder_unavailable": {
+        "English": "{name} sells chat completions but no embeddings, so "
+        "Co-STORM cannot run on it. Pick a service for embeddings here.",
+        "ไทย": "{name} ขายเฉพาะ chat completions ไม่มี embeddings ทำให้ Co-STORM ทำงานไม่ได้ "
+        "ให้เลือกบริการสำหรับ embeddings ที่นี่",
+    },
+    "models.provider": {"English": "Provider", "ไทย": "ผู้ให้บริการ"},
+    "models.inherit": {
+        "English": "Same as the default",
+        "ไทย": "ใช้ตามผู้ให้บริการหลัก",
+    },
+    "models.model_name": {"English": "Model name", "ไทย": "ชื่อโมเดล"},
+    "models.model_default": {
+        "English": "Leave empty to use {name}.",
+        "ไทย": "เว้นว่างไว้เพื่อใช้ {name}",
+    },
+    "models.model_no_default": {
+        "English": "This provider ships no default, so a name is required.",
+        "ไทย": "ผู้ให้บริการนี้ไม่มีชื่อโมเดลเริ่มต้น จึงต้องระบุเอง",
+    },
+    "models.model_required": {"English": "required", "ไทย": "ต้องระบุ"},
+    "models.api_base": {"English": "API base URL", "ไทย": "API base URL"},
+    "models.key_saved": {
+        "English": "{name} — saved, ending {last4}",
+        "ไทย": "{name} — บันทึกแล้ว ลงท้าย {last4}",
+    },
+    "models.key_needed": {"English": "{name}", "ไทย": "{name}"},
+    "models.from_server": {
+        "English": "Set on the server, not here — it cannot be removed from "
+        "this page, and saving a key here would take its place.",
+        "ไทย": "ค่านี้ตั้งไว้ที่เซิร์ฟเวอร์ ไม่ได้ตั้งจากหน้านี้ จึงลบจากหน้านี้ไม่ได้ "
+        "การบันทึกคีย์ที่นี่จะถูกใช้แทนค่าดังกล่าว",
+    },
+    "models.forget_key": {"English": "Forget this key", "ไทย": "ลบคีย์นี้"},
+    "models.test": {"English": "Test", "ไทย": "ทดสอบ"},
+    "models.testing": {"English": "Calling the model…", "ไทย": "กำลังเรียกโมเดล…"},
+    "models.saved": {"English": "Saved — {what}", "ไทย": "บันทึกแล้ว — {what}"},
+    "models.saved_key_forgotten": {
+        "English": "Removed {name}",
+        "ไทย": "ลบ {name} แล้ว",
+    },
+    "models.saved_preset_added": {
+        "English": "Added {name} to the list",
+        "ไทย": "เพิ่ม {name} ในรายการแล้ว",
+    },
+    "models.saved_preset_removed": {
+        "English": "Removed {name} from the list",
+        "ไทย": "นำ {name} ออกจากรายการแล้ว",
+    },
+    "models.save": {"English": "Save", "ไทย": "บันทึก"},
+    "models.test_ok": {
+        "English": "{model} answered in {seconds}s: “{reply}”",
+        "ไทย": "{model} ตอบกลับใน {seconds} วินาที: “{reply}”",
+    },
+    "models.encoder_ok": {
+        "English": "Embeddings answered in {seconds}s, {dimensions} dimensions.",
+        "ไทย": "embeddings ตอบกลับใน {seconds} วินาที ขนาด {dimensions} มิติ",
+    },
+    "models.test_failed": {
+        "English": "The model could not be reached.",
+        "ไทย": "เรียกโมเดลไม่สำเร็จ",
+    },
+    "models.empty_reply": {
+        "English": "The model replied with nothing. It is reachable, but it is "
+        "not answering — often a token budget spent on reasoning before any "
+        "text is written.",
+        "ไทย": "โมเดลตอบกลับมาเป็นค่าว่าง แปลว่าติดต่อได้แต่ไม่ตอบ "
+        "สาเหตุที่พบบ่อยคือโควตา token ถูกใช้ไปกับการคิดจนหมดก่อนจะเขียนข้อความออกมา",
+    },
+    "models.slow": {
+        "English": "That took {seconds}s for one word. A healthy model answers "
+        "this in one to eight. A full run makes thousands of calls, so check "
+        "the model name before using it.",
+        "ไทย": "ใช้เวลา {seconds} วินาทีสำหรับคำเดียว ซึ่งโมเดลปกติจะตอบใน 1–8 วินาที "
+        "การค้นคว้าหนึ่งครั้งเรียกโมเดลหลายพันครั้ง จึงควรตรวจสอบชื่อโมเดลก่อนใช้งาน",
+    },
+    "models.where_saved": {
+        "English": "Keys are written to a file on this server, readable by its "
+        "owner only, and never to the database — anything a member's session "
+        "can read is something that member can take.",
+        "ไทย": "คีย์ถูกบันทึกเป็นไฟล์บนเซิร์ฟเวอร์นี้ อ่านได้เฉพาะเจ้าของไฟล์ และไม่ถูกเก็บลงฐานข้อมูล "
+        "เพราะสิ่งที่เซสชันของสมาชิกอ่านได้ ย่อมเป็นสิ่งที่สมาชิกคนนั้นนำออกไปได้",
     },
     # -- creating an article --------------------------------------------
     "create.eyebrow": {"English": "Powered by STORM", "ไทย": "ขับเคลื่อนด้วย STORM"},

@@ -62,7 +62,25 @@ def _source_card(name, chosen):
             return
 
         typed = ""
-        if source["key"]:
+        if source.get("shares"):
+            # Rides another source's address — the same instance, asked
+            # differently. Nothing to type here; set it on the other card.
+            shared = search_sources.SOURCES[source["shares"]]["label"]
+            st.caption(t(source["note"]))
+            st.caption(t("search.shares_address", name=shared))
+        elif source.get("kind") == "url":
+            # An address, not a secret: shown in full, edited in the open.
+            # A blank box still means "keep what is saved", as with keys.
+            saved_url = search_sources.secret_for(name) or ""
+            typed = st.text_input(
+                t("search.url_saved") if is_set else t("search.url_needed"),
+                key=f"key_{name}",
+                placeholder=saved_url or "https://searx.example.org",
+            )
+            st.caption(t(source["note"]))
+            if source["signup"]:
+                st.caption(f"[{t('search.host_one')}]({source['signup']})")
+        elif source["key"]:
             label = (
                 t("search.key_saved", last4=last4) if is_set else t("search.key_needed")
             )
@@ -99,10 +117,13 @@ def _source_card(name, chosen):
                 search_sources.save(name, {source["key"]: typed} if source["key"] else {})
                 st.rerun()
 
-        if is_set and typed == "":
-            if st.button(
-                t("search.forget_key"), key=f"forget_{name}", type="tertiary"
-            ):
+        # A shared address is forgotten from the card that owns it, not here —
+        # this button would drop it for both.
+        if is_set and typed == "" and not source.get("shares"):
+            forget_label = (
+                t("search.forget_url") if source.get("kind") == "url" else t("search.forget_key")
+            )
+            if st.button(forget_label, key=f"forget_{name}", type="tertiary"):
                 search_sources.forget(source["key"])
                 st.rerun()
 
@@ -127,3 +148,29 @@ def search_sources_page():
         for column, name in zip(columns, grid[row_start : row_start + 2]):
             with column:
                 _source_card(name, chosen)
+
+    _offer_section(settings)
+
+
+def _offer_section(settings):
+    """Which of the configured sources a member may tick for their own run.
+
+    Only sources that can be built right now are listed — one without its
+    key would fail in front of the person least able to fix it. The source
+    in use is always offered; it is what a run gets when nothing is ticked.
+    """
+    ready = [n for n in search_sources.OFFERED if search_sources.ready(n)]
+    with st.container(border=True, key="src_offer"):
+        st.markdown(f"**{t('search.offer_title')}**")
+        st.caption(t("search.offer_note"))
+        chosen = st.multiselect(
+            t("search.offer_title"),
+            ready,
+            default=[n for n in settings["offered"] if n in ready],
+            format_func=lambda n: search_sources.SOURCES[n]["label"],
+            key="src_offer_pick",
+            label_visibility="collapsed",
+        )
+        if st.button(t("search.offer_save"), key="src_offer_save", type="primary"):
+            search_sources.set_offered(chosen)
+            st.rerun()

@@ -98,9 +98,22 @@ class Encoder:
                 or os.getenv("GEMINI_API_KEY")
                 or os.getenv("GOOGLE_API_KEY")
             }
+        elif encoder_type.lower() == "ollama":
+            # Embeddings from a model on this machine: no key, no quota, and
+            # nothing leaves the host. The model has to be one Ollama has
+            # pulled — `ollama list` — because unlike the hosted providers
+            # there is no default worth guessing.
+            model = os.getenv("OLLAMA_EMBEDDING_MODEL") or "bge-m3:latest"
+            self.embedding_model_name = f"ollama/{model}"
+            self.kargs = {
+                "api_base": api_base
+                or os.getenv("OLLAMA_API_BASE")
+                or "http://localhost:11434"
+            }
         else:
             raise ValueError(
-                f"Unsupported ENCODER_API_TYPE '{encoder_type}'. Supported types are 'openai', 'azure', 'gemini'."
+                f"Unsupported ENCODER_API_TYPE '{encoder_type}'. Supported types are "
+                "'openai', 'azure', 'gemini', 'ollama'."
             )
 
     def get_total_token_usage(self, reset: bool = False) -> int:

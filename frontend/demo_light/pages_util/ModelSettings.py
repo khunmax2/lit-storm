@@ -90,50 +90,72 @@ def _key_box(key_name, prefix):
     return typed
 
 
-def _keys_card():
-    """Every provider the app knows, and the key each one needs.
+def _provider_slot(slot, chosen, other):
+    """One of the two provider slots: which provider, and its key.
 
-    One place for keys rather than a box on each card that picked a
-    provider: a key belongs to the provider, and the same key drawn three
-    times read as three keys to fill in. Fill in as many as you like; the
-    pickers below offer exactly the ones that are filled.
+    `slot` is "primary" or "secondary"; `other` is what the opposite slot
+    holds, so the same provider cannot be chosen twice.
     """
-    ready = set(model_settings.configured_providers())
-    with st.container(border=True, key="role_keys"):
+    known = [n for n in demo_util.PROVIDERS if n != other]
+    options = ([""] if slot == "secondary" else []) + known
+    if chosen not in options:
+        chosen = options[0]
+
+    ready = chosen in model_settings.configured_providers()
+    with st.container(border=True, key=f"slot_{slot}"):
+        state = (
+            ui_theme.badge(t("models.key_ready"), tone="positive")
+            if ready
+            else ui_theme.badge(t("models.key_missing"), tone="warning")
+        )
         st.markdown(
-            f'<div class="src-head"><span class="name">{t("models.keys")}</span>'
-            f'<span class="tags">{ui_theme.badge(str(len(ready)), tone="info")}</span></div>',
+            f'<div class="src-head"><span class="name">{t(f"models.slot_{slot}")}</span>'
+            f'<span class="tags">{state if chosen else ""}</span></div>',
             unsafe_allow_html=True,
         )
-        st.caption(t("models.keys_what"))
+        st.caption(t(f"models.slot_{slot}_what"))
 
-        for name, details in demo_util.PROVIDERS.items():
-            with st.container(border=True, key=f"provkey_{name}"):
-                state = (
-                    ui_theme.badge(t("models.key_ready"), tone="positive")
-                    if name in ready
-                    else ui_theme.badge(t("models.key_missing"), tone="warning")
-                )
-                st.markdown(
-                    f'<div class="src-head"><span class="name">{name}</span>'
-                    f'<span class="tags">{state}</span></div>',
-                    unsafe_allow_html=True,
-                )
-                typed_key = _key_box(details["key"], f"keys_{name}")
-                typed_base = ""
-                if details.get("base"):
-                    typed_base = st.text_input(
-                        t("models.api_base"),
-                        value=model_settings.setting(details["base"]) or "",
-                        key=f"keys_base_{name}",
-                        placeholder="https://api.example.com/v1",
-                    )
-                if st.button(t("models.save"), key=f"keys_save_{name}", width="stretch"):
-                    pending = {details["key"]: typed_key}
-                    if details.get("base"):
-                        pending[details["base"]] = typed_base
-                    model_settings.save({k: v for k, v in pending.items() if v})
-                    st.rerun()
+        provider = st.selectbox(
+            t("models.provider"),
+            options,
+            index=options.index(chosen),
+            key=f"slot_prov_{slot}",
+            format_func=lambda name: t("models.slot_none") if name == "" else name,
+        )
+        if not provider:
+            if st.button(t("models.save"), key=f"slot_save_{slot}", width="stretch"):
+                model_settings.forget(model_settings.SECONDARY)
+                st.rerun()
+            return
+
+        details = demo_util.PROVIDERS[provider]
+        typed_key = _key_box(details["key"], f"slot_{slot}")
+        typed_base = ""
+        if details.get("base"):
+            typed_base = st.text_input(
+                t("models.api_base"),
+                value=model_settings.setting(details["base"]) or "",
+                key=f"slot_base_{slot}",
+                placeholder="https://api.example.com/v1",
+            )
+        if st.button(t("models.save"), key=f"slot_save_{slot}", type="primary", width="stretch"):
+            pending = {details["key"]: typed_key}
+            if details.get("base"):
+                pending[details["base"]] = typed_base
+            model_settings.save({k: v for k, v in pending.items() if v})
+            name = "LLM_PROVIDER" if slot == "primary" else model_settings.SECONDARY
+            model_settings.save({name: provider})
+            st.rerun()
+
+
+def _provider_slots():
+    """The two slots, side by side."""
+    primary, secondary = model_settings.provider_slots()
+    columns = st.columns(2, gap="medium")
+    with columns[0]:
+        _provider_slot("primary", primary, secondary)
+    with columns[1]:
+        _provider_slot("secondary", secondary or "", primary)
 
 
 def _role_card(role):
@@ -274,28 +296,11 @@ def model_settings_page():
         st.error(t("models.cannot_run"))
         st.code(str(error), language=None)
 
-    _keys_card()
+    _provider_slots()
 
-    ready = model_settings.configured_providers()
-    if not ready:
+    if not model_settings.configured_providers():
         st.info(t("models.no_keys"))
         return
-
-    # Only worth asking when there is a choice: one configured provider is
-    # already the default, and `default_provider` says so without being told.
-    if len(ready) > 1:
-        with st.container(border=True, key="role_default"):
-            st.markdown(
-                f'<div class="src-head"><span class="name">{t("models.default_provider")}</span></div>',
-                unsafe_allow_html=True,
-            )
-            st.caption(t("models.default_what"))
-            provider = _provider_picker(
-                t("models.provider"), "prov_default", default, allow_inherit=False
-            )
-            if st.button(t("models.save"), key="save_default", type="primary"):
-                model_settings.save({"LLM_PROVIDER": provider})
-                st.rerun()
 
     columns = st.columns(2, gap="medium")
     for column, role in zip(columns, model_settings.ROLES):

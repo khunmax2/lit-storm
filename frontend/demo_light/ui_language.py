@@ -203,6 +203,19 @@ _STRINGS = {
     "models.preset_label": {"English": "Shown as", "ไทย": "ชื่อที่แสดง"},
     "models.preset_save": {"English": "Offer it", "ไทย": "เพิ่มในรายการ"},
     "models.preset_remove": {"English": "Remove", "ไทย": "ลบ"},
+    "models.slot_primary": {"English": "Primary provider", "ไทย": "ผู้ให้บริการหลัก"},
+    "models.slot_primary_what": {
+        "English": "Both roles use this unless one names the other.",
+        "ไทย": "ทั้งสองหน้าที่จะใช้รายนี้ เว้นแต่จะระบุอีกราย",
+    },
+    "models.slot_secondary": {"English": "Second provider", "ไทย": "ผู้ให้บริการรอง"},
+    "models.slot_secondary_what": {
+        "English": "Optional. Add one to run the two roles on different "
+        "providers — the questions somewhere cheap, the writing somewhere strong.",
+        "ไทย": "ไม่บังคับ เพิ่มไว้เพื่อให้สองหน้าที่ใช้คนละราย เช่น "
+        "ตั้งคำถามที่ราคาถูก ส่วนการเขียนใช้รายที่เขียนดีกว่า",
+    },
+    "models.slot_none": {"English": "Not used", "ไทย": "ไม่ใช้"},
     "models.keys": {"English": "Provider keys", "ไทย": "คีย์ของผู้ให้บริการ"},
     "models.keys_what": {
         "English": "Fill in as many as you like. The pickers below offer "

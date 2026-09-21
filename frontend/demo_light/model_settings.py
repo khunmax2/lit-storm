@@ -56,7 +56,13 @@ def managed():
     """
     import demo_util
 
-    names = {"LLM_PROVIDER", "ENCODER_PROVIDER", "LLM_API_BASE", "LLM_API_KEY"}
+    names = {
+        "LLM_PROVIDER",
+        SECONDARY,
+        "ENCODER_PROVIDER",
+        "LLM_API_BASE",
+        "LLM_API_KEY",
+    }
     for role in ROLES:
         names.add(f"LLM_{role}_PROVIDER")
         names.add(f"LLM_{role}_MODEL")
@@ -116,8 +122,38 @@ def _write(values):
 PRESETS_KEY = "_presets"
 
 
+# The second slot's provider. The first is LLM_PROVIDER, which predates
+# this and is what a deployment configured through the environment sets.
+SECONDARY = "LLM_SECONDARY_PROVIDER"
+
+
+def provider_slots():
+    """(primary, secondary) — the two providers this deployment uses.
+
+    Two rather than a row per provider the app knows: a deployment uses one
+    or two, and asking about five made the page mostly empty boxes. Which
+    provider fills a slot is a choice; the key then belongs to that choice.
+
+    `secondary` is None when unset, unusable, or the same as primary. An
+    unnamed primary falls back to the only provider with a key — filling in
+    one key says enough — and then to gemini, which is what the app has
+    always defaulted to.
+    """
+    import demo_util
+
+    primary = (setting("LLM_PROVIDER") or "").strip().lower()
+    if primary not in demo_util.PROVIDERS:
+        with_keys = [n for n, p in demo_util.PROVIDERS.items() if setting(p["key"])]
+        primary = with_keys[0] if len(with_keys) == 1 else "gemini"
+
+    secondary = (setting(SECONDARY) or "").strip().lower()
+    if secondary not in demo_util.PROVIDERS or secondary == primary:
+        secondary = None
+    return primary, secondary
+
+
 def configured_providers():
-    """Providers that have everything needed to call them, in table order.
+    """The slots that can actually be called, primary first.
 
     A key, and a base URL for the one provider that is an endpoint rather
     than a service. This is the list the pickers offer: choosing a provider
@@ -127,7 +163,10 @@ def configured_providers():
     import demo_util
 
     ready = []
-    for name, provider in demo_util.PROVIDERS.items():
+    for name in provider_slots():
+        if not name:
+            continue
+        provider = demo_util.PROVIDERS[name]
         if not setting(provider["key"]):
             continue
         if provider.get("base") and not setting(provider["base"]):
@@ -137,20 +176,12 @@ def configured_providers():
 
 
 def default_provider():
-    """The provider both roles use unless one names another.
-
-    LLM_PROVIDER when it is set and usable. Failing that, the only
-    configured provider — filling in one key is a clear enough statement of
-    intent that it should not also need choosing from a list of one. Failing
-    that, gemini, which is what the app has always defaulted to.
-    """
-    chosen = (setting("LLM_PROVIDER") or "").strip().lower()
+    """The provider both roles use unless one names another."""
+    primary, _ = provider_slots()
     ready = configured_providers()
-    if chosen and chosen in ready:
-        return chosen
-    if len(ready) == 1:
-        return ready[0]
-    return chosen or "gemini"
+    if primary in ready:
+        return primary
+    return ready[0] if ready else primary
 
 
 def presets():

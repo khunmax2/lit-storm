@@ -13,6 +13,7 @@ reports how long the answer took, so a bad alias is visible in one click.
 import auth
 import costorm
 import demo_util
+import model_capabilities
 import model_settings
 import streamlit as st
 import ui_theme
@@ -179,35 +180,68 @@ def _provider_slots():
         _provider_slot("secondary", secondary or "", primary)
 
 
-def _thinking_switch(role):
-    """A switch to stop this role's model thinking. "off" or "".
+def _thinking_control(role, provider, model):
+    """How this role's model should think. Returns the setting to save.
 
-    Only drawn when there is evidence it would do something: a test of this
-    role saw the model spend tokens thinking, or it is already switched off
-    and has to be switchable back. Otherwise a model with nothing to turn off
-    would carry a control that silently does nothing, and whoever set it would
-    have no way to tell.
+    Three shapes, because models come in three kinds and offering the wrong
+    control is worse than offering none:
+
+    * a model that cannot think gets no control at all;
+    * one that can only be switched gets a checkbox;
+    * one that takes an effort level gets the levels.
+
+    Which it is comes from the provider's own catalogue where there is one.
+    Where there is not — every provider here except OpenRouter — it falls
+    back to what the test button measured, which only knows after someone
+    has pressed it, and says so.
     """
     saved = (model_settings.setting(f"LLM_{role}_REASONING") or "").strip().lower()
-    result = _last_test(role)
-    thought = (result or {}).get("thought", 0)
-    if not thought and saved != "off":
+    kind = model_capabilities.thinking(provider, model)
+
+    if kind == model_capabilities.UNKNOWN:
+        # Nobody published anything. The probe's own observation is the only
+        # evidence there is, and it is evidence of thinking, not of whether
+        # it can be dialled — so this stays the switch it was.
+        result = _last_test(role)
+        thought = (result or {}).get("thought", 0)
+        if not thought and saved != model_settings.REASONING_OFF:
+            return ""
+        return _thinking_checkbox(role, saved, thought, measured=True)
+
+    if kind == model_capabilities.NONE:
+        # Nothing to turn off. Saying so beats an absent control that reads
+        # as an oversight — and it is a useful thing to know about a model.
+        st.caption(t("models.no_thinking_none"))
         return ""
 
+    if kind == model_capabilities.ON_OFF:
+        return _thinking_checkbox(role, saved, thought=0, measured=False)
+
+    options = ["", model_settings.REASONING_OFF, *demo_util.REASONING_EFFORTS]
+    index = options.index(saved) if saved in options else 0
+    chosen = st.selectbox(
+        t("models.thinking"),
+        options,
+        index=index,
+        key=f"think_{role}",
+        format_func=lambda value: t(f"models.thinking_{value or 'default'}"),
+        help=t("models.no_thinking_help"),
+    )
+    return chosen
+
+
+def _thinking_checkbox(role, saved, thought, measured):
+    """The on/off form, for a model that has no levels to choose between."""
     off = st.checkbox(
         t("models.no_thinking"),
-        value=saved == "off",
+        value=saved == model_settings.REASONING_OFF,
         key=f"think_{role}",
         help=t("models.no_thinking_help"),
     )
-    if thought:
-        # What the test actually measured, so the switch is not advice.
+    if measured and thought:
+        # What the test actually measured, so the control is not advice.
         st.caption(t("models.thought_seen", tokens=thought))
-    elif saved == "off" and result:
-        # Asked not to think, and did not. The switch is doing its job, and
-        # the evidence for that is the absence the caption above reports.
-        st.caption(t("models.thought_none"))
-    return "off" if off else ""
+    return model_settings.REASONING_OFF if off else ""
 
 
 def _role_card(role):
@@ -252,7 +286,7 @@ def _role_card(role):
             f"LLM_{role}_PROVIDER": provider,
             f"LLM_{role}_MODEL": model,
         }
-        pending[f"LLM_{role}_REASONING"] = _thinking_switch(role)
+        pending[f"LLM_{role}_REASONING"] = _thinking_control(role, chosen, model)
 
         left, right = st.columns(2)
         with left:

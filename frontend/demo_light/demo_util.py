@@ -645,15 +645,30 @@ ROLES = ("FAST", "STRONG")
 # return an empty string, which is a working call that said nothing.
 ROLE_TOKENS = {"FAST": 500, "STRONG": 3000}
 
-# Set on a role to stop its model thinking before it answers. Thinking is
-# spent from the same budget as the answer, so on the fast role's 500 tokens
-# a model can use the lot and return nothing — billed, and silent.
+# What LLM_<ROLE>_REASONING may say, and what each means on the wire.
 #
-# "off" rather than a boolean because the opposite is not "on": it is not
-# sending the parameter at all, which is what a model with no thinking to
-# turn off needs. OpenRouter's spelling; it is the only provider here whose
-# models offer the choice.
-NO_REASONING = {"reasoning": {"enabled": False}}
+# Thinking is spent from the same budget as the answer, so on the fast
+# role's 500 tokens a model can use the lot and return nothing — billed,
+# and silent. Turning it off, or down, is the fix.
+#
+# Unset is its own answer and not the same as any of these: it sends no
+# reasoning parameter at all, which is what a model with nothing to turn
+# off needs, and what leaves a model that does think at its own default.
+#
+# OpenRouter's spelling. It is the only provider here that publishes which
+# models accept which — see model_capabilities.
+REASONING_OFF = "off"
+REASONING_EFFORTS = ("minimal", "low", "medium", "high")
+
+
+def reasoning_kwargs(setting_value):
+    """The `reasoning` argument for a saved setting, or {} for unset."""
+    value = (setting_value or "").strip().lower()
+    if value == REASONING_OFF:
+        return {"reasoning": {"enabled": False}}
+    if value in REASONING_EFFORTS:
+        return {"reasoning": {"effort": value}}
+    return {}
 
 
 def resolve_role(role, default_provider, lookup=None):
@@ -701,8 +716,7 @@ def resolve_role(role, default_provider, lookup=None):
         # Ride out the occasional 429 rather than failing the whole run.
         "num_retries": 6,
     }
-    if (lookup(f"LLM_{role}_REASONING") or "").strip().lower() == "off":
-        kwargs.update(NO_REASONING)
+    kwargs.update(reasoning_kwargs(lookup(f"LLM_{role}_REASONING")))
     if "base" in provider:
         base = lookup(provider["base"])
         if not base:
@@ -741,7 +755,15 @@ def _settings_fingerprint(*calls):
     parts = []
     for model, kwargs in calls:
         secret = f"{kwargs.get('api_key', '')}|{kwargs.get('api_base', '')}"
-        thinking = "" if "reasoning" in kwargs else "+think"
+        # Named, not just present: "medium" and "high" are different runs
+        # and a runner built for one must not be reused for the other.
+        reasoning = kwargs.get("reasoning") or {}
+        if not reasoning:
+            thinking = "+think"
+        elif reasoning.get("enabled") is False:
+            thinking = "-think"
+        else:
+            thinking = "+" + str(reasoning.get("effort", "?"))
         parts.append(
             f"{model}{thinking}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}"
         )

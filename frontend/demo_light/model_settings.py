@@ -130,6 +130,9 @@ PRESETS_KEY = "_presets"
 # this and is what a deployment configured through the environment sets.
 SECONDARY = "LLM_SECONDARY_PROVIDER"
 
+# Re-exported so the page does not have to import demo_util for one word.
+REASONING_OFF = "off"
+
 
 def provider_slots():
     """(primary, secondary) — the two providers this deployment uses.

@@ -260,6 +260,26 @@ _STRINGS = {
         "English": "**Runs a handful of times, and writes the article.** Quality is what you are paying for — the outline, the sections and the language polish all come from here.\n\nPick the best writer the budget allows. It gets 3000 tokens per reply, which is room enough that **a model that thinks before answering suits this box**, unlike the fast one.\n\nWorks well: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`.",
         "ไทย": "**ถูกเรียกไม่กี่ครั้ง และเป็นตัวเขียนบทความ** คุณภาพคือสิ่งที่จ่ายเงินซื้อ ทั้งโครงร่าง เนื้อหาแต่ละหัวข้อ และการปรับภาษา มาจากตรงนี้\n\nเลือกตัวที่เขียนดีที่สุดเท่าที่งบไหว ได้งบ 3000 token ต่อหนึ่งคำตอบ ซึ่งกว้างพอที่ **โมเดลที่คิดก่อนตอบจะเหมาะกับช่องนี้** ต่างจากโมเดลเร็ว\n\nที่ใช้ได้ดี: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`",
     },
+    "models.thinking": {"English": "Thinking", "ไทย": "การคิดก่อนตอบ"},
+    "models.thinking_default": {
+        "English": "The model's own default",
+        "ไทย": "ตามค่าเริ่มต้นของโมเดล",
+    },
+    "models.thinking_off": {"English": "Off", "ไทย": "ปิด"},
+    "models.thinking_minimal": {
+        "English": "Minimal — cheapest",
+        "ไทย": "น้อยที่สุด — ถูกที่สุด",
+    },
+    "models.thinking_low": {"English": "Low", "ไทย": "น้อย"},
+    "models.thinking_medium": {"English": "Medium", "ไทย": "ปานกลาง"},
+    "models.thinking_high": {
+        "English": "High — slowest and dearest",
+        "ไทย": "มาก — ช้าและแพงที่สุด",
+    },
+    "models.no_thinking_none": {
+        "English": "This model does not think before answering, so there is nothing to set.",
+        "ไทย": "โมเดลนี้ไม่คิดก่อนตอบอยู่แล้ว จึงไม่มีอะไรให้ตั้ง",
+    },
     "models.no_thinking": {
         "English": "Do not think before answering",
         "ไทย": "ไม่ต้องคิดก่อนตอบ",

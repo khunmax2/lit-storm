@@ -11,8 +11,11 @@ cp .env.example .env     # then fill it in
 docker compose up -d --build
 ```
 
-It is served at `/` through the stack's edge proxy and publishes no port
-of its own. One service of the stack in `deploy/docker-compose.yml`, on one
+It is served at `/lit-storm/` through the stack's edge proxy and publishes
+no port of its own. `STREAMLIT_SERVER_BASE_URL_PATH` tells Streamlit where
+it lives — the page, its assets and `/_stcore/stream` all move under it,
+so the proxy keeps the prefix rather than stripping it, and the image's
+own healthcheck reads the same variable. One service of the stack in `deploy/docker-compose.yml`, on one
 network with the rest.
 
 ## No secrets.toml, on purpose

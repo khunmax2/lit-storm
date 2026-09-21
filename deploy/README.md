@@ -13,7 +13,11 @@ or by service name from inside.
 | service | what it is | reachable at |
 | --- | --- | --- |
 | `edge` | nginx, the stack's only door | `127.0.0.1:${LIT_STORM_HTTP_PORT}` |
-| `app` | the Streamlit app | `/` |
+
+`/` redirects to the app. `LIT_STORM_BASE_PATH` moves it, and is read by
+both the proxy and Streamlit so the two cannot disagree.
+
+| `app` | the Streamlit app | `/lit-storm/` |
 | `research-ui` | Deep Research, framed in a tab | `/research/` |
 | `agents-research` | Agent Research, framed in a tab | `/agents/` |
 | `searxng` | metasearch for all of them | inside only |
@@ -66,6 +70,10 @@ in the files that fix them:
 - **Streamlit needs the WebSocket upgrade.** Without `Upgrade`/`Connection`
   headers the page loads and then sits there, because the socket carrying
   every rerun never opens.
+- **Redirects must be relative.** nginx builds an absolute `Location`
+  from its own listen port by default — 8080 inside the container, not
+  the port anyone typed — so `/` sent the browser somewhere nothing
+  serves. `absolute_redirect off`.
 - **`/research/` must not have its prefix stripped.** Nuxt is told it lives
   there and builds its pages and asset URLs under it; handed `/` it answers
   500.
@@ -75,7 +83,9 @@ in the files that fix them:
 ## Running the app outside the stack
 
 `streamlit run` on a laptop against these containers reaches neither the
-service names nor the edge's paths. Point it at the edge:
+service names nor the edge's paths. Point it at the edge — and note the
+app itself is then at `/`, because `STREAMLIT_SERVER_BASE_URL_PATH` is
+set by the compose file and not by your shell:
 
 ```
 RESEARCH_UI_URL=http://localhost:8080/research/

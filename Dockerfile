@@ -104,8 +104,12 @@ EXPOSE 8501
 
 # Streamlit's own readiness endpoint. No curl in slim, and adding one to ask a
 # question Python can ask is a package more than the image needs.
+# Follows STREAMLIT_SERVER_BASE_URL_PATH: served under a base path, "/"
+# is a 404 and the container would report unhealthy while serving every
+# request put to it. 127.0.0.1 rather than localhost for the same reason
+# the edge's check uses it — localhost can resolve to ::1 first.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
-    CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4).status == 200 else 1)"]
+    CMD ["python", "-c", "import os,sys,urllib.request; base=os.environ.get('STREAMLIT_SERVER_BASE_URL_PATH','').strip('/'); root='/'+base if base else ''; sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:8501{root}/_stcore/health', timeout=4).status == 200 else 1)"]
 
 WORKDIR /app/frontend/demo_light
 

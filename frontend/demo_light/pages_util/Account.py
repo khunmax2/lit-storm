@@ -126,15 +126,17 @@ def sidebar_account():
             role_label = (
                 t("auth.role_admin") if auth.is_admin() else t("auth.role_member")
             )
-            used, limit = auth.quota()
+            # Who you are, and nothing else. The monthly run count used to
+            # sit here too, which put a number that changes with the work
+            # onto the one block on screen that answers "whose account is
+            # this" — and made the line long enough to be truncated, so it
+            # was neither identity nor a usable count.
             name = auth.display_name()
             st.markdown(
                 f'<div class="side-account">'
                 f'<span class="avatar">{escape(name.strip()[:1].upper())}</span>'
                 f'<span class="who"><span class="name">{escape(name)}</span>'
-                f'<span class="meta">{escape(role_label)}'
-                f'<span class="sep"> · </span>'
-                f'{escape(t("auth.quota", used=used, limit=limit))}</span></span></div>',
+                f'<span class="meta">{escape(role_label)}</span></span></div>',
                 unsafe_allow_html=True,
             )
         if st.button(

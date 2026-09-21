@@ -605,10 +605,6 @@ _STRINGS = {
     },
     "auth.role_member": {"English": "Member", "ไทย": "สมาชิก"},
     "auth.role_admin": {"English": "Admin", "ไทย": "ผู้ดูแลระบบ"},
-    "auth.quota": {
-        "English": "{used} of {limit} runs this month",
-        "ไทย": "ค้นคว้าไปแล้ว {used} จาก {limit} ครั้งในเดือนนี้",
-    },
     "auth.quota_spent": {
         "English": "You have used this month's {limit} research runs. An admin "
         "can raise your limit.",

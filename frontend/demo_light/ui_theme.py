@@ -1298,7 +1298,6 @@ span[class*="material-icons"] {{
     overflow: hidden;
     text-overflow: ellipsis;
 }}
-.side-account .sep {{ opacity: 0.5; }}
 
 /* ---------- the aside column: contents and references ---------- */
 /* The article is a tall scroll; the panels beside it stay put. */

@@ -217,6 +217,14 @@ _STRINGS = {
         "copied whole.",
         "ไทย": "ผู้ให้บริการปฏิเสธคีย์ เรื่องนี้เกี่ยวกับคีย์ ไม่เกี่ยวกับบัญชีของคุณในระบบนี้ ตรวจว่าคีย์ยังใช้งานได้อยู่ และคัดลอกมาครบทั้งสาย",
     },
+    "models.pick_fast": {
+        "English": "**Runs hundreds of times in one research, and answers in a sentence.** Speed and price matter more than quality here — it asks the questions, it does not write the article.\n\nPick a small, quick model that answers straight away. It gets 500 tokens per reply.\n\n**Avoid a model that thinks before answering.** Its thinking comes out of the same 500 tokens, so it can spend the lot and return nothing — billed, and silent. Thai prompts make it think longer than English ones.\n\nWorks well: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`.",
+        "ไทย": "**ถูกเรียกหลักร้อยครั้งต่อการค้นคว้าหนึ่งรอบ และตอบสั้นแค่ประโยคเดียว** ความเร็วและราคาสำคัญกว่าคุณภาพ เพราะมันทำหน้าที่ตั้งคำถาม ไม่ได้เขียนบทความ\n\nเลือกโมเดลเล็กที่ตอบทันที ได้งบ 500 token ต่อหนึ่งคำตอบ\n\n**เลี่ยงโมเดลที่คิดก่อนตอบ** เพราะความคิดของมันกินงบ 500 token ก้อนเดียวกัน จึงอาจใช้หมดแล้วไม่เหลือที่ให้ตอบ เสียเงินแล้วไม่ได้อะไร และ prompt ภาษาไทยทำให้มันคิดยาวกว่าภาษาอังกฤษ\n\nที่ใช้ได้ดี: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`",
+    },
+    "models.pick_strong": {
+        "English": "**Runs a handful of times, and writes the article.** Quality is what you are paying for — the outline, the sections and the language polish all come from here.\n\nPick the best writer the budget allows. It gets 3000 tokens per reply, which is room enough that **a model that thinks before answering suits this box**, unlike the fast one.\n\nWorks well: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`.",
+        "ไทย": "**ถูกเรียกไม่กี่ครั้ง และเป็นตัวเขียนบทความ** คุณภาพคือสิ่งที่จ่ายเงินซื้อ ทั้งโครงร่าง เนื้อหาแต่ละหัวข้อ และการปรับภาษา มาจากตรงนี้\n\nเลือกตัวที่เขียนดีที่สุดเท่าที่งบไหว ได้งบ 3000 token ต่อหนึ่งคำตอบ ซึ่งกว้างพอที่ **โมเดลที่คิดก่อนตอบจะเหมาะกับช่องนี้** ต่างจากโมเดลเร็ว\n\nที่ใช้ได้ดี: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`",
+    },
     "models.slot_primary": {"English": "Primary provider", "ไทย": "ผู้ให้บริการหลัก"},
     "models.slot_primary_what": {
         "English": "Both roles use this unless one names the other.",

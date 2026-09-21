@@ -196,6 +196,9 @@ def _role_card(role):
             value=model_settings.setting(f"LLM_{role}_MODEL") or "",
             key=f"model_{role}",
             placeholder=placeholder or t("models.model_required"),
+            # What suits this role differs enough between the two that
+            # naming a good model for one is bad advice for the other.
+            help=t(f"models.pick_{role.lower()}"),
         )
         if placeholder:
             st.caption(t("models.model_default", name=placeholder))

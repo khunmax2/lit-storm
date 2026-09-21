@@ -203,6 +203,14 @@ _STRINGS = {
     "models.preset_label": {"English": "Shown as", "ไทย": "ชื่อที่แสดง"},
     "models.preset_save": {"English": "Offer it", "ไทย": "เพิ่มในรายการ"},
     "models.preset_remove": {"English": "Remove", "ไทย": "ลบ"},
+    "models.key_from_default": {
+        "English": "Uses the default provider's {name}.",
+        "ไทย": "ใช้ {name} ของผู้ให้บริการหลัก",
+    },
+    "models.cannot_run": {
+        "English": "These settings cannot start a run yet:",
+        "ไทย": "ค่าตั้งค่าชุดนี้ยังเริ่มการค้นคว้าไม่ได้:",
+    },
     "search.needs_endpoint": {
         "English": "Marked internal-only in the library, and needs a private "
         "Stanford endpoint that is not published.",

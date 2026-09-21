@@ -116,7 +116,16 @@ def _role_card(role):
         elif not model:
             st.caption(t("models.model_no_default"))
 
-        typed_key = _key_box(details.get("key", ""), f"role_{role}") if details.get("key") else ""
+        # The key belongs to the provider, not to the role. A role that
+        # inherits the default provider therefore inherits its key, and
+        # drawing the box again here offered three edits of one value —
+        # which read as three keys to fill in.
+        typed_key = ""
+        if details.get("key"):
+            if provider:
+                typed_key = _key_box(details["key"], f"role_{role}")
+            else:
+                st.caption(t("models.key_from_default", name=details["key"]))
         typed_base = ""
         if details.get("base"):
             typed_base = st.text_input(
@@ -217,6 +226,17 @@ def model_settings_page():
     default = (model_settings.setting("LLM_PROVIDER") or "gemini").strip().lower()
     ui_theme.page_header(t("models.title"), t("models.using", name=default))
     st.caption(t("models.intro"))
+
+    # Changing the default provider leaves the role model names behind —
+    # they are ids in the old provider's vocabulary, or absent for a provider
+    # that ships no defaults. Both fail when a run starts, in front of
+    # whoever pressed the button rather than the admin who changed this. So
+    # resolve them here and say so now.
+    try:
+        demo_util.lm_settings()
+    except demo_util.LMConfigError as error:
+        st.error(t("models.cannot_run"))
+        st.code(str(error), language=None)
 
     with st.container(border=True, key="role_default"):
         st.markdown(

@@ -37,7 +37,19 @@ def _show_test(scope):
     _, ok, message, seconds, extra = result
     if not ok:
         st.error(t("models.test_failed"))
-        st.code(t("models.empty_reply") if message == "empty_reply" else message, language=None)
+        # Wrapped: the part of a provider error that says what went wrong
+        # is at the end, after the exception class and litellm's own
+        # re-raise. Unwrapped it sits past the right edge of the card.
+        st.code(
+            t("models.empty_reply") if message == "empty_reply" else message,
+            language=None,
+            wrap_lines=True,
+        )
+        # A rejected key reads as a fault in this app rather than at the
+        # provider: OpenRouter answers a revoked key with "User not found",
+        # which sounds like a missing account here. Say whose it is.
+        if message.startswith("AuthenticationError"):
+            st.caption(t("models.auth_hint"))
         return
     if scope == "encoder":
         st.success(t("models.encoder_ok", seconds=f"{seconds:.1f}", dimensions=extra))
@@ -317,7 +329,7 @@ def model_settings_page():
         demo_util.lm_settings()
     except demo_util.LMConfigError as error:
         st.error(t("models.cannot_run"))
-        st.code(str(error), language=None)
+        st.code(str(error), language=None, wrap_lines=True)
 
     _provider_slots()
 

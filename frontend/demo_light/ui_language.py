@@ -212,6 +212,11 @@ _STRINGS = {
         "และข้อมูลไม่ออกจากเครื่อง ทั้งสองช่องไม่บังคับ เว้นว่างแล้วจะใช้ค่าในช่องจาง "
         "โมเดลต้องเป็นตัวที่ Ollama ดาวน์โหลดไว้แล้ว",
     },
+    "models.auth_hint": {
+        "English": "The provider rejected the key — this is about the key, not about your account here. Check that it is current, and that it was "
+        "copied whole.",
+        "ไทย": "ผู้ให้บริการปฏิเสธคีย์ เรื่องนี้เกี่ยวกับคีย์ ไม่เกี่ยวกับบัญชีของคุณในระบบนี้ ตรวจว่าคีย์ยังใช้งานได้อยู่ และคัดลอกมาครบทั้งสาย",
+    },
     "models.slot_primary": {"English": "Primary provider", "ไทย": "ผู้ให้บริการหลัก"},
     "models.slot_primary_what": {
         "English": "Both roles use this unless one names the other.",

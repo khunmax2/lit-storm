@@ -149,11 +149,46 @@ _STRINGS = {
         "ไทย": "ผู้ช่วยค้นคว้าแบบวนซ้ำพร้อมแผนผังการค้นคว้าสด "
         "เป็นแอปแยกที่นำมาแสดงในกรอบ ค่าตั้งค่าเป็นของมันเอง",
     },
-    "research.not_configured": {
-        "English": "Deep Research is not running. Start it with "
-        "`docker compose up -d` in deploy/research-ui, or set RESEARCH_UI_URL.",
-        "ไทย": "Deep Research ยังไม่ได้รัน เริ่มด้วย `docker compose up -d` ใน "
-        "deploy/research-ui หรือตั้งค่า RESEARCH_UI_URL",
+    "research_ui.not_configured": {
+        "English": "Deep Research has no address set. Set RESEARCH_UI_URL, "
+        "or leave it unset to use the stack's own.",
+        "ไทย": "ยังไม่ได้ตั้งที่อยู่ของ Deep Research ตั้งค่า RESEARCH_UI_URL "
+        "หรือเว้นว่างไว้เพื่อใช้ค่าของสแตก",
+    },
+    "research.not_running": {
+        "English": "Deep Research is not answering. Start it with "
+        "`docker compose up -d research-ui` in deploy.",
+        "ไทย": "Deep Research ไม่ตอบสนอง เริ่มด้วย "
+        "`docker compose up -d research-ui` ในโฟลเดอร์ deploy",
+    },
+    "agents_research.not_configured": {
+        "English": "The agents researcher has no address set. Set "
+        "AGENTS_RESEARCH_URL, or leave it unset to use the stack's own.",
+        "ไทย": "ยังไม่ได้ตั้งที่อยู่ของผู้ช่วยค้นคว้าแบบเอเจนต์ ตั้งค่า "
+        "AGENTS_RESEARCH_URL หรือเว้นว่างไว้เพื่อใช้ค่าของสแตก",
+    },
+    "agents.not_running": {
+        "English": "The agents researcher is not answering. Start it with "
+        "`docker compose up -d agents-research` in deploy.",
+        "ไทย": "ผู้ช่วยค้นคว้าแบบเอเจนต์ไม่ตอบสนอง เริ่มด้วย "
+        "`docker compose up -d agents-research` ในโฟลเดอร์ deploy",
+    },
+    "agents.frame_note": {
+        "English": "Runs in its own window below. Its reports are not kept "
+        "in your library.",
+        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานจะไม่ถูกเก็บในคลังบทความของคุณ",
+    },
+    "sibling.probe_said": {
+        "English": "Asked {url} and got: {detail}",
+        "ไทย": "ลองเรียก {url} แล้วได้: {detail}",
+    },
+    "sibling.retry": {"English": "Check again", "ไทย": "ตรวจอีกครั้ง"},
+    "home.engine_agents": {"English": "Agent Research", "ไทย": "Agent Research"},
+    "home.engine_agents_note": {
+        "English": "Plans a report, then researches each part in a loop "
+        "until it stops finding gaps. A separate application, framed here.",
+        "ไทย": "วางโครงรายงานก่อน แล้วค้นคว้าทีละส่วนวนซ้ำจนไม่เหลือช่องว่าง "
+        "เป็นแอปแยกที่นำมาแสดงในกรอบ",
     },
     "research.frame_note": {
         "English": "Runs in its own window below. Its history stays in this browser.",

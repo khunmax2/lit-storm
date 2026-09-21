@@ -1,6 +1,6 @@
 # The stack
 
-Eight services, one compose project, one network, one `.env`.
+Nine services, one compose project, one network, one `.env`.
 
 ```
 cp .env.example .env     # then fill it in
@@ -11,7 +11,8 @@ docker compose up -d --build
 | --- | --- | --- |
 | `app` | the Streamlit app | `127.0.0.1:8501` |
 | `research-ui` | Deep Research, framed in a tab | `127.0.0.1:3100` |
-| `searxng` | metasearch for both of them | `127.0.0.1:8080` |
+| `agents-research` | Agent Research, framed in a tab | `127.0.0.1:3200` |
+| `searxng` | metasearch for all of them | `127.0.0.1:8080` |
 | `gateway` | nginx, presenting the two Supabase paths | `127.0.0.1:8000` |
 | `auth` | GoTrue | inside only |
 | `rest` | PostgREST | inside only |

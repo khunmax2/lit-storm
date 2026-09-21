@@ -207,6 +207,40 @@ services:
         max-size: "2m"
         max-file: "2"
 
+  # --------------------------------------------- agents-deep-research
+  # The fourth engine, and the second sibling framed in a tab. Upstream is a
+  # library with no web surface, so our copy adds one — the image is built
+  # from ../../agents-deep-research, which is our repo rather than a GitHub
+  # fork, pinned in agents-research/agents-research-pin.json.
+  agents-research:
+    image: ${AGENTS_RESEARCH_IMAGE:-lit-storm/agents-research:dev}
+    restart: unless-stopped
+    environment:
+      # Its own models, deliberately. It is a separate application and the
+      # host app's Models page does not reach across — see its README for
+      # why the fast model here is not the one STORM uses.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      REASONING_MODEL_PROVIDER: ${AGENTS_MODEL_PROVIDER:-openrouter}
+      MAIN_MODEL_PROVIDER: ${AGENTS_MODEL_PROVIDER:-openrouter}
+      FAST_MODEL_PROVIDER: ${AGENTS_MODEL_PROVIDER:-openrouter}
+      REASONING_MODEL: ${AGENTS_REASONING_MODEL:-deepseek/deepseek-v4.1-flash}
+      MAIN_MODEL: ${AGENTS_MAIN_MODEL:-deepseek/deepseek-v4.1-flash}
+      FAST_MODEL: ${AGENTS_FAST_MODEL:-openai/gpt-4o-mini}
+      # The same SearXNG both other engines use. "searchxng" is upstream's
+      # spelling of the provider name, typo and all.
+      SEARCH_PROVIDER: ${AGENTS_SEARCH_PROVIDER:-searchxng}
+      SEARCHXNG_HOST: ${AGENTS_SEARXNG_HOST:-http://searxng:8080}
+    depends_on:
+      searxng:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${AGENTS_RESEARCH_PORT:-3200}:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "2m"
+        max-file: "2"
+
   # ----------------------------------------------------------------- app
   app:
     image: ${LIT_STORM_IMAGE:-lit-storm/app:dev}
@@ -232,6 +266,8 @@ services:
         condition: service_started
       searxng:
         condition: service_healthy
+      agents-research:
+        condition: service_started
     extra_hosts:
       # Ollama runs on the host, not in this stack, so host.docker.internal
       # has to resolve. Docker Desktop provides it; a Linux host does not

@@ -1,12 +1,12 @@
 {
   "_comment": "Which commit of our copy the stack expects, and which image was built from it. Deploys use an image; nothing is patched or resolved at deploy time.",
   "repository": "https://github.com/khunmax2/lit_agents-deep-research",
-  "commit": "0da55382c7d4f329cfa068dbe986950eb3026b1f",
+  "commit": "be071e1399e044dc1975f0413143ba7cc917a29f",
   "upstream": "https://github.com/qx-labs/agents-deep-research",
   "upstream_commit": "5e7f4b2321b20bf04c72a405688ab9980887c603",
   "upstream_license": "Apache-2.0",
   "image": "lit-storm/agents-research:dev",
-  "image_id": "sha256:c066e8a72e4ac404ab4dd438a1023eddc2c837b386c19ee6b708a84c77c0e129",
+  "image_id": "sha256:e36ecca2e6787dd74745e290723bab7e38a5175cb923090932cd2a445f403056",
   "built": "2026-09-21",
   "_visibility": "The GitHub repository is private, so there is no GHCR image yet; the stack builds locally from ../../agents-deep-research."
 }

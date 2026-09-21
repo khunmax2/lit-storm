@@ -1,44 +1,47 @@
 # The stack
 
-Nine services, one compose project, one network, one `.env`.
+Ten services, one compose project, one network, one `.env`.
 
 ```
 cp .env.example .env     # then fill it in
 docker compose up -d --build
 ```
 
+**One port is published: the edge.** Everything else is reached through it
+or by service name from inside.
+
 | service | what it is | reachable at |
 | --- | --- | --- |
-| `app` | the Streamlit app | `127.0.0.1:8501` |
-| `research-ui` | Deep Research, framed in a tab | `127.0.0.1:3100` |
-| `agents-research` | Agent Research, framed in a tab | `127.0.0.1:3200` |
-| `searxng` | metasearch for all of them | `127.0.0.1:8080` |
-| `gateway` | nginx, presenting the two Supabase paths | `127.0.0.1:8000` |
+| `edge` | nginx, the stack's only door | `127.0.0.1:${LIT_STORM_HTTP_PORT}` |
+| `app` | the Streamlit app | `/` |
+| `research-ui` | Deep Research, framed in a tab | `/research/` |
+| `agents-research` | Agent Research, framed in a tab | `/agents/` |
+| `searxng` | metasearch for all of them | inside only |
+| `gateway` | nginx, presenting the two Supabase paths | inside only |
 | `auth` | GoTrue | inside only |
 | `rest` | PostgREST | inside only |
-| `db` | Postgres | `127.0.0.1:5433` |
+| `db` | Postgres | inside only |
 | `schema` | applies the app's schema, then exits 0 | one shot |
 
 Each has a README of its own in the directory beside this file, for the
-things specific to it. Everything binds to loopback; a deployment puts a
-reverse proxy in front.
+things specific to it.
 
-## Published ports are a development convenience
+## Why only one port
 
-Every `ports:` entry here binds `127.0.0.1` on the machine running the
-stack. That is right for a laptop and wrong for a host, for a reason worth
-seeing before it bites: **the host's ports are one namespace shared with
-every other stack on it.** Starting this alongside another project that
-publishes 8080 fails with
+**The host's ports are one namespace shared with every other stack on it.**
+This stack used to claim six of them, and starting it beside another project
+that publishes 8080 failed with
 
 ```
 Bind for 127.0.0.1:8080 failed: port is already allocated
 ```
 
-which is why `SEARXNG_PORT` exists. Moving a port is the small fix. The
-real one is not to publish it.
+Moving the port would have been the small fix. Publishing one port is the
+real one — and it makes the laptop the same shape as a host, so `/research/`
+working here is evidence that it will work deployed rather than something to
+find out later.
 
-Only three of the nine are reached by a browser at all:
+Only three services are reached by a browser at all:
 
 | service | who reaches it | needs publishing? |
 | --- | --- | --- |
@@ -49,14 +52,35 @@ Only three of the nine are reached by a browser at all:
 | `gateway`, `auth`, `rest` | the app, server-side — `supabase-py` runs in the app, not in the browser | **no** |
 | `db` | `rest`, `auth`, and a human doing maintenance | **no** |
 
-So on a host: drop every `ports:` except behind one reverse proxy holding
-443, and let the rest talk on `lit-storm_default` where the names already
-resolve. Nothing in the application changes — the app reaches Supabase at
-`http://gateway:8000` and SearXNG at `http://searxng:8080` today, neither
-of which goes through a published port.
+That is what `edge` does. Nothing in the application changed to make it
+possible — the app already reached Supabase at `http://gateway:8000` and
+SearXNG at `http://searxng:8080`, neither through a published port. A
+deployment swaps this one port for 443 and a certificate.
 
-Two stacks can then sit on one host without knowing about each other,
-because neither asks the host for anything except through the proxy.
+Two stacks can sit on one host without knowing about each other, because
+neither asks the host for anything except through its own proxy.
+
+Getting there needed three things that are easy to get wrong, all recorded
+in the files that fix them:
+
+- **Streamlit needs the WebSocket upgrade.** Without `Upgrade`/`Connection`
+  headers the page loads and then sits there, because the socket carrying
+  every rerun never opens.
+- **`/research/` must not have its prefix stripped.** Nuxt is told it lives
+  there and builds its pages and asset URLs under it; handed `/` it answers
+  500.
+- **`/agents/` must.** Our own page fetches `api/runs` relative, so it works
+  at whatever path it is mounted.
+
+## Running the app outside the stack
+
+`streamlit run` on a laptop against these containers reaches neither the
+service names nor the edge's paths. Point it at the edge:
+
+```
+RESEARCH_UI_URL=http://localhost:8080/research/
+AGENTS_RESEARCH_URL=http://localhost:8080/agents/
+```
 
 ## It used to be four projects
 

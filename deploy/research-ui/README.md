@@ -33,7 +33,10 @@ one search provider both applications support:
 | `NUXT_AI_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | `NUXT_PUBLIC_WEB_SEARCH_PROVIDER` | `tavily` — the only overlap with this app's sources |
 
-Listens on `127.0.0.1:3100`. The main app reads `RESEARCH_UI_URL` and
+Served at `/research/` through the stack's edge proxy; it publishes no
+port of its own. `NUXT_APP_BASE_URL` has to match that path — the edge does
+not strip it, because Nuxt builds its pages and asset URLs under it and
+answers 500 when handed `/`. The main app reads `RESEARCH_UI_URL` and
 defaults to that.
 
 **Verified:** `gemini-3.6-flash` answers through the OpenAI-compatible

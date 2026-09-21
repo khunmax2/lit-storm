@@ -13,8 +13,8 @@ its reports stay on its side.
 docker compose up -d agents-research     # from deploy/
 ```
 
-It answers on `127.0.0.1:3200`, and the app frames it in the **Agent
-Research** tab.
+It answers at `/agents/` through the stack's edge proxy, and the app
+frames it in the **Agent Research** tab. It publishes no port of its own.
 
 ## Upstream is a library; the web surface is ours
 

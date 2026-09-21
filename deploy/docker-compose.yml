@@ -15,6 +15,35 @@
 name: lit-storm
 
 services:
+  # ---------------------------------------------------------------- edge
+  # The stack's one door. Everything else stops publishing a port, so this
+  # asks the host for exactly one — which is what lets another stack share
+  # the machine, and what makes the laptop shaped like a host.
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./edge/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+      - research-ui
+      - agents-research
+    ports:
+      - "127.0.0.1:${LIT_STORM_HTTP_PORT:-8080}:8080"
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget tries ::1 first and nginx
+      # listens on IPv4 only, so the check was refused by a proxy that was
+      # answering every request put to it.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   # ------------------------------------------------------------ Supabase
   # Cut down to what the app actually calls: GoTrue (sign up, sign in, sign
   # out, refresh, get user) and PostgREST (`table` and `rpc`). No Storage,
@@ -31,10 +60,11 @@ services:
       # Runs once, on an empty data directory: the roles GoTrue and PostgREST
       # sign in as, then the app's own schema.
       - ./supabase/init:/docker-entrypoint-initdb.d:ro
-    ports:
-      # Exposed so the schema and a restore can be driven from the host. Bound
-      # to loopback: nothing outside this machine should reach the database.
-      - "127.0.0.1:5433:5432"
+    # No published port. The schema and a restore are driven through
+    # `docker compose exec db psql` and `pg_dumpall`, which need no port at
+    # all; publishing one only offers the database to whatever else is on
+    # the host. Add `-p 127.0.0.1:5433:5432` to a one-off `docker run` if a
+    # GUI client is genuinely needed.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -132,8 +162,9 @@ services:
       - rest
     volumes:
       - ./supabase/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "127.0.0.1:${SUPABASE_PORT:-8000}:8000"
+    # No published port. supabase-py runs inside the app, server-side, and
+    # reaches this at http://gateway:8000 on the stack's own network. The
+    # browser never calls Supabase directly.
 
   # ------------------------------------------------------------- SearXNG
   # One metasearch instance for both applications: no key, no quota, and one
@@ -151,16 +182,10 @@ services:
       # Signs sessions and CSRF tokens. Generated once in .env rather than
       # kept in settings.yml, so the file can be committed.
       SEARXNG_SECRET: ${SEARXNG_SECRET:-lit-storm-local-dev-not-for-production}
-    ports:
-      # Loopback only. Exposing a metasearch instance to a network invites
-      # abuse, and these two applications are the only clients.
-      #
-      # The host port is settable because 8080 is the most contended port on
-      # a development machine — another project of this author's publishes a
-      # gateway there, and starting both stacks failed with "port is already
-      # allocated". Nothing inside the stack is affected: services reach
-      # SearXNG by name on 8080 whatever this is set to.
-      - "127.0.0.1:${SEARXNG_PORT:-8080}:8080"
+    # No published port, and this is the one that proved the rule: it was
+    # the only port written into this file rather than read from .env, and
+    # it was the one that collided with another stack on 8080. Its three
+    # clients are all inside, and reach it as http://searxng:8080.
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
       interval: 10s
@@ -192,20 +217,24 @@ services:
       # To sit under a path beside the main app — a deployment host opens
       # 443 and nothing else, so the sibling lives at a path, never a port.
       # Nuxt reads this at runtime; leave it unset for the root.
-      NUXT_APP_BASE_URL: ${RESEARCH_UI_BASE_PATH:-/}
+      NUXT_APP_BASE_URL: ${RESEARCH_UI_BASE_PATH:-/research/}
       # Reached by service name, which is what being one stack buys: this
       # used to need `searxng` declared as an external network.
       NUXT_WEB_SEARCH_API_BASE: ${NUXT_WEB_SEARCH_API_BASE:-http://searxng:8080}
     depends_on:
       searxng:
         condition: service_healthy
-    ports:
-      # Loopback only, like every other service here. Reaching it from a
-      # browser goes through the main app's frame, or through whatever
-      # reverse proxy fronts a deployment.
-      - "127.0.0.1:3100:3000"
+    # No published port: the browser reaches this through the edge, at
+    # /research/, which is what a deployment would do anyway.
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      # Follows NUXT_APP_BASE_URL: with a base path set, "/" is a 500 and
+      # the container would report unhealthy while serving perfectly.
+      #
+      # $$ and not $: compose expands ${...} itself, at parse time, from the
+      # host's .env — where this is not set. Written with one $ it became
+      # "/" before the container ever saw it, and the check failed for the
+      # very reason it was rewritten to avoid.
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000$${NUXT_APP_BASE_URL:-/}"]
       interval: 15s
       timeout: 5s
       retries: 6
@@ -241,8 +270,8 @@ services:
     depends_on:
       searxng:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:${AGENTS_RESEARCH_PORT:-3200}:3000"
+    # No published port: the browser reaches this through the edge, at
+    # /agents/.
     logging:
       driver: json-file
       options:
@@ -281,8 +310,7 @@ services:
       # has to resolve. Docker Desktop provides it; a Linux host does not
       # without this line.
       - "host.docker.internal:host-gateway"
-    ports:
-      - "127.0.0.1:${LIT_STORM_PORT:-8501}:8501"
+    # No published port: the edge serves this at the root.
     logging:
       driver: json-file
       options:

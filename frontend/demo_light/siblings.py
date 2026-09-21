@@ -8,13 +8,21 @@ here so the two tabs cannot drift apart.
 Each sibling has two addresses, and the difference matters:
 
 * the **browser** address, which goes into the iframe and is resolved by the
-  person's browser — `http://localhost:3100`, published by the compose file;
+  person's browser. Behind the edge proxy this is a path on the same origin
+  — `/research/` — so it needs no host and no port, and works unchanged
+  whatever the deployment is called.
 * the **internal** address, which this app uses to ask whether the sibling is
   up — `http://research-ui:3000`, the service name on the stack's network.
 
 Probing the browser address from inside this container asks the container
 about itself and always fails. That is not a hypothetical: it is the first
 thing that goes wrong when a health check is added to a framed tab.
+
+Running the app outside the stack — `streamlit run` on a laptop, against
+these same containers — neither default applies: the service name does not
+resolve and there is no edge in front. Set RESEARCH_UI_URL and
+AGENTS_RESEARCH_URL to the edge's own address, such as
+`http://localhost:8088/research/`.
 """
 
 import urllib.error
@@ -59,7 +67,7 @@ class Sibling:
 RESEARCH_UI = Sibling(
     name="research_ui",
     browser_setting="RESEARCH_UI_URL",
-    browser_default="http://localhost:3100",
+    browser_default="/research/",
     internal_setting="RESEARCH_UI_INTERNAL_URL",
     internal_default="http://research-ui:3000",
     # Nuxt has no health endpoint of its own; the root answering 200 is the
@@ -70,7 +78,7 @@ RESEARCH_UI = Sibling(
 AGENTS_RESEARCH = Sibling(
     name="agents_research",
     browser_setting="AGENTS_RESEARCH_URL",
-    browser_default="http://localhost:3200",
+    browser_default="/agents/",
     internal_setting="AGENTS_RESEARCH_INTERNAL_URL",
     internal_default="http://agents-research:3000",
     # Ours, so it has a real one — and it reports whether a model key is
@@ -115,7 +123,12 @@ def reachable(sibling):
     """
     tried = []
     for base in (sibling.internal_url(), sibling.browser_url()):
-        if not base or base in [address for address, _ in tried]:
+        # A same-origin path is what the browser resolves, and there is
+        # nothing here to resolve it against — skip it rather than build a
+        # nonsense URL and report the sibling down because of it.
+        if not base or not base.startswith("http"):
+            continue
+        if base in [address for address, _ in tried]:
             continue
         ok, detail = _probe(base + sibling.health_path)
         if ok:
@@ -123,7 +136,10 @@ def reachable(sibling):
         tried.append((base, detail))
 
     if not tried:
-        return False, "no address set"
+        # Nothing absolute to ask. Saying "down" would be a guess dressed as
+        # a fact, and it would hide a sibling that is working; the frame is
+        # a better test than this check ever was.
+        return True, "not checked"
     return False, ", ".join(f"{address} → {detail}" for address, detail in tried)
 
 
@@ -145,13 +161,19 @@ def frame_url(sibling):
     base = sibling.browser_url()
     if not base:
         return ""
-    theme = "light"
-    try:
-        theme = "dark" if st.context.theme.type == "dark" else "light"
-    except Exception:  # noqa: BLE001 - no theme context outside a real session
-        pass
+    # Works for both shapes without asking which it is: "/research/" stays a
+    # path the browser resolves against this origin, and an absolute address
+    # keeps its host. `browser_url` has already taken the trailing slash off
+    # either one.
     query = {"embed": "1", "lang": LANG_CODES.get(ui_language.current(), "en")}
     if sibling.pass_theme:
-        query["theme"] = theme
-    query = urlencode(query)
-    return f"{base}/?{query}"
+        query["theme"] = _theme()
+    return f"{base}/?{urlencode(query)}"
+
+
+def _theme():
+    """"dark" or "light", as far as this app can tell. See `frame_url`."""
+    try:
+        return "dark" if st.context.theme.type == "dark" else "light"
+    except Exception:  # noqa: BLE001 - no theme context outside a real session
+        return "light"

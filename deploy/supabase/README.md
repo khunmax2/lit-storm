@@ -36,7 +36,7 @@ The stack listens on `127.0.0.1` only:
 | Port | Service |
 | --- | --- |
 | 8000 | gateway — this is `SUPABASE_URL` |
-| 5433 | Postgres, for restores and inspection |
+| 5433 | *no longer published* — see below |
 
 To start over, deleting all data: `docker compose down -v`.
 
@@ -92,7 +92,10 @@ history and the process list.
 - The ports bind to loopback. Putting this on a network means TLS in front and
   a real `SUPABASE_PUBLIC_URL`.
 - `docker compose down -v` deletes the database. There is no backup job here;
-  `pg_dump` against port 5433 is the whole story.
+  `docker compose exec db pg_dumpall -U postgres` is the whole story.
+  Nothing here publishes a port any more: the stack has one door and it
+  is the edge proxy, so the database is reached through `exec` rather
+  than offered to whatever else is on the host.
 
 ## Regenerating `.env`
 

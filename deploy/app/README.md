@@ -11,8 +11,9 @@ cp .env.example .env     # then fill it in
 docker compose up -d --build
 ```
 
-It listens on `127.0.0.1:8501`. It is one service of the stack in
-`deploy/docker-compose.yml`, on one network with the rest.
+It is served at `/` through the stack's edge proxy and publishes no port
+of its own. One service of the stack in `deploy/docker-compose.yml`, on one
+network with the rest.
 
 ## No secrets.toml, on purpose
 

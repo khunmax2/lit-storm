@@ -179,8 +179,8 @@ _STRINGS = {
         "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานจะไม่ถูกเก็บในคลังบทความของคุณ",
     },
     "sibling.probe_said": {
-        "English": "Asked {url} and got: {detail}",
-        "ไทย": "ลองเรียก {url} แล้วได้: {detail}",
+        "English": "Tried: {detail}",
+        "ไทย": "ลองเรียก: {detail}",
     },
     "sibling.retry": {"English": "Check again", "ไทย": "ตรวจอีกครั้ง"},
     "home.engine_agents": {"English": "Agent Research", "ไทย": "Agent Research"},

@@ -27,9 +27,10 @@ def framed_page(sibling, note_key, down_key, container_key):
     up, detail = siblings.reachable(sibling)
     if not up:
         st.warning(t(down_key))
-        # The probe's own words, for whoever is fixing it: "ConnectionError"
-        # and "404" send you to different places.
-        st.caption(t("sibling.probe_said", detail=detail, url=sibling.internal_url()))
+        # Every address tried and what each said, for whoever is fixing it.
+        # Naming only one was wrong as soon as there were two: on a host run
+        # the service name always fails and the message pointed at it.
+        st.caption(t("sibling.probe_said", detail=detail))
         if st.button(t("sibling.retry"), key=f"retry_{sibling.name}"):
             siblings._probe.clear()
             st.rerun()

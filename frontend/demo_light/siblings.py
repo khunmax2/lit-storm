@@ -97,11 +97,29 @@ def _probe(url):
 
 
 def reachable(sibling):
-    """Whether the sibling answers, asked over the stack's own network."""
-    base = sibling.internal_url()
-    if not base:
-        return False, "unset"
-    return _probe(base + sibling.health_path)
+    """Whether the sibling answers at either address it might have.
+
+    Both are tried because this app runs in two places. Inside the stack the
+    service name resolves and the published port does not; on a laptop
+    running `streamlit run` against the same containers it is the other way
+    round — `agents-research:3000` is a Docker network name and means nothing
+    on the host.
+
+    Checking only the internal one was the first version, and it reported
+    every sibling as down for anyone not running the app in a container.
+    """
+    tried = []
+    for base in (sibling.internal_url(), sibling.browser_url()):
+        if not base or base in [address for address, _ in tried]:
+            continue
+        ok, detail = _probe(base + sibling.health_path)
+        if ok:
+            return True, f"{base} → {detail}"
+        tried.append((base, detail))
+
+    if not tried:
+        return False, "no address set"
+    return False, ", ".join(f"{address} → {detail}" for address, detail in tried)
 
 
 def frame_url(sibling):

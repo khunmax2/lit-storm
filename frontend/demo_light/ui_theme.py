@@ -286,6 +286,24 @@ span[class*="material-icons"] {{
     align-items: baseline;
 }}
 
+/* The engine switch. Centred by the row around it rather than by a column
+   ratio, so its width is decided by its labels — and allowed to wrap, so a
+   narrow window puts the fourth engine on a second line instead of hiding
+   it in a scroller no one can see. */
+/* Centred by its own margins: sized to its content, the switch is a flex
+   item in Streamlit's column and the column aligns its items to the start,
+   so centring the row inside the switch moved nothing. */
+.st-key-home_engine {{
+    margin-left: auto !important;
+    margin-right: auto !important;
+}}
+.st-key-home_engine [role="radiogroup"] {{
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    overflow: visible !important;
+    max-width: 100% !important;
+}}
+
 .lp-note {{
     text-align: center;
     font-size: 0.82rem;
@@ -470,12 +488,24 @@ span[class*="material-icons"] {{
     color: var(--ink) !important;
     background: var(--nav-hover) !important;
 }}
-/* Streamlit adds a chevron after a popover's label; on a menu that is only
-   its icon, the chevron is a second glyph saying the same thing. */
-[data-testid="stVerticalBlock"]:has(
-    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
-)
-    [data-testid="stPopover"] button [data-testid="stIconMaterial"]:last-of-type {{
+/* Streamlit adds a chevron after a popover's label. This menu already says
+   what it is twice — a ⋮ and the word — so the chevron is a third glyph for
+   the same thing.
+   It is matched by the wrapper Streamlit marks aria-hidden, which is the
+   chevron and nothing else. The selector here used to say `:last-of-type`
+   on the icon, and `:last-of-type` counts siblings of the same tag inside
+   each parent: the chevron and the menu's own ⋮ sit in different wrappers,
+   so each was the last of its type and both disappeared. That cost nothing
+   while the menu was icon-only, which is when it was written. Once the menu
+   gained a label the button was left with the word between two empty 16px
+   boxes and visibly off its own centre.
+
+   Both ⋮ menus are named here rather than the article card alone: the one
+   on a member's row carried ⋮, the word and a chevron, three affordances
+   for one action, purely because the rule that removed the third had been
+   written inside the card's scope. */
+[class*="st-key-card_menu_"] [data-testid="stPopover"] button [aria-hidden="true"],
+[class*="st-key-admin_action_"] [data-testid="stPopover"] button [aria-hidden="true"] {{
     display: none;
 }}
 /* The card's own action: outlined, not filled. It opens something, it does
@@ -734,6 +764,35 @@ span[class*="material-icons"] {{
     .st-key-lang_selector [role="group"] {{
         gap: 4px !important;
     }}
+}}
+
+/* Streamlit's own small controls, measured on the settings pages: the eye
+   that reveals an API key is 32x16, the ✕ on a chosen search source is
+   15x7, and the `?` that explains what a model role wants — the one thing
+   on that page written to be read — is 16x16. WCAG 2.2 Target Size
+   (Minimum) is 24x24 for a pointer, so all three are under it with a mouse
+   before touch is considered at all.
+   Matched by aria-label and by testid, both of which Streamlit keeps
+   stable; its class names are generated per build and are not.
+
+   24 and not the 44 the touch block below asks for, and this rule is the
+   more specific of the two so it wins on a phone as well. That is
+   deliberate: each of these sits inside a larger control — the eye inside a
+   40px field, the ✕ inside a chip inside one — and a 44px child would
+   burst the parent it lives in. WCAG 2.2 puts the pointer minimum at 24 for
+   exactly this case; the field itself is the full-size target. */
+.stApp [data-testid="stTextInputRootElement"] button,
+.stApp [data-testid="stTooltipHoverTarget"] > button,
+.stApp button[aria-label^="Remove"],
+.stApp button[aria-label="Clear all"],
+.stApp button[aria-label="Open"] {{
+    min-width: 24px !important;
+    min-height: 24px !important;
+}}
+/* A taller ✕ makes a taller chip; centre what is in it rather than let it
+   sit against the top. */
+.stApp [data-baseweb="tag"] {{
+    align-items: center !important;
 }}
 
 /* Streamlit puts a 16x16 anchor link beside every heading, for linking to a
@@ -1109,10 +1168,8 @@ span[class*="material-icons"] {{
     opacity: 0.45;
     font-size: 0.85rem;
 }}
-/* Crumbs keep their own width — allowed to shrink, Streamlit's button box
-   comes up a hair short of its label and clips the last letter. The strip
-   clips instead, at its own edge, if a title is long enough to run into the
-   identity. */
+/* Crumbs keep their own width. The strip clips instead, at its own edge, if
+   a title is long enough to run into the identity. */
 .st-key-crumbs > [data-testid="stElementContainer"] {{
     display: flex !important;
     align-items: center !important;
@@ -1131,6 +1188,24 @@ span[class*="material-icons"] {{
     margin: 0 -0.35rem !important;
     border-radius: 6px !important;
     white-space: nowrap !important;
+    /* Size to the label, not to the box around it. The negative margin just
+       above pulls the crumb's padding back so its text lines up with the
+       content column — and it also shrinks the parent that Streamlit lays
+       the button out against, because that parent is shrink-to-fit. The
+       button then came out at exactly its own padding narrower than its
+       text, and Streamlit's label box ellipsises what does not fit: every
+       page showed a trimmed crumb, "หน้าแรก" as "หน้า...". An intrinsic
+       width breaks the loop — the button is as wide as what is in it,
+       whatever the box around it measures. */
+    width: max-content !important;
+}}
+/* With the width right nothing should ever be trimmed. A crumb that does
+   not fit is a strip clipping at its own edge, not a word with its end
+   eaten and a tooltip offered in apology. */
+.st-key-crumbs .stButton > button [data-testid="stMarkdownContainer"] {{
+    overflow: visible !important;
+    text-overflow: clip !important;
+    max-width: none !important;
 }}
 .st-key-crumbs .stButton > button:hover:not(:disabled) {{
     color: var(--ink) !important;

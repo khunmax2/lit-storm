@@ -25,6 +25,7 @@ AGENTS_RESEARCH_URL to the edge's own address, such as
 `http://localhost:8088/research/`.
 """
 
+import os
 import urllib.error
 import urllib.request
 from urllib.parse import urlencode
@@ -47,13 +48,17 @@ class Sibling:
     """One framed application: where it is, and what to call it."""
 
     def __init__(self, name, browser_setting, browser_default, internal_setting,
-                 internal_default, health_path, pass_theme=True):
+                 internal_default, health_path, pass_theme=True,
+                 internal_health_path=None):
         self.name = name
         self.browser_setting = browser_setting
         self.browser_default = browser_default
         self.internal_setting = internal_setting
         self.internal_default = internal_default
         self.health_path = health_path
+        # The path to ask the internal address for, when it differs from the
+        # browser one. See RESEARCH_UI below.
+        self.internal_health_path = internal_health_path or health_path
         # Whether to tell this sibling which theme to use. See `frame_url`.
         self.pass_theme = pass_theme
 
@@ -70,9 +75,19 @@ RESEARCH_UI = Sibling(
     browser_default="/research/",
     internal_setting="RESEARCH_UI_INTERNAL_URL",
     internal_default="http://research-ui:3000",
-    # Nuxt has no health endpoint of its own; the root answering 200 is the
-    # same thing its container healthcheck asks for.
+    # Nuxt has no health endpoint of its own; a page answering 200 is the
+    # same thing its container healthcheck asks for. Which page is not the
+    # root: Nuxt is told it lives at NUXT_APP_BASE_URL and answers "Cannot
+    # find any path matching /" everywhere else — and its own error page
+    # then throws, so the root is a 500 rather than a 404 and reads as a
+    # dead process. The container's healthcheck was given this prefix when
+    # the app moved under a path; this probe was not, so the tab reported
+    # the sibling down while the sibling was serving it perfectly.
+    #
+    # The browser address already carries the prefix, so only the internal
+    # one needs it added.
     health_path="/",
+    internal_health_path=os.environ.get("RESEARCH_UI_BASE_PATH", "/research/"),
 )
 
 AGENTS_RESEARCH = Sibling(
@@ -122,7 +137,11 @@ def reachable(sibling):
     every sibling as down for anyone not running the app in a container.
     """
     tried = []
-    for base in (sibling.internal_url(), sibling.browser_url()):
+    addresses = (
+        (sibling.internal_url(), sibling.internal_health_path),
+        (sibling.browser_url(), sibling.health_path),
+    )
+    for base, path in addresses:
         # A same-origin path is what the browser resolves, and there is
         # nothing here to resolve it against — skip it rather than build a
         # nonsense URL and report the sibling down because of it.
@@ -130,7 +149,7 @@ def reachable(sibling):
             continue
         if base in [address for address, _ in tried]:
             continue
-        ok, detail = _probe(base + sibling.health_path)
+        ok, detail = _probe(base + path)
         if ok:
             return True, f"{base} → {detail}"
         tried.append((base, detail))

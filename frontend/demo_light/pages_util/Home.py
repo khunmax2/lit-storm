@@ -48,21 +48,26 @@ def _engine():
 def _switch():
     """The choice, drawn where the hero's eyebrow used to be."""
     st.session_state.setdefault(ENGINE_KEY, STORM)
-    _, middle, _ = st.columns([1, 2, 1])
-    with middle:
-        st.segmented_control(
-            t("home.engine_label"),
-            list(ENGINES),
-            format_func=lambda name: f"{ENGINES[name][0]} {t(ENGINES[name][1])}",
-            key=ENGINE_KEY,
-            label_visibility="collapsed",
-            width="stretch",
-        )
-        st.markdown(
-            f'<div class="lp-note" style="margin-top:.35rem">'
-            f"{t(ENGINES[_engine()][2])}</div>",
-            unsafe_allow_html=True,
-        )
+    # Not in a middle column. `st.columns([1, 2, 1])` handed the switch a
+    # fixed half of the page, and four labels with their icons want 536px:
+    # at a 1400px window the row was given 478 and "Agent Research" was cut
+    # to "Agent R" — inside a scroller with nothing to say it scrolled, so
+    # the fourth engine simply looked like it had a short name. A fraction
+    # of the page cannot know what is being put into it. The stylesheet
+    # centres the row instead and lets it be its own width, and wrap when
+    # the window cannot hold it on one line.
+    st.segmented_control(
+        t("home.engine_label"),
+        list(ENGINES),
+        format_func=lambda name: f"{ENGINES[name][0]} {t(ENGINES[name][1])}",
+        key=ENGINE_KEY,
+        label_visibility="collapsed",
+    )
+    st.markdown(
+        f'<div class="lp-note" style="margin-top:.35rem">'
+        f"{t(ENGINES[_engine()][2])}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def home_page():

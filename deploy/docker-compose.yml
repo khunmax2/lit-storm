@@ -303,6 +303,11 @@ services:
       # /_stcore/stream all under it, so the proxy keeps the prefix rather
       # than stripping it.
       STREAMLIT_SERVER_BASE_URL_PATH: ${LIT_STORM_BASE_PATH:-lit-storm}
+      # Where the research sibling thinks it lives. The same value it is
+      # given below, because this app has to ask it for a page that exists:
+      # Nuxt answers 500 anywhere outside its base path, so a health probe
+      # at the root reports a healthy container as down.
+      RESEARCH_UI_BASE_PATH: ${RESEARCH_UI_BASE_PATH:-/research/}
     volumes:
       # The settings the admin pages write, and Streamlit's own scratch space
       # — HOME is /data in the image. Not the source tree: a mount over

@@ -88,9 +88,20 @@ def main():
     if "first_run" not in st.session_state:
         st.session_state["first_run"] = True
 
-    # set api keys from secrets
+    # Publish secrets.toml into the environment, for the code that reads
+    # os.environ directly rather than going through `auth.setting`.
+    #
+    # Guarded because a container has no secrets.toml — `auth.setting` says
+    # so in as many words — and iterating one that is not there raises
+    # instead of coming back empty. Nothing is lost when it does: what this
+    # loop would have published is what such a deployment already passes in
+    # as environment variables.
     if st.session_state["first_run"]:
-        for key, value in st.secrets.items():
+        try:
+            carried = list(st.secrets.items())
+        except FileNotFoundError:
+            carried = []
+        for key, value in carried:
             if type(value) == str:
                 os.environ[key] = value
 

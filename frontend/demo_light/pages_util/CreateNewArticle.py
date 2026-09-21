@@ -1,3 +1,4 @@
+import logging
 import os
 from html import escape
 
@@ -252,7 +253,18 @@ def _report_failure(status, error):
 
     Streamlit's default is to render the exception and its stack into the
     page, which tells a researcher nothing and looks like the app broke.
+
+    The stack still goes to the server log. Without that it is nowhere: a
+    run that died deep in the engine showed one line in the page —
+    "AttributeError: 'NoneType' object has no attribute 'strip'" — and left
+    no way to find out which call produced the None.
+
+    `exc_info=error` rather than `logging.exception`, which reads the
+    exception currently being handled — and by here there is none, because
+    the caller stores the error and reports it after the block so that an
+    errored status does not collapse over the explanation.
     """
+    logging.error("research run failed: %s", error, exc_info=error)
     auth.record_run_end(
         st.session_state.get("page3_run_id"), "failed", error=str(error)
     )

@@ -81,6 +81,8 @@ Windows (PowerShell), from the project root:
 
 **`--server.runOnSave` is not cosmetic.** Without it Streamlit reloads only the main script, not *imported modules* like `demo_util.py` — so an edit appears to do nothing until you restart. `watchdog` must be installed or file watching does not work at all. The cost of having it on: saving a file while Co-STORM is warming up restarts the script and **destroys the run in progress**, which can be fifteen minutes of work.
 
+**It does not cover `knowledge_storm/`.** Streamlit watches only modules under the folder holding the main script, which is `frontend/demo_light` — so an edit to the engine is loaded when the server starts and never again. The symptom is the confusing one: the page reloads, shows your new UI, and the engine behind it still behaves the old way. Restart the server after touching anything outside `frontend/demo_light`.
+
 Full walkthrough, including Windows commands and the Supabase setup: [frontend/demo_light/README.md](frontend/demo_light/README.md) (Thai).
 
 ---

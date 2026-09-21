@@ -39,13 +39,15 @@ class Sibling:
     """One framed application: where it is, and what to call it."""
 
     def __init__(self, name, browser_setting, browser_default, internal_setting,
-                 internal_default, health_path):
+                 internal_default, health_path, pass_theme=True):
         self.name = name
         self.browser_setting = browser_setting
         self.browser_default = browser_default
         self.internal_setting = internal_setting
         self.internal_default = internal_default
         self.health_path = health_path
+        # Whether to tell this sibling which theme to use. See `frame_url`.
+        self.pass_theme = pass_theme
 
     def browser_url(self):
         return (auth.setting(self.browser_setting) or self.browser_default).strip().rstrip("/")
@@ -74,6 +76,9 @@ AGENTS_RESEARCH = Sibling(
     # Ours, so it has a real one — and it reports whether a model key is
     # present as well as whether the process is up.
     health_path="/healthz",
+    # Ours also reads prefers-color-scheme itself, which is better than
+    # anything this app can tell it. See `frame_url`.
+    pass_theme=False,
 )
 
 
@@ -128,6 +133,14 @@ def frame_url(sibling):
     `lang` and `theme` so the frame matches the page around it, `embed=1` so
     it hides its own language and theme controls — which would otherwise sit
     under this app's and announce a second application.
+
+    `theme` is sent only to a sibling that cannot work it out alone.
+    `st.context.theme` documents that its value "may be incorrect during a
+    change in theme", which is precisely when the frame needs it: a frame
+    told the wrong theme sat dark inside a light page until something else
+    reloaded it. Our own sibling reads prefers-color-scheme in the browser
+    that is already displaying it, and follows changes live, so it is told
+    nothing and is never wrong.
     """
     base = sibling.browser_url()
     if not base:
@@ -137,11 +150,8 @@ def frame_url(sibling):
         theme = "dark" if st.context.theme.type == "dark" else "light"
     except Exception:  # noqa: BLE001 - no theme context outside a real session
         pass
-    query = urlencode(
-        {
-            "embed": "1",
-            "lang": LANG_CODES.get(ui_language.current(), "en"),
-            "theme": theme,
-        }
-    )
+    query = {"embed": "1", "lang": LANG_CODES.get(ui_language.current(), "en")}
+    if sibling.pass_theme:
+        query["theme"] = theme
+    query = urlencode(query)
     return f"{base}/?{query}"

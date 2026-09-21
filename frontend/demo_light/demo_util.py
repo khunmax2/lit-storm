@@ -645,30 +645,57 @@ ROLES = ("FAST", "STRONG")
 # return an empty string, which is a working call that said nothing.
 ROLE_TOKENS = {"FAST": 500, "STRONG": 3000}
 
-# What LLM_<ROLE>_REASONING may say, and what each means on the wire.
+# What LLM_<ROLE>_REASONING may say:
+#
+#   ""            leave the model alone — send nothing
+#   "off"         do not think
+#   "effort:high" think this hard, in the provider's own words
+#   "budget:800"  think for at most this many tokens
 #
 # Thinking is spent from the same budget as the answer, so on the fast
 # role's 500 tokens a model can use the lot and return nothing — billed,
 # and silent. Turning it off, or down, is the fix.
 #
-# Unset is its own answer and not the same as any of these: it sends no
-# reasoning parameter at all, which is what a model with nothing to turn
-# off needs, and what leaves a model that does think at its own default.
-#
-# OpenRouter's spelling. It is the only provider here that publishes which
-# models accept which — see model_capabilities.
+# Unset is its own answer and not the same as "off": it sends no parameter
+# at all, which is what a model with nothing to turn off needs, and what
+# leaves a thinking model at its own default.
 REASONING_OFF = "off"
-REASONING_EFFORTS = ("minimal", "low", "medium", "high")
 
 
-def reasoning_kwargs(setting_value):
-    """The `reasoning` argument for a saved setting, or {} for unset."""
+def reasoning_kwargs(setting_value, provider):
+    """The call argument for a saved setting, or {} for unset.
+
+    The shape depends on who is being called, and getting that wrong is
+    silent rather than loud. litellm does not list `reasoning_effort` as
+    supported for OpenRouter and `litellm.drop_params` is on, so sending it
+    there is dropped without a word: measured, `reasoning_effort="none"`
+    still spent 584 reasoning tokens, where OpenRouter's own `reasoning`
+    object spent 0. So OpenRouter is sent its object, and everyone else is
+    sent litellm's parameter for litellm to translate.
+    """
     value = (setting_value or "").strip().lower()
+    if not value:
+        return {}
+
+    kind, _, detail = value.partition(":")
+    openrouter = (provider or "").strip().lower() == "openrouter"
+
     if value == REASONING_OFF:
-        return {"reasoning": {"enabled": False}}
-    if value in REASONING_EFFORTS:
-        return {"reasoning": {"effort": value}}
+        # "none" is a real effort level in both vocabularies; `enabled:
+        # False` is OpenRouter's own spelling and the one measured to work.
+        return {"reasoning": {"enabled": False}} if openrouter else {"reasoning_effort": "none"}
+
+    if kind == "effort" and detail:
+        return {"reasoning": {"effort": detail}} if openrouter else {"reasoning_effort": detail}
+
+    if kind == "budget" and detail.isdigit():
+        # Only OpenRouter takes a raw token budget here. litellm expresses
+        # the same idea as an effort level, and picking one for a number
+        # would be inventing a mapping the page never promised.
+        return {"reasoning": {"max_tokens": int(detail)}} if openrouter else {}
+
     return {}
+
 
 
 def resolve_role(role, default_provider, lookup=None):
@@ -716,7 +743,7 @@ def resolve_role(role, default_provider, lookup=None):
         # Ride out the occasional 429 rather than failing the whole run.
         "num_retries": 6,
     }
-    kwargs.update(reasoning_kwargs(lookup(f"LLM_{role}_REASONING")))
+    kwargs.update(reasoning_kwargs(lookup(f"LLM_{role}_REASONING"), name))
     if "base" in provider:
         base = lookup(provider["base"])
         if not base:
@@ -756,14 +783,19 @@ def _settings_fingerprint(*calls):
     for model, kwargs in calls:
         secret = f"{kwargs.get('api_key', '')}|{kwargs.get('api_base', '')}"
         # Named, not just present: "medium" and "high" are different runs
-        # and a runner built for one must not be reused for the other.
+        # and a runner built for one must not be reused for the other. Both
+        # wire formats are read, because which one was used depends on the
+        # provider and the fingerprint must not depend on that.
         reasoning = kwargs.get("reasoning") or {}
-        if not reasoning:
-            thinking = "+think"
-        elif reasoning.get("enabled") is False:
+        effort = kwargs.get("reasoning_effort")
+        if reasoning.get("enabled") is False or effort == "none":
             thinking = "-think"
+        elif reasoning.get("effort") or effort:
+            thinking = "+" + str(reasoning.get("effort") or effort)
+        elif reasoning.get("max_tokens"):
+            thinking = f"+{reasoning['max_tokens']}tok"
         else:
-            thinking = "+" + str(reasoning.get("effort", "?"))
+            thinking = "+think"
         parts.append(
             f"{model}{thinking}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}"
         )

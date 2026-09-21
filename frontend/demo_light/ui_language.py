@@ -261,21 +261,27 @@ _STRINGS = {
         "ไทย": "**ถูกเรียกไม่กี่ครั้ง และเป็นตัวเขียนบทความ** คุณภาพคือสิ่งที่จ่ายเงินซื้อ ทั้งโครงร่าง เนื้อหาแต่ละหัวข้อ และการปรับภาษา มาจากตรงนี้\n\nเลือกตัวที่เขียนดีที่สุดเท่าที่งบไหว ได้งบ 3000 token ต่อหนึ่งคำตอบ ซึ่งกว้างพอที่ **โมเดลที่คิดก่อนตอบจะเหมาะกับช่องนี้** ต่างจากโมเดลเร็ว\n\nที่ใช้ได้ดี: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`",
     },
     "models.thinking": {"English": "Thinking", "ไทย": "การคิดก่อนตอบ"},
+    "models.thinking_default_named": {
+        "English": "The model's own default ({level})",
+        "ไทย": "ตามค่าเริ่มต้นของโมเดล ({level})",
+    },
+    "models.thinking_mandatory": {
+        "English": "This model cannot be told to stop thinking, only how hard.",
+        "ไทย": "โมเดลนี้สั่งให้หยุดคิดไม่ได้ ตั้งได้แค่ว่าจะให้คิดหนักแค่ไหน",
+    },
+    "models.thinking_budget": {
+        "English": "Thinking budget (tokens)",
+        "ไทย": "งบสำหรับการคิด (token)",
+    },
+    "models.thinking_budget_help": {
+        "English": "This model takes an allowance rather than a level. Zero leaves it at its own default. It comes out of the same budget as the answer, so keep it well under the role's.",
+        "ไทย": "โมเดลนี้รับเป็นจำนวน token ไม่ใช่ระดับ ใส่ 0 คือปล่อยตามค่าเริ่มต้นของมัน งบนี้กินรวมกับคำตอบ จึงควรตั้งให้ต่ำกว่างบของบทบาทนั้นพอสมควร",
+    },
     "models.thinking_default": {
         "English": "The model's own default",
         "ไทย": "ตามค่าเริ่มต้นของโมเดล",
     },
     "models.thinking_off": {"English": "Off", "ไทย": "ปิด"},
-    "models.thinking_minimal": {
-        "English": "Minimal — cheapest",
-        "ไทย": "น้อยที่สุด — ถูกที่สุด",
-    },
-    "models.thinking_low": {"English": "Low", "ไทย": "น้อย"},
-    "models.thinking_medium": {"English": "Medium", "ไทย": "ปานกลาง"},
-    "models.thinking_high": {
-        "English": "High — slowest and dearest",
-        "ไทย": "มาก — ช้าและแพงที่สุด",
-    },
     "models.no_thinking_none": {
         "English": "This model does not think before answering, so there is nothing to set.",
         "ไทย": "โมเดลนี้ไม่คิดก่อนตอบอยู่แล้ว จึงไม่มีอะไรให้ตั้ง",

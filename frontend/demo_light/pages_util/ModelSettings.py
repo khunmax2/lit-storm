@@ -183,63 +183,119 @@ def _provider_slots():
 def _thinking_control(role, provider, model):
     """How this role's model should think. Returns the setting to save.
 
-    Three shapes, because models come in three kinds and offering the wrong
-    control is worse than offering none:
-
-    * a model that cannot think gets no control at all;
-    * one that can only be switched gets a checkbox;
-    * one that takes an effort level gets the levels.
-
-    Which it is comes from the provider's own catalogue where there is one.
-    Where there is not — every provider here except OpenRouter — it falls
-    back to what the test button measured, which only knows after someone
-    has pressed it, and says so.
+    The shape follows what the provider says the model accepts, because
+    offering a level a model rejects is offering something that will not
+    happen: `deepseek-v4.1-flash` takes only max, high and low — not
+    minimal, not medium — and `gemini-3.6-flash` cannot be turned off at
+    all. See model_capabilities for where that comes from.
     """
     saved = (model_settings.setting(f"LLM_{role}_REASONING") or "").strip().lower()
-    kind = model_capabilities.thinking(provider, model)
-
-    if kind == model_capabilities.UNKNOWN:
-        # Nobody published anything. The probe's own observation is the only
-        # evidence there is, and it is evidence of thinking, not of whether
-        # it can be dialled — so this stays the switch it was.
-        result = _last_test(role)
-        thought = (result or {}).get("thought", 0)
-        if not thought and saved != model_settings.REASONING_OFF:
-            return ""
-        return _thinking_checkbox(role, saved, thought, measured=True)
+    can = model_capabilities.thinking(provider, model)
+    kind = can["kind"]
 
     if kind == model_capabilities.NONE:
-        # Nothing to turn off. Saying so beats an absent control that reads
-        # as an oversight — and it is a useful thing to know about a model.
+        # Nothing to turn off. Saying so beats an absent control, which
+        # reads as an oversight rather than as an answer.
         st.caption(t("models.no_thinking_none"))
         return ""
 
-    if kind == model_capabilities.ON_OFF:
-        return _thinking_checkbox(role, saved, thought=0, measured=False)
+    if kind == model_capabilities.UNKNOWN:
+        # Nobody published anything, so the only evidence is what the test
+        # button measured — and that is evidence of thinking, not of what
+        # can be asked. A switch is the most that can honestly be offered.
+        thought = (_last_test(role) or {}).get("thought", 0)
+        if not thought and saved != model_settings.REASONING_OFF:
+            return ""
+        return _thinking_switch(role, saved, thought)
 
-    options = ["", model_settings.REASONING_OFF, *demo_util.REASONING_EFFORTS]
-    index = options.index(saved) if saved in options else 0
+    if kind == model_capabilities.BUDGET:
+        return _thinking_budget(role, saved, can)
+
+    if kind == model_capabilities.EFFORT:
+        return _thinking_levels(role, saved, can)
+
+    return _thinking_switch(role, saved, thought=0)
+
+
+def _thinking_options(can):
+    """(values, labels) for the choices this model actually accepts."""
+    values = [""]
+    # `mandatory` means the model rejects being switched off, so the option
+    # is absent rather than present and failing.
+    if not can["mandatory"]:
+        values.append(model_settings.REASONING_OFF)
+    values += [f"effort:{level}" for level in can["efforts"]]
+    return values
+
+
+def _thinking_label(value, can):
+    if not value:
+        return (
+            t("models.thinking_default_named", level=can["default"])
+            if can["default"]
+            else t("models.thinking_default")
+        )
+    if value == model_settings.REASONING_OFF:
+        return t("models.thinking_off")
+    return value.partition(":")[2]
+
+
+def _thinking_levels(role, saved, can):
+    """A menu of the levels this model names, in the order it names them."""
+    values = _thinking_options(can)
+    index = values.index(saved) if saved in values else 0
     chosen = st.selectbox(
         t("models.thinking"),
-        options,
+        values,
         index=index,
         key=f"think_{role}",
-        format_func=lambda value: t(f"models.thinking_{value or 'default'}"),
+        format_func=lambda value: _thinking_label(value, can),
         help=t("models.no_thinking_help"),
     )
+    if can["mandatory"]:
+        st.caption(t("models.thinking_mandatory"))
     return chosen
 
 
-def _thinking_checkbox(role, saved, thought, measured):
-    """The on/off form, for a model that has no levels to choose between."""
+def _thinking_budget(role, saved, can):
+    """A token allowance, for a model that takes one instead of a level."""
+    current = 0
+    if saved.startswith("budget:") and saved.partition(":")[2].isdigit():
+        current = int(saved.partition(":")[2])
+
+    off = False
+    if not can["mandatory"]:
+        off = st.checkbox(
+            t("models.no_thinking"),
+            value=saved == model_settings.REASONING_OFF,
+            key=f"think_off_{role}",
+            help=t("models.no_thinking_help"),
+        )
+    if off:
+        return model_settings.REASONING_OFF
+
+    budget = st.number_input(
+        t("models.thinking_budget"),
+        min_value=0,
+        max_value=32000,
+        step=100,
+        value=current,
+        key=f"think_budget_{role}",
+        help=t("models.thinking_budget_help"),
+    )
+    return f"budget:{int(budget)}" if budget else ""
+
+
+def _thinking_switch(role, saved, thought):
+    """On or off, for a model nobody has told us anything else about."""
     off = st.checkbox(
         t("models.no_thinking"),
         value=saved == model_settings.REASONING_OFF,
         key=f"think_{role}",
         help=t("models.no_thinking_help"),
     )
-    if measured and thought:
-        # What the test actually measured, so the control is not advice.
+    if thought:
+        # What the test measured, so the control is evidence and not advice.
         st.caption(t("models.thought_seen", tokens=thought))
     return model_settings.REASONING_OFF if off else ""
 

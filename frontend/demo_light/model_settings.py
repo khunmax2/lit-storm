@@ -37,12 +37,16 @@ ROLES = ("FAST", "STRONG")
 # reachable and talking" without a token bill worth mentioning.
 PROBE = "Reply with the single word: ready"
 
-# Generous for a one-word answer, and deliberately so. A reasoning model
-# spends part of its budget thinking before it writes anything — Gemini 3.6
-# Flash burns around 600 tokens on that — so a tight budget is consumed
-# entirely by reasoning and the model returns an empty string. At 64 this
-# probe reported every healthy Gemini model as "replied with nothing", which
-# is a broken test, not a broken model. Unused budget is not billed.
+# A role is probed with the budget that role runs on, from
+# demo_util.ROLE_TOKENS. This matters for a reasoning model, which spends
+# part of its budget thinking before it writes anything: DeepSeek v4.1
+# Flash took all 500 of the fast role's tokens on thought and returned an
+# empty string. Probed at a larger budget it passes and then fails on
+# every call of the actual run, which is the wrong way round for a test to
+# be wrong. Unused budget is not billed.
+#
+# PROBE_TOKENS is the fallback for a probe with no role. At 64 an earlier
+# version reported every healthy Gemini model as "replied with nothing".
 PROBE_TOKENS = 1000
 
 
@@ -309,16 +313,21 @@ def check(role, overrides=None):
     except demo_util.LMConfigError as error:
         return False, str(error), 0.0, ""
     try:
-        lm = demo_util.build_lm(model, PROBE_TOKENS, kwargs)
+        budget = demo_util.ROLE_TOKENS.get(role, PROBE_TOKENS)
+        lm = demo_util.build_lm(model, budget, kwargs)
         answers = lm(prompt=PROBE, cache=False)
     except Exception as error:  # noqa: BLE001 - any provider, any failure
         return False, f"{type(error).__name__}: {error}", time.monotonic() - started, ""
     elapsed = time.monotonic() - started
-    reply = (answers[0] if answers else "").strip()
+    # A reasoning model that spends the whole budget thinking answers with a
+    # list holding None, not with an empty string — `(answers[0] or "")`
+    # rather than a bare index, or the page dies with an AttributeError
+    # instead of reporting a model that said nothing.
+    reply = ((answers[0] if answers else "") or "").strip()
     if not reply:
-        # Reachable but silent. With PROBE_TOKENS this is the model's own
-        # behaviour rather than a budget we set too low — the same shape of
-        # failure Co-STORM hit at max_tokens=1000.
+        # Reachable but silent, on the budget this role really runs with —
+        # so the run would do the same. Usually a reasoning model with no
+        # room left to answer in.
         return False, "empty_reply", elapsed, ""
     return True, model, elapsed, reply
 

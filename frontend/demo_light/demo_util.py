@@ -637,6 +637,14 @@ PROVIDERS = {
 # Two models, named for the work they do rather than for their size.
 ROLES = ("FAST", "STRONG")
 
+# What each role is allowed to spend on one reply. The fast role runs
+# hundreds of times in a run and answers in a sentence; the strong role
+# writes sections. The settings page probes a role with the same budget,
+# so a model that cannot answer inside it fails the test rather than the
+# run — a reasoning model can spend the whole of 500 on thinking and
+# return an empty string, which is a working call that said nothing.
+ROLE_TOKENS = {"FAST": 500, "STRONG": 3000}
+
 
 def resolve_role(role, default_provider, lookup=None):
     """(model id, call arguments) for one of the two roles.
@@ -762,8 +770,8 @@ def set_storm_runner():
     ):
         return
 
-    fast_lm = build_lm(fast_model, 500, fast_kwargs)
-    strong_lm = build_lm(strong_model, 3000, strong_kwargs)
+    fast_lm = build_lm(fast_model, ROLE_TOKENS["FAST"], fast_kwargs)
+    strong_lm = build_lm(strong_model, ROLE_TOKENS["STRONG"], strong_kwargs)
 
     llm_configs.set_conv_simulator_lm(fast_lm)
     llm_configs.set_question_asker_lm(fast_lm)

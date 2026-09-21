@@ -229,6 +229,17 @@ services:
       # Reached by service name, which is what being one stack buys: this
       # used to need `searxng` declared as an external network.
       NUXT_WEB_SEARCH_API_BASE: ${NUXT_WEB_SEARCH_API_BASE:-http://searxng:8080}
+      # How long the report itself may take. The default is 5 minutes, and a
+      # Thai report runs past it: a full run here searched for a minute and
+      # was still streaming its report at 4:40 when the server cut the
+      # connection — so the work was done, paid for, and thrown away at the
+      # last step, reported as "the report request timed out".
+      #
+      # Thai is the reason rather than the length. It tokenises far worse
+      # than English, so the same report is several times more tokens to
+      # write. 15 minutes, to match the research phase's own default, and
+      # still inside the proxy's 900s read timeout.
+      NUXT_PUBLIC_RESEARCH_REPORT_TIMEOUT_MS: ${RESEARCH_REPORT_TIMEOUT_MS:-900000}
     depends_on:
       searxng:
         condition: service_healthy

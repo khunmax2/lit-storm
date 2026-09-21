@@ -96,6 +96,30 @@ server {
         proxy_pass http://research-ui:3000;
     }
 
+    # The same application, reached at the root, because its own client asks
+    # for it there. Nuxt is told it lives at /research/ and builds its pages,
+    # its assets and even its icon endpoint under that prefix — but the three
+    # calls that do the work are written as `$fetch("/api/...")`, and a
+    # leading slash in Nuxt bypasses app.baseURL. So the page loads from
+    # /research/ and then posts to /api/feedback, which nothing served: every
+    # run ended at an nginx 404 that the app reported as "could not get
+    # questions from the model".
+    #
+    # Named one by one rather than taking all of /api/: the root is shared,
+    # and a second sibling with the same habit should collide loudly here
+    # rather than quietly answer from the wrong application.
+    # The prefix is put back on, because Nitro honours app.baseURL where the
+    # client did not: the handler really is at /research/api/feedback, and
+    # asking for /api/feedback gets a 404 from the application itself, not
+    # only from this proxy.
+    location ~ ^/api/(research|report|feedback)$ {
+        proxy_pass http://research-ui:3000/research/api/$1;
+        # Both of the long ones stream Server-Sent Events. Buffered, nginx
+        # holds the whole run and hands it over at the end, so a research
+        # that is working looks like one that has hung.
+        proxy_buffering off;
+    }
+
     # Stripped. Our own page is told nothing and needs nothing: it fetches
     # "api/runs" relative, so it works at whatever path it is mounted.
     location /agents/ {

@@ -1,6 +1,7 @@
 import os
 import html
 
+import article_import
 import article_store
 import demo_util
 import streamlit as st
@@ -54,6 +55,81 @@ def _deleted_articles():
                             "articles.restored", name
                         )
                         st.rerun()
+
+
+def _import_panel(width="content"):
+    """Take in a report that was written by one of the framed engines.
+
+    Deep Research and the agents researcher both hand a finished report over
+    as Markdown and then have nowhere to put it. This is the far end of that:
+    the file goes in, an article comes out, and the library stops being only
+    half of what a member has made.
+
+    The title is read from the report's own first heading rather than asked
+    for, because the report already knows what it is called. It stays
+    editable — a heading is a headline, and a directory name is a name.
+    """
+    with st.popover(
+        t("articles.import"),
+        icon=":material/upload_file:",
+        key="import_article",
+        width=width,
+    ):
+        st.caption(t("articles.import_note"))
+        upload = st.file_uploader(
+            t("articles.import_file"),
+            type=["md", "markdown", "txt"],
+            key="import_file",
+        )
+
+        text = ""
+        suggested = ""
+        if upload is not None:
+            try:
+                text = upload.getvalue().decode("utf-8")
+            except UnicodeDecodeError:
+                st.error(t("articles.import_not_text"), icon=":material/error:")
+            else:
+                suggested = article_import.suggested_title(text, upload.name)
+                found = len(article_import.parse_sources(text))
+                # Said before saving, not after: whether the references came
+                # across is the one thing about an import that is worth
+                # knowing while the decision is still being made.
+                st.caption(
+                    t("articles.import_sources", n=found)
+                    if found
+                    else t("articles.import_no_sources")
+                )
+
+        title = st.text_input(
+            t("articles.import_title"),
+            placeholder=suggested or t("articles.import_title"),
+            key="import_title",
+        )
+        if st.button(
+            t("articles.import_save"),
+            type="primary",
+            width="stretch",
+            disabled=not text.strip(),
+            key="import_save",
+        ):
+            chosen = (title or "").strip() or suggested
+            try:
+                name = article_import.save(
+                    demo_util.working_dir(),
+                    chosen,
+                    text,
+                    origin=upload.name if upload else "",
+                )
+            except ValueError:
+                st.error(t("articles.import_bad_title"), icon=":material/error:")
+            except FileExistsError:
+                st.error(t("articles.import_exists"), icon=":material/error:")
+            except OSError:
+                st.error(t("articles.action_failed"), icon=":material/error:")
+            else:
+                st.session_state["page2_library_notice"] = ("articles.imported", name)
+                st.rerun()
 
 
 def _card_menu(article_name, article_path, file_path_dict):
@@ -258,6 +334,11 @@ def my_articles_page():
             ):
                 st.session_state["nav_pending"] = "Create New Article"
                 st.rerun()
+            # Here too, and not only on a library that already has something
+            # in it: a member whose first report came from Deep Research
+            # arrives at this page with nothing, and importing is exactly
+            # what they are here to do.
+            _import_panel(width="stretch")
         return
 
     article_names = sorted(articles.keys(), key=lambda n: n.lower())
@@ -271,7 +352,7 @@ def my_articles_page():
     )
     _deleted_articles()
 
-    search_col, _ = st.columns([2, 3])
+    search_col, import_col, _ = st.columns([2, 1, 2], vertical_alignment="center")
     with search_col:
         query = st.text_input(
             t("articles.search"),
@@ -279,6 +360,8 @@ def my_articles_page():
             icon=":material/search:",
             label_visibility="collapsed",
         )
+    with import_col:
+        _import_panel(width="stretch")
     if query:
         needle = query.lower().replace(" ", "_")
         article_names = [n for n in article_names if needle in n.lower()]

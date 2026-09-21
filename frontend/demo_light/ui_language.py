@@ -885,6 +885,51 @@ _STRINGS = {
         "English": "Restore a report to your library. Deleting a report does not refund research quota.",
         "ไทย": "กู้คืนรายงานกลับไปยังคลังได้ การลบรายงานไม่คืนโควตาค้นคว้าที่ใช้ไปแล้ว",
     },
+    "articles.import": {"English": "Import report", "ไทย": "นำเข้าบทความ"},
+    "articles.import_note": {
+        "English": "Bring in a finished report from Deep Research or Agent "
+        "Research: export it as Markdown there, then add the file here.",
+        "ไทย": "นำรายงานที่เสร็จแล้วจาก Deep Research หรือ Agent Research เข้ามา "
+        "โดยกดส่งออก Markdown ที่นั่น แล้วเพิ่มไฟล์ที่นี่",
+    },
+    "articles.import_file": {
+        "English": "Markdown file", "ไทย": "ไฟล์ Markdown",
+    },
+    "articles.import_title": {
+        "English": "Article title", "ไทย": "ชื่อบทความ",
+    },
+    "articles.import_save": {
+        "English": "Add to my articles", "ไทย": "เพิ่มลงบทความของฉัน",
+    },
+    "articles.import_sources": {
+        "English": "{n} sources found — references will work.",
+        "ไทย": "พบแหล่งอ้างอิง {n} รายการ แถบอ้างอิงจะใช้งานได้",
+    },
+    "articles.import_no_sources": {
+        "English": "No source list found. The report will be added without "
+        "a reference panel.",
+        "ไทย": "ไม่พบรายการแหล่งอ้างอิง บทความจะถูกเพิ่มโดยไม่มีแถบอ้างอิง",
+    },
+    "articles.import_not_text": {
+        "English": "This file is not readable text. Export the report as "
+        "Markdown and try again.",
+        "ไทย": "อ่านไฟล์นี้เป็นข้อความไม่ได้ กรุณาส่งออกรายงานเป็น Markdown แล้วลองใหม่",
+    },
+    "articles.import_bad_title": {
+        "English": "That title cannot be used as a name. Try one without "
+        "slashes, and not starting with a dot.",
+        "ไทย": "ใช้ชื่อนี้ไม่ได้ กรุณาเลี่ยงเครื่องหมาย / และอย่าขึ้นต้นด้วยจุด",
+    },
+    "articles.import_exists": {
+        "English": "An article with this title already exists. Choose another "
+        "title, or move the existing one to Deleted reports first.",
+        "ไทย": "มีบทความชื่อนี้อยู่แล้ว กรุณาตั้งชื่ออื่น "
+        "หรือย้ายบทความเดิมไปยังรายการรายงานที่ลบก่อน",
+    },
+    "articles.imported": {
+        "English": "Added “{name}” to your articles.",
+        "ไทย": "เพิ่ม “{name}” ลงบทความของฉันแล้ว",
+    },
     "articles.restore": {"English": "Restore", "ไทย": "กู้คืน"},
     "articles.restored": {
         "English": "Restored “{name}”.", "ไทย": "กู้คืน “{name}” แล้ว",

@@ -33,20 +33,31 @@ LIGHT = {
     "nav-hover": "#EEF2F8",
     "shadow": "rgba(15, 23, 42, 0.16)",
     "shadow-soft": "rgba(15, 23, 42, 0.22)",
-    # The rail. Same values in both themes: it is the product's frame, and
+    # The rail, in daylight. It used to carry the dark-mode navy into the
+    # light theme on the argument that the frame should stay dark while the
+    # page is light. Looking at what shipping products do in light mode says
+    # otherwise: Material 3 puts a navigation drawer on `surface-container-low`
+    # with a soft tinted pill for the active item, Stripe's docs rail is
+    # #FFFFFF on a white page, and Tailwind's has no background at all. The
+    # rail is separated by a hairline and by type, not by a dark slab.
+    #
+    # So: the rail is a surface like the cards are, the page stays the slate
+    # behind them, and the active item is the brand's own soft tint rather
+    # than a saturated fill.
     # the reference draws it dark against a light page.
-    "rail-bg": "#0D1A2D",
-    "rail-bg-foot": "#102341",
-    "rail-line": "#1B2C45",
-    "rail-line-soft": "#1B2C45",
-    "rail-ink": "#F1F5F9",
-    "rail-text": "#CBD5E1",
-    "rail-muted": "#94A3B8",
-    "rail-nav": "#A8B5CA",
-    "rail-hover": "#16283F",
-    "rail-active": "#1D4ED8",
-    "rail-active-ink": "#FFFFFF",
-    "rail-border": "#25384F",
+    "rail-bg": "#FFFFFF",
+    "rail-bg-foot": "#F8FAFC",
+    "rail-line": "#E2E8F0",
+    "rail-line-soft": "#EDF1F6",
+    "rail-ink": "#0F172A",
+    "rail-text": "#334155",
+    "rail-muted": "#64748B",
+    "rail-nav": "#475569",
+    "rail-hover": "#F1F5F9",
+    "rail-active": "#E8EEFC",
+    "rail-active-ink": "#1D4ED8",
+    "rail-active-edge": "#1D4ED8",
+    "rail-border": "#E2E8F0",
 }
 
 
@@ -78,6 +89,7 @@ DARK = {
     "rail-hover": "#16283F",
     "rail-active": "#1D4ED8",
     "rail-active-ink": "#FFFFFF",
+    "rail-active-edge": "#60A5FA",
     "rail-border": "#25384F",
 }
 
@@ -959,16 +971,21 @@ span[class*="material-icons"] {{
     background: var(--rail-hover) !important;
     color: var(--rail-ink) !important;
 }}
+/* The selected item. These were hardcoded to a near-white pill with a blue
+   edge, which is a shape drawn for a dark rail — on a white one the pill is
+   invisible and only the edge survives. They are tokens now, so each theme
+   gets the contrast it needs: a soft brand tint in daylight, the saturated
+   fill at night. */
 .st-key-nav_main button[data-variant="segmented_control"][data-selected="true"],
 .st-key-nav_manage button[data-variant="segmented_control"][data-selected="true"] {{
-    background: #f8fbff !important;
-    color: #1651d6 !important;
+    background: var(--rail-active) !important;
+    color: var(--rail-active-ink) !important;
     font-weight: 700 !important;
-    box-shadow: inset 4px 0 #2461e9, 0 4px 16px rgba(0,0,0,.1);
+    box-shadow: inset 4px 0 var(--rail-active-edge);
 }}
 .st-key-nav_main button[data-variant="segmented_control"][data-selected="true"] [data-testid*="Icon"],
 .st-key-nav_manage button[data-variant="segmented_control"][data-selected="true"] [data-testid*="Icon"] {{
-    color: #1651d6 !important;
+    color: var(--rail-active-ink) !important;
 }}
 [data-testid="stSidebar"] .side-label {{
     color: var(--rail-muted);
@@ -1177,7 +1194,8 @@ span[class*="material-icons"] {{
 /* A surface of its own, on its own ramp, in whichever theme is running: the
    rail should read as the product's frame rather than as part of the page,
    and it was pinned dark to get that. Pinned, it stayed black behind a light
-   page. The `--rail-*` tokens say the same thing in both themes instead. */
+   page. The `--rail-*` tokens carry it, and they differ per theme: navy
+   at night, a white surface in daylight. */
 [data-testid="stSidebar"] {{
     /* Not flat: the reference lifts very slightly towards the foot, which
        keeps a tall rail from reading as a cut-out. */
@@ -1370,17 +1388,40 @@ span[class*="material-icons"] {{
     z-index: 999991;
     width: auto !important;
 }}
-.st-key-lang_selector button {{
-    border: 1px solid var(--line) !important;
+/* Two buttons in a tray rather than a popover holding a radio group: with
+   exactly two languages the choice fits on screen, so opening a panel to
+   make it was three clicks for what should be one. The tray is drawn once,
+   around both, and the buttons inside carry no borders of their own. */
+.st-key-lang_selector [data-testid="stElementContainer"] {{
+    width: auto !important;
+}}
+.st-key-lang_selector div[data-baseweb="button-group"],
+.st-key-lang_selector [role="group"] {{
     background: var(--surface) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 9px !important;
+    padding: 2px !important;
+    gap: 2px !important;
+}}
+.st-key-lang_selector button {{
+    border: 0 !important;
+    background: transparent !important;
     color: var(--muted) !important;
-    border-radius: 8px !important;
-    padding: 0.3rem 0.6rem !important;
+    border-radius: 7px !important;
+    padding: 0.18rem 0.55rem !important;
     min-height: 0 !important;
+    font-size: 0.78rem !important;
+    font-weight: 650 !important;
+    letter-spacing: .02em;
 }}
 .st-key-lang_selector button:hover {{
-    border-color: var(--brand) !important;
     color: var(--brand) !important;
+    background: var(--nav-hover) !important;
+}}
+/* The live one, so the tray says which language is on without being read. */
+.st-key-lang_selector button[data-selected="true"] {{
+    background: var(--brand) !important;
+    color: var(--on-brand) !important;
 }}
 
 /* ---------- Streamlit's own menu ---------- */

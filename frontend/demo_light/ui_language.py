@@ -16,9 +16,12 @@ import auth
 
 # Display name -> itself. Language names are written in their own language,
 # which is what a picker should show to someone who cannot read the current one.
-LANGUAGES = ("English", "ไทย")
+LANGUAGES = ("ไทย", "English")
 
-DEFAULT = "English"
+# Thai, because this deployment is Thai: the people using it read Thai, the
+# topics are Thai, and English was only ever the default because upstream is
+# an English project. A remembered choice still wins over it.
+DEFAULT = "ไทย"
 
 # Not prefixed with "page", so it survives `clear_other_page_session_state`.
 STATE_KEY = "ui_lang"
@@ -1387,18 +1390,21 @@ def selector():
     if STATE_KEY not in st.session_state:
         st.session_state[STATE_KEY] = _remembered() or DEFAULT
 
-    with st.popover(
-        _SHORT.get(current(), current()),
-        icon=":material/language:",
-        help=t("lang.label"),
-        key="lang_selector",
-    ):
-        st.radio(
+    # Two options, shown at once, chosen in one tap. A popover holding a
+    # radio group made a two-way switch cost a click to open, a click to
+    # choose and a click to dismiss, and put a floating panel over the page
+    # to do it.
+    # The container carries the key the stylesheet pins to the top corner;
+    # the control's own key belongs to the session value.
+    with st.container(key="lang_selector"):
+        st.segmented_control(
             t("lang.label"),
             LANGUAGES,
             key=STATE_KEY,
             on_change=_picked,
+            format_func=lambda name: _SHORT.get(name, name),
             label_visibility="collapsed",
+            help=t("lang.label"),
         )
 
     _remember()

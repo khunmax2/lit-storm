@@ -37,11 +37,14 @@ from knowledge_storm.storm_wiki.modules import (
 # Display name -> the name the model is told to write in. None means "leave
 # STORM alone", which is not the same as asking it for English.
 LANGUAGES = {
-    "English": None,
     "ไทย": "Thai (ภาษาไทย)",
+    "English": None,
 }
 
-DEFAULT = "English"
+# Thai first here as well. The article language is the one a reader notices
+# immediately, and asking for it in the language they were not expecting is
+# the wrong way round.
+DEFAULT = "ไทย"
 
 
 def _article(language):

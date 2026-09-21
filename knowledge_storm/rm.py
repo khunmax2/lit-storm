@@ -773,6 +773,27 @@ class SearXNG(dspy.Retrieve):
                             }
                         )
                         added += 1
+
+                # An instance whose engines are all refusing answers 200 with
+                # an empty list, so a run collects nothing and no one is told
+                # why. SearXNG does say why, in a field that was being thrown
+                # away: `[['brave', 'Suspended: too many requests'],
+                # ['duckduckgo', 'timeout']]`. Repeated runs against the same
+                # instance earn exactly that.
+                if not added:
+                    refusing = results.get("unresponsive_engines") or []
+                    if refusing:
+                        named = ", ".join(
+                            f"{engine}: {reason}" for engine, reason in refusing
+                        )
+                        logging.warning(
+                            "SearXNG returned nothing for %r — its engines are "
+                            "not answering (%s)",
+                            query,
+                            named,
+                        )
+                    else:
+                        logging.warning("SearXNG returned nothing for %r", query)
             except SearXNGConfigError:
                 raise
             except Exception as e:

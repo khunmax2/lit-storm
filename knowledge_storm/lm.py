@@ -189,6 +189,15 @@ def _inspect_history(lm, n: int = 1):
 ############################
 
 
+class EmptyCompletionError(RuntimeError):
+    """The provider answered, and the answer had no text in it.
+
+    Its own class so a caller can tell it from a network or auth failure:
+    nothing is wrong with the connection or the key, and retrying the same
+    call with the same budget will do the same thing.
+    """
+
+
 class LitellmModel(LM):
     """A wrapper class for LiteLLM.
 
@@ -253,6 +262,24 @@ class LitellmModel(LM):
             c.message.content if hasattr(c, "message") else c["text"]
             for c in response["choices"]
         ]
+
+        # A provider can answer 200 with no content at all: a model that
+        # thinks before it writes and spends the whole token budget thinking
+        # returns `content: null` with `finish_reason: "length"`. Left alone
+        # the None travels into dspy, which calls .strip() on it, and the run
+        # dies with "'NoneType' object has no attribute 'strip'" — true, and
+        # useless. Say what happened and where to fix it.
+        if outputs and all(text is None for text in outputs):
+            usage = response_dict.get("usage") or {}
+            details = usage.get("completion_tokens_details") or {}
+            thought = details.get("reasoning_tokens") or 0
+            finish = (response["choices"][0] or {}).get("finish_reason")
+            raise EmptyCompletionError(
+                f"{self.model} returned no text. It spent {thought} tokens "
+                f"thinking of a budget of {kwargs.get('max_tokens')} and "
+                f"stopped because of {finish!r}. Give the model more room, or "
+                f"turn its thinking off."
+            )
 
         # Logging, with removed api key & where `cost` is None on cache hit.
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("api_")}

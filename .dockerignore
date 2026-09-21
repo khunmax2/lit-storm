@@ -1,0 +1,44 @@
+# Everything the image does not need. The two that matter most are .venv,
+# which is 1.3GB of a different platform's wheels, and DEMO_WORKING_DIR,
+# which is members' reports — neither belongs in a layer that gets pushed.
+
+.venv/
+venv/
+env/
+
+# Members' reports and the admin's saved settings. Both are state; both
+# arrive as mounts at runtime. Baking them in would ship one deployment's
+# data to every other one.
+frontend/demo_light/DEMO_WORKING_DIR/
+frontend/demo_light/.streamlit/secrets.toml
+frontend/demo_light/.streamlit/secrets.toml.*
+frontend/demo_light/.streamlit/model_settings.json
+frontend/demo_light/.streamlit/search_sources.json
+
+.git/
+.gitignore
+.github/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Other people's stacks, and the compose files that start them. The image is
+# the app; how it is run is not part of it.
+deploy/
+
+docs/
+examples/
+assets/
+tests/
+
+.claude/
+.vscode/
+.idea/
+*.md
+!README.md
+
+.DS_Store
+Thumbs.db

@@ -26,9 +26,7 @@ import time
 
 import auth
 
-SETTINGS_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), ".streamlit", "model_settings.json"
-)
+SETTINGS_PATH = os.path.join(auth.state_dir(), "model_settings.json")
 
 # The two model roles, and the per-role settings each one accepts.
 ROLES = ("FAST", "STRONG")

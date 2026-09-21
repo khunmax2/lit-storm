@@ -1,0 +1,64 @@
+# The app itself. Until the stacks are merged this joins the other two by
+# their networks, the same way deploy/research-ui reaches SearXNG — start
+# deploy/supabase and deploy/searxng first.
+#
+#     docker build -t lit-storm/app:dev ../..
+#     cp .env.example .env     # then fill it in
+#     docker compose --env-file .env up -d
+#
+# The image carries no secrets.toml. `auth.setting` reads secrets.toml first
+# and the environment second, so a container with no secrets.toml gets
+# everything from .env and one image serves every deployment.
+
+name: lit-storm-app
+
+services:
+  app:
+    image: ${LIT_STORM_IMAGE:-lit-storm/app:dev}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Supabase by service name across its network. `localhost:8000` is what
+      # a host run uses and it cannot work here: inside a container localhost
+      # is the container.
+      SUPABASE_URL: ${SUPABASE_URL:-http://gateway:8000}
+    volumes:
+      # The settings the admin pages write, and Streamlit's own scratch space
+      # — HOME is /data in the image. Not the source tree: a mount over
+      # .streamlit would take config.toml, and the theme, with it.
+      - app-state:/data
+      # Members' reports. The one piece of data here that is theirs.
+      - app-reports:/app/frontend/demo_light/DEMO_WORKING_DIR
+    networks:
+      - default
+      - supabase
+      - searxng
+    extra_hosts:
+      # Ollama runs on the host, not in a container, so host.docker.internal
+      # has to resolve. Docker Desktop provides it; a Linux host does not
+      # without this line.
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Loopback, like every other service here. A deployment puts a reverse
+      # proxy in front; nothing on this stack opens itself to the network.
+      - "127.0.0.1:${LIT_STORM_PORT:-8501}:8501"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  app-state:
+  app-reports:
+
+networks:
+  supabase:
+    # Created by deploy/supabase; start that stack first.
+    name: lit-storm-supabase_default
+    external: true
+  searxng:
+    # Created by deploy/searxng.
+    name: lit-storm-searxng_default
+    external: true

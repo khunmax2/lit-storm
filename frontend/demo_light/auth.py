@@ -130,6 +130,21 @@ class AuthUnavailable(RuntimeError):
     """Supabase is not configured, so there is nothing to sign in to."""
 
 
+def state_dir():
+    """Where this deployment keeps the settings the admin pages write.
+
+    `.streamlit` beside the app by default, which is where they have always
+    been and what a checkout and a host run expect. STORM_STATE_DIR moves
+    them, which a container needs: the files sit inside the source tree, and
+    mounting a volume over `.streamlit` to keep them would take `config.toml`
+    with it and the app would lose its theme.
+    """
+    chosen = (os.environ.get("STORM_STATE_DIR") or "").strip()
+    if chosen:
+        return chosen
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), ".streamlit")
+
+
 def setting(name):
     """A secret from secrets.toml, or failing that the environment.
 

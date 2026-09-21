@@ -15,9 +15,7 @@ import os
 
 import auth
 
-SETTINGS_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), ".streamlit", "search_sources.json"
-)
+SETTINGS_PATH = os.path.join(auth.state_dir(), "search_sources.json")
 
 # Everything knowledge_storm/rm.py offers, and what it takes to run it.
 #   key      the secret it needs, or None when it needs none

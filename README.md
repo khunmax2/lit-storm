@@ -83,6 +83,28 @@ Windows (PowerShell), from the project root:
 
 **It does not cover `knowledge_storm/`.** Streamlit watches only modules under the folder holding the main script, which is `frontend/demo_light` — so an edit to the engine is loaded when the server starts and never again. The symptom is the confusing one: the page reloads, shows your new UI, and the engine behind it still behaves the old way. Restart the server after touching anything outside `frontend/demo_light`.
 
+### Or run it as a container
+
+The app has an image of its own, which is what a deployment should use — the
+other three services here were always containers and this one was a host
+process with nothing to pin.
+
+```
+docker build -t lit-storm/app:dev .
+cd deploy/app && cp .env.example .env    # then fill it in
+docker compose --env-file .env up -d
+```
+
+The image carries **no `secrets.toml`**, deliberately: a value in that file
+cannot be overridden by an environment variable, so mounting one would make
+the container quietly ignore half of `.env`. Settings come from `.env`, and
+what the admin pages save lives in a volume rather than in `.streamlit`,
+where a mount would take `config.toml` and the theme with it. That is what
+`STORM_STATE_DIR` moves; unset, it is `.streamlit` beside the app as before.
+
+Details, including why the image is 3.2GB and what keeps it from being 5:
+[deploy/app/README.md](deploy/app/README.md).
+
 Full walkthrough, including Windows commands and the Supabase setup: [frontend/demo_light/README.md](frontend/demo_light/README.md) (Thai).
 
 ---

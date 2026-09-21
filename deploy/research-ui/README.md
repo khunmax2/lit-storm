@@ -101,16 +101,40 @@ docker build -t lit-storm/research-ui:latest ../../../deep-research-web-ui
 RESEARCH_UI_IMAGE=lit-storm/research-ui:latest docker compose --env-file .env up -d
 ```
 
-## It shares the main app's model key, and that has a cost
+## Its model settings do not follow the main app's
 
-`.env` carries the same `GOOGLE_API_KEY` the main app uses, because it is
-the key this deployment has. On Gemini's free tier that is one quota for
-both applications, and Deep Research spends it fast: every research node
-is several model calls, and a depth-1 breadth-1 run was enough to take the
-key to `429 You exceeded your current quota` — which then stops the main
-app too, on its next run, for a reason that has nothing to do with it.
+`.env` is written by hand and read by the container **when it starts**.
+Nothing propagates: changing a key on the Models page leaves this stack on
+whatever it was started with, and the symptom is a stale key failing in a
+tab that looks like part of the same application. After editing `.env`:
 
-Give this a key of its own, or a paid one, before anyone relies on both.
+```
+RESEARCH_UI_IMAGE=lit-storm/research-ui:searxng docker compose --env-file .env up -d --force-recreate
+```
+
+(the override is only needed while the GHCR package is private.)
+
+This ran on the main app's `GOOGLE_API_KEY` first, and that is worth not
+repeating. On Gemini's free tier one key is one quota for both
+applications, and Deep Research spends it fast: every research node is
+several model calls, and a depth-1 breadth-1 run was enough to reach
+`429 You exceeded your current quota` — which then stops the main app too,
+on its next run, for a reason that has nothing to do with it.
+
+It now points at OpenRouter, which is a paid account rather than a shared
+free quota, through the same `openai-compatible` provider:
+
+```
+NUXT_PUBLIC_AI_PROVIDER=openai-compatible
+NUXT_AI_API_BASE=https://openrouter.ai/api/v1
+NUXT_AI_API_KEY=sk-or-v1-…
+NUXT_PUBLIC_AI_MODEL=deepseek/deepseek-v4.1-flash
+```
+
+A reasoning model puts its thinking in the completion before any answer,
+so a small `max_tokens` returns an empty `content` with `finish_reason:
+stop` — reachable, paid for, and silent. If this model is swapped for
+another, check a reply comes back rather than that the call succeeded.
 
 ## Search: the same SearXNG the main app uses
 

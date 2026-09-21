@@ -218,12 +218,28 @@ _STRINGS = {
         "ไทย": "ผู้ให้บริการปฏิเสธคีย์ เรื่องนี้เกี่ยวกับคีย์ ไม่เกี่ยวกับบัญชีของคุณในระบบนี้ ตรวจว่าคีย์ยังใช้งานได้อยู่ และคัดลอกมาครบทั้งสาย",
     },
     "models.pick_fast": {
-        "English": "**Runs hundreds of times in one research, and answers in a sentence.** Speed and price matter more than quality here — it asks the questions, it does not write the article.\n\nPick a small, quick model that answers straight away. It gets 500 tokens per reply.\n\n**Avoid a model that thinks before answering.** Its thinking comes out of the same 500 tokens, so it can spend the lot and return nothing — billed, and silent. Thai prompts make it think longer than English ones.\n\nWorks well: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`.",
-        "ไทย": "**ถูกเรียกหลักร้อยครั้งต่อการค้นคว้าหนึ่งรอบ และตอบสั้นแค่ประโยคเดียว** ความเร็วและราคาสำคัญกว่าคุณภาพ เพราะมันทำหน้าที่ตั้งคำถาม ไม่ได้เขียนบทความ\n\nเลือกโมเดลเล็กที่ตอบทันที ได้งบ 500 token ต่อหนึ่งคำตอบ\n\n**เลี่ยงโมเดลที่คิดก่อนตอบ** เพราะความคิดของมันกินงบ 500 token ก้อนเดียวกัน จึงอาจใช้หมดแล้วไม่เหลือที่ให้ตอบ เสียเงินแล้วไม่ได้อะไร และ prompt ภาษาไทยทำให้มันคิดยาวกว่าภาษาอังกฤษ\n\nที่ใช้ได้ดี: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`",
+        "English": "**Runs hundreds of times in one research, and answers in a sentence.** Speed and price matter more than quality here — it asks the questions, it does not write the article.\n\nPick a small, quick model that answers straight away. It gets 500 tokens per reply.\n\n**A model that thinks before answering needs care here.** Its thinking comes out of the same 500 tokens, so it can spend the lot and return nothing — billed, and silent. Thai prompts make it think longer than English ones. Test the model: if it thinks, a switch appears below to turn that off, and then it is fine.\n\nWorks well: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`.",
+        "ไทย": "**ถูกเรียกหลักร้อยครั้งต่อการค้นคว้าหนึ่งรอบ และตอบสั้นแค่ประโยคเดียว** ความเร็วและราคาสำคัญกว่าคุณภาพ เพราะมันทำหน้าที่ตั้งคำถาม ไม่ได้เขียนบทความ\n\nเลือกโมเดลเล็กที่ตอบทันที ได้งบ 500 token ต่อหนึ่งคำตอบ\n\n**โมเดลที่คิดก่อนตอบต้องระวังในช่องนี้** เพราะความคิดของมันกินงบ 500 token ก้อนเดียวกัน จึงอาจใช้หมดแล้วไม่เหลือที่ให้ตอบ เสียเงินแล้วไม่ได้อะไร และ prompt ภาษาไทยทำให้มันคิดยาวกว่าภาษาอังกฤษ ลองกดทดสอบดู ถ้ามันคิด จะมีสวิตช์ปิดการคิดขึ้นมาข้างล่าง ปิดแล้วก็ใช้ได้\n\nที่ใช้ได้ดี: `meta-llama/llama-4-scout`, `qwen/qwen3-30b-a3b-instruct-2507`",
     },
     "models.pick_strong": {
         "English": "**Runs a handful of times, and writes the article.** Quality is what you are paying for — the outline, the sections and the language polish all come from here.\n\nPick the best writer the budget allows. It gets 3000 tokens per reply, which is room enough that **a model that thinks before answering suits this box**, unlike the fast one.\n\nWorks well: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`.",
         "ไทย": "**ถูกเรียกไม่กี่ครั้ง และเป็นตัวเขียนบทความ** คุณภาพคือสิ่งที่จ่ายเงินซื้อ ทั้งโครงร่าง เนื้อหาแต่ละหัวข้อ และการปรับภาษา มาจากตรงนี้\n\nเลือกตัวที่เขียนดีที่สุดเท่าที่งบไหว ได้งบ 3000 token ต่อหนึ่งคำตอบ ซึ่งกว้างพอที่ **โมเดลที่คิดก่อนตอบจะเหมาะกับช่องนี้** ต่างจากโมเดลเร็ว\n\nที่ใช้ได้ดี: `deepseek/deepseek-v4.1-flash`, `google/gemini-3.6-flash`",
+    },
+    "models.no_thinking": {
+        "English": "Do not think before answering",
+        "ไทย": "ไม่ต้องคิดก่อนตอบ",
+    },
+    "models.no_thinking_help": {
+        "English": "Some models write out their thinking before the answer, and that thinking is spent from the same token budget as the answer.\n\nOn the fast role's 500 tokens a model can use all of it thinking and return nothing at all — a call that succeeded, was billed, and said nothing. Turning thinking off fixes that and makes the model faster and cheaper.\n\nOn the strong role there is usually room for both, and the thinking tends to improve the writing. Leave it on there unless you have a reason.\n\nThis box only appears when a test has seen this model think, so it is never offered where it would do nothing.",
+        "ไทย": "โมเดลบางตัวเขียนความคิดออกมาก่อนคำตอบ และความคิดนั้นกินงบ token ก้อนเดียวกับคำตอบ\n\nที่งบ 500 token ของโมเดลเร็ว มันอาจคิดจนหมดงบแล้วไม่เหลือที่ให้ตอบเลย กลายเป็นการเรียกที่สำเร็จ เสียเงินแล้ว แต่ไม่ได้อะไร ปิดการคิดแล้วจะหายปัญหา ทั้งเร็วขึ้นและถูกลง\n\nส่วนโมเดลหลักงบ 3000 token มักมีที่พอให้ทั้งคิดและตอบ และการคิดช่วยให้เขียนดีขึ้น ถ้าไม่มีเหตุผลเป็นพิเศษก็เปิดไว้\n\nช่องนี้จะขึ้นเฉพาะตอนที่การทดสอบเห็นโมเดลตัวนี้คิดจริง จึงไม่มีทางโผล่มาในที่ที่กดแล้วไม่เกิดอะไรขึ้น",
+    },
+    "models.thought_seen": {
+        "English": "The test saw this model spend {tokens} tokens thinking.",
+        "ไทย": "การทดสอบพบว่าโมเดลนี้ใช้ {tokens} token ไปกับการคิด",
+    },
+    "models.thought_none": {
+        "English": "The last test saw no thinking — the switch is taking effect.",
+        "ไทย": "การทดสอบครั้งล่าสุดไม่พบการคิดแล้ว แปลว่าสวิตช์ทำงาน",
     },
     "models.slot_primary": {"English": "Primary provider", "ไทย": "ผู้ให้บริการหลัก"},
     "models.slot_primary_what": {

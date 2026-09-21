@@ -107,6 +107,50 @@ LLM_STRONG_MODEL = "gemini-3.6-flash"
 
 Measure response times before unpinning. A newer model is not automatically a faster one.
 
+### A thinking model on the fast role can answer nothing at all
+
+The two roles get different budgets, from `ROLE_TOKENS` in
+`frontend/demo_light/demo_util.py`: **500 tokens for the fast role**, which
+runs hundreds of times in a research and answers in a sentence, and **3000
+for the strong one**, which writes the article.
+
+A model that writes out its thinking spends it from that same budget. On 500
+tokens that can be the whole of it: `deepseek/deepseek-v4.1-flash` and
+`qwen/qwen3.7-flash`, asked a real question with a Thai topic in it, both
+used all 500 thinking and returned nothing — `finish_reason: length`, a call
+that succeeded, was billed, and said nothing. The same prompt in English left
+room to answer. Thai makes these models think longer.
+
+So either pick a model that does not think, or switch its thinking off:
+
+```toml
+LLM_FAST_MODEL = "meta-llama/llama-4-scout"    # does not think
+LLM_FAST_REASONING = "off"                     # or tell one not to
+```
+
+`LLM_FAST_REASONING` / `LLM_STRONG_REASONING` send OpenRouter's
+`reasoning: {enabled: false}`. Unset sends nothing at all, which is what a
+model with no thinking to turn off needs — the two are not opposites.
+
+On the Models page the switch is drawn only when a test has **observed** that
+model thinking, so it never appears where it would do nothing. That is
+measured, not looked up: the probe reads `reasoning_tokens` back off the call
+it just made, which works for any provider that reports it, where a
+capability catalogue would only cover OpenRouter and would describe what a
+model can do rather than what it just did.
+
+Measured here, on the fast role's 500 tokens with a Thai prompt:
+
+| model | thinking | result | per call |
+| --- | --- | --- | --- |
+| `qwen/qwen3.7-flash` | on (default) | **nothing, 3/3** | $0.000067 |
+| `qwen/qwen3.7-flash` | off | good Thai, 1.1s | $0.000005 |
+| `meta-llama/llama-4-scout` | none to switch | good Thai, 1.0s | $0.000014 |
+| `deepseek/deepseek-v4.1-flash` | on (default) | **nothing, 3/3** | $0.000622 |
+
+Leave thinking on for the strong role unless you have a reason: 3000 tokens
+is usually room for both, and it tends to improve the writing.
+
 ### Embeddings — Co-STORM only
 
 Co-STORM files every snippet it collects into a mind map by **similarity**, not by asking a model where it belongs. That needs an embedding service, separate from chat completions.

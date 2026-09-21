@@ -27,14 +27,23 @@ SLOW_SECONDS = 15.0
 
 
 def _remember(scope, outcome):
-    st.session_state[TEST_RESULT] = (scope, *outcome)
+    st.session_state[TEST_RESULT] = dict(outcome, scope=scope)
+
+
+def _last_test(scope):
+    """What the last test of this scope saw, or None."""
+    result = st.session_state.get(TEST_RESULT)
+    if isinstance(result, dict) and result.get("scope") == scope:
+        return result
+    return None
 
 
 def _show_test(scope):
-    result = st.session_state.get(TEST_RESULT)
-    if not result or result[0] != scope:
+    result = _last_test(scope)
+    if not result:
         return
-    _, ok, message, seconds, extra = result
+    ok, message = result["ok"], result["message"]
+    seconds, extra = result["seconds"], result["reply"]
     if not ok:
         st.error(t("models.test_failed"))
         # Wrapped: the part of a provider error that says what went wrong
@@ -170,6 +179,37 @@ def _provider_slots():
         _provider_slot("secondary", secondary or "", primary)
 
 
+def _thinking_switch(role):
+    """A switch to stop this role's model thinking. "off" or "".
+
+    Only drawn when there is evidence it would do something: a test of this
+    role saw the model spend tokens thinking, or it is already switched off
+    and has to be switchable back. Otherwise a model with nothing to turn off
+    would carry a control that silently does nothing, and whoever set it would
+    have no way to tell.
+    """
+    saved = (model_settings.setting(f"LLM_{role}_REASONING") or "").strip().lower()
+    result = _last_test(role)
+    thought = (result or {}).get("thought", 0)
+    if not thought and saved != "off":
+        return ""
+
+    off = st.checkbox(
+        t("models.no_thinking"),
+        value=saved == "off",
+        key=f"think_{role}",
+        help=t("models.no_thinking_help"),
+    )
+    if thought:
+        # What the test actually measured, so the switch is not advice.
+        st.caption(t("models.thought_seen", tokens=thought))
+    elif saved == "off" and result:
+        # Asked not to think, and did not. The switch is doing its job, and
+        # the evidence for that is the absence the caption above reports.
+        st.caption(t("models.thought_none"))
+    return "off" if off else ""
+
+
 def _role_card(role):
     """One of the two model roles: provider, model name, key, test, save."""
     saved_provider = (model_settings.setting(f"LLM_{role}_PROVIDER") or "").strip().lower()
@@ -212,6 +252,7 @@ def _role_card(role):
             f"LLM_{role}_PROVIDER": provider,
             f"LLM_{role}_MODEL": model,
         }
+        pending[f"LLM_{role}_REASONING"] = _thinking_switch(role)
 
         left, right = st.columns(2)
         with left:
@@ -229,6 +270,11 @@ def _role_card(role):
                     model_settings.forget(f"LLM_{role}_PROVIDER")
                 if not model:
                     model_settings.forget(f"LLM_{role}_MODEL")
+                # An unticked switch is the same kind of choice: leaving it
+                # out would keep the model silent on a card that shows it
+                # thinking.
+                if not pending[f"LLM_{role}_REASONING"]:
+                    model_settings.forget(f"LLM_{role}_REASONING")
                 model_settings.save({k: v for k, v in pending.items() if v})
                 st.rerun()
 

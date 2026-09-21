@@ -70,6 +70,7 @@ def managed():
     for role in ROLES:
         names.add(f"LLM_{role}_PROVIDER")
         names.add(f"LLM_{role}_MODEL")
+        names.add(f"LLM_{role}_REASONING")
     names.update(provider["key"] for provider in demo_util.PROVIDERS.values())
     names.update(provider.get("base") for provider in demo_util.PROVIDERS.values())
     # Embeddings can sit on Azure even when no chat role does, and on an
@@ -293,7 +294,13 @@ def is_saved_here(name):
 
 
 def check(role, overrides=None):
-    """Call one role's model once. Returns (ok, message, seconds, reply).
+    """Call one role's model once. Returns a dict describing what happened.
+
+    `thought` is how many tokens the model spent thinking before it answered,
+    which is how the page knows whether this model has thinking to turn off.
+    It is observed rather than looked up: no provider here publishes it per
+    model in a way that covers all of them, and a catalogue would say what a
+    model is capable of rather than what it just did.
 
     `overrides` lets a key or model be tried before it is saved, the way the
     search page tests a key. Caching is switched off for the call: a cached
@@ -306,19 +313,31 @@ def check(role, overrides=None):
     def lookup(name):
         return overrides.get(name) or setting(name)
 
+    def outcome(ok, message, seconds=0.0, reply="", thought=0):
+        return {
+            "ok": ok,
+            "message": message,
+            "seconds": seconds,
+            "reply": reply,
+            "thought": thought,
+        }
+
     started = time.monotonic()
     try:
         default = (lookup("LLM_PROVIDER") or "gemini").strip().lower()
         model, kwargs = demo_util.resolve_role(role, default, lookup=lookup)
     except demo_util.LMConfigError as error:
-        return False, str(error), 0.0, ""
+        return outcome(False, str(error))
     try:
         budget = demo_util.ROLE_TOKENS.get(role, PROBE_TOKENS)
         lm = demo_util.build_lm(model, budget, kwargs)
         answers = lm(prompt=PROBE, cache=False)
     except Exception as error:  # noqa: BLE001 - any provider, any failure
-        return False, f"{type(error).__name__}: {error}", time.monotonic() - started, ""
+        return outcome(
+            False, f"{type(error).__name__}: {error}", time.monotonic() - started
+        )
     elapsed = time.monotonic() - started
+    thought = _thinking_tokens(lm)
     # A reasoning model that spends the whole budget thinking answers with a
     # list holding None, not with an empty string — `(answers[0] or "")`
     # rather than a bare index, or the page dies with an AttributeError
@@ -328,12 +347,45 @@ def check(role, overrides=None):
         # Reachable but silent, on the budget this role really runs with —
         # so the run would do the same. Usually a reasoning model with no
         # room left to answer in.
-        return False, "empty_reply", elapsed, ""
-    return True, model, elapsed, reply
+        return outcome(False, "empty_reply", elapsed, thought=thought)
+    return outcome(True, model, elapsed, reply, thought)
+
+
+def _thinking_tokens(lm):
+    """Tokens the last call spent thinking, or 0 if it did not or cannot say.
+
+    dspy keeps the provider's whole usage block on the call it just made;
+    `log_usage` reduces it to prompt and completion totals and drops this.
+    A provider that does not report the detail reads as 0, which is the same
+    as not thinking — the switch stays hidden and the model is left alone.
+    """
+    history = getattr(lm, "history", None)
+    if not history:
+        return 0
+    usage = history[-1].get("usage") or {}
+    details = usage.get("completion_tokens_details") or {}
+    try:
+        return int(details.get("reasoning_tokens") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _encoder_outcome(ok, message, seconds=0.0, dimensions=0):
+    """One shape of result for both tests, so the page unpacks one thing."""
+    return {
+        "ok": ok,
+        "message": message,
+        "seconds": seconds,
+        "reply": dimensions,
+        "thought": 0,
+    }
 
 
 def check_encoder(overrides=None):
-    """Embed one short string. Returns (ok, message, seconds, dimensions).
+    """Embed one short string. Returns the same dict shape `check` does.
+
+    `reply` carries the vector's width rather than a reply, and `thought` is
+    always 0 — an embedding model has nothing to think about.
 
     Co-STORM needs embeddings and STORM does not, so this is a separate test:
     a deployment can be perfectly healthy for one engine and unusable for the
@@ -349,7 +401,7 @@ def check_encoder(overrides=None):
             lookup=lambda setting_name: overrides.get(setting_name) or setting(setting_name)
         )
     except Exception as error:  # noqa: BLE001 - config errors carry their own text
-        return False, str(error), 0.0, 0
+        return _encoder_outcome(False, str(error))
     env_extra = {
         n: overrides.get(n) or setting(n)
         for n in costorm.OLLAMA_SETTINGS
@@ -369,7 +421,9 @@ def check_encoder(overrides=None):
             os.environ[variable] = value
         vector = Encoder().encode(PROBE)
     except Exception as error:  # noqa: BLE001 - any provider, any failure
-        return False, f"{type(error).__name__}: {error}", time.monotonic() - started, 0
+        return _encoder_outcome(
+            False, f"{type(error).__name__}: {error}", time.monotonic() - started
+        )
     finally:
         for variable, value in saved_env.items():
             if value is None:
@@ -378,4 +432,4 @@ def check_encoder(overrides=None):
                 os.environ[variable] = value
     elapsed = time.monotonic() - started
     size = len(vector[0]) if len(vector) and hasattr(vector[0], "__len__") else len(vector)
-    return True, name, elapsed, size
+    return _encoder_outcome(True, name, elapsed, size)

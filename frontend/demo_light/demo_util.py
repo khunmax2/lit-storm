@@ -645,6 +645,16 @@ ROLES = ("FAST", "STRONG")
 # return an empty string, which is a working call that said nothing.
 ROLE_TOKENS = {"FAST": 500, "STRONG": 3000}
 
+# Set on a role to stop its model thinking before it answers. Thinking is
+# spent from the same budget as the answer, so on the fast role's 500 tokens
+# a model can use the lot and return nothing — billed, and silent.
+#
+# "off" rather than a boolean because the opposite is not "on": it is not
+# sending the parameter at all, which is what a model with no thinking to
+# turn off needs. OpenRouter's spelling; it is the only provider here whose
+# models offer the choice.
+NO_REASONING = {"reasoning": {"enabled": False}}
+
 
 def resolve_role(role, default_provider, lookup=None):
     """(model id, call arguments) for one of the two roles.
@@ -691,6 +701,8 @@ def resolve_role(role, default_provider, lookup=None):
         # Ride out the occasional 429 rather than failing the whole run.
         "num_retries": 6,
     }
+    if (lookup(f"LLM_{role}_REASONING") or "").strip().lower() == "off":
+        kwargs.update(NO_REASONING)
     if "base" in provider:
         base = lookup(provider["base"])
         if not base:
@@ -729,7 +741,10 @@ def _settings_fingerprint(*calls):
     parts = []
     for model, kwargs in calls:
         secret = f"{kwargs.get('api_key', '')}|{kwargs.get('api_base', '')}"
-        parts.append(f"{model}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}")
+        thinking = "" if "reasoning" in kwargs else "+think"
+        parts.append(
+            f"{model}{thinking}:{hashlib.sha256(secret.encode()).hexdigest()[:12]}"
+        )
     return "|".join(parts)
 
 

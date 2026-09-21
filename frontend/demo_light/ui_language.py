@@ -139,6 +139,22 @@ _STRINGS = {
         "ไทย": "สมาชิกติ๊กเลือกได้จากรายการนี้ที่หน้าแรกก่อนเริ่มค้นคว้า แหล่งที่ใช้อยู่จะรวมอยู่เสมอ "
         "เพราะเป็นค่าที่ได้เมื่อไม่ติ๊กอะไร แสดงเฉพาะแหล่งที่ตั้งคีย์หรือที่อยู่ไว้แล้ว",
     },
+    "search.saved_in_use": {
+        "English": "Now searching with {name}",
+        "ไทย": "เปลี่ยนมาใช้ {name} แล้ว",
+    },
+    "search.saved_forgotten": {
+        "English": "Removed {name}",
+        "ไทย": "ลบ {name} แล้ว",
+    },
+    "search.saved_offered": {
+        "English": "Members can choose from: {list}",
+        "ไทย": "สมาชิกเลือกได้จาก: {list}",
+    },
+    "search.saved_offered_with_default": {
+        "English": "Members can choose from: {list} — {name} was added back, because it is what a run with nothing ticked uses.",
+        "ไทย": "สมาชิกเลือกได้จาก: {list} — {name} ถูกใส่กลับอัตโนมัติ เพราะเป็นแหล่งที่ใช้เมื่อไม่ติ๊กอะไร",
+    },
     "search.offer_save": {"English": "Save offer", "ไทย": "บันทึกรายการ"},
     # -- run options (the picker on Home) ----------------------------------
     # -- the framed research UI ---------------------------------------------

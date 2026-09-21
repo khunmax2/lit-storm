@@ -16,6 +16,29 @@ from ui_language import t
 TEST_RESULT = "page5_search_test"
 
 
+# What was just saved, carried across the rerun that a save triggers.
+SAVED = "page5_saved"
+
+
+def _saved_and_rerun(message):
+    """Record what happened, then rerun.
+
+    The toast cannot be raised here: a save ends in a rerun, and the rerun
+    discards the render the toast would have appeared in. It is left in
+    session state and shown by the next run — the same run that draws the
+    saved value, so the two agree.
+    """
+    st.session_state[SAVED] = message
+    st.rerun()
+
+
+def _show_saved():
+    """Announce the last save, once."""
+    message = st.session_state.pop(SAVED, None)
+    if message:
+        st.toast(message, icon=":material/check_circle:")
+
+
 def _test(name, typed):
     ok, message, urls = search_sources.check(name, secret=typed or None)
     st.session_state[TEST_RESULT] = (name, ok, message, urls)
@@ -115,7 +138,7 @@ def _source_card(name, chosen):
                 width="stretch",
             ):
                 search_sources.save(name, {source["key"]: typed} if source["key"] else {})
-                st.rerun()
+                _saved_and_rerun(t("search.saved_in_use", name=source["label"]))
 
         # A shared address is forgotten from the card that owns it, not here —
         # this button would drop it for both.
@@ -125,7 +148,7 @@ def _source_card(name, chosen):
             )
             if st.button(forget_label, key=f"forget_{name}", type="tertiary"):
                 search_sources.forget(source["key"])
-                st.rerun()
+                _saved_and_rerun(t("search.saved_forgotten", name=source["key"]))
 
         _show_test(name)
 
@@ -134,6 +157,10 @@ def search_sources_page():
     if not auth.is_admin():
         st.error(t("admin.not_admin"))
         return
+
+    # Before anything is drawn, so a save's confirmation arrives with the
+    # values it saved.
+    _show_saved()
 
     settings = search_sources.load()
     chosen = settings["source"]
@@ -173,4 +200,21 @@ def _offer_section(settings):
         )
         if st.button(t("search.offer_save"), key="src_offer_save", type="primary"):
             search_sources.set_offered(chosen)
-            st.rerun()
+            # `set_offered` puts the source in use back in whatever was
+            # chosen, because it is what a run with nothing ticked gets and
+            # a list without it would leave the default pointing outside the
+            # list. Saying so matters most when the choice was empty: the
+            # page then looks like it refused the save rather than like it
+            # completed one.
+            saved = search_sources.load()["offered"]
+            added = [n for n in saved if n not in chosen]
+            labels = ", ".join(search_sources.SOURCES[n]["label"] for n in saved)
+            if added:
+                message = t(
+                    "search.saved_offered_with_default",
+                    list=labels,
+                    name=search_sources.SOURCES[added[0]]["label"],
+                )
+            else:
+                message = t("search.saved_offered", list=labels)
+            _saved_and_rerun(message)

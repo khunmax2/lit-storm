@@ -23,6 +23,41 @@ Each has a README of its own in the directory beside this file, for the
 things specific to it. Everything binds to loopback; a deployment puts a
 reverse proxy in front.
 
+## Published ports are a development convenience
+
+Every `ports:` entry here binds `127.0.0.1` on the machine running the
+stack. That is right for a laptop and wrong for a host, for a reason worth
+seeing before it bites: **the host's ports are one namespace shared with
+every other stack on it.** Starting this alongside another project that
+publishes 8080 fails with
+
+```
+Bind for 127.0.0.1:8080 failed: port is already allocated
+```
+
+which is why `SEARXNG_PORT` exists. Moving a port is the small fix. The
+real one is not to publish it.
+
+Only three of the nine are reached by a browser at all:
+
+| service | who reaches it | needs publishing? |
+| --- | --- | --- |
+| `app` | the person's browser | yes — behind the proxy |
+| `research-ui` | the browser, through the app's iframe | yes — behind the proxy |
+| `agents-research` | the browser, through the app's iframe | yes — behind the proxy |
+| `searxng` | the other three, by service name | **no** |
+| `gateway`, `auth`, `rest` | the app, server-side — `supabase-py` runs in the app, not in the browser | **no** |
+| `db` | `rest`, `auth`, and a human doing maintenance | **no** |
+
+So on a host: drop every `ports:` except behind one reverse proxy holding
+443, and let the rest talk on `lit-storm_default` where the names already
+resolve. Nothing in the application changes — the app reaches Supabase at
+`http://gateway:8000` and SearXNG at `http://searxng:8080` today, neither
+of which goes through a published port.
+
+Two stacks can then sit on one host without knowing about each other,
+because neither asks the host for anything except through the proxy.
+
 ## It used to be four projects
 
 `deploy/supabase`, `deploy/searxng`, `deploy/research-ui` and `deploy/app`,

@@ -909,6 +909,27 @@ _STRINGS = {
         "ไทย": "แอปนี้รันอยู่ในคอนเทนเนอร์ คำว่า “localhost” จึงหมายถึงตัวคอนเทนเนอร์เอง "
         "ไม่ใช่เครื่องของคุณ ส่วน Ollama อยู่บนเครื่องคุณ ให้ใช้ {address} แทน",
     },
+    "articles.sort": {"English": "Order", "ไทย": "เรียงลำดับ"},
+    "articles.sort_newest": {"English": "Newest first", "ไทย": "ใหม่ที่สุดก่อน"},
+    "articles.sort_oldest": {"English": "Oldest first", "ไทย": "เก่าที่สุดก่อน"},
+    "articles.sort_name": {"English": "By title", "ไทย": "ตามชื่อ"},
+    "articles.show": {"English": "Show", "ไทย": "แสดง"},
+    "articles.show_all": {"English": "All reports", "ไทย": "ทั้งหมด"},
+    "articles.show_storm": {"English": "From STORM", "ไทย": "จาก STORM"},
+    "articles.show_costorm": {"English": "From Co-STORM", "ไทย": "จาก Co-STORM"},
+    "articles.show_deep-research": {
+        "English": "From Deep Research", "ไทย": "จาก Deep Research",
+    },
+    "articles.show_agents-research": {
+        "English": "From Agent Research", "ไทย": "จาก Agent Research",
+    },
+    "articles.show_imported": {"English": "Imported", "ไทย": "ที่นำเข้ามา"},
+    "articles.show_unfinished": {"English": "Unfinished", "ไทย": "ยังไม่สำเร็จ"},
+    "articles.no_filter_match_body": {
+        "English": "Nothing matches this filter. Choose “All reports” to see "
+        "the whole library again.",
+        "ไทย": "ไม่มีบทความที่ตรงกับตัวกรองนี้ เลือก “ทั้งหมด” เพื่อกลับไปดูทั้งคลัง",
+    },
     "articles.import": {"English": "Import report", "ไทย": "นำเข้าบทความ"},
     "articles.import_note": {
         "English": "Bring in a finished report from Deep Research or Agent "

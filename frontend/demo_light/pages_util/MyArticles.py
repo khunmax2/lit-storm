@@ -1,6 +1,7 @@
 import os
 import html
 
+import article_browse
 import article_import
 import article_store
 import demo_util
@@ -341,18 +342,22 @@ def my_articles_page():
             _import_panel(width="stretch")
         return
 
-    article_names = sorted(articles.keys(), key=lambda n: n.lower())
     ui_theme.page_header(
         t("nav.articles"),
         t(
             "articles.count",
-            n=len(article_names),
-            s="s" if len(article_names) > 1 else "",
+            n=len(articles),
+            s="s" if len(articles) > 1 else "",
         ),
     )
     _deleted_articles()
 
-    search_col, import_col, _ = st.columns([2, 1, 2], vertical_alignment="center")
+    # The library only grows, and what you want is nearly always what you
+    # just made, so the row asks two questions before it asks for a word to
+    # search for: in what order, and which of them.
+    search_col, sort_col, show_col, import_col = st.columns(
+        [3, 2, 2, 2], vertical_alignment="center"
+    )
     with search_col:
         query = st.text_input(
             t("articles.search"),
@@ -360,8 +365,41 @@ def my_articles_page():
             icon=":material/search:",
             label_visibility="collapsed",
         )
+    with sort_col:
+        sort = st.selectbox(
+            t("articles.sort"),
+            article_browse.SORTS,
+            key="page2_sort",
+            format_func=lambda name: t(f"articles.sort_{name}"),
+            label_visibility="collapsed",
+        )
+    with show_col:
+        # Only what this library actually holds. A filter offering choices
+        # that match nothing spends a click to prove there is nothing there.
+        choices = [article_browse.ALL] + article_browse.origins_present(articles)
+        if article_browse.has_unfinished(articles):
+            choices.append(article_browse.UNFINISHED)
+        show = st.selectbox(
+            t("articles.show"),
+            choices,
+            key="page2_show",
+            format_func=lambda name: (
+                t("articles.show_all") if name == article_browse.ALL
+                else t(f"articles.show_{name}")
+            ),
+            label_visibility="collapsed",
+        )
     with import_col:
         _import_panel(width="stretch")
+
+    article_names = article_browse.arrange(articles, sort=sort, show=show)
+    if not article_names:
+        ui_theme.empty_state(
+            "filter_alt_off",
+            t("articles.no_match_title"),
+            t("articles.no_filter_match_body"),
+        )
+        return
     if query:
         needle = query.lower().replace(" ", "_")
         article_names = [n for n in article_names if needle in n.lower()]

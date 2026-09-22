@@ -210,8 +210,20 @@ _STRINGS = {
         "เป็นแอปแยกที่นำมาแสดงในกรอบ",
     },
     "research.frame_note": {
-        "English": "Runs in its own window below. Its history stays in this browser.",
-        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง ประวัติจะอยู่ในเบราว์เซอร์นี้",
+        "English": "Runs in its own window below. Finished reports are filed "
+        "in My articles on their own.",
+        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานที่เสร็จแล้วจะถูกบันทึกลง "
+        "บทความของฉัน ให้เอง",
+    },
+    "research.synced": {
+        "English": "“{name}” was added to My articles.",
+        "ไทย": "เพิ่ม “{name}” ลงบทความของฉันแล้ว",
+    },
+    "research.sync_failed": {
+        "English": "A finished report could not be filed automatically. Export "
+        "it as Markdown and import it from My articles.",
+        "ไทย": "มีรายงานที่บันทึกอัตโนมัติไม่สำเร็จ กรุณาส่งออกเป็น Markdown "
+        "แล้วนำเข้าที่หน้าบทความของฉัน",
     },
     "research.open_tab": {"English": "Open in a tab", "ไทย": "เปิดในแท็บใหม่"},
     "run.options": {"English": "Research options", "ไทย": "ตัวเลือกการค้นคว้า"},

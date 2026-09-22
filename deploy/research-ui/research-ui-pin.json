@@ -50,6 +50,25 @@
     ],
     "search_providers_added": [
       "searxng"
-    ]
+    ],
+    "history_storage": {
+      "_comment": [
+        "The app files finished Deep Research reports into the library by",
+        "reading this key from localStorage, which it may do because the",
+        "proxy serves both applications from one origin. See",
+        "frontend/demo_light/research_sync.py.",
+        "",
+        "That is a read of somebody else's internal state, so it is written",
+        "down here and checked: a rebase that renames the key or drops one",
+        "of these fields fails this script instead of quietly syncing",
+        "nothing until somebody notices their library is empty."
+      ],
+      "key": "deep-research-history",
+      "item_fields": [
+        "id",
+        "title",
+        "report"
+      ]
+    }
   }
 }

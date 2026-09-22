@@ -123,6 +123,48 @@ def main():
                 print(f"frame: ?{param} is not read by useEmbed.ts")
                 status = max(status, 1)
 
+    # The one thing we read that is not an interface the sibling offers: its
+    # own history, out of the localStorage both applications share because
+    # the proxy gives them one origin. That is a borrowed internal, and the
+    # price of borrowing it is saying so here. A rebase that renames the key
+    # or drops a field we file reports by should fail this script, not go
+    # quiet until somebody notices nothing has reached their library.
+    storage = PIN["verified_against"].get("history_storage")
+    if storage:
+        sources = [
+            path
+            for path in checkout.rglob("*.ts")
+            if "node_modules" not in path.parts and ".output" not in path.parts
+        ] + [
+            path
+            for path in checkout.rglob("*.vue")
+            if "node_modules" not in path.parts and ".output" not in path.parts
+        ]
+        holders = [
+            path
+            for path in sources
+            if storage["key"] in path.read_text(encoding="utf-8", errors="ignore")
+        ]
+        if not holders:
+            print(f"history: no source names {storage['key']} — the sync reads nothing")
+            status = max(status, 1)
+        else:
+            where = ", ".join(
+                str(path.relative_to(checkout)) for path in holders[:3]
+            )
+            text = "\n".join(
+                path.read_text(encoding="utf-8", errors="ignore") for path in holders
+            )
+            missing = [f for f in storage["item_fields"] if f not in text]
+            if missing:
+                print(
+                    f"history: {where} no longer mentions {', '.join(missing)} — "
+                    "reports would sync without them"
+                )
+                status = max(status, 1)
+            else:
+                print(f"history: {storage['key']} and its fields still in {where}")
+
     if PIN["image"].get("digest") is None:
         print("image: no digest published — local build only; a deploy must not proceed on this")
 

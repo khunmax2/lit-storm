@@ -23,15 +23,29 @@ def framed_page(sibling, note_key, down_key, container_key):
     # Both engines write their finished runs to the storage this origin
     # shares, and one watcher reads both — so it belongs here, with the rest
     # of what the two tabs have in common, rather than in either of them.
-    # Before the frame, because a report filed on this run should be
-    # announced above it and not a screen below.
+    #
+    # It is drawn unconditionally, and what it has to say is said in a toast
+    # rather than on the page. That is not a matter of taste. Streamlit
+    # matches elements by their position, so a message that appears above
+    # the frame only on the run that files a report shifts the frame down a
+    # place — and a shifted frame is a remounted frame, which reloads the
+    # sibling and wipes the report the reader is in the middle of. Measured:
+    # a plain rerun leaves the frame alone, and a rerun with one element
+    # inserted above it does not.
+    #
+    # A toast is drawn in an overlay and adds nothing to the tree, so the
+    # filing stays what it should be — something that happened behind the
+    # reader while they went on reading.
     filed = research_sync.watch()
     if filed:
-        st.success(t("sibling.synced", name=filed.replace("_", " ")))
+        st.toast(
+            t("sibling.synced", name=filed.replace("_", " ")),
+            icon=":material/library_add_check:",
+        )
     elif st.session_state.pop("research_sync_error", None):
         # Said once, and quietly. The report is still in the engine that
         # wrote it and can be exported and imported by hand.
-        st.warning(t("sibling.sync_failed"))
+        st.toast(t("sibling.sync_failed"), icon=":material/warning:")
 
     url = siblings.frame_url(sibling)
     if not url:

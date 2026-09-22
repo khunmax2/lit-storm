@@ -114,17 +114,23 @@ def watch():
     """Draw the watcher and file whatever it hands over.
 
     Returns the name of an article filed on this run, or None. Called from
-    the Deep Research tab, beside the frame — the component is zero height
-    and draws nothing.
+    a framed tab, above the frame — the component is zero height and draws
+    nothing visible.
+
+    It is drawn on every run and before any decision about whether there is
+    anything to do, because the frame below it is positional: an element
+    that appears on some runs and not others moves the frame, and a moved
+    frame is reloaded. See the note in `FramedSibling.framed_page`.
     """
-    if not auth.user_id():
-        return None
-    root = demo_util.working_dir()
-    already = synced(root)
+    signed_in = bool(auth.user_id())
+    root = demo_util.working_dir() if signed_in else None
+    already = synced(root) if root else {}
 
     # The ids go in so the component can tell a new report from one it has
     # already handed over; this is also what releases it to offer the next.
     handed = _component(saved=list(already), default=None)
+    if not root:
+        return None
     if not isinstance(handed, dict) or not handed.get("id"):
         return None
     if handed["id"] in already:

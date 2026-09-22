@@ -885,6 +885,13 @@ _STRINGS = {
         "English": "Restore a report to your library. Deleting a report does not refund research quota.",
         "ไทย": "กู้คืนรายงานกลับไปยังคลังได้ การลบรายงานไม่คืนโควตาค้นคว้าที่ใช้ไปแล้ว",
     },
+    "models.loopback_hint": {
+        "English": "This app runs in a container, where “localhost” is the "
+        "container itself and not your machine. Ollama is on your machine, "
+        "so use {address} instead.",
+        "ไทย": "แอปนี้รันอยู่ในคอนเทนเนอร์ คำว่า “localhost” จึงหมายถึงตัวคอนเทนเนอร์เอง "
+        "ไม่ใช่เครื่องของคุณ ส่วน Ollama อยู่บนเครื่องคุณ ให้ใช้ {address} แทน",
+    },
     "articles.import": {"English": "Import report", "ไทย": "นำเข้าบทความ"},
     "articles.import_note": {
         "English": "Bring in a finished report from Deep Research or Agent "

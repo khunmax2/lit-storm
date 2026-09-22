@@ -183,7 +183,7 @@ It defaults to your chat provider, because for Gemini and OpenAI the same key bu
 ENCODER_PROVIDER = "gemini"     # gemini, openai, azure, or ollama
 ```
 
-The key comes from that provider's usual variable. `ollama` needs none: it embeds with a model on the machine itself, so nothing leaves the host and there is no quota. It reads `OLLAMA_EMBEDDING_MODEL` (default `bge-m3:latest`, which has to be a model Ollama has pulled) and `OLLAMA_API_BASE` (default `http://localhost:11434`).
+The key comes from that provider's usual variable. `ollama` needs none: it embeds with a model on the machine itself, so nothing leaves the host and there is no quota. It reads `OLLAMA_EMBEDDING_MODEL` (default `bge-m3:latest`, which has to be a model Ollama has pulled) and `OLLAMA_API_BASE`, whose default follows where the app is running: `http://localhost:11434` on a laptop, and `http://host.docker.internal:11434` inside the container, because there `localhost` is the container and Ollama is on the host.
 
 If a key is missing, the app says so before the discussion starts rather than failing partway through. STORM does not need this; Co-STORM cannot run without it.
 

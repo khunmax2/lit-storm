@@ -1,9 +1,35 @@
 import os
+import socket
 import numpy as np
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Union, Optional, Dict, Literal
 from pathlib import Path
+
+
+def default_ollama_base() -> str:
+    """Where Ollama is, seen from wherever this code is running.
+
+    Ollama runs on the person's own machine. When this app runs there too,
+    that machine is localhost. When it runs in a container — which is how it
+    ships — localhost is the container, and the host is reached by the name
+    Docker publishes for it.
+
+    Getting this wrong produces "[Errno 111] Connection refused", which reads
+    as "Ollama is not running" and is not: Ollama is running, a step away,
+    and nothing in that message says so.
+
+    The name is resolved rather than assumed. Docker Desktop provides it, and
+    the compose file adds it on a Linux host with `host-gateway`; somewhere
+    that offers neither, localhost is still the better guess.
+    """
+    if os.path.exists("/.dockerenv"):
+        try:
+            socket.gethostbyname("host.docker.internal")
+            return "http://host.docker.internal:11434"
+        except OSError:
+            pass
+    return "http://localhost:11434"
 
 try:
     import warnings
@@ -108,7 +134,7 @@ class Encoder:
             self.kargs = {
                 "api_base": api_base
                 or os.getenv("OLLAMA_API_BASE")
-                or "http://localhost:11434"
+                or default_ollama_base()
             }
         else:
             raise ValueError(

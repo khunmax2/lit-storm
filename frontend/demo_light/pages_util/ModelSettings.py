@@ -82,6 +82,14 @@ def _show_test(scope):
         # which sounds like a missing account here. Say whose it is.
         if message.startswith("AuthenticationError"):
             st.caption(t("models.auth_hint"))
+        # A refused connection to a loopback address, from inside a
+        # container, is the single most likely way this page fails — and the
+        # error says "Connection refused", which sounds like Ollama is down.
+        # It is not: it is running one hop away, on the host.
+        elif "Connection refused" in message and _is_loopback(result.get("probed")):
+            st.caption(
+                t("models.loopback_hint", address=_ollama_default())
+            )
         return
     if scope == "encoder":
         st.success(t("models.encoder_ok", seconds=f"{seconds:.1f}", dimensions=extra))
@@ -89,6 +97,25 @@ def _show_test(scope):
         st.success(t("models.test_ok", model=message, seconds=f"{seconds:.1f}", reply=extra))
     if seconds >= SLOW_SECONDS:
         st.warning(t("models.slow", seconds=f"{seconds:.0f}"))
+
+
+def _is_loopback(address):
+    """Whether an address points at the machine asking, not at the host."""
+    return any(
+        name in (address or "") for name in ("localhost", "127.0.0.1", "[::1]")
+    )
+
+
+def _ollama_default():
+    """Where Ollama would be from here. Imported late on purpose.
+
+    `knowledge_storm.encoder` pulls litellm in with it, and `check_encoder`
+    already defers it for that reason; a page-level import would undo that
+    for everyone who opens this page without touching the Ollama boxes.
+    """
+    from knowledge_storm.encoder import default_ollama_base
+
+    return default_ollama_base()
 
 
 def _provider_picker(label, key, current, allow_inherit):
@@ -442,11 +469,15 @@ def _encoder_card():
                 key="encoder_ollama_model",
                 placeholder="bge-m3:latest",
             )
+            # The placeholder is worked out, not written down. It used to say
+            # http://localhost:11434, which is right on a laptop and wrong in
+            # the container this ships as — and a box that suggests an
+            # address which cannot work is worse than an empty one.
             typed_ollama["OLLAMA_API_BASE"] = st.text_input(
                 t("models.api_base"),
                 value=model_settings.setting("OLLAMA_API_BASE") or "",
                 key="encoder_ollama_base",
-                placeholder="http://localhost:11434",
+                placeholder=_ollama_default(),
             )
         else:
             typed_key = _key_box(costorm.ENCODERS[chosen], "encoder")
@@ -461,7 +492,16 @@ def _encoder_card():
                 t("models.test"), key="test_encoder", icon=":material/wifi_tethering:", width="stretch"
             ):
                 with st.spinner(t("models.testing")):
-                    _remember("encoder", model_settings.check_encoder(overrides=pending))
+                    outcome = model_settings.check_encoder(overrides=pending)
+                    # The address actually asked, which is what the hint
+                    # below reasons about — the typed one if there is one,
+                    # not whatever happens to be saved.
+                    outcome["probed"] = (
+                        pending.get("OLLAMA_API_BASE")
+                        or model_settings.setting("OLLAMA_API_BASE")
+                        or ""
+                    )
+                    _remember("encoder", outcome)
         with right:
             if st.button(t("models.save"), key="save_encoder", type="primary", width="stretch"):
                 if not provider:

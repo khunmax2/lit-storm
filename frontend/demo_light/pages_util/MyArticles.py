@@ -251,15 +251,28 @@ def _article_card(article_name, file_path_dict):
             body += f'<div class="meta">{ui_theme.meta_line(meta)}</div>'
         body += f'<div class="excerpt">{html.escape(excerpt)}</div></div>'
         st.markdown(body, unsafe_allow_html=True)
-        # Drawn after the body and lifted into the corner by CSS, so it needs
-        # no row of its own to sit in.
-        _card_menu(article_name, article_path, file_path_dict)
-        return st.button(
-            t("articles.read") if ready else t("articles.inspect"),
-            icon=":material/description:" if ready else ":material/search:",
-            key=f"open_{article_name}",
-            width="stretch",
-        )
+        # One row for both actions. The menu used to have a row to itself:
+        # a 78px box right-aligned in a 268px card, touching the excerpt
+        # above it with no gap at all, and 44px tall against the 40px of the
+        # button it sits over — a secondary action taking more room and more
+        # height than the primary one, in a band of white space of its own.
+        #
+        # Beside it instead, which is where an overflow menu belongs: the
+        # card loses a whole row, the two actions line up, and which of them
+        # is the point is no longer in question.
+        with st.container(
+            horizontal=True,
+            vertical_alignment="center",
+            key=f"card_actions_{article_name}",
+        ):
+            opened = st.button(
+                t("articles.read") if ready else t("articles.inspect"),
+                icon=":material/description:" if ready else ":material/search:",
+                key=f"open_{article_name}",
+                width="stretch",
+            )
+            _card_menu(article_name, article_path, file_path_dict)
+        return opened
 
 
 def _grid(article_names, articles):

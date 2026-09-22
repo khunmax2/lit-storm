@@ -438,8 +438,34 @@ span[class*="material-icons"] {{
 [data-testid="stVerticalBlock"]:has(
     > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
 )
-    [data-testid="stElementContainer"]:has(.stButton) {{
+    [class*="st-key-card_actions_"] {{
+    /* Pushed to the foot of the card, so every card in a row ends on the
+       same line however tall its excerpt came out. */
     margin-top: auto;
+    width: 100% !important;
+    /* Stretch, so the menu is as tall as the row rather than as tall as a
+       number written down somewhere. The two used to be given their heights
+       separately, and a phone proved why that fails: the coarse-pointer
+       rule raised the read button to 44px and the menu's own `!important`
+       held it at 40 — uneven, and under the target size a finger needs. */
+    align-items: stretch !important;
+    gap: 0.4rem !important;
+    /* Streamlit's horizontal container wraps. The read button asks for the
+       full width of the card, so with the menu beside it the two came to
+       more than a row and the menu dropped onto a second line — which is
+       the thing this row was made to stop. */
+    flex-wrap: nowrap !important;
+}}
+/* The primary action takes what is left after the menu beside it. */
+[data-testid="stVerticalBlock"]:has(
+    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
+)
+    [class*="st-key-card_actions_"] [data-testid="stElementContainer"]:has(.stButton) {{
+    /* Basis 0, not auto: the button inside asks for 100% of the card, and
+       with `auto` that ask becomes the starting width the row tries to
+       honour. From zero it simply takes what the menu leaves. */
+    flex: 1 1 0 !important;
+    min-width: 0;
     /* A block container leaves a few pixels of leading under an inline-block
        button, and the amount depends on the label — so two cards in a row
        ended up with their buttons on different lines. A flex box is the
@@ -456,17 +482,27 @@ span[class*="material-icons"] {{
        the label, which is what knocked one card's button off its row's line. */
     display: flex;
 }}
-/* Keep the title fully readable; the secondary menu gets its own short row. */
-[data-testid="stVerticalBlock"]:has(
-    > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
-)
-    :is(
-        [data-testid="stElementContainer"], [data-testid="stLayoutWrapper"]
-    ):has([data-testid="stPopover"]) {{
+/* The menu sits at the end of the action row and takes only its own width.
+   Matched by its own key rather than by `:has([data-testid="stPopover"])`,
+   which matches every ancestor that contains the menu — including the row
+   the menu now shares with the read button. That squeezed the whole row to
+   the width of its widest child and dropped the menu onto a second line:
+   the selector was written when the menu was alone in its wrapper and
+   "the thing containing the popover" could only mean one element. */
+[class*="st-key-card_menu_"] {{
     position: static;
-    width: fit-content;
-    margin-left: auto;
+    flex: 0 0 auto !important;
+    width: fit-content !important;
+    align-self: stretch !important;
     z-index: 2;
+}}
+/* Down to the button. The wrapper stretches to the row, but everything
+   between it and the button is a plain block whose height is its content,
+   so without this the stretch stops one element in and the button keeps the
+   height it would have had alone. */
+[class*="st-key-card_menu_"] > [data-testid="stPopover"],
+[class*="st-key-card_menu_"] [data-testid="stPopover"] > div {{
+    height: 100% !important;
 }}
 [data-testid="stVerticalBlock"]:has(
     > [data-testid="stElementContainer"] > [data-testid="stMarkdown"] .acard
@@ -476,7 +512,11 @@ span[class*="material-icons"] {{
     background: var(--surface) !important;
     color: var(--muted) !important;
     padding: .35rem .55rem !important;
-    min-height: 2.75rem !important;
+    /* The same height as the button it now stands beside. It used to be
+       2.75rem against that button's 2.5rem, which read as the menu being
+       the more important of the two. */
+    min-height: 2.5rem !important;
+    height: 100% !important;
     opacity: 1;
     font-size: .78rem !important;
 }}
@@ -588,6 +628,11 @@ span[class*="material-icons"] {{
     /* Three lines at the line-height above. 3.9em only reserved two, so a
        card with a short excerpt sat 10px shorter than its neighbours. */
     min-height: 4.65em;
+    /* Air under the last line. The action row is pushed to the foot of the
+       card by `margin-top: auto`, which leaves no gap of its own once an
+       excerpt runs the full three lines — and then the buttons sat directly
+       against the text. */
+    margin-bottom: 0.85rem;
 }}
 
 /* ---------- a search source's card ---------- */

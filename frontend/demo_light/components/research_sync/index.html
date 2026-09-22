@@ -29,10 +29,18 @@
 <script>
   "use strict";
 
-  // Where the research UI keeps its runs. Asserted against the pinned image
-  // by deploy/research-ui/check_research_ui_contract.py, so an upstream bump
-  // that renames it fails the check instead of quietly syncing nothing.
-  var HISTORY_KEY = "deep-research-history";
+  // Where the two framed engines keep their finished runs. Both write the
+  // same shape, which is why this reads them with one loop rather than two.
+  //
+  // The first is the research UI's own, borrowed: asserted against the
+  // pinned image by deploy/research-ui/check_research_ui_contract.py, so an
+  // upstream bump that renames it fails a check instead of quietly syncing
+  // nothing. The second is ours, written by the agents page for this, and
+  // for its own sake — that page had no memory of a finished run at all.
+  var SOURCES = [
+    { key: "deep-research-history", from: "deep-research" },
+    { key: "agents-research-history", from: "agents-research" },
+  ];
 
   // Slow on purpose. A run takes minutes; nothing is gained by looking more
   // often than a person would, and every push costs a Streamlit rerun.
@@ -51,15 +59,22 @@
     // Any of this can fail: storage disabled, a half-written value, a shape
     // that changed. A sync that cannot read is a sync that does nothing,
     // never a page that breaks.
-    try {
-      var raw = window.localStorage.getItem(HISTORY_KEY);
-      if (!raw) return [];
-      var parsed = JSON.parse(raw);
-      var items = parsed && parsed.items;
-      return Array.isArray(items) ? items : [];
-    } catch (error) {
-      return [];
+    var all = [];
+    for (var s = 0; s < SOURCES.length; s++) {
+      try {
+        var raw = window.localStorage.getItem(SOURCES[s].key);
+        if (!raw) continue;
+        var parsed = JSON.parse(raw);
+        var items = parsed && parsed.items;
+        if (!Array.isArray(items)) continue;
+        for (var i = 0; i < items.length; i++) {
+          if (items[i]) all.push({ item: items[i], from: SOURCES[s].from });
+        }
+      } catch (error) {
+        // This source is unreadable; the other may not be.
+      }
     }
+    return all;
   }
 
   function finished(item) {
@@ -74,14 +89,16 @@
   }
 
   function look() {
-    var items = history();
+    var found = history();
     // Newest first, so a backlog arrives in the order a person would expect
     // to find it — and one per pass, because each one costs a rerun.
-    items.sort(function (a, b) {
-      return (b.updatedAt || b.createdAt || 0) > (a.updatedAt || a.createdAt || 0) ? 1 : -1;
+    found.sort(function (a, b) {
+      var left = a.item.updatedAt || a.item.createdAt || "";
+      var right = b.item.updatedAt || b.item.createdAt || "";
+      return right > left ? 1 : -1;
     });
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
+    for (var i = 0; i < found.length; i++) {
+      var item = found[i].item;
       if (!finished(item)) continue;
       if (saved.indexOf(item.id) !== -1) continue;
       if (announced === item.id) return; // handed over; waiting for Python
@@ -90,6 +107,7 @@
         dataType: "json",
         value: {
           id: item.id,
+          from: found[i].from,
           title: typeof item.title === "string" ? item.title : "",
           query: typeof item.query === "string" ? item.query : "",
           report: item.report,

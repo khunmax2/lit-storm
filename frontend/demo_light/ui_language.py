@@ -193,9 +193,10 @@ _STRINGS = {
         "`docker compose up -d agents-research` ในโฟลเดอร์ deploy",
     },
     "agents.frame_note": {
-        "English": "Runs in its own window below. Its reports are not kept "
-        "in your library.",
-        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานจะไม่ถูกเก็บในคลังบทความของคุณ",
+        "English": "Runs in its own window below. Finished reports are filed "
+        "in My articles on their own.",
+        "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานที่เสร็จแล้วจะถูกบันทึกลง "
+        "บทความของฉัน ให้เอง",
     },
     "sibling.probe_said": {
         "English": "Tried: {detail}",
@@ -215,11 +216,11 @@ _STRINGS = {
         "ไทย": "ทำงานในหน้าต่างของตัวเองด้านล่าง รายงานที่เสร็จแล้วจะถูกบันทึกลง "
         "บทความของฉัน ให้เอง",
     },
-    "research.synced": {
+    "sibling.synced": {
         "English": "“{name}” was added to My articles.",
         "ไทย": "เพิ่ม “{name}” ลงบทความของฉันแล้ว",
     },
-    "research.sync_failed": {
+    "sibling.sync_failed": {
         "English": "A finished report could not be filed automatically. Export "
         "it as Markdown and import it from My articles.",
         "ไทย": "มีรายงานที่บันทึกอัตโนมัติไม่สำเร็จ กรุณาส่งออกเป็น Markdown "

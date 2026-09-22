@@ -11,6 +11,7 @@ in the browser's language, inside our layout — and it reads as this app
 being broken rather than a container being stopped.
 """
 
+import research_sync
 import siblings
 import streamlit as st
 import ui_theme
@@ -19,6 +20,19 @@ from ui_language import t
 
 def framed_page(sibling, note_key, down_key, container_key):
     """One sibling's tab: a line, a way out, and the frame — if it is up."""
+    # Both engines write their finished runs to the storage this origin
+    # shares, and one watcher reads both — so it belongs here, with the rest
+    # of what the two tabs have in common, rather than in either of them.
+    # Before the frame, because a report filed on this run should be
+    # announced above it and not a screen below.
+    filed = research_sync.watch()
+    if filed:
+        st.success(t("sibling.synced", name=filed.replace("_", " ")))
+    elif st.session_state.pop("research_sync_error", None):
+        # Said once, and quietly. The report is still in the engine that
+        # wrote it and can be exported and imported by hand.
+        st.warning(t("sibling.sync_failed"))
+
     url = siblings.frame_url(sibling)
     if not url:
         st.info(t(f"{sibling.name}.not_configured"))

@@ -97,11 +97,14 @@ def _file_report(root, report):
     title = (report.get("title") or report.get("query") or "").strip()
     if not title:
         raise ValueError("the report has no title")
+    # Which engine wrote it, so an article can say where it came from long
+    # after the browser that produced it has forgotten.
+    engine = (report.get("from") or "deep-research").strip()
     name = article_import.save(
         root,
         _free_name(root, title),
         report["report"],
-        origin=f"deep-research:{report.get('id', '')}",
+        origin=f"{engine}:{report.get('id', '')}",
     )
     _remember(root, report["id"], name)
     return name

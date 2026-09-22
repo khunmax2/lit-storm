@@ -189,12 +189,34 @@ def _reset():
 
 
 def busy():
-    """Whether a discussion is open and should keep the page to itself.
+    """Whether a discussion exists at all.
 
     Unlike a STORM run this survives navigation: the keys are not `page_`
-    ones, so a discussion is still there after a trip to the library.
+    ones, so a discussion is still there after a trip to the library — and,
+    since `round_table_page` resumes from `costorm_state`, after a trip to
+    another engine and back as well.
     """
     return st.session_state.get("costorm_state", "idle") != "idle"
+
+
+def working():
+    """Whether a turn is being taken right now, as opposed to merely open.
+
+    These were one thing, called `busy`, and conflating them cost the reader
+    the page: a discussion that existed held the front door for as long as it
+    existed, and the only control that let go of it also threw it away.
+
+    A discussion sits still most of the time. The moments that must not be
+    interrupted are narrow and both are here: a warm start, which is doing a
+    mini-STORM synchronously, and a queued turn, which `_round_table` has yet
+    to pop and run. Navigate away from either and the work is simply dropped
+    — a warm start that never warms, or a turn that was asked for and never
+    taken.
+    """
+    return (
+        st.session_state.get("costorm_state") == "warming"
+        or st.session_state.get("costorm_pending") is not None
+    )
 
 
 # --------------------------------------------------------------- opening

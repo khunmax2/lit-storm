@@ -68,19 +68,47 @@ def _switch():
         f"{t(ENGINES[_engine()][2])}</div>",
         unsafe_allow_html=True,
     )
+    # A discussion the reader has walked away from is still running up a
+    # knowledge base and still costing what it cost. Now that leaving is
+    # allowed, say that it is there — otherwise it is state nothing on
+    # screen accounts for, and the way back is a guess.
+    if RoundTable.busy() and _engine() != COSTORM:
+        _, middle, _ = st.columns([1, 3, 1])
+        with middle:
+            if st.button(
+                t("home.discussion_open"),
+                icon=":material/forum:",
+                width="stretch",
+                type="tertiary",
+            ):
+                st.session_state[ENGINE_KEY] = COSTORM
+                st.rerun()
 
 
 def home_page():
     demo_util.clear_other_page_session_state(page_index=3)
 
-    # Whichever one is mid-flight keeps the page, whatever the switch says.
-    # Co-STORM is asked first: its state outlives navigation, so a discussion
-    # left open is the thing most likely to be come back to.
-    if RoundTable.busy():
-        RoundTable.round_table_page()
-        return
+    # A STORM run owns the page for as long as it lasts. Its state is a
+    # `page3_` key, so walking away is already how you abandon one, and
+    # there is no discussion to come back to.
     if CreateNewArticle.busy():
         CreateNewArticle.create_new_article_page()
+        return
+
+    # A discussion is not the same thing, and treating it as one took the
+    # page away. Co-STORM state is deliberately not a `page_` key so that a
+    # discussion survives a walk to the library — but this asked
+    # `RoundTable.busy()`, which is true for as long as a discussion exists,
+    # and so the switch was never drawn again. The reader was left in a room
+    # with one door marked "start a new discussion", which discards the one
+    # they were in. That is a strange thing to insist on for state a browser
+    # refresh loses anyway.
+    #
+    # Now only work actually in flight holds the page, and the switch stays.
+    # `round_table_page` resumes from `costorm_state`, so leaving Co-STORM
+    # and coming back finds the discussion where it was.
+    if RoundTable.working():
+        RoundTable.round_table_page()
         return
 
     _switch()

@@ -885,6 +885,10 @@ _STRINGS = {
         "English": "Restore a report to your library. Deleting a report does not refund research quota.",
         "ไทย": "กู้คืนรายงานกลับไปยังคลังได้ การลบรายงานไม่คืนโควตาค้นคว้าที่ใช้ไปแล้ว",
     },
+    "home.discussion_open": {
+        "English": "A discussion is still open — go back to Co-STORM",
+        "ไทย": "มีการสนทนาเปิดค้างอยู่ — กลับไปที่ Co-STORM",
+    },
     "models.loopback_hint": {
         "English": "This app runs in a container, where “localhost” is the "
         "container itself and not your machine. Ollama is on your machine, "

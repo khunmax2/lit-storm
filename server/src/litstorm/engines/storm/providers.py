@@ -61,6 +61,14 @@ def reasoning_kwargs(value, provider):
     return {}
 
 
+def _permanent(error):
+    """A Google error that trying again will not fix: a bad key, a bad
+    request, a model that does not exist. Those stop the Run at once
+    (docs/web-app-design.md, การ retry คำขอที่ล้มเหลว)."""
+    code = getattr(error, "code", None)
+    return isinstance(code, int) and 400 <= code < 500 and code not in (408, 429)
+
+
 class BoundedGoogleModel(GoogleModel):
     """GoogleModel with our retry ceiling and a request timeout."""
 
@@ -74,7 +82,7 @@ class BoundedGoogleModel(GoogleModel):
             http_options=types.HttpOptions(timeout=int(timeout * 1000)),
         )
 
-    @backoff.on_exception(backoff.expo, Exception, max_tries=TRIES)
+    @backoff.on_exception(backoff.expo, Exception, max_tries=TRIES, giveup=_permanent)
     def request(self, prompt, **kwargs):
         return self.basic_request(prompt, **kwargs)
 

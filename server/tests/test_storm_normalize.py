@@ -1,0 +1,105 @@
+"""STORM's files on disk, turned into report.json."""
+
+import json
+
+import pytest
+
+from litstorm import report
+from litstorm.engines.storm.normalize import normalize, parse_sections
+
+ARTICLE = """# summary
+
+สงกรานต์เป็นเทศกาลปีใหม่ไทย [4][1].
+
+# ประวัติ
+
+เริ่มจากคติพราหมณ์ [4].
+
+## ที่มาของชื่อ
+
+มาจากภาษาสันสกฤต [9] และ [7].
+
+# ประเพณี
+
+รดน้ำดำหัว [1].
+"""
+
+
+def refs(**index):
+    return {
+        "url_to_unified_index": {f"https://s/{n}": n for n in index.values()},
+        "url_to_info": {
+            f"https://s/{n}": {
+                "url": f"https://s/{n}",
+                "title": f"Source {n}",
+                "description": "",
+                "snippets": [f"passage {n}", "  "],
+                "meta": {},
+                "citation_uuid": -1,
+            }
+            for n in index.values()
+        },
+    }
+
+
+@pytest.fixture
+def article_dir(tmp_path):
+    (tmp_path / "storm_gen_article_polished.txt").write_text(ARTICLE, encoding="utf-8")
+    # 7 is cited in the text but has no source; 2 has a source but is not cited.
+    (tmp_path / "url_to_info.json").write_text(
+        json.dumps(refs(a=1, b=2, c=4, d=9)), encoding="utf-8"
+    )
+    return tmp_path
+
+
+def test_lead_and_nested_sections():
+    lead, sections = parse_sections(ARTICLE)
+    assert lead.startswith("สงกรานต์")
+    assert [s["heading"] for s in sections] == ["ประวัติ", "ประเพณี"]
+    assert sections[0]["children"][0]["heading"] == "ที่มาของชื่อ"
+    assert [s["id"] for s in report.walk(sections)] == ["s1", "s2", "s3"]
+
+
+def test_sources_renumbered_in_reading_order(article_dir):
+    result, dropped = normalize(str(article_dir), "สงกรานต์", "th")
+
+    assert result["lead"] == "สงกรานต์เป็นเทศกาลปีใหม่ไทย [1][2]."
+    assert [(s["id"], s["url"]) for s in result["sources"]] == [
+        (1, "https://s/4"),
+        (2, "https://s/1"),
+        (3, "https://s/9"),
+    ]
+    child = result["sections"][0]["children"][0]
+    assert child["body"] == "มาจากภาษาสันสกฤต [3] และ."
+    assert dropped == 1
+
+
+def test_uncited_sources_are_left_out_and_blank_evidence_dropped(article_dir):
+    result, _ = normalize(str(article_dir), "สงกรานต์", "th")
+    assert "https://s/2" not in {s["url"] for s in result["sources"]}
+    assert result["sources"][0]["evidence"] == ["passage 4"]
+
+
+def test_draft_used_when_polishing_did_not_finish(tmp_path):
+    (tmp_path / "storm_gen_article.txt").write_text("# A\n\nText [1].", encoding="utf-8")
+    (tmp_path / "url_to_info.json").write_text(json.dumps(refs(a=1)), encoding="utf-8")
+    result, _ = normalize(str(tmp_path), "t", "en")
+    assert result["lead"] == ""
+    assert result["sections"][0]["body"] == "Text [1]."
+
+
+def test_validate_rejects_a_dangling_citation():
+    bad = {
+        "schema": 1, "engine": "x", "title": "t", "language": "en",
+        "lead": "[2]", "sections": [], "sources": [],
+    }
+    with pytest.raises(report.ReportError, match="no source"):
+        report.validate(bad)
+
+
+def test_empty_report_is_empty():
+    empty = {
+        "schema": 1, "engine": "x", "title": "t", "language": "en",
+        "lead": "  ", "sections": [], "sources": [],
+    }
+    assert report.is_empty(empty)

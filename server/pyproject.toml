@@ -1,0 +1,39 @@
+[project]
+name = "litstorm-server"
+version = "0.1.0"
+description = "API and Worker for the lit-storm web app"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "knowledge-storm",
+    "markdown-it-py>=3",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Chromium prints the PDF export. Kept optional so the API image can do
+# without a browser; the Worker installs it.
+pdf = ["playwright>=1.47"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[project.scripts]
+litstorm = "litstorm.cli:main"
+
+[tool.uv.sources]
+knowledge-storm = { path = "..", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/litstorm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: calls a real LLM or search service and costs money",
+    "slow: starts processes that import STORM",
+]
+addopts = "-m 'not live'"

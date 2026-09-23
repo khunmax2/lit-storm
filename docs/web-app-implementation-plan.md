@@ -1,6 +1,6 @@
 # Web App — แผนทางเทคนิคและลำดับพัฒนา
 
-สถานะ: ร่างข้อเสนอทางเทคนิค ยังไม่ได้เริ่มพัฒนาเว็บใหม่ ขอบเขตที่ผู้ใช้ยืนยันอยู่ใน [web-app-design.md](./web-app-design.md) และคำศัพท์อยู่ใน [CONTEXT.md](../CONTEXT.md)
+สถานะ: แผนทางเทคนิคที่ยืนยันทิศทางแล้วเมื่อ 2026-09-24 ยังไม่ได้เริ่มพัฒนาเว็บใหม่ ขอบเขตที่ผู้ใช้ยืนยันอยู่ใน [web-app-design.md](./web-app-design.md) คำศัพท์อยู่ใน [CONTEXT.md](./CONTEXT.md) และการตัดสินใจทางสถาปัตยกรรมอยู่ใน [adr/](./adr/)
 
 ## ผลลัพธ์แรกที่ต้องทำให้ได้
 
@@ -16,18 +16,26 @@
 - `knowledge_storm/storm_wiki/modules/callback.py` มี callbacks สำหรับ progress บางขั้น แต่ไม่ได้เป็นระบบคิวหรือระบบยกเลิกงานครบวงจร
 - `frontend/demo_light/article_store.py` มี logic จัดเก็บตามเจ้าของและถังขยะที่ใช้เป็นฐานอ้างอิงได้ แต่ต้องปรับให้ผูกกับ Project/Session/Run ใหม่
 - มีตัวสร้าง HTML เดิมใน `frontend/demo_light/html_report.py` ซึ่งต้องตรวจความสามารถก่อนเลือกนำกลับมาใช้กับข้อกำหนด export ใหม่
+- `frontend/demo_light/article_language.py` สลับภาษาโดยแก้ docstring ของ `dspy.Signature` ซึ่งเป็นค่าที่ใช้ร่วมกันทั้ง process จึงรันสอง Run ใน process เดียวกันไม่ได้ ([ADR-0003](./adr/0003-one-process-per-run.md))
+- `deploy/` ปัจจุบันมี Supabase (GoTrue, PostgREST), `research-ui` และ `agents-research` ซึ่งไม่ย้ายมาอยู่ใน stack ใหม่ของรุ่นแรก ([ADR-0002](./adr/0002-drop-supabase-own-auth.md), [ADR-0004](./adr/0004-engine-interface.md))
 
-## โครงสร้างที่เสนอ
+## โครงสร้างที่ตกลงแล้ว
 
-- **Web**: หน้าล็อกอิน Dashboard Projects Sessions Reports Sources และ Settings เรียก Application Backend เท่านั้น
-- **Application Backend (Python)**: รวมบัญชี สิทธิ์ Projects/Sessions การส่งงาน โควตา และการอ่านผลในแอปเดียวก่อน เพื่อใช้ภาษาเดียวกับ engine และลดส่วนเชื่อมต่อระหว่างภาษา
-- **Worker (Python)**: แยก process/container จาก Backend เรียก engine และสร้างผลลัพธ์ งานวิจัยไม่อยู่ใน HTTP request
-- **PostgreSQL**: ข้อมูลผู้ใช้ ownership สถานะ Run การจองโควตา และการจัดสรรคิว
-- **Persistent file volume**: เก็บผลดิบ ผลที่แปลงแล้ว และ export ตาม Run; ส่งไฟล์ผ่าน Backend ที่ตรวจสิทธิ์ ไม่เปิดไดเรกทอรีโดยตรงให้ browser
+```
+web/        Vite + React + TS, Tailwind, shadcn/ui, TanStack Query, TS client จาก OpenAPI
+server/     Python project เดียว (uv, SQLAlchemy 2, Alembic)
+  api       FastAPI: บัญชี, session, สิทธิ์, Projects/Sessions, การส่งงาน, โควตา, การอ่านผล
+  worker    supervisor: claim งาน, สร้าง subprocess ต่อ Run, heartbeat, งานตามเวลา
+  engines/  Engine interface + STORM adapter (โค้ดที่คัดลอกมาจาก demo_light)
+deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, searxng
+```
 
-เริ่มจาก Web, Backend, Worker และ PostgreSQL ใน Compose เดียว ระบบบัญชีเป็นส่วนหนึ่งของ Backend ได้ ไม่จำเป็นต้องมี container สำหรับทุกหน้าที่ ส่วน framework และ library จะเลือกพร้อมตรวจความเข้ากันได้ก่อนสร้างโครงโปรเจกต์
-
-ข้อเสนอสำหรับคิวรุ่นแรกคือใช้ PostgreSQL เป็นแหล่งสถานะและคิวถาวร เพื่อลดการประสานข้อมูลข้ามระบบบนเครื่องเดียว ต้องพิสูจน์การ claim งาน การจัดคิวแบบสลับผู้ใช้ และการป้องกันงานซ้ำด้วย integration tests ก่อนยึดเป็นข้อสรุป หากเลือก queue framework เพิ่มเติม ต้องปิดพฤติกรรมเริ่ม Run ใหม่อัตโนมัติหลัง Worker ล่มให้ตรงกับข้อกำหนด
+- **Web** ([ADR-0001](./adr/0001-vite-spa-and-fastapi.md)): เป็น static SPA ที่ edge เสิร์ฟ เรียก API บน origin เดียวกัน ไม่มี business logic ใช้ polling แสดงความคืบหน้าของ Run
+- **API**: session เก็บฝั่ง server ส่ง cookie แบบ httpOnly และใช้ CSRF token API key ของ provider เข้ารหัสด้วย Fernet โดยใช้ master key จาก Docker secret
+- **Worker**: หนึ่ง Run ต่อหนึ่ง subprocess ยกเลิกโดยส่งสัญญาณแล้ว kill ถ้าเกิน 30 วินาที เพดานเวลารวมต่อ Run 60 นาที และทุก HTTP request มี timeout
+- **PostgreSQL**: เก็บสถานะและใช้เป็นคิวถาวร (`SELECT … FOR UPDATE SKIP LOCKED`) ต้องพิสูจน์การ claim งาน, คิวสลับผู้ใช้ และการกันงานซ้ำด้วย integration test
+- **Persistent volume**: เก็บ `report.json`, ผลดิบ และ export ต่อ Run ส่งไฟล์ผ่าน API ที่ตรวจสิทธิ์ ([ADR-0005](./adr/0005-report-json-file.md))
+- **PDF**: ใช้ Chromium (Playwright) พร้อมฟอนต์ไทย รวมอยู่ใน worker หรือแยกเป็น container `renderer`
 
 ## จุดเชื่อม engine
 
@@ -50,7 +58,9 @@
 - `quota_reservations`, `quota_ledger`: การจอง/ใช้/คืนที่ผูกกับ Run และรอบเดือน ป้องกันหักหรือคืนซ้ำ
 - `llm_models`, `search_providers`, `provider_credentials`: รายการที่เปิดใช้ defaults และ credentials ที่เก็บฝั่ง server แยกจาก config snapshot ที่ผู้ใช้เห็น
 - `reports`, `report_sources`, `report_citations`, `artifacts`: ผลลัพธ์ หลักฐาน และไฟล์ที่เชื่อมกับ Run
-- `support_access_grants`, `audit_events`: สิทธิ์อ่านเฉพาะ Run ตามผู้รับและเวลา พร้อมประวัติเข้าดู
+- `runs.engine`: มีตั้งแต่รุ่นแรกเพื่อรองรับ Engine อื่นในรุ่นสอง
+- `run_usage`: token แยกตามโมเดลและจำนวนครั้งที่เรียก search ต่อ stage พร้อมค่าใช้จ่ายโดยประมาณ
+- `audit_events`: ประวัติการกระทำของผู้ดูแล (`support_access_grants` ย้ายไปรุ่นสอง)
 - การลบใช้ข้อมูลเวลาเข้าถังขยะ/เวลาครบกำหนด คงความสัมพันธ์กับ Run และไม่คืนโควตาเพียงเพราะลบรายงาน
 
 ชื่อรายการเหล่านี้เป็นร่าง ไม่ใช่ SQL schema ที่อนุมัติแล้ว ต้องระบุ constraints, indexes และ transaction ก่อนทำ migration
@@ -66,11 +76,18 @@
 
 ## ลำดับพัฒนา
 
-1. **พิสูจน์ engine นอก Streamlit** — รันหัวข้อทดสอบผ่าน module ใหม่ เก็บผลแยกตาม Run ทดลอง progress, retry และ cancellation โดยใช้ fake provider สำหรับกรณีผิดพลาด และ API จริงสำหรับเส้นทางสำเร็จ
-2. **ทำเส้นทางครบวงจรบน local** — Compose, migrations, bootstrap Admin, login, ตั้งค่าบริการ, Project/Session, ส่งงานให้ Worker และอ่านผล ใช้หน้าจอพื้นฐานก่อน
-3. **ทำกติกางานและข้อมูลให้ครบ** — คิวสลับผู้ใช้ โควตา ค่า override งานข้ามเดือน ยกเลิก Worker interruption และลองใหม่ พร้อมทดสอบหลายผู้ใช้และคำขอพร้อมกัน
-4. **ทำรายงานและการจัดการให้ครบ** — Source Explorer, export 3 รูปแบบ, ไทย/อังกฤษ, member management, support grants, ถังขยะ และหน้าจอ Dashboard/Settings
-5. **ตรวจรับรุ่นแรก** — รันทุกรายการในเกณฑ์รับงาน รวมติดตั้งใหม่และ restart container แล้วข้อมูลยังอยู่ ก่อนเริ่มขอบเขตรุ่นสอง
+1. **พิสูจน์ engine นอก Streamlit** — คัดลอกโค้ดที่ใช้ซ้ำเข้า `server/engines/storm/` แล้วรันหัวข้อทดสอบใน subprocess เก็บผลแยกตาม Run ทดลอง progress, retry, การยกเลิกด้วย kill และการรันภาษาไทยกับภาษาอังกฤษพร้อมกัน จากนั้นแปลงผลเป็น `report.json` และ**ทดลองทำ PDF ภาษาไทยด้วย Chromium** ใช้ fake provider สำหรับกรณีผิดพลาด และ API จริงสำหรับเส้นทางสำเร็จ
+2. **ทำเส้นทางครบวงจรบน local** — Compose, migrations, bootstrap Admin, login, ตั้งค่าบริการ (มี SearXNG เป็นค่าเริ่มต้น), Project/Session, ส่งงานให้ Worker และอ่านผล วาง design token, layout หลัก และ TS client จาก OpenAPI ไว้ตั้งแต่ขั้นนี้ เพื่อไม่ต้องรื้อหน้าจอในขั้นที่ 4
+3. **ทำกติกางานและข้อมูลให้ครบ** — คิวสลับผู้ใช้, โควตาพร้อมตารางการคืน, ค่า override, งานข้ามเดือน, ยกเลิก, Worker interruption, เพดานเวลา และลองใหม่ **เทสต์คิวและโควตา (pytest + Postgres จริง + FakeEngine) ต้องผ่านก่อนเริ่มทำหน้าจอของขั้นนี้**
+4. **ทำรายงานและการจัดการให้ครบ** — Source Explorer, export 3 รูปแบบ, ไทย/อังกฤษ, การจัดการผู้ใช้, บันทึกค่าใช้จ่าย, ถังขยะ และหน้าจอ Dashboard/Settings
+5. **ตรวจรับรุ่นแรก** — รันทุกรายการในเกณฑ์รับงานด้วย Playwright บน compose stack รวมติดตั้งใหม่และ restart container แล้วข้อมูลยังอยู่ ใช้ STORM จริงเฉพาะ smoke test จากนั้นเปลี่ยนมาใช้ระบบใหม่และลบ Streamlit กับ Supabase
+
+## ก่อนเริ่มรุ่นสอง
+
+- Support Access Grant
+- Agent Research: import เป็น library แล้วเขียน adapter
+- Deep Research: เพิ่ม endpoint ฝั่ง server ใน fork ของ Nuxt ก่อน แล้วจึงเขียน adapter
+- Co-STORM: ออกแบบ Discussion (หลาย Turn และเก็บ state ถาวร) อาจเปลี่ยนความคืบหน้าเป็น SSE
 
 ## จุดตรวจแรก
 

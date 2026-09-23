@@ -136,7 +136,7 @@ def _import_panel(width="content"):
 def _card_menu(article_name, article_path, file_path_dict):
     """Every report, including an interrupted one, can be deleted."""
     with st.popover(
-        t("articles.actions"), icon=":material/more_vert:",
+        t("articles.actions"), icon=":material/more_horiz:",
         key=f"card_menu_{article_name}"
     ):
         if article_path:

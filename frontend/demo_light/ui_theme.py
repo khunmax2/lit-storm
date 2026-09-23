@@ -443,11 +443,13 @@ span[class*="material-icons"] {{
        same line however tall its excerpt came out. */
     margin-top: auto;
     width: 100% !important;
-    /* Stretch, so the menu is as tall as the row rather than as tall as a
-       number written down somewhere. The two used to be given their heights
-       separately, and a phone proved why that fails: the coarse-pointer
-       rule raised the read button to 44px and the menu's own `!important`
-       held it at 40 — uneven, and under the target size a finger needs. */
+    /* Stretch, so the two actions are one height decided in one place. The
+       menu is a 2.75rem square and sets the row; the read button follows it.
+       Which of them leads does not matter — that a height is set on only
+       one of them does. They were sized separately once, and a phone proved
+       why that fails: the coarse-pointer rule raised the read button to
+       44px while the menu's own `!important` held it at 40, leaving it
+       uneven and under the size a finger needs. */
     align-items: stretch !important;
     gap: 0.4rem !important;
     /* Streamlit's horizontal container wraps. The read button asks for the
@@ -510,12 +512,10 @@ span[class*="material-icons"] {{
     [data-testid="stPopover"] button {{
     border: 1px solid var(--line) !important;
     background: var(--surface) !important;
-    color: var(--muted) !important;
-    padding: .35rem .55rem !important;
-    /* The same height as the button it now stands beside. It used to be
-       2.75rem against that button's 2.5rem, which read as the menu being
-       the more important of the two. */
-    min-height: 2.5rem !important;
+    color: var(--ink) !important;
+    padding: 0 !important;
+    /* A comfortable target; the adjacent read action stretches with it. */
+    min-height: 2.75rem !important;
     height: 100% !important;
     opacity: 1;
     font-size: .78rem !important;
@@ -525,8 +525,54 @@ span[class*="material-icons"] {{
 )
     [data-testid="stPopover"] button:hover {{
     opacity: 1;
+    color: var(--brand) !important;
+    background: var(--brand-soft) !important;
+}}
+/* Compact overflow control. Keep the label in the accessibility tree. */
+[class*="st-key-card_menu_"] [data-testid="stPopover"] button {{
+    width: 2.75rem !important;
+    min-width: 2.75rem !important;
+    min-height: 2.75rem !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    justify-content: center !important;
+    /* The app's own button radius, from config.toml. At .75rem this was
+       visibly rounder than the read button it sits against. */
+    border-radius: 0.55rem !important;
     color: var(--ink) !important;
-    background: var(--nav-hover) !important;
+    transition: background-color 150ms ease, border-color 150ms ease;
+}}
+/* Streamlit offsets the content to compensate for its trailing chevron.
+   Once that chevron is hidden, its -5px right margin shifts the icon 2.5px. */
+[class*="st-key-card_menu_"] [data-testid="stPopoverButton"] > div {{
+    margin: 0 !important;
+    gap: 0 !important;
+}}
+[class*="st-key-card_menu_"] [data-testid="stPopover"] button [data-testid="stMarkdownContainer"] {{
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+}}
+[class*="st-key-card_menu_"] [data-testid="stPopover"] button:is(:hover, [aria-expanded="true"]) {{
+    background: var(--brand-soft) !important;
+    border-color: var(--brand) !important;
+    color: var(--brand) !important;
+}}
+/* The same ring every other control in the app draws, so one control does
+   not announce focus differently from the rest. */
+[class*="st-key-card_menu_"] [data-testid="stPopover"] button:focus-visible {{
+    outline: 3px solid var(--brand) !important;
+    outline-offset: 2px;
+}}
+@media (prefers-reduced-motion: reduce) {{
+    [class*="st-key-card_menu_"] [data-testid="stPopover"] button {{
+        transition: none;
+    }}
 }}
 /* Streamlit adds a chevron after a popover's label. This menu already says
    what it is twice — a ⋮ and the word — so the chevron is a third glyph for

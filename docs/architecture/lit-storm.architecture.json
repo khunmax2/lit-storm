@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "lit-storm · สถาปัตยกรรมระบบ",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1300,
+      850
+    ],
+    "repository": {
+      "revision": "82d94b2a1675e06e8a8d8bd3703d38bc94ef2207",
+      "url": "https://github.com/khunmax2/lit-storm"
+    }
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "ผู้ใช้งาน",
+      "sublabel": "Browser · iframe · localStorage",
+      "pos": [
+        40,
+        370
+      ],
+      "size": [
+        230,
+        80
+      ],
+      "sources": [
+        {
+          "path": "frontend/demo_light/siblings.py"
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "type": "cloud",
+      "label": "Nginx Edge",
+      "sublabel": "ทางเข้าร่วม HTTP / WebSocket",
+      "pos": [
+        390,
+        370
+      ],
+      "size": [
+        230,
+        80
+      ],
+      "sources": [
+        {
+          "path": "deploy/edge/default.conf.template"
+        }
+      ]
+    },
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "Streamlit :8501",
+      "sublabel": "STORM / Co-STORM ใน Python",
+      "pos": [
+        770,
+        370
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "frontend/demo_light/demo_util.py"
+        },
+        {
+          "path": "frontend/demo_light/costorm.py"
+        }
+      ]
+    },
+    {
+      "id": "identity",
+      "type": "security",
+      "label": "Supabase",
+      "sublabel": "gateway → GoTrue / PostgREST",
+      "pos": [
+        770,
+        120
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "deploy/docker-compose.yml"
+        },
+        {
+          "path": "frontend/demo_light/auth.py"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "บัญชี · โควตา · audit · RLS",
+      "pos": [
+        1018,
+        120
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "docs/supabase-schema.sql"
+        }
+      ]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "ไฟล์ถาวร",
+      "sublabel": "app-reports / app-state",
+      "pos": [
+        1018,
+        370
+      ],
+      "size": [
+        260,
+        80
+      ],
+      "sources": [
+        {
+          "path": "frontend/demo_light/article_store.py"
+        },
+        {
+          "path": "deploy/docker-compose.yml"
+        }
+      ]
+    },
+    {
+      "id": "siblings",
+      "type": "backend",
+      "label": "แอปวิจัยแยก :3000",
+      "sublabel": "research-ui / agents-research",
+      "pos": [
+        390,
+        680
+      ],
+      "size": [
+        250,
+        80
+      ],
+      "sources": [
+        {
+          "path": "deploy/docker-compose.yml"
+        },
+        {
+          "path": "frontend/demo_light/siblings.py"
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "type": "backend",
+      "label": "แหล่งค้นข้อมูล",
+      "sublabel": "SearXNG / Search API ที่เลือก",
+      "pos": [
+        770,
+        680
+      ],
+      "size": [
+        260,
+        80
+      ],
+      "sources": [
+        {
+          "path": "frontend/demo_light/search_sources.py"
+        },
+        {
+          "path": "knowledge_storm/rm.py"
+        }
+      ]
+    },
+    {
+      "id": "models",
+      "type": "external",
+      "label": "บริการโมเดล AI",
+      "sublabel": "LLM + Embedding สำหรับ Co-STORM",
+      "pos": [
+        1038,
+        680
+      ],
+      "size": [
+        250,
+        80
+      ],
+      "sources": [
+        {
+          "path": "knowledge_storm/lm.py"
+        },
+        {
+          "path": "knowledge_storm/encoder.py"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "browser",
+      "to": "edge",
+      "label": "HTTP / WS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "edge",
+      "to": "app",
+      "label": "/lit-storm/",
+      "variant": "emphasis"
+    },
+    {
+      "from": "app",
+      "to": "identity",
+      "label": "Auth / RPC",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "edge",
+      "to": "siblings",
+      "label": "/research/ · /agents/",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "app",
+      "to": "search",
+      "label": "ค้นเว็บ",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 90
+    },
+    {
+      "from": "siblings",
+      "to": "search",
+      "label": "SearXNG"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "ขอบเขตของภาพ",
+      "items": [
+        "อ้างอิงโค้ดและ Docker Compose ในโปรเจกต์นี้",
+        "Supabase รวม gateway, auth และ rest ไว้ในกล่องเดียว"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "งานวิจัยและรายงาน",
+      "items": [
+        "STORM: ค้นคว้า → โครงร่าง → บทความ → ปรับแก้",
+        "Co-STORM: สนทนาผู้เชี่ยวชาญ + แผนผังความรู้",
+        "แอปวิจัยแยกเรียก LLM ของตนเองด้วย"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "ข้อมูลแยกตามหน้าที่",
+      "items": [
+        "บัญชีและโควตาอยู่ใน PostgreSQL; รายงานอยู่ในไฟล์แยกผู้ใช้",
+        "Deep Research ส่งรายงานผ่าน localStorage → research_sync",
+        "ภาพสะท้อนการตั้งค่าใน repo ไม่ใช่ผลตรวจระบบที่รันจริง"
+      ]
+    }
+  ]
+}

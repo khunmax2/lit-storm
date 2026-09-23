@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "STORM และ Co-STORM · เส้นทางการทำงาน",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1300,
+      820
+    ]
+  },
+  "components": [
+    {
+      "id": "topic",
+      "type": "external",
+      "label": "หัวข้อวิจัย",
+      "sublabel": "ผู้ใช้ / Streamlit",
+      "pos": [
+        40,
+        350
+      ],
+      "size": [
+        180,
+        70
+      ]
+    },
+    {
+      "id": "storm",
+      "type": "backend",
+      "label": "STORMWikiRunner",
+      "sublabel": "ค้นคว้าอัตโนมัติ",
+      "pos": [
+        290,
+        180
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "costorm",
+      "type": "backend",
+      "label": "Co-STORM Runner",
+      "sublabel": "สนทนาร่วมกับผู้ใช้",
+      "pos": [
+        290,
+        520
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "retriever",
+      "type": "backend",
+      "label": "Retriever",
+      "sublabel": "ค้นเว็บแบบขนาน",
+      "pos": [
+        590,
+        350
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "stormstages",
+      "type": "backend",
+      "label": "STORM stages",
+      "sublabel": "persona → Q&A → outline → article → polish",
+      "pos": [
+        850,
+        130
+      ],
+      "size": [
+        280,
+        90
+      ]
+    },
+    {
+      "id": "experts",
+      "type": "backend",
+      "label": "Expert agents",
+      "sublabel": "Moderator · Expert · SimulatedUser",
+      "pos": [
+        850,
+        500
+      ],
+      "size": [
+        280,
+        80
+      ]
+    },
+    {
+      "id": "kb",
+      "type": "database",
+      "label": "KnowledgeBase",
+      "sublabel": "mind map + citations + conversation",
+      "pos": [
+        850,
+        350
+      ],
+      "size": [
+        280,
+        80
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "LLM providers",
+      "sublabel": "โมเดลแยกบทบาท",
+      "pos": [
+        1150,
+        220
+      ],
+      "size": [
+        100,
+        70
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "topic",
+      "to": "storm",
+      "label": "เริ่ม STORM",
+      "variant": "emphasis"
+    },
+    {
+      "from": "topic",
+      "to": "costorm",
+      "label": "เริ่ม Co-STORM",
+      "variant": "emphasis"
+    },
+    {
+      "from": "storm",
+      "to": "retriever",
+      "label": "สร้างคำถามและค้นผลลัพธ์"
+    },
+    {
+      "from": "costorm",
+      "to": "retriever",
+      "label": "ค้นตามคำถามของ agent"
+    },
+    {
+      "from": "retriever",
+      "to": "stormstages",
+      "label": "แหล่งอ้างอิง"
+    },
+    {
+      "from": "retriever",
+      "to": "experts",
+      "label": "ข้อมูลสนับสนุน"
+    },
+    {
+      "from": "experts",
+      "to": "kb",
+      "label": "สะสมบทสนทนาและหลักฐาน"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "STORM · อัตโนมัติ",
+      "items": [
+        "สร้าง persona และมุมมองของผู้เชี่ยวชาญ",
+        "ถาม-ค้นหลายรอบ แล้วสร้าง outline",
+        "เขียนบทความและ polish พร้อม citation"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Co-STORM · ร่วมมือ",
+      "items": [
+        "warm start สร้าง shared conceptual space",
+        "Moderator เลือก agent และกำกับแต่ละ turn",
+        "KnowledgeBase เป็น mind map ที่ปรับโครงสร้างได้"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "จุดต่างสำคัญ",
+      "items": [
+        "STORM เดิน pipeline จนจบเอง",
+        "Co-STORM เปิดให้ผู้ใช้แทรกแซงระหว่างสนทนา",
+        "Co-STORM ใช้ embedding เพื่อจัดกลุ่มความรู้"
+      ]
+    }
+  ]
+}

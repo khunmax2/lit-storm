@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "visual-check",
+  "status": "fail",
+  "visualReview": "pending",
+  "artifact": {
+    "path": "D:\\Vscode\\deep_research_lit\\lit-storm\\docs\\architecture\\lit-storm.architecture.html",
+    "sha256": "f44e7f0640eeb5a828a467fbe6f05ebad7edcdc65ebee3ff437da3e12cb0f265",
+    "bytes": 730340
+  },
+  "state": {
+    "detail": "read",
+    "motion": "still"
+  },
+  "chrome": {
+    "status": "available",
+    "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/visual-check-runtime",
+      "severity": "error",
+      "message": "visual-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "D:\\Vscode\\deep_research_lit\\lit-storm\\docs\\architecture\\lit-storm.architecture.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools process exit failed: Chrome closed with exit code 2147483651\nChrome process: exit code 2147483651.\nChrome stderr:\n[18816:38144:0923/192953.729:ERROR:chrome\\installer\\util\\google_update_settings_win.cc:270] Failed opening key Software\\Google\\Update\\ClientStateMedium\\{8A69D345-D564-463c-AFF1-A69D9E530F96} to set usagestats; result: 5\r\n[18816:9132:0923/192953.882:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:34464:0923/192953.882:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"C:\\Users\\khunc\\AppData\\Local\\Temp\\archify-visual-check-profile-0PBjXI\\GPUPersistentCache\\DawnGraphiteCache\\C4LYSEKRQPAHFGXS5Y5GXEPG4SFB3SL3\", error: 0: The process cannot access the file because it is being used by another process. (0x20)\r\n[18816:9132:0923/192953.912:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:9132:0923/192953.927:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:32608:0923/192953.928:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"C:\\Users\\khunc\\AppData\\Local\\Temp\\archify-visual-check-profile-0PBjXI\\GPUPersistentCache\\DawnGraphiteCache\\C4LYSEKRQPAHFGXS5Y5GXEPG4SFB3SL3\", error: 0: The process cannot access the file because it is being used by another process. (0x20)\r\n[18816:9132:0923/192953.943:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:7956:0923/192953.949:ERROR:services\\device\\public\\cpp\\geolocation\\system_geolocation_source_win.cc:251] Failed to get location access status: The parameter is incorrect. (0x80070057)\r\n[18816:9132:0923/192953.956:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:38144:0923/192953.957:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"C:\\Users\\khunc\\AppData\\Local\\Temp\\archify-visual-check-profile-0PBjXI\\GPUPersistentCache\\DawnGraphiteCache\\C4LYSEKRQPAHFGXS5Y5GXEPG4SFB3SL3\", error: 0: The process cannot access the file because it is being used by another process. (0x20)\r\n[18816:9132:0923/192953.969:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:9132:0923/192953.969:FATAL:content\\browser\\gpu\\gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun visual-check"
+      ]
+    }
+  ],
+  "containment": {
+    "status": "fail",
+    "viewports": []
+  },
+  "readability": {
+    "status": "fail",
+    "minimumProjectedNodeTextPx": 6,
+    "viewports": []
+  },
+  "viewerChrome": {
+    "status": "fail",
+    "viewports": []
+  },
+  "captures": {
+    "status": "fail",
+    "screenshots": [],
+    "contactSheet": null
+  },
+  "sidecars": {
+    "receipt": "lit-storm.architecture.visual-check.json",
+    "contactSheet": "lit-storm.architecture.visual-check.html"
+  },
+  "error": "Chrome DevTools process exit failed: Chrome closed with exit code 2147483651\nChrome process: exit code 2147483651.\nChrome stderr:\n[18816:38144:0923/192953.729:ERROR:chrome\\installer\\util\\google_update_settings_win.cc:270] Failed opening key Software\\Google\\Update\\ClientStateMedium\\{8A69D345-D564-463c-AFF1-A69D9E530F96} to set usagestats; result: 5\r\n[18816:9132:0923/192953.882:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:34464:0923/192953.882:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"C:\\Users\\khunc\\AppData\\Local\\Temp\\archify-visual-check-profile-0PBjXI\\GPUPersistentCache\\DawnGraphiteCache\\C4LYSEKRQPAHFGXS5Y5GXEPG4SFB3SL3\", error: 0: The process cannot access the file because it is being used by another process. (0x20)\r\n[18816:9132:0923/192953.912:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:9132:0923/192953.927:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:32608:0923/192953.928:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"C:\\Users\\khunc\\AppData\\Local\\Temp\\archify-visual-check-profile-0PBjXI\\GPUPersistentCache\\DawnGraphiteCache\\C4LYSEKRQPAHFGXS5Y5GXEPG4SFB3SL3\", error: 0: The process cannot access the file because it is being used by another process. (0x20)\r\n[18816:9132:0923/192953.943:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:7956:0923/192953.949:ERROR:services\\device\\public\\cpp\\geolocation\\system_geolocation_source_win.cc:251] Failed to get location access status: The parameter is incorrect. (0x80070057)\r\n[18816:9132:0923/192953.956:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:38144:0923/192953.957:ERROR:components\\viz\\host\\persistent_cache_sandboxed_file_factory.cc:153] Failed to open persistent cache files in directory \"C:\\Users\\khunc\\AppData\\Local\\Temp\\archify-visual-check-profile-0PBjXI\\GPUPersistentCache\\DawnGraphiteCache\\C4LYSEKRQPAHFGXS5Y5GXEPG4SFB3SL3\", error: 0: The process cannot access the file because it is being used by another process. (0x20)\r\n[18816:9132:0923/192953.969:ERROR:content\\browser\\gpu\\gpu_process_host.cc:1054] GPU process exited unexpectedly: exit_code=-1073741790\r\n[18816:9132:0923/192953.969:FATAL:content\\browser\\gpu\\gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
+}

@@ -1,0 +1,2711 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "lit-storm",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/api/setup": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Setup Status",
+    "operationId": "setup_status_api_setup_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SetupStatus"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Setup",
+    "operationId": "setup_api_setup_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SetupIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/login": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Login",
+    "operationId": "login_api_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/logout": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Logout",
+    "operationId": "logout_api_auth_logout_post",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    }
+   }
+  },
+  "/api/me": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Me",
+    "operationId": "me_api_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeOut"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/me/language": {
+   "put": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Set Language",
+    "operationId": "set_language_api_me_language_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LanguageIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/password-link": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Check Link",
+    "description": "Whether a link still works — POST, so the token stays out of logs.",
+    "operationId": "check_link_api_auth_password_link_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SetPasswordIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LinkStatus"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/password": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Set Password",
+    "operationId": "set_password_api_auth_password_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SetPasswordIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/users": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Users",
+    "operationId": "list_users_api_admin_users_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/UserOut"
+         },
+         "type": "array",
+         "title": "Response List Users Api Admin Users Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Create User",
+    "operationId": "create_user_api_admin_users_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LinkOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/users/{user_id}/link": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Reset Link",
+    "description": "Issue a set-password link. For an account that has a password this is\na reset: the old password stops working and the User is signed out\neverywhere until they choose a new one.",
+    "operationId": "reset_link_api_admin_users__user_id__link_post",
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "User Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LinkOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/users/{user_id}": {
+   "patch": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Patch User",
+    "operationId": "patch_user_api_admin_users__user_id__patch",
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "User Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/llm-credentials": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Credentials",
+    "operationId": "list_credentials_api_admin_llm_credentials_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/CredentialOut"
+         },
+         "type": "array",
+         "title": "Response List Credentials Api Admin Llm Credentials Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/llm-credentials/{provider}": {
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Put Credential",
+    "operationId": "put_credential_api_admin_llm_credentials__provider__put",
+    "parameters": [
+     {
+      "name": "provider",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Provider"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CredentialIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CredentialOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Delete Credential",
+    "operationId": "delete_credential_api_admin_llm_credentials__provider__delete",
+    "parameters": [
+     {
+      "name": "provider",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Provider"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/llm-models": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Models",
+    "operationId": "list_models_api_admin_llm_models_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ModelOut"
+         },
+         "type": "array",
+         "title": "Response List Models Api Admin Llm Models Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Create Model",
+    "operationId": "create_model_api_admin_llm_models_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ModelOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/llm-models/{model_id}": {
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Update Model",
+    "operationId": "update_model_api_admin_llm_models__model_id__put",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ModelOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/search-providers": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Search",
+    "operationId": "list_search_api_admin_search_providers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SearchOut"
+         },
+         "type": "array",
+         "title": "Response List Search Api Admin Search Providers Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Create Search",
+    "operationId": "create_search_api_admin_search_providers_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SearchIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SearchOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/search-providers/{provider_id}": {
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Update Search",
+    "operationId": "update_search_api_admin_search_providers__provider_id__put",
+    "parameters": [
+     {
+      "name": "provider_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Provider Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SearchIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SearchOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/limits": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Get Limits",
+    "operationId": "get_limits_api_admin_limits_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Limits"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Put Limits",
+    "operationId": "put_limits_api_admin_limits_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Limits"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Limits"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/options": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Options",
+    "operationId": "options_api_options_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Options"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/projects": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "List Projects",
+    "operationId": "list_projects_api_projects_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ProjectOut"
+         },
+         "type": "array",
+         "title": "Response List Projects Api Projects Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Create Project",
+    "operationId": "create_project_api_projects_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/projects/{project_id}": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Get Project",
+    "operationId": "get_project_api_projects__project_id__get",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/projects/{project_id}/sessions": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Create Session",
+    "operationId": "create_session_api_projects__project_id__sessions_post",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SessionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sessions/{session_id}": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Get Session",
+    "operationId": "get_session_api_sessions__session_id__get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sessions/{session_id}/runs": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Create Run",
+    "operationId": "create_run_api_sessions__session_id__runs_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RunIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/runs/{run_id}": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Get Run",
+    "operationId": "get_run_api_runs__run_id__get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "After"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/runs/{run_id}/cancel": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Cancel Run",
+    "description": "Stop a Run. One still waiting stops now; one running is asked to stop\nand becomes \"cancelling\" until the Worker confirms (design: การยกเลิก Run).\n\nBoth are conditional updates, so a cancel racing the Worker's claim or\nfinish changes nothing it should not.",
+    "operationId": "cancel_run_api_runs__run_id__cancel_post",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/runs/{run_id}/report": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Get Report",
+    "operationId": "get_report_api_runs__run_id__report_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/runs/{run_id}/export": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Export Report",
+    "operationId": "export_report_api_runs__run_id__export_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^(html|md|pdf)$",
+       "title": "Format"
+      }
+     },
+     {
+      "name": "evidence",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Evidence"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/health": {
+   "get": {
+    "summary": "Health",
+    "operationId": "health_api_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "Choice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "is_default"
+    ],
+    "title": "Choice"
+   },
+   "CredentialIn": {
+    "properties": {
+     "api_key": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Api Key"
+     },
+     "api_base": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Base"
+     }
+    },
+    "type": "object",
+    "required": [
+     "api_key"
+    ],
+    "title": "CredentialIn"
+   },
+   "CredentialOut": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "title": "Provider"
+     },
+     "key_hint": {
+      "type": "string",
+      "title": "Key Hint"
+     },
+     "api_base": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Base"
+     }
+    },
+    "type": "object",
+    "required": [
+     "provider",
+     "key_hint",
+     "api_base"
+    ],
+    "title": "CredentialOut"
+   },
+   "EventOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "At"
+     },
+     "type": {
+      "type": "string",
+      "title": "Type"
+     },
+     "data": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Data"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "at",
+     "type",
+     "data"
+    ],
+    "title": "EventOut"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "LanguageIn": {
+    "properties": {
+     "ui_language": {
+      "type": "string",
+      "pattern": "^(th|en)$",
+      "title": "Ui Language"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ui_language"
+    ],
+    "title": "LanguageIn"
+   },
+   "Limits": {
+    "properties": {
+     "max_concurrent_total": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Max Concurrent Total",
+      "default": 2
+     },
+     "max_concurrent_per_user": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Max Concurrent Per User",
+      "default": 1
+     },
+     "max_queued_per_user": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Max Queued Per User",
+      "default": 5
+     },
+     "monthly_run_quota": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Monthly Run Quota",
+      "default": 10
+     },
+     "run_deadline_minutes": {
+      "type": "integer",
+      "minimum": 5.0,
+      "title": "Run Deadline Minutes",
+      "default": 60
+     },
+     "storm_params": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Storm Params"
+     }
+    },
+    "type": "object",
+    "title": "Limits"
+   },
+   "LinkOut": {
+    "properties": {
+     "user": {
+      "$ref": "#/components/schemas/UserOut"
+     },
+     "link": {
+      "type": "string",
+      "title": "Link"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user",
+     "link",
+     "expires_at"
+    ],
+    "title": "LinkOut"
+   },
+   "LinkStatus": {
+    "properties": {
+     "valid": {
+      "type": "boolean",
+      "title": "Valid"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "purpose": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purpose"
+     }
+    },
+    "type": "object",
+    "required": [
+     "valid"
+    ],
+    "title": "LinkStatus"
+   },
+   "LoginIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "password": {
+      "type": "string",
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "LoginIn"
+   },
+   "MeOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "ui_language": {
+      "type": "string",
+      "title": "Ui Language"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "name",
+     "role",
+     "ui_language"
+    ],
+    "title": "MeOut"
+   },
+   "ModelIn": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "provider": {
+      "type": "string",
+      "title": "Provider"
+     },
+     "model": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Model"
+     },
+     "reasoning": {
+      "type": "string",
+      "title": "Reasoning",
+      "default": ""
+     },
+     "max_tokens": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Max Tokens"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "label",
+     "provider",
+     "model"
+    ],
+    "title": "ModelIn"
+   },
+   "ModelOut": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "provider": {
+      "type": "string",
+      "title": "Provider"
+     },
+     "model": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Model"
+     },
+     "reasoning": {
+      "type": "string",
+      "title": "Reasoning",
+      "default": ""
+     },
+     "max_tokens": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Max Tokens"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default",
+      "default": false
+     },
+     "id": {
+      "type": "string",
+      "title": "Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "label",
+     "provider",
+     "model",
+     "id"
+    ],
+    "title": "ModelOut"
+   },
+   "Options": {
+    "properties": {
+     "models": {
+      "items": {
+       "$ref": "#/components/schemas/Choice"
+      },
+      "type": "array",
+      "title": "Models"
+     },
+     "search_providers": {
+      "items": {
+       "$ref": "#/components/schemas/Choice"
+      },
+      "type": "array",
+      "title": "Search Providers"
+     },
+     "languages": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Languages"
+     }
+    },
+    "type": "object",
+    "required": [
+     "models",
+     "search_providers",
+     "languages"
+    ],
+    "title": "Options"
+   },
+   "ProjectDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "sessions": {
+      "items": {
+       "$ref": "#/components/schemas/SessionSummary"
+      },
+      "type": "array",
+      "title": "Sessions"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "created_at",
+     "sessions"
+    ],
+    "title": "ProjectDetail"
+   },
+   "ProjectIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "ProjectIn"
+   },
+   "ProjectOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "created_at"
+    ],
+    "title": "ProjectOut"
+   },
+   "RunDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "session_id": {
+      "type": "string",
+      "title": "Session Id"
+     },
+     "parent_run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Run Id"
+     },
+     "topic": {
+      "type": "string",
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "title": "Language"
+     },
+     "model_label": {
+      "type": "string",
+      "title": "Model Label"
+     },
+     "search_label": {
+      "type": "string",
+      "title": "Search Label"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "stage": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stage"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "quota_refunded": {
+      "type": "boolean",
+      "title": "Quota Refunded"
+     },
+     "queued_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Queued At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "report_title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Report Title"
+     },
+     "source_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Count"
+     },
+     "events": {
+      "items": {
+       "$ref": "#/components/schemas/EventOut"
+      },
+      "type": "array",
+      "title": "Events"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "session_id",
+     "parent_run_id",
+     "topic",
+     "language",
+     "model_label",
+     "search_label",
+     "status",
+     "stage",
+     "reason",
+     "message",
+     "quota_refunded",
+     "queued_at",
+     "started_at",
+     "finished_at",
+     "report_title",
+     "source_count",
+     "events"
+    ],
+    "title": "RunDetail"
+   },
+   "RunIn": {
+    "properties": {
+     "topic": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "pattern": "^(th|en)$",
+      "title": "Language"
+     },
+     "llm_model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Model Id"
+     },
+     "search_provider_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Provider Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "topic",
+     "language"
+    ],
+    "title": "RunIn"
+   },
+   "RunOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "session_id": {
+      "type": "string",
+      "title": "Session Id"
+     },
+     "parent_run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Run Id"
+     },
+     "topic": {
+      "type": "string",
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "title": "Language"
+     },
+     "model_label": {
+      "type": "string",
+      "title": "Model Label"
+     },
+     "search_label": {
+      "type": "string",
+      "title": "Search Label"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "stage": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stage"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "quota_refunded": {
+      "type": "boolean",
+      "title": "Quota Refunded"
+     },
+     "queued_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Queued At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "report_title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Report Title"
+     },
+     "source_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Count"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "session_id",
+     "parent_run_id",
+     "topic",
+     "language",
+     "model_label",
+     "search_label",
+     "status",
+     "stage",
+     "reason",
+     "message",
+     "quota_refunded",
+     "queued_at",
+     "started_at",
+     "finished_at",
+     "report_title",
+     "source_count"
+    ],
+    "title": "RunOut"
+   },
+   "SearchIn": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "endpoint": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Endpoint"
+     },
+     "engines": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Engines"
+     },
+     "api_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "label",
+     "kind"
+    ],
+    "title": "SearchIn"
+   },
+   "SearchOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "endpoint": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Endpoint"
+     },
+     "engines": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Engines"
+     },
+     "key_hint": {
+      "type": "string",
+      "title": "Key Hint"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "kind",
+     "endpoint",
+     "engines",
+     "key_hint",
+     "enabled",
+     "is_default"
+    ],
+    "title": "SearchOut"
+   },
+   "SessionIn": {
+    "properties": {
+     "topic": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "pattern": "^(th|en)$",
+      "title": "Language"
+     },
+     "llm_model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Model Id"
+     },
+     "search_provider_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Provider Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "topic",
+     "language"
+    ],
+    "title": "SessionIn",
+    "description": "A new Session starts with its first Run."
+   },
+   "SessionOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "project_id": {
+      "type": "string",
+      "title": "Project Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "runs": {
+      "items": {
+       "$ref": "#/components/schemas/RunOut"
+      },
+      "type": "array",
+      "title": "Runs"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "title",
+     "created_at",
+     "runs"
+    ],
+    "title": "SessionOut"
+   },
+   "SessionSummary": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "last_status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title",
+     "created_at",
+     "last_status"
+    ],
+    "title": "SessionSummary"
+   },
+   "SetPasswordIn": {
+    "properties": {
+     "token": {
+      "type": "string",
+      "title": "Token"
+     },
+     "password": {
+      "type": "string",
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "token",
+     "password"
+    ],
+    "title": "SetPasswordIn"
+   },
+   "SetupIn": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "password": {
+      "type": "string",
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "email",
+     "name",
+     "password"
+    ],
+    "title": "SetupIn"
+   },
+   "SetupStatus": {
+    "properties": {
+     "needed": {
+      "type": "boolean",
+      "title": "Needed"
+     },
+     "code_configured": {
+      "type": "boolean",
+      "title": "Code Configured"
+     }
+    },
+    "type": "object",
+    "required": [
+     "needed",
+     "code_configured"
+    ],
+    "title": "SetupStatus"
+   },
+   "UserIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "role": {
+      "type": "string",
+      "pattern": "^(user|admin)$",
+      "title": "Role",
+      "default": "user"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "name"
+    ],
+    "title": "UserIn"
+   },
+   "UserOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "is_active": {
+      "type": "boolean",
+      "title": "Is Active"
+     },
+     "has_password": {
+      "type": "boolean",
+      "title": "Has Password"
+     },
+     "monthly_run_quota": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Run Quota"
+     },
+     "max_concurrent_runs": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Concurrent Runs"
+     },
+     "max_queued_runs": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Queued Runs"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "name",
+     "role",
+     "is_active",
+     "has_password",
+     "monthly_run_quota",
+     "max_concurrent_runs",
+     "max_queued_runs",
+     "created_at"
+    ],
+    "title": "UserOut"
+   },
+   "UserPatch": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "role": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(user|admin)$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "monthly_run_quota": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Run Quota"
+     },
+     "max_concurrent_runs": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Concurrent Runs"
+     },
+     "max_queued_runs": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Queued Runs"
+     }
+    },
+    "type": "object",
+    "title": "UserPatch"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

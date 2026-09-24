@@ -166,11 +166,18 @@ class StormEngine:
                     outline=outline, information_table=table, callback_handler=callbacks
                 ),
             )
-            stage(
+            polished = stage(
                 "polish",
                 lambda: runner.run_article_polishing_module(
                     draft_article=draft, remove_duplicate=False
                 ),
+            )
+            # Polishing puts the lead first and renumbers every citation,
+            # but STORM only rewrites the text: url_to_info.json keeps the
+            # draft's numbers, and read together they cite the wrong source.
+            # The polished article object has the right ones; save those.
+            polished.dump_reference_to_file(
+                os.path.join(runner.article_output_dir, normalize.POLISHED_REFERENCES)
             )
         finally:
             # The call log and the redacted model settings, whatever happened.

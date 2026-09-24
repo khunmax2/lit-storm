@@ -82,6 +82,26 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 4. **ทำรายงานและการจัดการให้ครบ** — Source Explorer, export 3 รูปแบบ, ไทย/อังกฤษ, การจัดการผู้ใช้, บันทึกค่าใช้จ่าย, ถังขยะ และหน้าจอ Dashboard/Settings
 5. **ตรวจรับรุ่นแรก** — รันทุกรายการในเกณฑ์รับงานด้วย Playwright บน compose stack รวมติดตั้งใหม่และ restart container แล้วข้อมูลยังอยู่ ใช้ STORM จริงเฉพาะ smoke test จากนั้นเปลี่ยนมาใช้ระบบใหม่และลบ Streamlit กับ Supabase
 
+## ผลขั้นที่ 1 (2026-09-24)
+
+ได้รายงานภาษาไทยจริงโดยไม่ใช้ Streamlit แล้ว (`qwen/qwen3.7-flash` ผ่าน OpenRouter ร่วมกับ arXiv) citation ทั้ง 17 จุดชี้ไปยังแหล่งที่ถูกต้อง โค้ดอยู่ใน [server/](../server/)
+
+**ปัญหาที่พบระหว่างรันจริงและแก้แล้ว**
+- **Polish ของ STORM ทำ citation ผิด:** ขั้น polish เรียงเลข citation ใหม่ แต่ไม่เขียน `url_to_info.json` ใหม่ ผลคือข้อความกับแหล่งอ้างอิงชี้ไม่ตรงกัน แอป Streamlit เดิมก็มีปัญหานี้ ตอนนี้ engine บันทึก `url_to_info_polished.json` แยกไว้
+- **Lead ของรายงานหาย:** โมเดลเขียน lead โดยขึ้นต้นด้วย heading ที่ซ้ำกับ section แรก STORM จึงรวม lead เข้ากับ section นั้นแล้วทิ้งไป แก้โดยเพิ่มคำสั่งเฉพาะสำหรับ lead ว่าห้ามมี heading
+- **Retry เกินข้อกำหนด:** แอปเดิมตั้ง LiteLLM ให้ retry 6 ครั้ง และ `GoogleModel` ลองได้ 8 ครั้ง ตอนนี้จำกัดที่รวม 3 ครั้ง ส่วน error 4xx ที่ไม่ใช่ 408 หรือ 429 หยุดทันที
+- **Run ทำงานต่อหลัง supervisor ตาย:** child ทำงานต่อเองโดยไม่มีใครดูแล ตอนนี้ child เฝ้า process แม่ และหยุดเมื่อ process แม่หายไป (บน Windows ห้ามใช้ pipe เพราะทำให้การ import numpy ค้าง)
+- **Thai encoding บน Windows:** `knowledge_storm` เปิดไฟล์โดยไม่ระบุ encoding แก้โดยให้ child รันในโหมด UTF-8
+- **OpenRouter ไม่ทำตามคำสั่งปิด reasoning:** บางโฮสต์ไม่ทำตาม แก้โดยใช้ `provider.require_parameters` แต่ `deepseek/deepseek-v4.1-flash` ยังคิดต่อบนโฮสต์ DeepInfra อยู่ดี จึงใช้กับ STORM ไม่ได้
+- **PDF ตัดหลักฐานทิ้ง:** Chromium ไม่พิมพ์เนื้อหาใน `<details>` ที่ยังปิดอยู่ ตอนนี้เปิดไว้ทั้งหมดตอนพิมพ์ PDF
+
+**ปัญหาที่ยังค้างอยู่**
+- **คำตอบภาษาไทยในขั้น research ถูกตัดท้าย:** STORM ตัดประโยคด้วย `.!?` จึงไปตัดที่เลขข้อในรายการ เช่น `\n3.` ทำให้ข้อสุดท้ายของคำตอบหายไป ต้องแก้ใน `knowledge_storm/utils.py` ซึ่งจะกระทบแอปเดิมด้วย
+- **ความยาวรายงานไม่สม่ำเสมอ:** รายงานของโมเดลเดียวกันยาวตั้งแต่ 3 ถึง 9 section ขึ้นกับ outline ที่โมเดลเขียน ควรกำหนดจำนวน section ขั้นต่ำ หรือเลือกโมเดลค่าเริ่มต้นที่นิ่งกว่านี้
+- **ข้อความไทยที่ copy จาก PDF เพี้ยน:** ภาพที่พิมพ์ออกมาถูกต้อง แต่ text layer สลับตำแหน่งสระและวรรณยุกต์ ต้องทดสอบกับ Noto Sans Thai ใน Docker
+- **ขนาดของ image Worker:** `knowledge_storm` บังคับ import `sentence_transformers` ซึ่งต้องใช้ torch ควรใช้ torch แบบ CPU
+- **`run_config.json` ของ STORM มีเลขท้าย 4 หลักของ API key:** STORM redact ไว้แล้วตามปกติ แต่ต้องตัดสินใจว่าจะยอมให้ข้อมูลนี้อยู่ในไฟล์ของ Run หรือไม่
+
 ## ก่อนเริ่มรุ่นสอง
 
 - Support Access Grant

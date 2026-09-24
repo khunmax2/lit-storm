@@ -69,7 +69,9 @@ blockquote { margin: .5rem 0; padding: .4rem .9rem; border-left: 3px solid var(-
   a { color: inherit; }
   details > summary { display: none; }
   h2, h3 { break-after: avoid; }
-  ol.sources li { break-inside: avoid; }
+  /* Keep a source's name with its link, but let long evidence flow on:
+     keeping the whole entry together left most of each page blank. */
+  .src-title, .src-url, .note { break-after: avoid; break-inside: avoid; }
 }
 """
 

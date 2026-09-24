@@ -5,7 +5,7 @@ import json
 import pytest
 
 from litstorm import report
-from litstorm.engines.storm.normalize import normalize, parse_sections
+from litstorm.engines.storm.normalize import POLISHED_REFERENCES, normalize, parse_sections
 
 ARTICLE = """# summary
 
@@ -46,7 +46,7 @@ def refs(**index):
 def article_dir(tmp_path):
     (tmp_path / "storm_gen_article_polished.txt").write_text(ARTICLE, encoding="utf-8")
     # 7 is cited in the text but has no source; 2 has a source but is not cited.
-    (tmp_path / "url_to_info.json").write_text(
+    (tmp_path / POLISHED_REFERENCES).write_text(
         json.dumps(refs(a=1, b=2, c=4, d=9)), encoding="utf-8"
     )
     return tmp_path
@@ -86,6 +86,46 @@ def test_draft_used_when_polishing_did_not_finish(tmp_path):
     result, _ = normalize(str(tmp_path), "t", "en")
     assert result["lead"] == ""
     assert result["sections"][0]["body"] == "Text [1]."
+
+
+def test_polished_text_is_never_read_with_the_drafts_references(tmp_path):
+    # STORM renumbers citations when polishing but leaves url_to_info.json
+    # with the draft's numbers. Without our saved references, the polished
+    # text cannot be trusted; the draft is read instead.
+    (tmp_path / "storm_gen_article_polished.txt").write_text("# A\n\nPolished [2].", encoding="utf-8")
+    (tmp_path / "storm_gen_article.txt").write_text("# A\n\nDraft [1].", encoding="utf-8")
+    (tmp_path / "url_to_info.json").write_text(json.dumps(refs(a=1)), encoding="utf-8")
+    result, _ = normalize(str(tmp_path), "t", "en")
+    assert result["sections"][0]["body"] == "Draft [1]."
+
+
+@pytest.mark.slow
+def test_storm_polishing_renumbers_citations_and_the_object_knows_it():
+    """Reproduce the STORM behaviour the engine works around."""
+    from knowledge_storm.interface import Information
+    from knowledge_storm.storm_wiki.modules.storm_dataclass import StormArticle
+
+    def info(n):
+        return Information(url=f"https://s/{n}", description="", snippets=[f"p{n}"], title=f"S{n}")
+
+    draft = StormArticle("t")
+    draft.update_section("# One\nFirst [1].", [info(1)])
+    draft.update_section("# Two\nSecond [1].", [info(2)])
+    draft.post_processing()
+    draft_index = dict(draft.reference["url_to_unified_index"])
+    assert draft_index == {"https://s/1": 1, "https://s/2": 2}
+
+    # What polish_article does: a lead citing source 2 first, then reorder.
+    import copy
+    from knowledge_storm.utils import ArticleTextProcessing
+
+    polished = copy.deepcopy(draft)
+    text = "# summary\nLead [2].\n\n" + draft.to_string()
+    polished.insert_or_create_section(ArticleTextProcessing.parse_article_into_dict(text))
+    polished.post_processing()
+
+    assert polished.reference["url_to_unified_index"] == {"https://s/2": 1, "https://s/1": 2}
+    assert polished.reference["url_to_unified_index"] != draft_index  # the file would be stale
 
 
 def test_validate_rejects_a_dangling_citation():

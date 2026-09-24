@@ -26,11 +26,25 @@ HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 LEAD_HEADING = "summary"
 
 
-def article_path(article_dir):
-    for name in ("storm_gen_article_polished.txt", "storm_gen_article.txt"):
-        path = os.path.join(article_dir, name)
-        if os.path.exists(path):
-            return path
+POLISHED_REFERENCES = "url_to_info_polished.json"
+
+# Each article text, with the references its citation numbers belong to.
+# STORM's polishing renumbers citations without rewriting url_to_info.json,
+# so polished text is only ever read with the references saved beside it by
+# our engine; without them the draft is used instead.
+_PAIRS = (
+    ("storm_gen_article_polished.txt", POLISHED_REFERENCES),
+    ("storm_gen_article.txt", "url_to_info.json"),
+)
+
+
+def article_paths(article_dir):
+    """(article, references) paths that agree with each other, or None."""
+    for text, refs in _PAIRS:
+        text_path = os.path.join(article_dir, text)
+        refs_path = os.path.join(article_dir, refs)
+        if os.path.exists(text_path) and os.path.exists(refs_path):
+            return text_path, refs_path
     return None
 
 
@@ -100,17 +114,14 @@ def _rewrite(text, mapping):
 
 def normalize(article_dir, topic, language):
     """(report, dropped_markers) for one STORM output directory."""
-    path = article_path(article_dir)
-    if path is None:
-        raise FileNotFoundError(f"no article in {article_dir}")
-    with open(path, encoding="utf-8") as f:
+    paths = article_paths(article_dir)
+    if paths is None:
+        raise FileNotFoundError(f"no article with its references in {article_dir}")
+    text_path, refs_path = paths
+    with open(text_path, encoding="utf-8") as f:
         lead, sections = parse_sections(f.read())
-
-    refs_path = os.path.join(article_dir, "url_to_info.json")
-    refs = {"url_to_unified_index": {}, "url_to_info": {}}
-    if os.path.exists(refs_path):
-        with open(refs_path, encoding="utf-8") as f:
-            refs = json.load(f)
+    with open(refs_path, encoding="utf-8") as f:
+        refs = json.load(f)
     by_index = {
         int(index): refs["url_to_info"].get(url, {"url": url})
         for url, index in refs.get("url_to_unified_index", {}).items()

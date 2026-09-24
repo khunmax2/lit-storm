@@ -48,6 +48,21 @@ Keep these exactly as they are:
 """
 
 
+def _lead(language):
+    """The lead: prose only. Measured: told to keep "#" markers, a model
+    opened the lead with the first section's heading, and STORM merged the
+    lead into that section and dropped it."""
+    return f"""
+
+IMPORTANT — Language:
+Write the lead section in {language}.
+Write paragraphs only: no heading, no "#" line, no title. Keep the inline
+citation markers [1], [2], ... exactly as they are. Give proper nouns and
+technical terms in {language} followed by the original in parentheses the
+first time each one appears.
+"""
+
+
 def _persona(language):
     """The editor personas."""
     return f"""
@@ -96,7 +111,7 @@ _TARGETS = (
     (outline_generation.WritePageOutline, _article),
     (outline_generation.WritePageOutlineFromConv, _article),
     (article_generation.WriteSection, _article),
-    (article_polish.WriteLeadSection, _article),
+    (article_polish.WriteLeadSection, _lead),
     (article_polish.PolishPage, _article),
     (persona_generator.GenPersona, _persona),
     (knowledge_curation.AskQuestion, _question),

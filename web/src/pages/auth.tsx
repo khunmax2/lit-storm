@@ -1,28 +1,53 @@
+// Setup, sign-in and set-password: a centred card, as in shadcn's login blocks.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { BookOpenText, Loader2 } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
-import { api, call } from "../api/client";
-import { Button, Card, ErrorText, Field, Input, Spinner } from "../components/ui";
-import { useT } from "../i18n";
+import { api, call } from "@/api/client";
+import { ErrorText } from "@/components/common";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useT } from "@/i18n";
 
-function Centered({ title, lead, children }: { title: string; lead?: ReactNode; children: ReactNode }) {
-  const { lang, setLang } = useT();
+function Centered({ title, description, children }: { title: string; description?: ReactNode; children: ReactNode }) {
+  const { t, lang, setLang } = useT();
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-between">
-          <span className="text-sm font-semibold tracking-wide text-muted">lit-storm</span>
-          <button className="text-xs text-muted hover:text-ink" onClick={() => setLang(lang === "th" ? "en" : "th")}>
+    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-6">
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-semibold">
+            <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <BookOpenText className="size-4" />
+            </div>
+            lit-storm
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setLang(lang === "th" ? "en" : "th")}>
             {lang === "th" ? "English" : "ไทย"}
-          </button>
+          </Button>
         </div>
         <Card>
-          <h1 className="mb-1 text-xl font-semibold">{title}</h1>
-          {lead && <p className="mb-5 text-sm text-muted">{lead}</p>}
-          {children}
+          <CardHeader>
+            <CardTitle className="text-xl">{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </CardHeader>
+          <CardContent>{children}</CardContent>
         </Card>
+        <p className="text-center text-xs text-muted-foreground">{t("auth.tagline")}</p>
       </div>
+    </div>
+  );
+}
+
+function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -40,28 +65,36 @@ export function SetupPage() {
       navigate({ to: "/admin" });
     },
   });
-  if (status.isLoading) return <Spinner />;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setup.mutate();
   };
   return (
-    <Centered title={t("setup.title")} lead={t("setup.lead")}>
+    <Centered title={t("setup.title")} description={t("setup.lead")}>
       {status.data && !status.data.code_configured ? (
-        <p className="text-sm text-warn">{t("setup.noCode")}</p>
+        <Alert>
+          <AlertDescription>{t("setup.noCode")}</AlertDescription>
+        </Alert>
       ) : (
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-          <Field label={t("setup.code")}>
-            <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+        <form className="grid gap-4" onSubmit={submit}>
+          <Field id="code" label={t("setup.code")}>
+            <Input id="code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
           </Field>
-          <Field label={t("name")}>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Field id="name" label={t("name")}>
+            <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </Field>
-          <Field label={t("email")}>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-          </Field>
-          <Field label={t("password")} hint={t("pw.weak")}>
+          <Field id="email" label={t("email")}>
             <Input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+            />
+          </Field>
+          <Field id="password" label={t("password")} hint={t("pw.weak")}>
+            <Input
+              id="password"
               type="password"
               minLength={10}
               autoComplete="new-password"
@@ -70,8 +103,11 @@ export function SetupPage() {
               required
             />
           </Field>
-          <ErrorText error={setup.error} />
-          <Button disabled={setup.isPending}>{t("setup.submit")}</Button>
+          {setup.error && <ErrorText error={setup.error} />}
+          <Button type="submit" className="w-full" disabled={setup.isPending}>
+            {setup.isPending && <Loader2 className="animate-spin" />}
+            {t("setup.submit")}
+          </Button>
         </form>
       )}
     </Centered>
@@ -94,17 +130,26 @@ export function LoginPage() {
   return (
     <Centered title={t("login.title")}>
       <form
-        className="flex flex-col gap-4"
+        className="grid gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           login.mutate();
         }}
       >
-        <Field label={t("email")}>
-          <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </Field>
-        <Field label={t("password")}>
+        <Field id="email" label={t("email")}>
           <Input
+            id="email"
+            type="email"
+            autoComplete="username"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </Field>
+        <Field id="password" label={t("password")}>
+          <Input
+            id="password"
             type="password"
             autoComplete="current-password"
             value={password}
@@ -112,8 +157,15 @@ export function LoginPage() {
             required
           />
         </Field>
-        {login.error && <p className="text-sm text-bad">{t("login.failed")}</p>}
-        <Button disabled={login.isPending}>{t("signIn")}</Button>
+        {login.error && (
+          <Alert variant="destructive">
+            <AlertDescription>{t("login.failed")}</AlertDescription>
+          </Alert>
+        )}
+        <Button type="submit" className="w-full" disabled={login.isPending}>
+          {login.isPending && <Loader2 className="animate-spin" />}
+          {t("signIn")}
+        </Button>
       </form>
     </Centered>
   );
@@ -140,26 +192,34 @@ export function SetPasswordPage() {
       navigate({ to: "/" });
     },
   });
-  if (link.isLoading) return <Spinner />;
+  if (link.isLoading)
+    return (
+      <div className="flex min-h-svh items-center justify-center">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
   if (!token || !link.data?.valid) {
     return (
       <Centered title={t("pw.title")}>
-        <p className="text-sm text-bad">{t("pw.invalid")}</p>
+        <Alert variant="destructive">
+          <AlertDescription>{t("pw.invalid")}</AlertDescription>
+        </Alert>
       </Centered>
     );
   }
   return (
-    <Centered title={t("pw.title")} lead={t("pw.lead", { email: link.data.email ?? "" })}>
+    <Centered title={t("pw.title")} description={t("pw.lead", { email: link.data.email ?? "" })}>
       <form
-        className="flex flex-col gap-4"
+        className="grid gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           save.mutate();
         }}
       >
         <input type="email" hidden readOnly autoComplete="username" value={link.data.email ?? ""} />
-        <Field label={t("password")}>
+        <Field id="password" label={t("password")} hint={t("pw.weak")}>
           <Input
+            id="password"
             type="password"
             minLength={10}
             autoComplete="new-password"
@@ -168,8 +228,10 @@ export function SetPasswordPage() {
             required
           />
         </Field>
-        <ErrorText error={save.error} />
-        <Button disabled={save.isPending}>{t("pw.submit")}</Button>
+        {save.error && <ErrorText error={save.error} />}
+        <Button type="submit" className="w-full" disabled={save.isPending}>
+          {t("pw.submit")}
+        </Button>
       </form>
     </Centered>
   );

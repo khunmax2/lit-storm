@@ -1,308 +1,436 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  BookOpen,
+  Check,
+  Circle,
+  FileText,
+  FolderOpen,
+  FolderPlus,
+  Globe,
+  Loader2,
+  MoreHorizontal,
+  RotateCcw,
+  Sparkles,
+  Square,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
-import { api, call, type Schemas } from "../api/client";
-import { Button, Card, ErrorText, Field, Input, PageTitle, Select, Spinner, StatusBadge, formatDate } from "../components/ui";
-import { has, useT } from "../i18n";
+import { api, call, type Schemas } from "@/api/client";
+import {
+  ErrorText,
+  LoadingRows,
+  PageHeader,
+  StatusBadge,
+  Toolbar,
+  domainOf,
+  errorMessage,
+  formatDate,
+  timeAgo,
+} from "@/components/common";
+import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { has, useT } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 type Run = Schemas["RunOut"];
 const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
+const STAGES = ["research", "outline", "article", "polish"] as const;
 
-// --- Projects ---------------------------------------------------------------
+/** Ask before doing something that cannot be undone from this page. */
+function useConfirm() {
+  const { t } = useT();
+  const [state, setState] = useState<{ text: string; action: () => void } | null>(null);
+  const dialog = (
+    <AlertDialog open={!!state} onOpenChange={(open) => !open && setState(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("common.confirm")}</AlertDialogTitle>
+          <AlertDialogDescription>{state?.text}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={() => {
+              state?.action();
+              setState(null);
+            }}
+          >
+            {t("yes")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+  return { confirm: (text: string, action: () => void) => setState({ text, action }), dialog };
+}
 
-export function ProjectsPage() {
-  const { t, lang } = useT();
+// --- Projects ------------------------------------------------------------------
+
+function NewProjectDialog() {
+  const { t } = useT();
   const queryClient = useQueryClient();
-  const projects = useQuery({ queryKey: ["projects"], queryFn: () => call(api.GET("/api/projects")) });
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const create = useMutation({
     mutationFn: () => call(api.POST("/api/projects", { body: { name } })),
-    onSuccess: () => {
+    onSuccess: (p) => {
+      setOpen(false);
       setName("");
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      navigate({ to: "/projects/$projectId", params: { projectId: p.id } });
     },
   });
   return (
-    <>
-      <PageTitle>{t("projects.title")}</PageTitle>
-      <form
-        className="mb-8 flex flex-wrap gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          create.mutate();
-        }}
-      >
-        <Input
-          className="max-w-md flex-1"
-          placeholder={t("projects.namePlaceholder")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <Button disabled={create.isPending}>{t("projects.new")}</Button>
-      </form>
-      {projects.isLoading && <Spinner />}
-      {projects.data?.length === 0 && <p className="text-muted">{t("projects.empty")}</p>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <FolderPlus />
+          {t("projects.new")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            create.mutate();
+          }}
+          className="grid gap-4"
+        >
+          <DialogHeader>
+            <DialogTitle>{t("projects.newTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="project-name">{t("projects.name")}</Label>
+            <Input
+              id="project-name"
+              autoFocus
+              placeholder={t("projects.namePlaceholder")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          {create.error && <ErrorText error={create.error} />}
+          <DialogFooter>
+            <Button type="submit" disabled={create.isPending || !name.trim()}>
+              {t("create")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function ProjectsPage() {
+  const { t, lang } = useT();
+  const projects = useQuery({ queryKey: ["projects"], queryFn: () => call(api.GET("/api/projects")) });
+  return (
+    <div className="mx-auto w-full max-w-5xl px-6 py-8">
+      <Toolbar>
+        <span className="text-sm font-medium">{t("projects.title")}</span>
+      </Toolbar>
+      <PageHeader title={t("projects.title")} actions={<NewProjectDialog />} />
+      {projects.isLoading && <LoadingRows />}
+      {projects.data?.length === 0 && (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FolderOpen />
+            </EmptyMedia>
+            <EmptyTitle>{t("projects.title")}</EmptyTitle>
+            <EmptyDescription>{t("projects.empty")}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <NewProjectDialog />
+          </EmptyContent>
+        </Empty>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {projects.data?.map((p) => (
-          <Link
-            key={p.id}
-            to="/projects/$projectId"
-            params={{ projectId: p.id }}
-            className="rounded-lg border border-line bg-surface p-4 transition hover:border-accent"
-          >
-            <div className="font-medium">{p.name}</div>
-            <div className="mt-1 text-xs text-muted">{formatDate(p.created_at, lang)}</div>
+          <Link key={p.id} to="/projects/$projectId" params={{ projectId: p.id }} className="group">
+            <Card className="h-full py-0 transition-colors group-hover:bg-muted/40">
+              <CardContent className="flex items-start gap-3 p-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <FolderOpen className="size-4 text-muted-foreground" />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="text-xs text-muted-foreground">{formatDate(p.created_at, lang)}</div>
+                </div>
+              </CardContent>
+            </Card>
           </Link>
         ))}
-      </div>
-    </>
-  );
-}
-
-// --- the form that starts a Run ----------------------------------------------
-
-type RunForm = { topic: string; language: string; llm_model_id: string; search_provider_id: string };
-
-// One press of Start is one Run: the same key goes with every retry of the
-// request, and a new key is made only after the Run was created.
-function useRequestKey() {
-  const key = useRef(crypto.randomUUID());
-  return { current: () => key.current, next: () => (key.current = crypto.randomUUID()) };
-}
-
-export function QuotaLine() {
-  const { t } = useT();
-  const quota = useQuery({ queryKey: ["quota"], queryFn: () => call(api.GET("/api/me/quota")) });
-  const q = quota.data;
-  if (!q) return null;
-  if (q.remaining === 0 && q.reserved === 0) return <p className="text-sm text-warn">{t("quota.full")}</p>;
-  return (
-    <p className="text-sm text-muted">
-      {t("quota.line", { remaining: q.remaining, limit: q.limit })}
-      {q.reserved > 0 && ` · ${t("quota.reserved", { reserved: q.reserved })}`}
-    </p>
-  );
-}
-
-function useRunOptions() {
-  return useQuery({ queryKey: ["options"], queryFn: () => call(api.GET("/api/options")) });
-}
-
-function RunFields({ form, setForm }: { form: RunForm; setForm: (f: RunForm) => void }) {
-  const { t } = useT();
-  const options = useRunOptions();
-  const o = options.data;
-  useEffect(() => {
-    // Preselect the defaults once options arrive (design: หน้าเริ่มวิจัยเลือก default ไว้ให้).
-    if (!o) return;
-    const model = form.llm_model_id || o.models.find((m) => m.is_default)?.id || o.models[0]?.id || "";
-    const search =
-      form.search_provider_id || o.search_providers.find((p) => p.is_default)?.id || o.search_providers[0]?.id || "";
-    if (model !== form.llm_model_id || search !== form.search_provider_id)
-      setForm({ ...form, llm_model_id: model, search_provider_id: search });
-  }, [o]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (o && (o.models.length === 0 || o.search_providers.length === 0))
-    return <p className="text-sm text-warn">{t("run.noOptions")}</p>;
-  return (
-    <div className="flex flex-col gap-4">
-      <Field label={t("run.topic")}>
-        <Input
-          placeholder={t("run.topicPlaceholder")}
-          value={form.topic}
-          onChange={(e) => setForm({ ...form, topic: e.target.value })}
-          minLength={3}
-          maxLength={500}
-          required
-        />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label={t("run.language")}>
-          <Select value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
-            <option value="th">{t("lang.th")}</option>
-            <option value="en">{t("lang.en")}</option>
-          </Select>
-        </Field>
-        <Field label={t("run.model")}>
-          <Select value={form.llm_model_id} onChange={(e) => setForm({ ...form, llm_model_id: e.target.value })}>
-            {o?.models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label={t("run.search")}>
-          <Select value={form.search_provider_id} onChange={(e) => setForm({ ...form, search_provider_id: e.target.value })}>
-            {o?.search_providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
       </div>
     </div>
   );
 }
 
-function body(form: RunForm, request_key: string) {
-  return {
-    topic: form.topic,
-    language: form.language,
-    llm_model_id: form.llm_model_id || null,
-    search_provider_id: form.search_provider_id || null,
-    request_key,
-  };
-}
-
-// --- a Project and its Sessions ---------------------------------------------------
+// --- a Project ------------------------------------------------------------------
 
 export function ProjectPage() {
   const { t, lang } = useT();
   const { projectId } = useParams({ from: "/app/projects/$projectId" });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
   });
   const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "" });
   const requestKey = useRequestKey();
-  const queryClient = useQueryClient();
   const start = useMutation({
     mutationFn: () =>
       call(
         api.POST("/api/projects/{project_id}/sessions", {
           params: { path: { project_id: projectId } },
-          body: body(form, requestKey.current()),
+          body: runBody(form, requestKey.current()),
         }),
       ),
     onSuccess: (s) => {
       requestKey.next();
-      queryClient.invalidateQueries({ queryKey: ["quota"] });
+      queryClient.invalidateQueries();
       navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } });
     },
   });
   const remove = useMutation({
     mutationFn: () => call(api.DELETE("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
     onSuccess: () => {
+      toast.success(t("common.deleted"));
       queryClient.invalidateQueries();
-      navigate({ to: "/" });
+      navigate({ to: "/projects" });
     },
   });
-  if (project.isLoading) return <Spinner />;
-  if (!project.data) return <ErrorText error={project.error} />;
+  if (project.isLoading)
+    return (
+      <div className="p-8">
+        <LoadingRows />
+      </div>
+    );
+  if (!project.data)
+    return (
+      <div className="p-8">
+        <ErrorText error={project.error} />
+      </div>
+    );
+  const p = project.data;
+
   return (
-    <>
-      <Link to="/" className="text-sm text-muted hover:text-ink">
-        ← {t("nav.projects")}
-      </Link>
-      <PageTitle
-        action={
-          <Button variant="danger" onClick={() => confirm(t("delete.confirmProject")) && remove.mutate()}>
-            {t("delete.project")}
-          </Button>
+    <div className="mx-auto w-full max-w-5xl px-6 py-8">
+      {dialog}
+      <Toolbar>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/projects">{t("projects.title")}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="max-w-60 truncate">{p.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </Toolbar>
+      <PageHeader
+        title={p.name}
+        description={t("projects.count", { n: p.sessions.length })}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label={t("run.more")}>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => confirm(t("delete.confirmProject"), () => remove.mutate())}
+              >
+                <Trash2 />
+                {t("delete.project")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
-      >
-        {project.data.name}
-      </PageTitle>
-      <Card className="mb-8">
-        <h2 className="mb-4 font-semibold">{t("project.newSession")}</h2>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            start.mutate();
-          }}
-        >
-          <RunFields form={form} setForm={setForm} />
+      />
+      <Composer form={form} setForm={setForm} onSubmit={() => start.mutate()} pending={start.isPending} size="md" />
+      <div className="mt-2 flex justify-end">
+        <QuotaLine />
+      </div>
+      {start.error && (
+        <div className="mt-3">
           <ErrorText error={start.error} />
-          <div className="flex flex-wrap items-center gap-4">
-            <Button disabled={start.isPending}>{t("run.start")}</Button>
-            <QuotaLine />
-          </div>
-        </form>
-      </Card>
-      <h2 className="mb-3 font-semibold">{t("project.sessions")}</h2>
-      {project.data.sessions.length === 0 && <p className="text-muted">{t("project.empty")}</p>}
-      <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-        {project.data.sessions.map((s) => (
-          <li key={s.id}>
-            <Link
-              to="/sessions/$sessionId"
-              params={{ sessionId: s.id }}
-              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-sunk"
-            >
-              <span className="min-w-0 truncate">{s.title}</span>
-              <span className="flex shrink-0 items-center gap-3">
-                <span className="hidden text-xs text-muted sm:inline">{formatDate(s.created_at, lang)}</span>
-                {s.last_status && <StatusBadge status={s.last_status} />}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </>
+        </div>
+      )}
+
+      <h2 className="mt-10 mb-3 text-sm font-medium text-muted-foreground">{t("project.sessions")}</h2>
+      {p.sessions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("project.empty")}</p>
+      ) : (
+        <Card className="py-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">{t("run.topic")}</TableHead>
+                <TableHead className="w-44">{t("common.status")}</TableHead>
+                <TableHead className="w-36 pr-4 text-right">{t("common.created")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {p.sessions.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } })}
+                >
+                  <TableCell className="max-w-0 pl-4">
+                    <div className="truncate font-medium">{s.title}</div>
+                  </TableCell>
+                  <TableCell>{s.last_status && <StatusBadge status={s.last_status} />}</TableCell>
+                  <TableCell className="pr-4 text-right text-xs text-muted-foreground">
+                    {timeAgo(s.created_at, lang)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
   );
 }
 
-// --- a Session: its Runs, live progress, and "research again" ----------------------
+// --- a Run --------------------------------------------------------------------------
 
-function RunProgress({ run }: { run: Run }) {
+function Stepper({ stage, status }: { stage: string | null; status: string }) {
+  const { t } = useT();
+  const current = STAGES.indexOf((stage ?? "") as (typeof STAGES)[number]);
+  const done = status === "succeeded";
+  return (
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
+      {STAGES.map((s, i) => {
+        const state = done || i < current ? "done" : i === current ? "now" : "todo";
+        return (
+          <li key={s} className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                state === "done" && "bg-success-soft text-success",
+                state === "now" && "bg-brand-soft font-medium text-brand",
+                state === "todo" && "bg-muted text-muted-foreground",
+              )}
+            >
+              {state === "done" ? (
+                <Check className="size-3" />
+              ) : state === "now" ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Circle className="size-3" />
+              )}
+              {t(`stage.${s}`)}
+            </span>
+            {i < STAGES.length - 1 && <span className="h-px w-3 bg-border" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function LiveProgress({ run }: { run: Run }) {
   const { t } = useT();
   const queryClient = useQueryClient();
   const [events, setEvents] = useState<Schemas["EventOut"][]>([]);
   const after = events.length ? events[events.length - 1].id : 0;
-  const live = !FINAL.has(run.status);
+  const live = run.status === "running" || run.status === "cancelling";
   const detail = useQuery({
     queryKey: ["run", run.id, after],
-    queryFn: () =>
-      call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: run.id }, query: { after } } })),
+    queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: run.id }, query: { after } } })),
     refetchInterval: live ? 2500 : false,
+    enabled: live,
   });
   useEffect(() => {
     const d = detail.data;
     if (!d) return;
     if (d.events.length) setEvents((prev) => [...prev, ...d.events]);
-    if (d.status !== run.status || d.stage !== run.stage)
+    if (d.status !== run.status || d.stage !== run.stage) {
       queryClient.invalidateQueries({ queryKey: ["session", run.session_id] });
+      queryClient.invalidateQueries({ queryKey: ["recent"] });
+    }
   }, [detail.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const browsed = useMemo(
-    () => new Set(events.flatMap((e) => (e.type === "note" && e.data.kind === "browsed" ? (e.data.urls as string[]) : []))),
+    () => [
+      ...new Set(
+        events.flatMap((e) => (e.type === "note" && e.data.kind === "browsed" ? (e.data.urls as string[]) : [])),
+      ),
+    ],
     [events],
   );
-  const perspectives = events.find((e) => e.type === "note" && e.data.kind === "perspectives")?.data
-    .perspectives as string[] | undefined;
-  const stages = ["research", "outline", "article", "polish"];
-  const current = stages.indexOf(run.stage ?? "");
-
-  if (run.status === "queued") return <p className="mt-3 text-xs text-muted">{t("run.closeSafe")}</p>;
-  if (!live || run.status === "needs_selection") return null;
+  if (!live) return null;
   return (
-    <div className="mt-4 rounded-md bg-sunk p-4 text-sm">
-      <ol className="mb-3 flex flex-wrap gap-x-5 gap-y-2">
-        {stages.map((s, i) => (
-          <li key={s} className={i < current ? "text-ok" : i === current ? "font-medium text-accent" : "text-muted"}>
-            {i < current ? "✓ " : i === current ? "● " : "○ "}
-            {has(`stage.${s}`) ? t(`stage.${s}` as "stage.research") : s}
-          </li>
-        ))}
-      </ol>
-      {browsed.size > 0 && <p className="text-muted">{t("run.browsed", { n: browsed.size })}</p>}
-      {perspectives && (
-        <details className="mt-2 text-muted">
-          <summary className="cursor-pointer">{t("run.perspectives")}</summary>
-          <ul className="mt-1 list-disc pl-5">
-            {perspectives.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </details>
+    <div className="space-y-3 rounded-xl bg-muted/50 p-4">
+      <Stepper stage={run.stage} status={run.status} />
+      {browsed.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <Globe className="size-3.5" />
+          {t("run.browsed", { n: browsed.length })}
+          {browsed.slice(-4).map((u) => (
+            <span key={u} className="max-w-48 truncate rounded-full bg-background px-2 py-0.5">
+              {domainOf(u)}
+            </span>
+          ))}
+        </div>
       )}
-      <p className="mt-2 text-xs text-muted">{t("run.closeSafe")}</p>
+      <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>
     </div>
   );
 }
@@ -310,8 +438,7 @@ function RunProgress({ run }: { run: Run }) {
 function ChooseAgain({ run }: { run: Run }) {
   const { t } = useT();
   const queryClient = useQueryClient();
-  const options = useRunOptions();
-  const o = options.data;
+  const o = useRunOptions().data;
   const [model, setModel] = useState("");
   const [search, setSearch] = useState("");
   useEffect(() => {
@@ -330,120 +457,194 @@ function ChooseAgain({ run }: { run: Run }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["session", run.session_id] }),
   });
   return (
-    <div className="mt-4 rounded-md bg-warn-soft p-4 text-sm">
-      <p className="mb-3">{t("run.chooseAgain")}</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <Field label={t("run.model")}>
-          <Select value={model} onChange={(e) => setModel(e.target.value)}>
+    <div className="space-y-3 rounded-xl border border-warning/30 bg-warning-soft p-4 text-sm">
+      <p>{t("run.chooseAgain")}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={model} onValueChange={setModel}>
+          <SelectTrigger className="w-56 bg-background">
+            <SelectValue placeholder={t("run.model")} />
+          </SelectTrigger>
+          <SelectContent>
             {o?.models.map((m) => (
-              <option key={m.id} value={m.id}>
+              <SelectItem key={m.id} value={m.id}>
                 {m.label}
-              </option>
+              </SelectItem>
             ))}
-          </Select>
-        </Field>
-        <Field label={t("run.search")}>
-          <Select value={search} onChange={(e) => setSearch(e.target.value)}>
+          </SelectContent>
+        </Select>
+        <Select value={search} onValueChange={setSearch}>
+          <SelectTrigger className="w-44 bg-background">
+            <SelectValue placeholder={t("run.search")} />
+          </SelectTrigger>
+          <SelectContent>
             {o?.search_providers.map((p) => (
-              <option key={p.id} value={p.id}>
+              <SelectItem key={p.id} value={p.id}>
                 {p.label}
-              </option>
+              </SelectItem>
             ))}
-          </Select>
-        </Field>
+          </SelectContent>
+        </Select>
         <Button disabled={save.isPending || !model || !search} onClick={() => save.mutate()}>
           {t("run.queueAgain")}
         </Button>
       </div>
-      <ErrorText error={save.error} />
+      {save.error && <ErrorText error={save.error} />}
     </div>
   );
 }
 
-function RunCard({ run }: { run: Run }) {
+function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: () => void) => void }) {
   const { t, lang } = useT();
   const queryClient = useQueryClient();
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["session", run.session_id] });
     queryClient.invalidateQueries({ queryKey: ["quota"] });
+    queryClient.invalidateQueries({ queryKey: ["recent"] });
   };
+  const onError = (e: unknown) => toast.error(errorMessage(e, t));
   const cancel = useMutation({
     mutationFn: () => call(api.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: run.id } } })),
     onSuccess: refresh,
+    onError,
   });
   const retry = useMutation({
     mutationFn: () => call(api.POST("/api/runs/{run_id}/retry", { params: { path: { run_id: run.id } } })),
     onSuccess: refresh,
+    onError,
   });
   const remove = useMutation({
     mutationFn: () => call(api.DELETE("/api/runs/{run_id}", { params: { path: { run_id: run.id } } })),
-    onSuccess: refresh,
+    onSuccess: () => {
+      toast.success(t("common.deleted"));
+      refresh();
+    },
+    onError,
   });
+  const readable = run.status === "succeeded" || (run.status === "cancelled" && !!run.report_title);
   const reasonKey = `reason.${run.reason}`;
+  const canRetry = ["failed", "interrupted", "cancelled"].includes(run.status);
+  const canCancel = !FINAL.has(run.status) && run.status !== "cancelling";
+
   return (
-    <Card>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={run.status} />
-            <span className="text-xs text-muted">{formatDate(run.queued_at, lang)}</span>
-            {run.parent_run_id && <span className="text-xs text-muted">· {t("run.retryOf")}</span>}
+    <Card className="gap-4 py-4">
+      <CardContent className="space-y-4 px-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <StatusBadge status={run.status} />
+              <span>{formatDate(run.queued_at, lang)}</span>
+              {run.parent_run_id && (
+                <span className="flex items-center gap-1">
+                  <RotateCcw className="size-3" />
+                  {t("run.retryOf")}
+                </span>
+              )}
+            </div>
+            <div className="font-medium leading-snug">{run.report_title || run.topic}</div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Globe className="size-3" />
+                {run.language === "th" ? t("lang.th") : t("lang.en")}
+              </span>
+              <span className="flex items-center gap-1">
+                <Sparkles className="size-3" />
+                {run.model_label}
+              </span>
+              <span>{run.search_label}</span>
+              {run.source_count != null && (
+                <span className="flex items-center gap-1">
+                  <BookOpen className="size-3" />
+                  {t("run.sources", { n: run.source_count })}
+                </span>
+              )}
+            </div>
           </div>
-          <p className="mt-2 font-medium">{run.topic}</p>
-          <p className="mt-1 text-xs text-muted">
-            {run.language === "th" ? t("lang.th") : t("lang.en")} · {run.model_label} · {run.search_label}
-            {run.source_count != null && ` · ${t("run.sources", { n: run.source_count })}`}
+          <div className="flex shrink-0 items-center gap-2">
+            {readable && (
+              <Button asChild>
+                <Link to="/runs/$runId" params={{ runId: run.id }}>
+                  <FileText />
+                  {t("run.open")}
+                </Link>
+              </Button>
+            )}
+            {canRetry && !readable && (
+              <Button variant="outline" disabled={retry.isPending} onClick={() => retry.mutate()}>
+                <RotateCcw />
+                {t("run.retry")}
+              </Button>
+            )}
+            {canCancel && (
+              <Button
+                variant="outline"
+                disabled={cancel.isPending}
+                onClick={() => confirm(t("run.cancelConfirm"), () => cancel.mutate())}
+              >
+                <Square />
+                {t("run.cancel")}
+              </Button>
+            )}
+            {FINAL.has(run.status) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label={t("run.more")}>
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canRetry && readable && (
+                    <>
+                      <DropdownMenuItem onClick={() => retry.mutate()}>
+                        <RotateCcw />
+                        {t("run.retry")}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => confirm(t("delete.confirmRun"), () => remove.mutate())}
+                  >
+                    <Trash2 />
+                    {t("delete.run")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+        {run.status !== "succeeded" && run.reason && run.reason !== "cancelled" && (
+          <p className="rounded-lg bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {has(reasonKey) ? t(reasonKey as "reason.timed_out") : run.reason}
+            {run.quota_refunded && <span className="ml-2 text-xs text-muted-foreground">· {t("run.refunded")}</span>}
           </p>
-          {run.status !== "succeeded" && run.reason && run.reason !== "cancelled" && (
-            <p className="mt-2 text-sm text-bad">
-              {has(reasonKey) ? t(reasonKey as "reason.timed_out") : run.reason}
-              {run.quota_refunded && <span className="ml-2 text-xs text-muted">({t("run.refunded")})</span>}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {(run.status === "succeeded" || (run.status === "cancelled" && run.report_title)) && (
-            <Link to="/runs/$runId" params={{ runId: run.id }}>
-              <Button>{t("run.open")}</Button>
-            </Link>
-          )}
-          {FINAL.has(run.status) && (
-            <Button variant="quiet" disabled={remove.isPending} onClick={() => confirm(t("delete.confirmRun")) && remove.mutate()}>
-              {t("delete.run")}
-            </Button>
-          )}
-          {["failed", "interrupted", "cancelled"].includes(run.status) && (
-            <Button variant="quiet" disabled={retry.isPending} onClick={() => retry.mutate()}>
-              {t("run.retry")}
-            </Button>
-          )}
-          {!FINAL.has(run.status) && run.status !== "cancelling" && (
-            <Button
-              variant="danger"
-              disabled={cancel.isPending}
-              onClick={() => confirm(t("run.cancelConfirm")) && cancel.mutate()}
-            >
-              {t("run.cancel")}
-            </Button>
-          )}
-        </div>
-      </div>
-      <ErrorText error={retry.error} />
-      {run.status === "needs_selection" && <ChooseAgain run={run} />}
-      <RunProgress run={run} />
+        )}
+        {run.status === "needs_selection" && <ChooseAgain run={run} />}
+        {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
+        <LiveProgress run={run} />
+      </CardContent>
     </Card>
   );
 }
+
+// --- a Session ------------------------------------------------------------------------
 
 export function SessionPage() {
   const { t } = useT();
   const { sessionId } = useParams({ from: "/app/sessions/$sessionId" });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { confirm, dialog } = useConfirm();
   const session = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => call(api.GET("/api/sessions/{session_id}", { params: { path: { session_id: sessionId } } })),
-    refetchInterval: (q) => (q.state.data?.runs.some((r) => !FINAL.has(r.status)) ? 5000 : false),
+    refetchInterval: (q) => (q.state.data?.runs.some((r) => !FINAL.has(r.status)) ? 4000 : false),
+  });
+  const project = useQuery({
+    queryKey: ["project", session.data?.project_id],
+    queryFn: () =>
+      call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: session.data!.project_id } } })),
+    enabled: !!session.data,
   });
   const latest = session.data?.runs[0];
   const [form, setForm] = useState<RunForm | null>(null);
@@ -457,65 +658,97 @@ export function SessionPage() {
       call(
         api.POST("/api/sessions/{session_id}/runs", {
           params: { path: { session_id: sessionId } },
-          body: body(form!, requestKey.current()),
+          body: runBody(form!, requestKey.current()),
         }),
       ),
     onSuccess: () => {
       requestKey.next();
       queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
       queryClient.invalidateQueries({ queryKey: ["quota"] });
+      queryClient.invalidateQueries({ queryKey: ["recent"] });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
   });
   const remove = useMutation({
     mutationFn: () => call(api.DELETE("/api/sessions/{session_id}", { params: { path: { session_id: sessionId } } })),
     onSuccess: () => {
       const projectId = session.data!.project_id;
+      toast.success(t("common.deleted"));
       queryClient.invalidateQueries();
       navigate({ to: "/projects/$projectId", params: { projectId } });
     },
   });
-  if (session.isLoading) return <Spinner />;
-  if (!session.data) return <ErrorText error={session.error} />;
+  if (session.isLoading)
+    return (
+      <div className="p-8">
+        <LoadingRows />
+      </div>
+    );
+  if (!session.data)
+    return (
+      <div className="p-8">
+        <ErrorText error={session.error} />
+      </div>
+    );
+  const s = session.data;
+
   return (
-    <>
-      <Link to="/projects/$projectId" params={{ projectId: session.data.project_id }} className="text-sm text-muted hover:text-ink">
-        ← {t("back")}
-      </Link>
-      <PageTitle
-        action={
-          <Button variant="danger" onClick={() => confirm(t("delete.confirmSession")) && remove.mutate()}>
-            {t("delete.session")}
-          </Button>
+    <div className="mx-auto w-full max-w-4xl px-6 py-8">
+      {dialog}
+      <Toolbar>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem className="hidden sm:inline-flex">
+              <BreadcrumbLink asChild>
+                <Link to="/projects/$projectId" params={{ projectId: s.project_id }}>
+                  {project.data?.name ?? t("home.project")}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="hidden sm:inline-flex" />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="max-w-72 truncate">{s.title}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </Toolbar>
+      <PageHeader
+        title={s.title}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label={t("run.more")}>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => confirm(t("delete.confirmSession"), () => remove.mutate())}
+              >
+                <Trash2 />
+                {t("delete.session")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
-      >
-        {session.data.title}
-      </PageTitle>
-      <h2 className="mb-3 font-semibold">{t("run.history")}</h2>
-      <div className="mb-10 flex flex-col gap-3">
-        {session.data.runs.map((r) => (
-          <RunCard key={r.id} run={r} />
+      />
+      <div className="space-y-3">
+        {s.runs.map((r) => (
+          <RunCard key={r.id} run={r} confirm={confirm} />
         ))}
       </div>
       {form && (
-        <Card>
-          <h2 className="mb-1 font-semibold">{t("run.again")}</h2>
-          <p className="mb-4 text-sm text-muted">{t("run.againLead")}</p>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              again.mutate();
-            }}
-          >
-            <RunFields form={form} setForm={setForm} />
-            <ErrorText error={again.error} />
-            <div className="flex flex-wrap items-center gap-4">
-              <Button disabled={again.isPending}>{t("run.start")}</Button>
-              <QuotaLine />
-            </div>
-          </form>
-        </Card>
+        <section className="mt-10 space-y-2">
+          <h2 className="text-sm font-medium">{t("run.again")}</h2>
+          <p className="text-sm text-muted-foreground">{t("run.againLead")}</p>
+          <Composer form={form} setForm={setForm} onSubmit={() => again.mutate()} pending={again.isPending} size="md" />
+          <div className="flex justify-end">
+            <QuotaLine />
+          </div>
+          {again.error && <ErrorText error={again.error} />}
+        </section>
       )}
-    </>
+    </div>
   );
 }

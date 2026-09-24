@@ -1,12 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { ApiError } from "./api/client";
-import { I18nProvider } from "./i18n";
-import { router } from "./router";
-import "./styles.css";
+import { ApiError } from "@/api/client";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { I18nProvider } from "@/i18n";
+import { router } from "@/router";
+import "@/styles.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,10 +23,15 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <RouterProvider router={router} />
-      </I18nProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <QueryClientProvider client={queryClient}>
+        <I18nProvider>
+          <TooltipProvider>
+            <RouterProvider router={router} />
+            <Toaster richColors position="bottom-right" />
+          </TooltipProvider>
+        </I18nProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

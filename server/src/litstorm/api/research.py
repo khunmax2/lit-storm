@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from litstorm import limits, quota, settings, trash
@@ -313,6 +313,55 @@ def create_session(
     if earlier:
         return session_out(session, session.get(ResearchSession, earlier.session_id))
     return session_out(session, rs)
+
+
+class RecentSession(BaseModel):
+    id: str
+    title: str
+    project_id: str
+    project_name: str
+    last_status: str | None
+    updated_at: datetime
+
+
+@router.get("/sessions/recent", response_model=list[RecentSession])
+def recent_sessions(
+    limit: int = Query(12, ge=1, le=50), user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """The owner's topics with the latest activity first, for the sidebar."""
+    latest = (
+        select(Run.session_id, func.max(Run.queued_at).label("at"))
+        .where(Run.owner_id == user.id, Run.trashed_at.is_(None), Run.session_id.is_not(None))
+        .group_by(Run.session_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(ResearchSession, Project.name, latest.c.at)
+        .join(Project, Project.id == ResearchSession.project_id)
+        .join(latest, latest.c.session_id == ResearchSession.id)
+        .where(
+            ResearchSession.owner_id == user.id,
+            ResearchSession.trashed_at.is_(None),
+            Project.trashed_at.is_(None),
+        )
+        .order_by(latest.c.at.desc())
+        .limit(limit)
+    ).all()
+    out = []
+    for rs, project_name, at in rows:
+        status = session.scalar(
+            select(Run.status)
+            .where(Run.session_id == rs.id, Run.trashed_at.is_(None))
+            .order_by(Run.queued_at.desc())
+            .limit(1)
+        )
+        out.append(
+            RecentSession(
+                id=str(rs.id), title=rs.title, project_id=str(rs.project_id),
+                project_name=project_name, last_status=status, updated_at=at,
+            )
+        )
+    return out
 
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)

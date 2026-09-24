@@ -561,7 +561,9 @@ class Acceptance:
     def write_report(self):
         order = ["install", "reports", "queue", "quota", "cancel", "close", "crash", "privacy", "deadline",
                  "citation", "export", "trash"]
-        lines = ["# ผลตรวจรับรุ่นแรก", "", f"รันเมื่อ {time.strftime('%Y-%m-%d %H:%M')} กับ stack ที่ติดตั้งใหม่จากศูนย์ (`docker compose down -v`)", ""]
+        where = ("บน stack เดิมที่ติดตั้งไว้ (`--rerun`)" if self.ctx.get("rerun")
+                 else "กับ stack ที่ติดตั้งใหม่จากศูนย์ (`docker compose down -v`)")
+        lines = ["# ผลตรวจรับรุ่นแรก", "", f"รันเมื่อ {time.strftime('%Y-%m-%d %H:%M')} {where}", ""]
         for key in order:
             c = self.c.get(key)
             if c is None:
@@ -579,6 +581,50 @@ def login(page, email, password):
     page.locator("input").nth(1).fill(password)
     page.get_by_role("button").last.click()
     page.wait_for_url(re.compile(r"/$"))
+
+
+def attach(acc):
+    """Pick up the stack a full run left behind, for --rerun."""
+    admin = Api(*ADMIN)
+    models = admin.get("/api/admin/llm-models").json()
+    acc.ctx.update(
+        admin=admin,
+        alice=Api(*ALICE),
+        bob=Api(*BOB),
+        model=next(m for m in models if m["is_default"]),
+        spare=next(m for m in models if not m["is_default"]),
+        arxiv=next(p for p in admin.get("/api/admin/search-providers").json() if p["kind"] == "arxiv"),
+        limits=admin.get("/api/admin/limits").json(),
+    )
+    # A Run parked by an earlier attempt still holds its reservation.
+    admin.put(f"/api/admin/llm-models/{acc.ctx['spare']['id']}", json={**acc.ctx["spare"], "enabled": True})
+
+
+RERUN = {"queue": "queue_and_quota", "cancel": "cancel_and_retry", "crash": "worker_crash", "deadline": "deadline"}
+
+
+def rerun(out, keys):
+    """Re-check the API-only criteria on the installed stack, without wiping it."""
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    acc = Acceptance(out)
+    acc.ctx["rerun"] = True
+    try:
+        attach(acc)
+        for key in keys:
+            getattr(acc, RERUN[key])()
+        set_limits(acc.ctx["admin"], **acc.ctx["limits"])
+    except Exception:
+        traceback.print_exc()
+        for c in acc.c.values():
+            if c.verdict == "not run":
+                c.verdict = "fail"
+                c.evidence.append("stopped: " + traceback.format_exc().strip().splitlines()[-1])
+    finally:
+        compose("start", "worker", check=False)
+        acc.write_report()
+    failed = [k for k, c in acc.c.items() if not c.verdict.startswith("pass")]
+    print("FAILED:" if failed else "ALL PASSED", failed or "")
+    return 1 if failed else 0
 
 
 def main(out):
@@ -618,4 +664,7 @@ def main(out):
 
 
 if __name__ == "__main__":
+    # --rerun queue,cancel,crash re-checks those on the stack as it stands.
+    if len(sys.argv) > 3 and sys.argv[2] == "--rerun":
+        sys.exit(rerun(sys.argv[1], sys.argv[3].split(",")))
     sys.exit(main(sys.argv[1]))

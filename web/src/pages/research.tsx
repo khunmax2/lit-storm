@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, call, type Schemas } from "../api/client";
 import { Button, Card, ErrorText, Field, Input, PageTitle, Select, Spinner, StatusBadge, formatDate } from "../components/ui";
@@ -65,6 +65,27 @@ export function ProjectsPage() {
 
 type RunForm = { topic: string; language: string; llm_model_id: string; search_provider_id: string };
 
+// One press of Start is one Run: the same key goes with every retry of the
+// request, and a new key is made only after the Run was created.
+function useRequestKey() {
+  const key = useRef(crypto.randomUUID());
+  return { current: () => key.current, next: () => (key.current = crypto.randomUUID()) };
+}
+
+export function QuotaLine() {
+  const { t } = useT();
+  const quota = useQuery({ queryKey: ["quota"], queryFn: () => call(api.GET("/api/me/quota")) });
+  const q = quota.data;
+  if (!q) return null;
+  if (q.remaining === 0 && q.reserved === 0) return <p className="text-sm text-warn">{t("quota.full")}</p>;
+  return (
+    <p className="text-sm text-muted">
+      {t("quota.line", { remaining: q.remaining, limit: q.limit })}
+      {q.reserved > 0 && ` · ${t("quota.reserved", { reserved: q.reserved })}`}
+    </p>
+  );
+}
+
 function useRunOptions() {
   return useQuery({ queryKey: ["options"], queryFn: () => call(api.GET("/api/options")) });
 }
@@ -127,12 +148,13 @@ function RunFields({ form, setForm }: { form: RunForm; setForm: (f: RunForm) => 
   );
 }
 
-function body(form: RunForm) {
+function body(form: RunForm, request_key: string) {
   return {
     topic: form.topic,
     language: form.language,
     llm_model_id: form.llm_model_id || null,
     search_provider_id: form.search_provider_id || null,
+    request_key,
   };
 }
 
@@ -147,10 +169,21 @@ export function ProjectPage() {
     queryFn: () => call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
   });
   const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "" });
+  const requestKey = useRequestKey();
+  const queryClient = useQueryClient();
   const start = useMutation({
     mutationFn: () =>
-      call(api.POST("/api/projects/{project_id}/sessions", { params: { path: { project_id: projectId } }, body: body(form) })),
-    onSuccess: (s) => navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } }),
+      call(
+        api.POST("/api/projects/{project_id}/sessions", {
+          params: { path: { project_id: projectId } },
+          body: body(form, requestKey.current()),
+        }),
+      ),
+    onSuccess: (s) => {
+      requestKey.next();
+      queryClient.invalidateQueries({ queryKey: ["quota"] });
+      navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } });
+    },
   });
   if (project.isLoading) return <Spinner />;
   if (!project.data) return <ErrorText error={project.error} />;
@@ -171,8 +204,9 @@ export function ProjectPage() {
         >
           <RunFields form={form} setForm={setForm} />
           <ErrorText error={start.error} />
-          <div>
+          <div className="flex flex-wrap items-center gap-4">
             <Button disabled={start.isPending}>{t("run.start")}</Button>
+            <QuotaLine />
           </div>
         </form>
       </Card>
@@ -230,7 +264,8 @@ function RunProgress({ run }: { run: Run }) {
   const stages = ["research", "outline", "article", "polish"];
   const current = stages.indexOf(run.stage ?? "");
 
-  if (!live) return null;
+  if (run.status === "queued") return <p className="mt-3 text-xs text-muted">{t("run.closeSafe")}</p>;
+  if (!live || run.status === "needs_selection") return null;
   return (
     <div className="mt-4 rounded-md bg-sunk p-4 text-sm">
       <ol className="mb-3 flex flex-wrap gap-x-5 gap-y-2">
@@ -257,12 +292,73 @@ function RunProgress({ run }: { run: Run }) {
   );
 }
 
+function ChooseAgain({ run }: { run: Run }) {
+  const { t } = useT();
+  const queryClient = useQueryClient();
+  const options = useRunOptions();
+  const o = options.data;
+  const [model, setModel] = useState("");
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    if (!o) return;
+    setModel((m) => m || o.models.find((x) => x.is_default)?.id || o.models[0]?.id || "");
+    setSearch((p) => p || o.search_providers.find((x) => x.is_default)?.id || o.search_providers[0]?.id || "");
+  }, [o]);
+  const save = useMutation({
+    mutationFn: () =>
+      call(
+        api.POST("/api/runs/{run_id}/selection", {
+          params: { path: { run_id: run.id } },
+          body: { llm_model_id: model, search_provider_id: search },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["session", run.session_id] }),
+  });
+  return (
+    <div className="mt-4 rounded-md bg-warn-soft p-4 text-sm">
+      <p className="mb-3">{t("run.chooseAgain")}</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label={t("run.model")}>
+          <Select value={model} onChange={(e) => setModel(e.target.value)}>
+            {o?.models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={t("run.search")}>
+          <Select value={search} onChange={(e) => setSearch(e.target.value)}>
+            {o?.search_providers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Button disabled={save.isPending || !model || !search} onClick={() => save.mutate()}>
+          {t("run.queueAgain")}
+        </Button>
+      </div>
+      <ErrorText error={save.error} />
+    </div>
+  );
+}
+
 function RunCard({ run }: { run: Run }) {
   const { t, lang } = useT();
   const queryClient = useQueryClient();
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["session", run.session_id] });
+    queryClient.invalidateQueries({ queryKey: ["quota"] });
+  };
   const cancel = useMutation({
     mutationFn: () => call(api.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: run.id } } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["session", run.session_id] }),
+    onSuccess: refresh,
+  });
+  const retry = useMutation({
+    mutationFn: () => call(api.POST("/api/runs/{run_id}/retry", { params: { path: { run_id: run.id } } })),
+    onSuccess: refresh,
   });
   const reasonKey = `reason.${run.reason}`;
   return (
@@ -272,6 +368,7 @@ function RunCard({ run }: { run: Run }) {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={run.status} />
             <span className="text-xs text-muted">{formatDate(run.queued_at, lang)}</span>
+            {run.parent_run_id && <span className="text-xs text-muted">· {t("run.retryOf")}</span>}
           </div>
           <p className="mt-2 font-medium">{run.topic}</p>
           <p className="mt-1 text-xs text-muted">
@@ -291,6 +388,11 @@ function RunCard({ run }: { run: Run }) {
               <Button>{t("run.open")}</Button>
             </Link>
           )}
+          {["failed", "interrupted", "cancelled"].includes(run.status) && (
+            <Button variant="quiet" disabled={retry.isPending} onClick={() => retry.mutate()}>
+              {t("run.retry")}
+            </Button>
+          )}
           {!FINAL.has(run.status) && run.status !== "cancelling" && (
             <Button
               variant="danger"
@@ -302,6 +404,8 @@ function RunCard({ run }: { run: Run }) {
           )}
         </div>
       </div>
+      <ErrorText error={retry.error} />
+      {run.status === "needs_selection" && <ChooseAgain run={run} />}
       <RunProgress run={run} />
     </Card>
   );
@@ -322,10 +426,20 @@ export function SessionPage() {
     if (latest && !form)
       setForm({ topic: latest.topic, language: latest.language, llm_model_id: "", search_provider_id: "" });
   }, [latest]); // eslint-disable-line react-hooks/exhaustive-deps
+  const requestKey = useRequestKey();
   const again = useMutation({
     mutationFn: () =>
-      call(api.POST("/api/sessions/{session_id}/runs", { params: { path: { session_id: sessionId } }, body: body(form!) })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["session", sessionId] }),
+      call(
+        api.POST("/api/sessions/{session_id}/runs", {
+          params: { path: { session_id: sessionId } },
+          body: body(form!, requestKey.current()),
+        }),
+      ),
+    onSuccess: () => {
+      requestKey.next();
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      queryClient.invalidateQueries({ queryKey: ["quota"] });
+    },
   });
   if (session.isLoading) return <Spinner />;
   if (!session.data) return <ErrorText error={session.error} />;
@@ -354,8 +468,9 @@ export function SessionPage() {
           >
             <RunFields form={form} setForm={setForm} />
             <ErrorText error={again.error} />
-            <div>
+            <div className="flex flex-wrap items-center gap-4">
               <Button disabled={again.isPending}>{t("run.start")}</Button>
+              <QuotaLine />
             </div>
           </form>
         </Card>

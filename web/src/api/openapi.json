@@ -1107,6 +1107,125 @@
     }
    }
   },
+  "/api/runs/{run_id}/selection": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Choose Again",
+    "description": "A Run parked because its model or provider was turned off gets a new\none and goes to the back of its owner's queue. It is the same Run, with\nthe same quota reservation: nothing is charged again.",
+    "operationId": "choose_again_api_runs__run_id__selection_post",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SelectionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/runs/{run_id}/retry": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Retry",
+    "description": "Try a Run again: a new Run in the same Session, with the same topic\nand settings, linked back to this one, whose history is kept. It starts\nfrom the beginning (docs/web-app-design.md, ผู้ใช้สั่งลองใหม่).\n\nIf the model or provider it used has since been turned off, the new Run\nwaits for the owner to choose again instead of failing.",
+    "operationId": "retry_api_runs__run_id__retry_post",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/me/quota": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "My Quota",
+    "operationId": "my_quota_api_me_quota_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/QuotaOut"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}": {
    "get": {
     "tags": [
@@ -1813,6 +1932,39 @@
     ],
     "title": "ProjectOut"
    },
+   "QuotaOut": {
+    "properties": {
+     "month": {
+      "type": "string",
+      "title": "Month"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "used": {
+      "type": "integer",
+      "title": "Used"
+     },
+     "reserved": {
+      "type": "integer",
+      "title": "Reserved"
+     },
+     "remaining": {
+      "type": "integer",
+      "title": "Remaining"
+     }
+    },
+    "type": "object",
+    "required": [
+     "month",
+     "limit",
+     "used",
+     "reserved",
+     "remaining"
+    ],
+    "title": "QuotaOut"
+   },
    "RunDetail": {
     "properties": {
      "id": {
@@ -1853,6 +2005,10 @@
      "status": {
       "type": "string",
       "title": "Status"
+     },
+     "quota_month": {
+      "type": "string",
+      "title": "Quota Month"
      },
      "stage": {
       "anyOf": [
@@ -1960,6 +2116,7 @@
      "model_label",
      "search_label",
      "status",
+     "quota_month",
      "stage",
      "reason",
      "message",
@@ -2009,6 +2166,18 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "request_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Key"
      }
     },
     "type": "object",
@@ -2058,6 +2227,10 @@
      "status": {
       "type": "string",
       "title": "Status"
+     },
+     "quota_month": {
+      "type": "string",
+      "title": "Quota Month"
      },
      "stage": {
       "anyOf": [
@@ -2158,6 +2331,7 @@
      "model_label",
      "search_label",
      "status",
+     "quota_month",
      "stage",
      "reason",
      "message",
@@ -2295,6 +2469,26 @@
     ],
     "title": "SearchOut"
    },
+   "SelectionIn": {
+    "properties": {
+     "llm_model_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Llm Model Id"
+     },
+     "search_provider_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Search Provider Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "llm_model_id",
+     "search_provider_id"
+    ],
+    "title": "SelectionIn"
+   },
    "SessionIn": {
     "properties": {
      "topic": {
@@ -2331,6 +2525,18 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "request_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Key"
      }
     },
     "type": "object",
@@ -2571,6 +2777,39 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "quota_limit": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quota Limit"
+     },
+     "quota_used": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quota Used"
+     },
+     "quota_reserved": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Quota Reserved"
      }
     },
     "type": "object",

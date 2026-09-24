@@ -410,6 +410,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose Again
+         * @description A Run parked because its model or provider was turned off gets a new
+         *     one and goes to the back of its owner's queue. It is the same Run, with
+         *     the same quota reservation: nothing is charged again.
+         */
+        post: operations["choose_again_api_runs__run_id__selection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry
+         * @description Try a Run again: a new Run in the same Session, with the same topic
+         *     and settings, linked back to this one, whose history is kept. It starts
+         *     from the beginning (docs/web-app-design.md, ผู้ใช้สั่งลองใหม่).
+         *
+         *     If the model or provider it used has since been turned off, the new Run
+         *     waits for the owner to choose again instead of failing.
+         */
+        post: operations["retry_api_runs__run_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Quota */
+        get: operations["my_quota_api_me_quota_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -727,6 +791,19 @@ export interface components {
              */
             created_at: string;
         };
+        /** QuotaOut */
+        QuotaOut: {
+            /** Month */
+            month: string;
+            /** Limit */
+            limit: number;
+            /** Used */
+            used: number;
+            /** Reserved */
+            reserved: number;
+            /** Remaining */
+            remaining: number;
+        };
         /** RunDetail */
         RunDetail: {
             /** Id */
@@ -745,6 +822,8 @@ export interface components {
             search_label: string;
             /** Status */
             status: string;
+            /** Quota Month */
+            quota_month: string;
             /** Stage */
             stage: string | null;
             /** Reason */
@@ -779,6 +858,8 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /** Request Key */
+            request_key?: string | null;
         };
         /** RunOut */
         RunOut: {
@@ -798,6 +879,8 @@ export interface components {
             search_label: string;
             /** Status */
             status: string;
+            /** Quota Month */
+            quota_month: string;
             /** Stage */
             stage: string | null;
             /** Reason */
@@ -862,6 +945,19 @@ export interface components {
             /** Is Default */
             is_default: boolean;
         };
+        /** SelectionIn */
+        SelectionIn: {
+            /**
+             * Llm Model Id
+             * Format: uuid
+             */
+            llm_model_id: string;
+            /**
+             * Search Provider Id
+             * Format: uuid
+             */
+            search_provider_id: string;
+        };
         /**
          * SessionIn
          * @description A new Session starts with its first Run.
@@ -875,6 +971,8 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /** Request Key */
+            request_key?: string | null;
         };
         /** SessionOut */
         SessionOut: {
@@ -974,6 +1072,12 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Quota Limit */
+            quota_limit?: number | null;
+            /** Quota Used */
+            quota_used?: number | null;
+            /** Quota Reserved */
+            quota_reserved?: number | null;
         };
         /** UserPatch */
         UserPatch: {
@@ -1868,6 +1972,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    choose_again_api_runs__run_id__selection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_api_runs__run_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_quota_api_me_quota_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaOut"];
                 };
             };
         };

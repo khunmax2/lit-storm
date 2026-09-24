@@ -34,6 +34,42 @@ function CopyLink({ link, email }: { link: string; email: string }) {
 
 // --- users ------------------------------------------------------------------
 
+type User = Schemas["UserOut"];
+const OVERRIDES = [
+  ["monthly_run_quota", "admin.override.quota"],
+  ["max_concurrent_runs", "admin.override.concurrent"],
+  ["max_queued_runs", "admin.override.queued"],
+] as const;
+
+function Overrides({ user, onSave }: { user: User; onSave: (body: Schemas["UserPatch"]) => void }) {
+  const { t } = useT();
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(OVERRIDES.map(([k]) => [k, user[k] == null ? "" : String(user[k])])),
+  );
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(Object.fromEntries(OVERRIDES.map(([k]) => [k, values[k] === "" ? null : Number(values[k])])));
+      }}
+    >
+      {OVERRIDES.map(([key, label]) => (
+        <label key={key} className="flex w-24 flex-col gap-1 text-xs text-muted">
+          {t(label)}
+          <Input
+            type="number"
+            min={0}
+            value={values[key]}
+            onChange={(e) => setValues({ ...values, [key]: e.target.value })}
+          />
+        </label>
+      ))}
+      <Button variant="quiet">{t("save")}</Button>
+    </form>
+  );
+}
+
 function Users() {
   const { t, lang } = useT();
   const queryClient = useQueryClient();
@@ -99,6 +135,7 @@ function Users() {
             <tr>
               <th className="px-4 py-2">{t("name")}</th>
               <th className="px-4 py-2">{t("admin.role")}</th>
+              <th className="px-4 py-2">{t("admin.thisMonth")}</th>
               <th className="px-4 py-2">{t("admin.hasPassword")}</th>
               <th className="px-4 py-2">{t("admin.active")}</th>
               <th className="px-4 py-2" />
@@ -106,7 +143,7 @@ function Users() {
           </thead>
           <tbody className="divide-y divide-line">
             {users.data?.map((u) => (
-              <tr key={u.id}>
+              <tr key={u.id} className="align-top">
                 <td className="px-4 py-3">
                   <div className="font-medium">{u.name}</div>
                   <div className="text-xs text-muted">
@@ -114,6 +151,20 @@ function Users() {
                   </div>
                 </td>
                 <td className="px-4 py-3">{u.role === "admin" ? t("admin.role.admin") : t("admin.role.user")}</td>
+                <td className="px-4 py-3">
+                  <div className="mb-2 whitespace-nowrap">
+                    {u.quota_used ?? 0} / {u.quota_limit ?? "–"}
+                    {!!u.quota_reserved && (
+                      <span className="text-xs text-muted"> · {t("quota.reserved", { reserved: u.quota_reserved })}</span>
+                    )}
+                  </div>
+                  <details>
+                    <summary className="cursor-pointer text-xs text-muted">{t("admin.overrides")}</summary>
+                    <div className="mt-2">
+                      <Overrides user={u} onSave={(body) => patch.mutate({ id: u.id, body })} />
+                    </div>
+                  </details>
+                </td>
                 <td className="px-4 py-3">{u.has_password ? t("yes") : t("no")}</td>
                 <td className="px-4 py-3">
                   <input

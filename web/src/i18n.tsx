@@ -68,6 +68,14 @@ const en = {
   "run.browsed": "Read {n} sources",
   "run.perspectives": "Perspectives",
   "run.noOptions": "An Administrator needs to add a model and a search provider first.",
+  "run.retry": "Try again",
+  "run.retryOf": "A retry of an earlier Run",
+  "run.chooseAgain": "The model or search provider this Run chose has been turned off. Choose another to put it back in the queue — it is not charged again.",
+  "run.queueAgain": "Queue again",
+
+  "quota.line": "{remaining} of {limit} Runs left this month",
+  "quota.reserved": "{reserved} waiting",
+  "quota.full": "No Runs left this month. The quota starts again on the 1st (Bangkok time).",
 
   "lang.th": "Thai",
   "lang.en": "English",
@@ -151,6 +159,16 @@ const en = {
   "error.bootstrap_code_wrong": "That setup code is not right.",
   "error.setup_done": "Setup has already been done.",
   "error.cannot_demote_self": "You cannot remove your own administrator access.",
+  "error.queue_full": "You already have as many Runs waiting as you may. Wait for one to start, or cancel one.",
+  "error.quota_exhausted": "No Runs left this month.",
+  "error.cannot_retry": "Only a failed, interrupted or cancelled Run can be tried again.",
+  "error.not_waiting_for_selection": "This Run is no longer waiting for a choice.",
+
+  "admin.thisMonth": "This month",
+  "admin.overrides": "Limits for this user — leave blank for the default",
+  "admin.override.quota": "Runs per month",
+  "admin.override.concurrent": "At once",
+  "admin.override.queued": "Waiting",
 };
 
 type Key = keyof typeof en;
@@ -219,6 +237,14 @@ const th: Record<Key, string> = {
   "run.browsed": "อ่านแล้ว {n} แหล่ง",
   "run.perspectives": "มุมมอง",
   "run.noOptions": "ผู้ดูแลระบบต้องเพิ่มโมเดลและบริการค้นหาก่อน",
+  "run.retry": "ลองใหม่",
+  "run.retryOf": "ลองใหม่จากรอบก่อน",
+  "run.chooseAgain": "โมเดลหรือบริการค้นหาที่รอบนี้เลือกไว้ถูกปิดใช้งานแล้ว เลือกตัวใหม่เพื่อกลับเข้าคิว โดยไม่หักโควตาซ้ำ",
+  "run.queueAgain": "เข้าคิวอีกครั้ง",
+
+  "quota.line": "เหลือ {remaining} จาก {limit} รอบในเดือนนี้",
+  "quota.reserved": "จองไว้ {reserved}",
+  "quota.full": "โควตาเดือนนี้หมดแล้ว จะเริ่มใหม่วันที่ 1 ของเดือนหน้า (เวลากรุงเทพฯ)",
 
   "lang.th": "ไทย",
   "lang.en": "อังกฤษ",
@@ -302,6 +328,16 @@ const th: Record<Key, string> = {
   "error.bootstrap_code_wrong": "รหัสตั้งต้นไม่ถูกต้อง",
   "error.setup_done": "ตั้งค่าครั้งแรกไปแล้ว",
   "error.cannot_demote_self": "ถอดสิทธิ์ผู้ดูแลของตัวเองไม่ได้",
+  "error.queue_full": "มีงานรอคิวครบจำนวนที่ทำได้แล้ว รอให้งานเริ่มหรือยกเลิกบางงานก่อน",
+  "error.quota_exhausted": "โควตาเดือนนี้หมดแล้ว",
+  "error.cannot_retry": "ลองใหม่ได้เฉพาะรอบที่ล้มเหลว ถูกขัดจังหวะ หรือถูกยกเลิก",
+  "error.not_waiting_for_selection": "รอบนี้ไม่ได้รอการเลือกแล้ว",
+
+  "admin.thisMonth": "เดือนนี้",
+  "admin.overrides": "ขีดจำกัดของผู้ใช้นี้ — เว้นว่างเพื่อใช้ค่าเริ่มต้น",
+  "admin.override.quota": "Run ต่อเดือน",
+  "admin.override.concurrent": "พร้อมกัน",
+  "admin.override.queued": "รอคิว",
 };
 
 const dictionaries: Record<Lang, Record<Key, string>> = { en, th };

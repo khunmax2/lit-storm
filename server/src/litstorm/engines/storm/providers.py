@@ -107,6 +107,12 @@ def build_lm(llm, api_key, max_tokens, timeout):
 
     kwargs = {"temperature": 1.0, "top_p": 0.9}
     kwargs.update(reasoning_kwargs(llm.get("reasoning"), provider))
+    if provider == "openrouter" and "reasoning" in kwargs:
+        # OpenRouter spreads one model over many hosts, and some ignore a
+        # reasoning setting: measured, "enabled: false" still spent 500
+        # tokens thinking when routed to one of them, and the reply came
+        # back empty. Route only to hosts that honour what we send.
+        kwargs["extra_body"] = {"provider": {"require_parameters": True}}
 
     if provider == "gemini":
         return BoundedGoogleModel(

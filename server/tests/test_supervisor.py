@@ -152,3 +152,72 @@ def test_config_snapshot_is_kept_with_the_run(tmp_path):
     saved = json.loads((tmp_path / files.CONFIG).read_text(encoding="utf-8"))
     assert saved["engine"] == "fake"
     assert "sk-secret" not in json.dumps(saved)
+
+
+def test_a_listener_that_raises_does_not_stop_supervision(tmp_path):
+    def boom(event):
+        raise UnicodeEncodeError("charmap", "ไทย", 0, 1, "cannot print")
+
+    outcome = fast(tmp_path, config([{"stage": "research"}]), on_event=boom)
+    assert outcome.status == "succeeded"
+
+
+def _alive(pid):
+    import os
+    import subprocess
+    import sys
+
+    if sys.platform == "win32":
+        out = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True
+        ).stdout
+        return str(pid) in out
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def test_the_run_stops_when_its_supervisor_dies(tmp_path):
+    """A crashed Worker must not leave its Run spending with nobody watching."""
+    import subprocess
+    import sys
+    import time
+
+    script = f"""
+import sys
+sys.path.insert(0, {str(tmp_path.parent)!r})
+from litstorm.engines.base import RunConfig, Secrets
+from litstorm.runner.supervisor import supervise
+cfg = RunConfig(run_id="o", engine="fake", topic="t", language="en",
+    llm={{}}, search={{}}, params={{"script": [{{"pid": True}}, {{"hang": True}}]}})
+supervise({str(tmp_path)!r}, cfg, Secrets(), poll_interval=0.05)
+"""
+    supervisor = subprocess.Popen([sys.executable, "-c", script])
+    events = tmp_path / files.EVENTS
+    pid = None
+    for _ in range(200):
+        if events.exists():
+            for line in events.read_text(encoding="utf-8").splitlines():
+                event = json.loads(line)
+                if event.get("kind") == "pid":
+                    pid = event["pid"]
+        if pid:
+            break
+        time.sleep(0.05)
+    assert pid, "the child never reported its pid"
+
+    supervisor.kill()
+    supervisor.wait()
+    for _ in range(100):
+        if not _alive(pid):
+            break
+        time.sleep(0.05)
+    assert not _alive(pid)
+
+
+def test_thai_files_can_be_written_whatever_the_host_locale(tmp_path):
+    outcome = fast(tmp_path, config([{"write_thai": True}]))
+    assert outcome.status == "succeeded", outcome.message
+    assert (tmp_path / "work" / "thai.txt").read_text(encoding="utf-8") == "สงกรานต์"

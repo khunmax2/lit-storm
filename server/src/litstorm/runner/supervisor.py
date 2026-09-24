@@ -13,6 +13,7 @@ Whatever the child's finished stages wrote stays in the Run's directory.
 """
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -21,6 +22,8 @@ from dataclasses import dataclass, field
 
 from litstorm import outcomes
 from litstorm.runner import files
+
+logger = logging.getLogger(__name__)
 
 CANCEL_GRACE = 30.0  # seconds from asking to stop to killing
 DEADLINE = 60 * 60.0  # the Run's wall-clock ceiling, set by admins
@@ -69,13 +72,19 @@ def write_config(run_dir, config):
 
 
 def start(run_dir, secrets):
-    """Launch the child. Credentials go through stdin, never to disk."""
+    """Launch the child. Credentials go through stdin, never to disk.
+
+    The child is told our pid, and exits if we do (child._exit_when_orphaned).
+    """
     with open(files.path(run_dir, "stderr.log"), "wb") as stderr:
         proc = subprocess.Popen(
-            [sys.executable, "-m", "litstorm.runner.child", run_dir],
+            [sys.executable, "-m", "litstorm.runner.child", run_dir, str(os.getpid())],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=stderr,
+            # knowledge_storm opens its files without naming an encoding;
+            # on a Windows host that is cp1252, which cannot hold Thai.
+            env={**os.environ, "PYTHONUTF8": "1"},
         )
     proc.stdin.write(
         json.dumps(
@@ -111,7 +120,10 @@ def supervise(
         for event in tail.read():
             if event.get("type") == "usage":
                 usage.append(event)
-            on_event(event)
+            try:
+                on_event(event)
+            except Exception:  # noqa: BLE001 - a listener's fault must not orphan the Run
+                logger.exception("on_event failed for %s", event.get("type"))
 
     while proc.poll() is None:
         drain()

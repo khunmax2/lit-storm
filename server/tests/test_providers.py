@@ -40,6 +40,18 @@ def test_a_bad_key_is_not_retried(monkeypatch):
     assert len(calls) == 1
 
 
+def test_openrouter_reasoning_is_only_routed_to_hosts_that_honour_it():
+    from litstorm.engines.storm import providers
+
+    llm = {"provider": "openrouter", "model": "a/b", "reasoning": "off"}
+    lm = providers.build_lm(llm, "k", 100, 30)
+    assert lm.kwargs["reasoning"] == {"enabled": False}
+    assert lm.kwargs["extra_body"] == {"provider": {"require_parameters": True}}
+
+    plain = providers.build_lm({"provider": "openrouter", "model": "a/b"}, "k", 100, 30)
+    assert "extra_body" not in plain.kwargs
+
+
 def test_litellm_gets_two_retries():
     from litstorm.engines.storm import providers
 

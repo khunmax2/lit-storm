@@ -7,6 +7,8 @@
     {"hang": true}                     never finish, and never look at cancel
     {"fail": "retries_exhausted"}      fail with this reason
     {"crash": true}                    die without a word, as a segfault would
+    {"pid": true}                      note its own process id
+    {"write_thai": true}               write Thai the way knowledge_storm does
     {"language_probe": true}           note the article prompt it would use
 
 and then it returns a one-section report citing one source.
@@ -60,6 +62,12 @@ class FakeEngine:
                     time.sleep(1)
             elif "fail" in step:
                 raise EngineFailure(step["fail"], f"told to fail: {step['fail']}")
+            elif step.get("pid"):
+                progress.note("pid", pid=os.getpid())
+            elif step.get("write_thai"):
+                # No encoding named, exactly as knowledge_storm's FileIOHelper.
+                with open(os.path.join(workspace, "thai.txt"), "w") as f:
+                    f.write("สงกรานต์")
             elif step.get("crash"):
                 os._exit(3)
             elif step.get("language_probe"):

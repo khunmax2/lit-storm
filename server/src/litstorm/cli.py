@@ -96,6 +96,8 @@ def cmd_export(args):
 
 
 def main(argv=None):
+    # Thai persona names and topics, on a console that may default to cp1252.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="litstorm")
     sub = parser.add_subparsers(dest="command", required=True)
 

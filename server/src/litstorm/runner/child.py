@@ -89,10 +89,40 @@ def run(run_dir, secrets):
     _write_outcome(run_dir, "succeeded", outcomes.SUCCEEDED)
 
 
+def _exit_when_orphaned(parent_pid):
+    """Stop if the supervisor goes away, however it goes.
+
+    Without this a crashed Worker would leave the Run spending tokens with
+    nobody watching, after the Run had been marked interrupted
+    (docs/web-app-design.md). The parent is watched directly rather than
+    through a pipe: on Windows a thread blocked reading a pipe stalls other
+    threads that touch the same handle, and numpy's import does.
+    """
+    if sys.platform == "win32":
+        import ctypes
+
+        synchronize, infinite = 0x00100000, 0xFFFFFFFF
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(synchronize, False, parent_pid)
+        if handle:
+            kernel32.WaitForSingleObject(handle, infinite)
+    else:
+        # Orphans are re-parented, so the parent's id stops being ours.
+        while os.getppid() == parent_pid:
+            time.sleep(1)
+    os._exit(4)
+
+
 def main():
     run_dir = sys.argv[1]
+    parent_pid = int(sys.argv[2]) if len(sys.argv) > 2 else os.getppid()
     raw = json.loads(sys.stdin.read() or "{}")
+    threading.Thread(target=_exit_when_orphaned, args=(parent_pid,), daemon=True).start()
     run(run_dir, Secrets(**raw))
+    sys.stderr.flush()
+    # Skip the interpreter's shutdown: STORM's thread pools can keep it
+    # waiting, and everything that matters is on disk, outcome.json last.
+    os._exit(0)
 
 
 if __name__ == "__main__":

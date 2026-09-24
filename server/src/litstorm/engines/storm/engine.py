@@ -154,6 +154,19 @@ class StormEngine:
                 "research",
                 lambda: runner.run_knowledge_curation_module(callback_handler=callbacks),
             )
+            # Research that found nothing: STORM would go on and crash while
+            # ranking an empty table ("Expected 2D array"), after spending
+            # on the outline. Stop here and say what happened.
+            if not table.url_to_info:
+                rm = runner.retriever.rm
+                if getattr(rm, "refused", 0):
+                    # Not an empty topic: the Search Provider said no, and
+                    # kept saying it after retrying.
+                    raise EngineFailure(
+                        outcomes.RETRIES_EXHAUSTED,
+                        f"the search provider refused {rm.refused} searches ({rm.last_refusal})",
+                    )
+                raise EngineFailure(outcomes.EMPTY_REPORT, "the research found no sources for this topic")
             outline = stage(
                 "outline",
                 lambda: runner.run_outline_generation_module(

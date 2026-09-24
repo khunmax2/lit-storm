@@ -26,6 +26,8 @@ ATOM = "{http://www.w3.org/2005/Atom}"
 # searches from a thread pool, so the politeness has to live here rather than
 # in the caller: one lock, and every thread waits its turn.
 _MIN_INTERVAL = 3.0
+TRIES = 3
+RETRYABLE = {429, 500, 502, 503, 504}
 _throttle = threading.Lock()
 _last_call = 0.0
 
@@ -48,6 +50,10 @@ class ArxivRM(dspy.Retrieve):
         self.sort_by = sort_by
         self.timeout = timeout
         self.usage = 0
+        # Queries arXiv refused outright, and the last reason: the engine
+        # reads these to tell "nothing was found" from "we were refused".
+        self.refused = 0
+        self.last_refusal = ""
 
     def get_usage_and_reset(self):
         usage = self.usage
@@ -65,9 +71,17 @@ class ArxivRM(dspy.Retrieve):
                 "sortOrder": "descending",
             }
         )
-        response = requests.get(
-            url, timeout=self.timeout, headers={"User-Agent": "STORM/1.0"}
-        )
+        # Three tries in all for what may pass (rate limit, server error),
+        # with growing gaps, as for every outside request
+        # (docs/web-app-design.md, การ retry คำขอที่ล้มเหลว).
+        for attempt in range(TRIES):
+            response = requests.get(
+                url, timeout=self.timeout, headers={"User-Agent": "STORM/1.0"}
+            )
+            if response.status_code not in RETRYABLE or attempt == TRIES - 1:
+                break
+            time.sleep(_MIN_INTERVAL * (2**attempt))
+            _wait_turn()
         response.raise_for_status()
         return ET.fromstring(response.text)
 
@@ -114,6 +128,8 @@ class ArxivRM(dspy.Retrieve):
                 root = self._search(query)
             except Exception as error:  # noqa: BLE001 - one bad query, not the run
                 logging.error(f"arXiv search failed for {query!r}: {error}")
+                self.refused += 1
+                self.last_refusal = str(error)[:200]
                 continue
             for entry in root.findall(ATOM + "entry"):
                 result = self._entry_to_result(entry)

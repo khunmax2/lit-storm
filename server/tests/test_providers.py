@@ -58,3 +58,46 @@ def test_litellm_gets_two_retries():
     lm = providers.build_lm({"provider": "openrouter", "model": "a/b"}, "k", 100, 30)
     assert lm.kwargs["num_retries"] == 2
     assert lm.kwargs["timeout"] == 30
+
+
+def test_arxiv_retries_a_rate_limit_then_counts_the_refusal(monkeypatch):
+    from litstorm.engines.storm import arxiv_rm
+
+    calls = []
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code, self.text = code, "<feed></feed>"
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                import requests
+
+                raise requests.HTTPError(f"{self.status_code} Client Error")
+
+    monkeypatch.setattr(arxiv_rm.requests, "get", lambda *a, **kw: calls.append(1) or Resp(429))
+    monkeypatch.setattr(arxiv_rm.time, "sleep", lambda s: None)
+    monkeypatch.setattr(arxiv_rm, "_wait_turn", lambda: None)
+    rm = arxiv_rm.ArxivRM(k=2)
+    assert rm.forward("graph neural networks") == []
+    assert len(calls) == 3  # three tries in all
+    assert rm.refused == 1 and "429" in rm.last_refusal
+
+
+def test_arxiv_does_not_retry_a_bad_request(monkeypatch):
+    from litstorm.engines.storm import arxiv_rm
+
+    calls = []
+
+    class Resp:
+        status_code, text = 400, ""
+
+        def raise_for_status(self):
+            import requests
+
+            raise requests.HTTPError("400 Client Error")
+
+    monkeypatch.setattr(arxiv_rm.requests, "get", lambda *a, **kw: calls.append(1) or Resp())
+    monkeypatch.setattr(arxiv_rm, "_wait_turn", lambda: None)
+    arxiv_rm.ArxivRM(k=2).forward("x")
+    assert len(calls) == 1

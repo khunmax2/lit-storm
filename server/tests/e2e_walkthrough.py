@@ -71,6 +71,17 @@ def resume(out, run_id):
         browser.close()
 
 
+def add_arxiv(page, shot):
+    page.get_by_role("button", name="เพิ่มบริการค้นหา").click()
+    form = page.locator("form").last
+    form.locator("input").first.fill("arXiv")
+    form.locator("select").select_option("arxiv")
+    form.get_by_label("ค่าเริ่มต้น").check()
+    form.get_by_role("button", name="บันทึก").click()
+    expect(page.get_by_text("arxiv", exact=False).first).to_be_visible()
+    shot(page, "03-admin-search")
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     shot = lambda page, name: page.screenshot(path=os.path.join(out, f"{name}.png"), full_page=True)
@@ -113,16 +124,15 @@ def main(out):
         shot(page, "02-admin-models")
 
         page.get_by_role("button", name="บริการค้นหา").first.click()
-        page.get_by_role("button", name="เพิ่มบริการค้นหา").click()
-        form = page.locator("form").last
-        form.locator("input").first.fill("arXiv")
-        form.locator("select").select_option("arxiv")
-        form.get_by_label("ค่าเริ่มต้น").check()
-        form.get_by_role("button", name="บันทึก").click()
-        expect(page.get_by_text("arxiv", exact=False).first).to_be_visible()
-        shot(page, "03-admin-search")
+        if os.environ.get("LITSTORM_E2E_KEEP_SEARXNG"):
+            # The stack seeds its own SearXNG as the default; use that.
+            expect(page.get_by_text("searxng", exact=False).first).to_be_visible()
+            shot(page, "03-admin-search")
+        else:
+            add_arxiv(page, shot)
 
         # 3. A User gets a one-time link
+
         page.get_by_role("button", name="ผู้ใช้").first.click()
         form = page.locator("form").first
         form.locator("input").nth(0).fill("reader@example.org")

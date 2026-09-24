@@ -42,3 +42,11 @@ tests/
 
 .DS_Store
 Thumbs.db
+
+# The web app that replaces Streamlit (server/, web/, stack/): their local
+# environments and secrets never go into an image.
+server/.venv/
+server/data/
+web/node_modules/
+web/dist/
+stack/secrets/

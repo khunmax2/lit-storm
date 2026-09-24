@@ -59,6 +59,15 @@ function Body({ sections, level = 2 }: { sections: Section[]; level?: number }) 
   );
 }
 
+function readable(url: string) {
+  // Thai addresses arrive percent-encoded; show them as a reader would type them.
+  try {
+    return decodeURI(url);
+  } catch {
+    return url;
+  }
+}
+
 function SourcePanel({ source, onClose }: { source: Source; onClose: () => void }) {
   const { t } = useT();
   const safe = /^https?:\/\//.test(source.url);
@@ -71,7 +80,7 @@ function SourcePanel({ source, onClose }: { source: Source; onClose: () => void 
         </button>
       </div>
       <h3 className="font-semibold leading-snug">{source.title}</h3>
-      <p className="mt-1 break-all text-xs text-muted">{source.url}</p>
+      <p className="mt-1 break-all text-xs text-muted">{readable(source.url)}</p>
       {safe && (
         <a href={source.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block">
           <Button variant="quiet">{t("report.openSource")} ↗</Button>

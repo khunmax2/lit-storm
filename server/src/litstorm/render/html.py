@@ -11,6 +11,7 @@ Model output is untrusted text: raw HTML in it is escaped, not rendered.
 
 import html
 import re
+from urllib.parse import unquote
 
 from markdown_it import MarkdownIt
 
@@ -50,7 +51,7 @@ h3 { font-size: 1.2rem; margin: 1.8rem 0 .5rem; }
 h4, h5, h6 { font-size: 1.05rem; margin: 1.4rem 0 .4rem; }
 p { margin: 0 0 1rem; }
 a { color: var(--accent); }
-a.cite { text-decoration: none; font-size: .78em; vertical-align: super; line-height: 0; padding: 0 .08em; }
+a.cite { text-decoration: none; font-size: .78em; vertical-align: super; line-height: 1; padding: .1em .12em; }
 nav.toc { background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1.2rem; margin: 0 0 2rem; }
 nav.toc h2 { font-size: 1rem; margin: 0 0 .3rem; }
 nav.toc ol { margin: 0; padding-left: 1.2rem; }
@@ -106,10 +107,12 @@ def _sections(sections, level=2):
 def _source(source, labels, with_evidence, expanded):
     url = html.escape(source["url"], quote=True)
     safe_href = url if re.match(r"^https?://", source["url"]) else "#"
+    # Thai addresses arrive percent-encoded; show them as a reader would type them.
+    shown = html.escape(unquote(source["url"]))
     parts = [
         f'<li id="src-{source["id"]}">',
         f'<div class="src-title">{html.escape(source["title"])}</div>',
-        f'<div class="src-url"><a href="{safe_href}" rel="noopener noreferrer" target="_blank">{url}</a></div>',
+        f'<div class="src-url"><a href="{safe_href}" rel="noopener noreferrer" target="_blank">{shown}</a></div>',
     ]
     if with_evidence:
         if source["evidence"]:

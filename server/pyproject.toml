@@ -15,6 +15,9 @@ dependencies = [
     "alembic>=1.13",
     "argon2-cffi>=23.1",
     "cryptography>=43",
+    # Pulled in by knowledge_storm (sentence-transformers). Named here only
+    # so Linux images take the CPU build below instead of several GB of CUDA.
+    "torch",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +33,12 @@ litstorm = "litstorm.cli:main"
 
 [tool.uv.sources]
 knowledge-storm = { path = "..", editable = true }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

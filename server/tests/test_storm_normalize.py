@@ -128,6 +128,22 @@ def test_storm_polishing_renumbers_citations_and_the_object_knows_it():
     assert polished.reference["url_to_unified_index"] != draft_index  # the file would be stale
 
 
+def test_back_matter_is_dropped_in_thai_and_english(tmp_path):
+    text = (
+        "# สถาปัตยกรรม\n\nเนื้อหา [1].\n\n"
+        "# ดูเพิ่ม (See Also)\n\n* โมเดลภาษา [2]\n\n"
+        "# การอ้างอิง (References)\n\nงานวิจัย [2]\n\n"
+        "# See also\n\n* x\n"
+    )
+    (tmp_path / "storm_gen_article.txt").write_text(text, encoding="utf-8")
+    (tmp_path / "url_to_info.json").write_text(json.dumps(refs(a=1, b=2)), encoding="utf-8")
+    result, _ = normalize(str(tmp_path), "t", "th")
+
+    assert [s["heading"] for s in result["sections"]] == ["สถาปัตยกรรม"]
+    # Source 2 was cited only from the back matter, so it goes too.
+    assert [s["url"] for s in result["sources"]] == ["https://s/1"]
+
+
 def test_validate_rejects_a_dangling_citation():
     bad = {
         "schema": 1, "engine": "x", "title": "t", "language": "en",

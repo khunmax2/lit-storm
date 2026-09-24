@@ -48,6 +48,9 @@ def classify(error):
             PermissionDeniedError,
             litellm.NotFoundError,
             litellm.BudgetExceededError,
+            # A setting the model does not accept, e.g. turning off reasoning
+            # on a model that always reasons. Retrying sends the same thing.
+            litellm.BadRequestError,
             SearXNGConfigError,
             EmptyCompletionError,
         ),

@@ -48,6 +48,24 @@ def article_paths(article_dir):
     return None
 
 
+# Wikipedia's back matter. The report lists its own sources, so a section
+# that lists them again, or points elsewhere, is dropped. STORM removes these
+# from outlines only by their English names; a Thai outline says "ดูเพิ่ม
+# (See Also)" and gets through.
+BACK_MATTER = {
+    "see also", "references", "reference", "notes", "external links",
+    "further reading", "bibliography", "sources",
+    "ดูเพิ่ม", "อ้างอิง", "การอ้างอิง", "แหล่งอ้างอิง", "เอกสารอ้างอิง",
+    "แหล่งข้อมูลอื่น", "อ่านเพิ่มเติม", "บรรณานุกรม", "หมายเหตุ",
+}
+
+
+def is_back_matter(heading):
+    """True for "See also", "ดูเพิ่ม (See Also)", "References" and the like."""
+    bare = re.sub(r"\(.*?\)", "", heading).strip().strip(":").strip().lower()
+    return bare in BACK_MATTER
+
+
 def parse_sections(text):
     """(lead, sections) from STORM's article text."""
     lead_lines = []
@@ -90,7 +108,8 @@ def parse_sections(text):
             for node in nodes
         ]
 
-    return "\n".join(lead_lines).strip(), finish(root["children"])
+    kept = [node for node in root["children"] if not is_back_matter(node["heading"])]
+    return "\n".join(lead_lines).strip(), finish(kept)
 
 
 MARKER = re.compile(r"(\s*)\[(\d+)\]")

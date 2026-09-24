@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, call, type Schemas } from "../api/client";
-import { Button, Card, ErrorText, Field, Input, PageTitle, Select, Spinner, formatDate } from "../components/ui";
+import { Button, Card, ErrorText, Field, Input, PageTitle, Select, Spinner, StatusBadge, formatDate } from "../components/ui";
 import { useT } from "../i18n";
 
 const LLM_PROVIDERS = ["openrouter", "gemini", "openai", "groq", "openai-compatible"];
@@ -29,6 +29,31 @@ function CopyLink({ link, email }: { link: string; email: string }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+// --- test buttons -------------------------------------------------------------
+
+function TestButton({ kind, id }: { kind: "model" | "search"; id: string }) {
+  const { t } = useT();
+  const test = useMutation({
+    mutationFn: () =>
+      kind === "model"
+        ? call(api.POST("/api/admin/llm-models/{model_id}/test", { params: { path: { model_id: id } } }))
+        : call(api.POST("/api/admin/search-providers/{provider_id}/test", { params: { path: { provider_id: id } } })),
+  });
+  const r = test.data;
+  return (
+    <span className="flex items-center gap-2">
+      {r && (
+        <span className={`max-w-xs truncate text-xs ${r.ok ? "text-ok" : "text-bad"}`} title={r.message}>
+          {r.ok ? "✓" : "✕"} {r.message} · {r.seconds}s
+        </span>
+      )}
+      <Button variant="quiet" disabled={test.isPending} onClick={() => test.mutate()}>
+        {test.isPending ? t("admin.testing") : t("admin.test")}
+      </Button>
+    </span>
   );
 }
 
@@ -263,7 +288,13 @@ function Keys() {
   );
 }
 
-type ModelForm = Omit<Schemas["ModelIn"], "max_tokens"> & { id?: string; talk: string; write: string };
+type ModelForm = Omit<Schemas["ModelIn"], "max_tokens" | "price_in_per_mtok" | "price_out_per_mtok"> & {
+  id?: string;
+  talk: string;
+  write: string;
+  priceIn: string;
+  priceOut: string;
+};
 
 const emptyModel: ModelForm = {
   label: "",
@@ -274,6 +305,8 @@ const emptyModel: ModelForm = {
   is_default: false,
   talk: "",
   write: "",
+  priceIn: "",
+  priceOut: "",
 };
 
 function Models() {
@@ -283,11 +316,16 @@ function Models() {
   const [form, setForm] = useState<ModelForm | null>(null);
   const save = useMutation({
     mutationFn: () => {
-      const { id, talk, write, ...rest } = form!;
+      const { id, talk, write, priceIn, priceOut, ...rest } = form!;
       const max_tokens: Record<string, number> = {};
       if (talk) max_tokens.conversation = Number(talk);
       if (write) max_tokens.writing = Number(write);
-      const body = { ...rest, max_tokens };
+      const body = {
+        ...rest,
+        max_tokens,
+        price_in_per_mtok: priceIn === "" ? null : priceIn,
+        price_out_per_mtok: priceOut === "" ? null : priceOut,
+      };
       return id
         ? call(api.PUT("/api/admin/llm-models/{model_id}", { params: { path: { model_id: id } }, body }))
         : call(api.POST("/api/admin/llm-models", { body }));
@@ -320,18 +358,23 @@ function Models() {
                   {m.reasoning && ` · ${m.reasoning}`}
                 </div>
               </div>
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  setForm({
-                    ...m,
-                    talk: String(tokens(m).conversation ?? ""),
-                    write: String(tokens(m).writing ?? ""),
-                  })
-                }
-              >
-                {t("edit")}
-              </Button>
+              <span className="flex items-center gap-2">
+                <TestButton kind="model" id={m.id} />
+                <Button
+                  variant="quiet"
+                  onClick={() =>
+                    setForm({
+                      ...m,
+                      talk: String(tokens(m).conversation ?? ""),
+                      write: String(tokens(m).writing ?? ""),
+                      priceIn: m.price_in_per_mtok == null ? "" : String(m.price_in_per_mtok),
+                      priceOut: m.price_out_per_mtok == null ? "" : String(m.price_out_per_mtok),
+                    })
+                  }
+                >
+                  {t("edit")}
+                </Button>
+              </span>
             </li>
           ))}
         </ul>
@@ -368,6 +411,12 @@ function Models() {
               <div className="flex gap-2">
                 <Input type="number" min={100} placeholder="500" value={form.talk} onChange={(e) => setForm({ ...form, talk: e.target.value })} />
                 <Input type="number" min={100} placeholder="3000" value={form.write} onChange={(e) => setForm({ ...form, write: e.target.value })} />
+              </div>
+            </Field>
+            <Field label={t("admin.price")} hint={t("admin.priceHelp")}>
+              <div className="flex gap-2">
+                <Input type="number" min={0} step="any" value={form.priceIn} onChange={(e) => setForm({ ...form, priceIn: e.target.value })} />
+                <Input type="number" min={0} step="any" value={form.priceOut} onChange={(e) => setForm({ ...form, priceOut: e.target.value })} />
               </div>
             </Field>
             <div className="flex items-end gap-5 text-sm">
@@ -437,12 +486,15 @@ function Search() {
                 {p.key_hint && ` · ${t("admin.keyHint", { hint: p.key_hint })}`}
               </div>
             </div>
-            <Button
-              variant="quiet"
-              onClick={() => setForm({ id: p.id, label: p.label, kind: p.kind, endpoint: p.endpoint, engines: p.engines, enabled: p.enabled, is_default: p.is_default })}
-            >
-              {t("edit")}
-            </Button>
+            <span className="flex items-center gap-2">
+              <TestButton kind="search" id={p.id} />
+              <Button
+                variant="quiet"
+                onClick={() => setForm({ id: p.id, label: p.label, kind: p.kind, endpoint: p.endpoint, engines: p.engines, enabled: p.enabled, is_default: p.is_default })}
+              >
+                {t("edit")}
+              </Button>
+            </span>
           </li>
         ))}
       </ul>
@@ -547,6 +599,123 @@ function Limits() {
   );
 }
 
+// --- usage ----------------------------------------------------------------------------
+
+function lastMonths(n: number) {
+  const out: string[] = [];
+  const d = new Date();
+  for (let i = 0; i < n; i++) {
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    d.setMonth(d.getMonth() - 1);
+  }
+  return out;
+}
+
+function usd(v: string | number | null | undefined) {
+  if (v == null) return "–";
+  return `$${Number(v).toFixed(Number(v) < 1 ? 4 : 2)}`;
+}
+
+function Usage() {
+  const { t, lang } = useT();
+  const months = lastMonths(6);
+  const [month, setMonth] = useState(months[0]);
+  const usage = useQuery({
+    queryKey: ["admin-usage", month],
+    queryFn: () => call(api.GET("/api/admin/usage", { params: { query: { month } } })),
+  });
+  const runs = useQuery({ queryKey: ["admin-runs"], queryFn: () => call(api.GET("/api/admin/runs", { params: { query: { limit: 50 } } })) });
+  const n = (v: number) => v.toLocaleString(lang === "th" ? "th-TH" : "en-GB");
+  const cell = "px-3 py-2 text-right tabular-nums";
+  return (
+    <div className="flex flex-col gap-6">
+      <p className="text-sm text-muted">{t("usage.privacy")}</p>
+      <Card>
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm">{t("usage.month")}</span>
+          <Select className="w-40" value={month} onChange={(e) => setMonth(e.target.value)}>
+            {months.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </Select>
+        </div>
+        {usage.data?.rows.length === 0 && <p className="text-sm text-muted">{t("usage.none")}</p>}
+        {!!usage.data?.rows.length && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted">
+                <tr>
+                  <th className="px-3 py-2 text-left">{t("usage.user")}</th>
+                  <th className={cell}>{t("usage.runs")}</th>
+                  <th className={cell}>{t("usage.ok")}</th>
+                  <th className={cell}>{t("usage.failed")}</th>
+                  <th className={cell}>{t("usage.refunded")}</th>
+                  <th className={cell}>{t("usage.tokens")}</th>
+                  <th className={cell}>{t("usage.searches")}</th>
+                  <th className={cell}>{t("usage.cost")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {usage.data.rows.map((r) => (
+                  <tr key={r.user_id}>
+                    <td className="px-3 py-2">{r.email}</td>
+                    <td className={cell}>{r.runs}</td>
+                    <td className={cell}>{r.succeeded}</td>
+                    <td className={cell}>{r.failed}</td>
+                    <td className={cell}>{r.refunded}</td>
+                    <td className={cell}>
+                      {n(r.tokens_in)} / {n(r.tokens_out)}
+                    </td>
+                    <td className={cell}>{r.search_calls}</td>
+                    <td className={cell}>
+                      {usd(r.cost_usd)}
+                      {r.cost_incomplete && <span className="block text-xs text-warn">{t("usage.unknown")}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-line font-medium">
+                  <td className="px-3 py-2">{t("usage.total")}</td>
+                  <td colSpan={6} />
+                  <td className={cell}>
+                    {usd(usage.data.total_cost_usd)}
+                    {usage.data.rows.some((r) => r.cost_incomplete) && (
+                      <span className="block text-xs font-normal text-warn">{t("usage.unknown")}</span>
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
+      <Card>
+        <h2 className="mb-3 font-semibold">{t("usage.recent")}</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-line">
+              {runs.data?.map((r) => (
+                <tr key={r.id}>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-muted">{formatDate(r.queued_at, lang)}</td>
+                  <td className="px-3 py-2">{r.email}</td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={r.status} />
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted">{r.reason && r.reason !== r.status ? r.reason : ""}</td>
+                  <td className="px-3 py-2 text-xs">{r.model_label}</td>
+                  <td className={cell}>{r.tokens_in != null ? `${n(r.tokens_in)} / ${n(r.tokens_out ?? 0)}` : "–"}</td>
+                  <td className={cell}>{usd(r.cost_usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { t } = useT();
   const tabs = [
@@ -554,6 +723,7 @@ export function AdminPage() {
     ["models", t("admin.models")],
     ["search", t("admin.search")],
     ["limits", t("admin.limits")],
+    ["usage", t("admin.usage")],
   ] as const;
   const [tab, setTab] = useState<(typeof tabs)[number][0]>("users");
   return (
@@ -574,6 +744,7 @@ export function AdminPage() {
       {tab === "models" && <Models />}
       {tab === "search" && <Search />}
       {tab === "limits" && <Limits />}
+      {tab === "usage" && <Usage />}
     </>
   );
 }

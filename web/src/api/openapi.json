@@ -770,6 +770,190 @@
     }
    }
   },
+  "/api/admin/llm-models/{model_id}/test": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Test Model",
+    "operationId": "test_model_api_admin_llm_models__model_id__test_post",
+    "parameters": [
+     {
+      "name": "model_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Model Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/search-providers/{provider_id}/test": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Test Search",
+    "operationId": "test_search_api_admin_search_providers__provider_id__test_post",
+    "parameters": [
+     {
+      "name": "provider_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Provider Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/usage": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Usage",
+    "operationId": "usage_api_admin_usage_get",
+    "parameters": [
+     {
+      "name": "month",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^\\d{4}-\\d{2}$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Month"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UsageOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/runs": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Recent Runs",
+    "operationId": "recent_runs_api_admin_runs_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "default": 100,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AdminRunOut"
+         },
+         "title": "Response Recent Runs Api Admin Runs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/limits": {
    "get": {
     "tags": [
@@ -956,6 +1140,40 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Trash Project",
+    "operationId": "trash_project_api_projects__project_id__delete",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/projects/{project_id}/sessions": {
@@ -1040,6 +1258,40 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Trash Session",
+    "operationId": "trash_session_api_sessions__session_id__delete",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -1278,6 +1530,40 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Trash Run",
+    "operationId": "trash_run_api_runs__run_id__delete",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/runs/{run_id}/cancel": {
@@ -1310,6 +1596,76 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/trash": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "List Trash",
+    "operationId": "list_trash_api_trash_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TrashItem"
+         },
+         "type": "array",
+         "title": "Response List Trash Api Trash Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/trash/{kind}/{item_id}/restore": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Restore",
+    "operationId": "restore_api_trash__kind___item_id__restore_post",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -1445,6 +1801,143 @@
  },
  "components": {
   "schemas": {
+   "AdminRunOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "model_label": {
+      "type": "string",
+      "title": "Model Label"
+     },
+     "queued_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Queued At"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started At"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     },
+     "tokens_in": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tokens In"
+     },
+     "tokens_out": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tokens Out"
+     },
+     "cost_usd": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cost Usd"
+     },
+     "quota_refunded": {
+      "type": "boolean",
+      "title": "Quota Refunded"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "status",
+     "reason",
+     "model_label",
+     "queued_at",
+     "started_at",
+     "finished_at",
+     "tokens_in",
+     "tokens_out",
+     "cost_usd",
+     "quota_refunded"
+    ],
+    "title": "AdminRunOut"
+   },
+   "CheckOut": {
+    "properties": {
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     },
+     "seconds": {
+      "type": "number",
+      "title": "Seconds"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ok",
+     "message",
+     "seconds"
+    ],
+    "title": "CheckOut"
+   },
    "Choice": {
     "properties": {
      "id": {
@@ -1767,6 +2260,38 @@
       "type": "boolean",
       "title": "Is Default",
       "default": false
+     },
+     "price_in_per_mtok": {
+      "anyOf": [
+       {
+        "type": "number",
+        "minimum": 0.0
+       },
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price In Per Mtok"
+     },
+     "price_out_per_mtok": {
+      "anyOf": [
+       {
+        "type": "number",
+        "minimum": 0.0
+       },
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Out Per Mtok"
      }
     },
     "type": "object",
@@ -1814,6 +2339,30 @@
       "type": "boolean",
       "title": "Is Default",
       "default": false
+     },
+     "price_in_per_mtok": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price In Per Mtok"
+     },
+     "price_out_per_mtok": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Out Per Mtok"
      },
      "id": {
       "type": "string",
@@ -2686,6 +3235,146 @@
      "code_configured"
     ],
     "title": "SetupStatus"
+   },
+   "TrashItem": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "trashed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Trashed At"
+     },
+     "purge_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Purge At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "id",
+     "title",
+     "trashed_at",
+     "purge_at"
+    ],
+    "title": "TrashItem"
+   },
+   "UsageOut": {
+    "properties": {
+     "month": {
+      "type": "string",
+      "title": "Month"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/UsageRow"
+      },
+      "type": "array",
+      "title": "Rows"
+     },
+     "total_cost_usd": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Cost Usd"
+     }
+    },
+    "type": "object",
+    "required": [
+     "month",
+     "rows",
+     "total_cost_usd"
+    ],
+    "title": "UsageOut"
+   },
+   "UsageRow": {
+    "properties": {
+     "user_id": {
+      "type": "string",
+      "title": "User Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "runs": {
+      "type": "integer",
+      "title": "Runs"
+     },
+     "succeeded": {
+      "type": "integer",
+      "title": "Succeeded"
+     },
+     "failed": {
+      "type": "integer",
+      "title": "Failed"
+     },
+     "refunded": {
+      "type": "integer",
+      "title": "Refunded"
+     },
+     "tokens_in": {
+      "type": "integer",
+      "title": "Tokens In"
+     },
+     "tokens_out": {
+      "type": "integer",
+      "title": "Tokens Out"
+     },
+     "search_calls": {
+      "type": "integer",
+      "title": "Search Calls"
+     },
+     "cost_usd": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cost Usd"
+     },
+     "cost_incomplete": {
+      "type": "boolean",
+      "title": "Cost Incomplete"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user_id",
+     "email",
+     "runs",
+     "succeeded",
+     "failed",
+     "refunded",
+     "tokens_in",
+     "tokens_out",
+     "search_calls",
+     "cost_usd",
+     "cost_incomplete"
+    ],
+    "title": "UsageRow"
    },
    "UserIn": {
     "properties": {

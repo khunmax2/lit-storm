@@ -185,6 +185,13 @@ export function ProjectPage() {
       navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } });
     },
   });
+  const remove = useMutation({
+    mutationFn: () => call(api.DELETE("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      navigate({ to: "/" });
+    },
+  });
   if (project.isLoading) return <Spinner />;
   if (!project.data) return <ErrorText error={project.error} />;
   return (
@@ -192,7 +199,15 @@ export function ProjectPage() {
       <Link to="/" className="text-sm text-muted hover:text-ink">
         ← {t("nav.projects")}
       </Link>
-      <PageTitle>{project.data.name}</PageTitle>
+      <PageTitle
+        action={
+          <Button variant="danger" onClick={() => confirm(t("delete.confirmProject")) && remove.mutate()}>
+            {t("delete.project")}
+          </Button>
+        }
+      >
+        {project.data.name}
+      </PageTitle>
       <Card className="mb-8">
         <h2 className="mb-4 font-semibold">{t("project.newSession")}</h2>
         <form
@@ -360,6 +375,10 @@ function RunCard({ run }: { run: Run }) {
     mutationFn: () => call(api.POST("/api/runs/{run_id}/retry", { params: { path: { run_id: run.id } } })),
     onSuccess: refresh,
   });
+  const remove = useMutation({
+    mutationFn: () => call(api.DELETE("/api/runs/{run_id}", { params: { path: { run_id: run.id } } })),
+    onSuccess: refresh,
+  });
   const reasonKey = `reason.${run.reason}`;
   return (
     <Card>
@@ -388,6 +407,11 @@ function RunCard({ run }: { run: Run }) {
               <Button>{t("run.open")}</Button>
             </Link>
           )}
+          {FINAL.has(run.status) && (
+            <Button variant="quiet" disabled={remove.isPending} onClick={() => confirm(t("delete.confirmRun")) && remove.mutate()}>
+              {t("delete.run")}
+            </Button>
+          )}
           {["failed", "interrupted", "cancelled"].includes(run.status) && (
             <Button variant="quiet" disabled={retry.isPending} onClick={() => retry.mutate()}>
               {t("run.retry")}
@@ -415,6 +439,7 @@ export function SessionPage() {
   const { t } = useT();
   const { sessionId } = useParams({ from: "/app/sessions/$sessionId" });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const session = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => call(api.GET("/api/sessions/{session_id}", { params: { path: { session_id: sessionId } } })),
@@ -441,6 +466,14 @@ export function SessionPage() {
       queryClient.invalidateQueries({ queryKey: ["quota"] });
     },
   });
+  const remove = useMutation({
+    mutationFn: () => call(api.DELETE("/api/sessions/{session_id}", { params: { path: { session_id: sessionId } } })),
+    onSuccess: () => {
+      const projectId = session.data!.project_id;
+      queryClient.invalidateQueries();
+      navigate({ to: "/projects/$projectId", params: { projectId } });
+    },
+  });
   if (session.isLoading) return <Spinner />;
   if (!session.data) return <ErrorText error={session.error} />;
   return (
@@ -448,7 +481,15 @@ export function SessionPage() {
       <Link to="/projects/$projectId" params={{ projectId: session.data.project_id }} className="text-sm text-muted hover:text-ink">
         ← {t("back")}
       </Link>
-      <PageTitle>{session.data.title}</PageTitle>
+      <PageTitle
+        action={
+          <Button variant="danger" onClick={() => confirm(t("delete.confirmSession")) && remove.mutate()}>
+            {t("delete.session")}
+          </Button>
+        }
+      >
+        {session.data.title}
+      </PageTitle>
       <h2 className="mb-3 font-semibold">{t("run.history")}</h2>
       <div className="mb-10 flex flex-col gap-3">
         {session.data.runs.map((r) => (

@@ -16,6 +16,7 @@ import { AdminPage } from "./pages/admin";
 import { LoginPage, SetPasswordPage, SetupPage } from "./pages/auth";
 import { ReportPage } from "./pages/report";
 import { ProjectPage, ProjectsPage, SessionPage } from "./pages/research";
+import { TrashPage } from "./pages/trash";
 
 // Everything behind sign-in. Not signed in: the first-run setup page if the
 // system has no Administrator yet, otherwise the sign-in page.
@@ -63,6 +64,9 @@ function SignedIn() {
             <Link to="/" className="text-muted hover:text-ink [&.active]:text-ink" activeOptions={{ exact: true }}>
               {t("nav.projects")}
             </Link>
+            <Link to="/trash" className="text-muted hover:text-ink [&.active]:text-ink">
+              {t("nav.trash")}
+            </Link>
             {me.data.role === "admin" && (
               <Link to="/admin" className="text-muted hover:text-ink [&.active]:text-ink">
                 {t("nav.admin")}
@@ -99,12 +103,13 @@ const projectRoute = createRoute({ getParentRoute: () => appRoute, path: "projec
 const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "sessions/$sessionId", component: SessionPage });
 const reportRoute = createRoute({ getParentRoute: () => appRoute, path: "runs/$runId", component: ReportPage });
 const adminRoute = createRoute({ getParentRoute: () => appRoute, path: "admin", component: AdminPage });
+const trashRoute = createRoute({ getParentRoute: () => appRoute, path: "trash", component: TrashPage });
 
 const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
   setPasswordRoute,
-  appRoute.addChildren([projectsRoute, projectRoute, sessionRoute, reportRoute, adminRoute]),
+  appRoute.addChildren([projectsRoute, projectRoute, sessionRoute, reportRoute, adminRoute, trashRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

@@ -19,18 +19,7 @@ from .arxiv_rm import ArxivRM
 RETRIES = 2  # after the first request, so three in all
 TRIES = RETRIES + 1
 
-# What each provider needs. Gemini goes through Google's SDK; the rest
-# through LiteLLM. Anything else that speaks the OpenAI API goes through
-# "openai-compatible" with its own base URL.
-LLM_PROVIDERS = {
-    "gemini": {"prefix": "gemini/"},
-    "openrouter": {"prefix": "openrouter/"},
-    "groq": {"prefix": "groq/"},
-    "openai": {"prefix": "openai/"},
-    "openai-compatible": {"prefix": "openai/", "needs_base": True},
-}
-
-SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv")
+from litstorm.catalog import LLM_PROVIDERS, SEARCH_PROVIDERS  # noqa: F401 - re-exported
 
 # How much one reply may spend. The conversation stages run hundreds of
 # times and answer in a sentence; the writing stages write sections.

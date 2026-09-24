@@ -12,7 +12,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, security
+from litstorm import limits, quota, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import LLM_PROVIDERS, SEARCH_PROVIDERS
@@ -35,9 +35,13 @@ class UserOut(BaseModel):
     max_concurrent_runs: int | None
     max_queued_runs: int | None
     created_at: datetime
+    # This month's quota, as the User sees it.
+    quota_limit: int | None = None
+    quota_used: int | None = None
+    quota_reserved: int | None = None
 
 
-def user_out(user):
+def user_out(user, usage=None):
     return UserOut(
         id=str(user.id),
         email=user.email,
@@ -49,6 +53,9 @@ def user_out(user):
         max_concurrent_runs=user.max_concurrent_runs,
         max_queued_runs=user.max_queued_runs,
         created_at=user.created_at,
+        quota_limit=usage.limit if usage else None,
+        quota_used=usage.used if usage else None,
+        quota_reserved=usage.reserved if usage else None,
     )
 
 
@@ -76,7 +83,11 @@ class UserPatch(BaseModel):
 
 @router.get("/users", response_model=list[UserOut])
 def list_users(session=Depends(deps.database)):
-    return [user_out(u) for u in session.scalars(select(User).order_by(User.created_at))]
+    configured = limits.load(session)
+    return [
+        user_out(u, quota.usage(session, u, configured=configured))
+        for u in session.scalars(select(User).order_by(User.created_at))
+    ]
 
 
 @router.post("/users", response_model=LinkOut, status_code=201)
@@ -195,6 +206,14 @@ def model_out(m):
     )
 
 
+def _park(session):
+    """Turning a model or provider off parks the queued Runs that chose it,
+    now rather than when the Worker next looks, so their owners see it."""
+    from litstorm.worker.queue import park_unavailable
+
+    park_unavailable(session)
+
+
 def _clear_default(session, table, wanted, keep_id=None):
     """Unset the current default before a new one is written: one default
     at most is enforced by a unique index, checked row by row."""
@@ -236,6 +255,8 @@ def update_model(model_id: uuid.UUID, body: ModelIn, session=Depends(deps.databa
     _clear_default(session, LlmModel, body.is_default, keep_id=row.id)
     for key, value in body.model_dump().items():
         setattr(row, key, value)
+    session.flush()
+    _park(session)
     session.commit()
     return model_out(row)
 
@@ -314,6 +335,8 @@ def update_search(provider_id: uuid.UUID, body: SearchIn, session=Depends(deps.d
         raise HTTPException(404, "not_found")
     _clear_default(session, SearchProvider, body.is_default, keep_id=row.id)
     _apply_search(row, body)
+    session.flush()
+    _park(session)
     session.commit()
     return search_out(row)
 

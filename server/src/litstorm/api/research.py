@@ -12,13 +12,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, settings
+from litstorm import limits, quota, settings
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.db.models import (
     CANCELLED,
     CANCELLING,
+    FAILED,
+    INTERRUPTED,
     NEEDS_SELECTION,
     QUEUED,
     RUNNING,
@@ -138,6 +141,9 @@ class RunIn(BaseModel):
     language: str = Field(pattern="^(th|en)$")
     llm_model_id: uuid.UUID | None = None  # default model when absent
     search_provider_id: uuid.UUID | None = None  # default provider when absent
+    # The page's id for one press of "Start". Sending the same key again
+    # returns the Run it already made instead of making another.
+    request_key: str | None = Field(default=None, max_length=64)
 
 
 class SessionIn(RunIn):
@@ -153,6 +159,7 @@ class RunOut(BaseModel):
     model_label: str
     search_label: str
     status: str
+    quota_month: str
     stage: str | None
     reason: str | None
     message: str | None
@@ -174,6 +181,7 @@ def run_out(run):
         model_label=run.config.get("llm", {}).get("label", ""),
         search_label=run.config.get("search", {}).get("label", ""),
         status=run.status,
+        quota_month=run.quota_month,
         stage=run.stage,
         reason=run.reason,
         message=run.message,
@@ -207,14 +215,60 @@ def _pick(session, table, wanted_id):
     return row
 
 
-def new_run(session, owner, research_session, body, parent_run_id=None):
-    """A queued Run with its config snapshot. Secrets are not in it."""
-    model = _pick(session, LlmModel, body.llm_model_id)
-    provider = _pick(session, SearchProvider, body.search_provider_id)
+def _snapshot(session, model, provider):
+    """The parts of a Run's config that come from the current settings."""
     configured = limits.load(session)
     params = dict(configured.storm_params)
     if model.max_tokens:
         params["max_tokens"] = model.max_tokens
+    return {
+        "llm": {
+            "label": model.label,
+            "provider": model.provider,
+            "model": model.model,
+            "reasoning": model.reasoning,
+        },
+        "search": {
+            "label": provider.label,
+            "provider": provider.kind,
+            "endpoint": provider.endpoint,
+            "engines": provider.engines,
+        },
+        "params": params,
+        "deadline_minutes": configured.run_deadline_minutes,
+    }
+
+
+def _existing(session, owner, request_key):
+    if not request_key:
+        return None
+    return session.scalar(select(Run).where(Run.owner_id == owner.id, Run.request_key == request_key))
+
+
+def _commit_once(session, owner, request_key):
+    """Commit a new Run. If the same request raced in beside it and won,
+    return that Run instead (the unique index decided); otherwise None."""
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        earlier = _existing(session, owner, request_key)
+        if earlier is None:
+            raise
+        return earlier
+    return None
+
+
+def new_run(session, owner, research_session, body, parent_run_id=None):
+    """A queued Run with its config snapshot. Secrets are not in it.
+
+    Checks the owner's queue limit and monthly quota first, under a lock on
+    the owner's row, so the check and the insert are one step
+    (docs/web-app-design.md, ส่งงานหนึ่งครั้ง).
+    """
+    model = _pick(session, LlmModel, body.llm_model_id)
+    provider = _pick(session, SearchProvider, body.search_provider_id)
+    quota.check_submit(session, owner)
     run = Run(
         session_id=research_session.id,
         owner_id=owner.id,
@@ -224,24 +278,10 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         language=body.language,
         llm_model_id=model.id,
         search_provider_id=provider.id,
-        config={
-            "llm": {
-                "label": model.label,
-                "provider": model.provider,
-                "model": model.model,
-                "reasoning": model.reasoning,
-            },
-            "search": {
-                "label": provider.label,
-                "provider": provider.kind,
-                "endpoint": provider.endpoint,
-                "engines": provider.engines,
-            },
-            "params": params,
-            "deadline_minutes": configured.run_deadline_minutes,
-        },
+        config=_snapshot(session, model, provider),
         status=QUEUED,
         quota_month=limits.quota_month(),
+        request_key=body.request_key,
     )
     session.add(run)
     return run
@@ -260,11 +300,16 @@ def create_session(
     project_id: uuid.UUID, body: SessionIn, user=Depends(deps.current_user), session=Depends(deps.database)
 ):
     project = deps.own(session, Project, project_id, user)
+    earlier = _existing(session, user, body.request_key)
+    if earlier:
+        return session_out(session, session.get(ResearchSession, earlier.session_id))
     rs = ResearchSession(project_id=project.id, owner_id=user.id, title=body.topic.strip()[:300])
     session.add(rs)
     session.flush()
     new_run(session, user, rs, body)
-    session.commit()
+    earlier = _commit_once(session, user, body.request_key)
+    if earlier:
+        return session_out(session, session.get(ResearchSession, earlier.session_id))
     return session_out(session, rs)
 
 
@@ -278,9 +323,93 @@ def create_run(
     session_id: uuid.UUID, body: RunIn, user=Depends(deps.current_user), session=Depends(deps.database)
 ):
     rs = deps.own(session, ResearchSession, session_id, user)
+    earlier = _existing(session, user, body.request_key)
+    if earlier:
+        return run_out(earlier)
     run = new_run(session, user, rs, body)
+    return run_out(_commit_once(session, user, body.request_key) or run)
+
+
+class SelectionIn(BaseModel):
+    llm_model_id: uuid.UUID
+    search_provider_id: uuid.UUID
+
+
+@router.post("/runs/{run_id}/selection", response_model=RunOut)
+def choose_again(
+    run_id: uuid.UUID, body: SelectionIn, user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """A Run parked because its model or provider was turned off gets a new
+    one and goes to the back of its owner's queue. It is the same Run, with
+    the same quota reservation: nothing is charged again."""
+    run = deps.own(session, Run, run_id, user)
+    model = _pick(session, LlmModel, body.llm_model_id)
+    provider = _pick(session, SearchProvider, body.search_provider_id)
+    snapshot = {**run.config, **_snapshot(session, model, provider)}
+    moved = session.execute(
+        update(Run)
+        .where(Run.id == run.id, Run.status == NEEDS_SELECTION)
+        .values(
+            status=QUEUED,
+            llm_model_id=model.id,
+            search_provider_id=provider.id,
+            config=snapshot,
+            queued_at=datetime.now(timezone.utc),
+        )
+    ).rowcount
+    if not moved:
+        raise HTTPException(409, "not_waiting_for_selection")
+    session.commit()
+    session.refresh(run)
+    return run_out(run)
+
+
+@router.post("/runs/{run_id}/retry", response_model=RunOut, status_code=201)
+def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """Try a Run again: a new Run in the same Session, with the same topic
+    and settings, linked back to this one, whose history is kept. It starts
+    from the beginning (docs/web-app-design.md, ผู้ใช้สั่งลองใหม่).
+
+    If the model or provider it used has since been turned off, the new Run
+    waits for the owner to choose again instead of failing.
+    """
+    old = deps.own(session, Run, run_id, user)
+    if old.status not in (FAILED, INTERRUPTED, CANCELLED):
+        raise HTTPException(409, "cannot_retry")
+    model = session.get(LlmModel, old.llm_model_id)
+    provider = session.get(SearchProvider, old.search_provider_id)
+    available = model is not None and model.enabled and provider is not None and provider.enabled
+    quota.check_submit(session, user)
+    run = Run(
+        session_id=old.session_id,
+        owner_id=user.id,
+        parent_run_id=old.id,
+        engine=old.engine,
+        topic=old.topic,
+        language=old.language,
+        llm_model_id=old.llm_model_id,
+        search_provider_id=old.search_provider_id,
+        config=_snapshot(session, model, provider) if available else old.config,
+        status=QUEUED if available else NEEDS_SELECTION,
+        quota_month=limits.quota_month(),
+    )
+    session.add(run)
     session.commit()
     return run_out(run)
+
+
+class QuotaOut(BaseModel):
+    month: str
+    limit: int
+    used: int
+    reserved: int
+    remaining: int
+
+
+@router.get("/me/quota", response_model=QuotaOut)
+def my_quota(user=Depends(deps.current_user), session=Depends(deps.database)):
+    u = quota.usage(session, user)
+    return QuotaOut(month=u.month, limit=u.limit, used=u.used, reserved=u.reserved, remaining=u.remaining)
 
 
 class EventOut(BaseModel):

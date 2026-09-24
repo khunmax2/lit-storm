@@ -49,6 +49,9 @@ class User(Base):
     monthly_run_quota: Mapped[int | None] = mapped_column(Integer)
     max_concurrent_runs: Mapped[int | None] = mapped_column(Integer)
     max_queued_runs: Mapped[int | None] = mapped_column(Integer)
+    # When this User's most recent Run started: the queue serves whoever has
+    # waited longest since their last turn.
+    last_run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
 
 
@@ -168,6 +171,9 @@ FAILED = "failed"
 CANCELLED = "cancelled"
 INTERRUPTED = "interrupted"
 ACTIVE = (RUNNING, CANCELLING)
+# Waiting for a slot: reserves quota and counts toward the queue limit, but
+# holds no processing slot.
+WAITING = (QUEUED, NEEDS_SELECTION)
 FINAL = (SUCCEEDED, FAILED, CANCELLED, INTERRUPTED)
 
 
@@ -209,9 +215,14 @@ class Run(Base):
     report_title: Mapped[str | None] = mapped_column(Text)
     source_count: Mapped[int | None] = mapped_column(Integer)
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The browser's id for one press of "Start" (see migration 0002).
+    request_key: Mapped[str | None] = mapped_column(String(64))
 
     __table_args__ = (
         Index("runs_queue", "queued_at", postgresql_where=text("status = 'queued'")),
+        Index("runs_one_per_request", "owner_id", "request_key", unique=True,
+              postgresql_where=text("request_key is not null")),
+        Index("runs_owner_month", "owner_id", "quota_month"),
         Index("runs_active_lease", "lease_expires_at", postgresql_where=text("status in ('running','cancelling')")),
     )
 

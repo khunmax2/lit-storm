@@ -6,26 +6,32 @@ marked the Run interrupted — therefore cannot write a final status over it
 (docs/web-app-design.md, พฤติกรรมที่ต้องรักษาใน transaction).
 
 Claiming takes a transaction-scoped advisory lock, so two Workers cannot both
-see one free slot and both fill it. Which Run gets a slot is FIFO for now;
-alternating between Users arrives with the rest of the queue rules in step 3.
+see one free slot and both fill it. When a slot is free the queue takes turns
+between Users (docs/web-app-design.md, การจัดสรรคิวระหว่างผู้ใช้): among Users
+with a Run waiting and room under their own ceiling, the one whose last Run
+started longest ago goes next, with their oldest Run. Someone who queued ten
+Runs does not make everyone else wait for all ten.
 """
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, or_, select, text, update
 
-from litstorm import limits, security
+from litstorm import limits, quota, security
 from litstorm.db.models import (
     ACTIVE,
     CANCELLING,
     INTERRUPTED,
     QUEUED,
     RUNNING,
+    NEEDS_SELECTION,
     LlmCredential,
+    LlmModel,
     Run,
     SearchProvider,
+    User,
 )
 from litstorm.engines.base import RunConfig, Secrets
 
@@ -46,24 +52,54 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def park_unavailable(session):
+    """Queued Runs whose model or provider an Administrator turned off wait
+    for their owner to choose again. They keep their quota reservation and
+    their place is given up (docs/web-app-design.md, การปิดใช้งานโมเดล)."""
+    disabled_models = select(LlmModel.id).where(LlmModel.enabled.is_(False))
+    disabled_providers = select(SearchProvider.id).where(SearchProvider.enabled.is_(False))
+    return session.execute(
+        update(Run)
+        .where(
+            Run.status == QUEUED,
+            or_(Run.llm_model_id.in_(disabled_models), Run.search_provider_id.in_(disabled_providers)),
+        )
+        .values(status=NEEDS_SELECTION)
+    ).rowcount
+
+
+def _next_run(session, configured):
+    """The Run whose turn it is, locked, or None."""
+    active = quota.active_by_owner()
+    ceiling = func.coalesce(User.max_concurrent_runs, configured.max_concurrent_per_user)
+    return session.scalar(
+        select(Run)
+        .join(User, User.id == Run.owner_id)
+        .outerjoin(active, active.c.owner_id == Run.owner_id)
+        .where(
+            Run.status == QUEUED,
+            User.is_active.is_(True),
+            func.coalesce(active.c.active, 0) < ceiling,
+        )
+        .order_by(User.last_run_started_at.asc().nulls_first(), Run.queued_at)
+        .limit(1)
+        .with_for_update(of=Run, skip_locked=True)
+    )
+
+
 def claim(session):
-    """Take the oldest queued Run if the system has a free slot, or None."""
+    """Take the next Run if the system has a free slot, or None."""
     session.execute(text("select pg_advisory_xact_lock(:id)"), {"id": CLAIM_LOCK})
     configured = limits.load(session)
+    park_unavailable(session)
     active = session.scalar(select(func.count()).select_from(Run).where(Run.status.in_(ACTIVE)))
     if active >= configured.max_concurrent_total:
-        session.rollback()
+        session.commit()
         return None
 
-    run = session.scalar(
-        select(Run)
-        .where(Run.status == QUEUED)
-        .order_by(Run.queued_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    )
+    run = _next_run(session, configured)
     if run is None:
-        session.rollback()
+        session.commit()
         return None
 
     token = uuid.uuid4()
@@ -73,6 +109,7 @@ def claim(session):
     run.started_at = now
     run.lease_expires_at = now + LEASE
     run.stage = None
+    session.execute(update(User).where(User.id == run.owner_id).values(last_run_started_at=now))
     secrets, llm = _secrets(session, run)
     session.commit()
 

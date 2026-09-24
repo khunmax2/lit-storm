@@ -91,6 +91,9 @@ def test_claims_respect_the_system_ceiling(admin, browser, configured, db):
     from litstorm import db as db_mod
     from litstorm.worker import queue
 
+    # One User here, so lift their own ceiling to see the system's.
+    current = admin.get("/api/admin/limits").json()
+    admin.put("/api/admin/limits", json={**current, "max_concurrent_per_user": 5})
     user = make_user(admin, browser)
     for _ in range(3):
         _session(user)

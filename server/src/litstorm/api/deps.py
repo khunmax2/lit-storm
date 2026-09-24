@@ -61,8 +61,16 @@ def own(session, model, row_id, user):
     Anything else is a 404 — including someone else's row, so ids cannot be
     probed for existence.
     """
+    from litstorm import trash
+    from litstorm.db.models import ResearchSession, Run
+
     row = session.get(model, row_id)
     if row is None or row.owner_id != user.id or getattr(row, "trashed_at", None):
+        raise HTTPException(404, "not_found")
+    # Inside something that is in the Trash counts as in the Trash.
+    if model is ResearchSession and not trash.session_alive(session, row):
+        raise HTTPException(404, "not_found")
+    if model is Run and not trash.run_alive(session, row):
         raise HTTPException(404, "not_found")
     return row
 

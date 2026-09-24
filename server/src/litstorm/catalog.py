@@ -16,3 +16,33 @@ LLM_PROVIDERS = {
 }
 
 SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv")
+
+
+def reasoning_kwargs(value, provider):
+    """The call argument for a saved reasoning setting, or {} for unset.
+
+    OpenRouter is sent its own `reasoning` object: LiteLLM drops
+    `reasoning_effort` for it without a word (see demo_util.reasoning_kwargs).
+    """
+    value = (value or "").strip().lower()
+    if not value:
+        return {}
+    kind, _, detail = value.partition(":")
+    openrouter = provider == "openrouter"
+    if value == "off":
+        return {"reasoning": {"enabled": False}} if openrouter else {"reasoning_effort": "none"}
+    if kind == "effort" and detail:
+        return {"reasoning": {"effort": detail}} if openrouter else {"reasoning_effort": detail}
+    if kind == "budget" and detail.isdigit():
+        return {"reasoning": {"max_tokens": int(detail)}} if openrouter else {}
+    return {}
+
+
+def routing_kwargs(provider, kwargs):
+    """OpenRouter spreads one model over many hosts, and some ignore a
+    reasoning setting: measured, "enabled: false" still spent 500 tokens
+    thinking when routed to one of them, and the reply came back empty.
+    Route only to hosts that honour what we send."""
+    if provider == "openrouter" and "reasoning" in kwargs:
+        return {"extra_body": {"provider": {"require_parameters": True}}}
+    return {}

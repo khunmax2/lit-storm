@@ -6,17 +6,18 @@ Stored keys never leave the server: an admin sees the last four characters
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, quota, security
+from litstorm import checks, limits, quota, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import LLM_PROVIDERS, SEARCH_PROVIDERS
-from litstorm.db.models import AuthSession, LlmCredential, LlmModel, SearchProvider, User
+from litstorm.db.models import AuthSession, LlmCredential, LlmModel, Run, SearchProvider, User
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(deps.admin)])
 
@@ -193,6 +194,9 @@ class ModelIn(BaseModel):
     max_tokens: dict = Field(default_factory=dict)
     enabled: bool = True
     is_default: bool = False
+    # USD per million tokens; leave empty to use LiteLLM's price table.
+    price_in_per_mtok: Decimal | None = Field(default=None, ge=0)
+    price_out_per_mtok: Decimal | None = Field(default=None, ge=0)
 
 
 class ModelOut(ModelIn):
@@ -203,6 +207,7 @@ def model_out(m):
     return ModelOut(
         id=str(m.id), label=m.label, provider=m.provider, model=m.model, reasoning=m.reasoning,
         max_tokens=m.max_tokens or {}, enabled=m.enabled, is_default=m.is_default,
+        price_in_per_mtok=m.price_in_per_mtok, price_out_per_mtok=m.price_out_per_mtok,
     )
 
 
@@ -339,6 +344,127 @@ def update_search(provider_id: uuid.UUID, body: SearchIn, session=Depends(deps.d
     _park(session)
     session.commit()
     return search_out(row)
+
+
+# --- test buttons ---------------------------------------------------------------------------
+
+
+class CheckOut(BaseModel):
+    ok: bool
+    message: str
+    seconds: float
+
+
+@router.post("/llm-models/{model_id}/test", response_model=CheckOut)
+def test_model(model_id: uuid.UUID, session=Depends(deps.database)):
+    model = session.get(LlmModel, model_id)
+    if model is None:
+        raise HTTPException(404, "not_found")
+    credential = session.get(LlmCredential, model.provider)
+    key = security.decrypt(credential.api_key_ciphertext) if credential else ""
+    ok, message, seconds = checks.llm(model, key, credential.api_base if credential else None)
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+
+
+@router.post("/search-providers/{provider_id}/test", response_model=CheckOut)
+def test_search(provider_id: uuid.UUID, session=Depends(deps.database)):
+    provider = session.get(SearchProvider, provider_id)
+    if provider is None:
+        raise HTTPException(404, "not_found")
+    ok, message, seconds = checks.search(provider, security.decrypt(provider.api_key_ciphertext))
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+
+
+# --- usage ---------------------------------------------------------------------------------------
+# What an Administrator sees of other people's research: who, when, how
+# much, with which model, and how it ended — never the topic or the report
+# (docs/web-app-design.md, สิทธิ์ผู้ดูแลต่อเนื้อหางานวิจัย).
+
+
+class UsageRow(BaseModel):
+    user_id: str
+    email: str
+    runs: int
+    succeeded: int
+    failed: int
+    refunded: int
+    tokens_in: int
+    tokens_out: int
+    search_calls: int
+    cost_usd: Decimal | None
+    # True when some Run's cost is unknown, so the sum is a lower bound.
+    cost_incomplete: bool
+
+
+class UsageOut(BaseModel):
+    month: str
+    rows: list[UsageRow]
+    total_cost_usd: Decimal | None
+
+
+@router.get("/usage", response_model=UsageOut)
+def usage(month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"), session=Depends(deps.database)):
+    month = month or limits.quota_month()
+    started = Run.started_at.is_not(None)
+    rows = session.execute(
+        select(
+            User.id,
+            User.email,
+            func.count(Run.id).filter(started),
+            func.count(Run.id).filter(Run.status == "succeeded"),
+            func.count(Run.id).filter(Run.status.in_(("failed", "interrupted"))),
+            func.count(Run.id).filter(Run.quota_refunded.is_(True)),
+            func.coalesce(func.sum(Run.tokens_in), 0),
+            func.coalesce(func.sum(Run.tokens_out), 0),
+            func.coalesce(func.sum(Run.search_calls), 0),
+            func.sum(Run.cost_usd),
+            func.count(Run.id).filter(started, Run.finished_at.is_not(None), Run.cost_usd.is_(None)),
+        )
+        .join(Run, (Run.owner_id == User.id) & (Run.quota_month == month))
+        .group_by(User.id, User.email)
+        .order_by(User.email)
+    ).all()
+    out = [
+        UsageRow(
+            user_id=str(r[0]), email=r[1], runs=r[2], succeeded=r[3], failed=r[4], refunded=r[5],
+            tokens_in=r[6], tokens_out=r[7], search_calls=r[8], cost_usd=r[9], cost_incomplete=r[10] > 0,
+        )
+        for r in rows
+    ]
+    total = sum((r.cost_usd for r in out if r.cost_usd is not None), Decimal(0))
+    return UsageOut(month=month, rows=out, total_cost_usd=total if out else None)
+
+
+class AdminRunOut(BaseModel):
+    id: str
+    email: str
+    status: str
+    reason: str | None
+    model_label: str
+    queued_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    tokens_in: int | None
+    tokens_out: int | None
+    cost_usd: Decimal | None
+    quota_refunded: bool
+
+
+@router.get("/runs", response_model=list[AdminRunOut])
+def recent_runs(limit: int = Query(default=100, le=500), session=Depends(deps.database)):
+    rows = session.execute(
+        select(Run, User.email).join(User, User.id == Run.owner_id).order_by(Run.queued_at.desc()).limit(limit)
+    ).all()
+    return [
+        AdminRunOut(
+            id=str(run.id), email=email, status=run.status, reason=run.reason,
+            model_label=run.config.get("llm", {}).get("label", ""),
+            queued_at=run.queued_at, started_at=run.started_at, finished_at=run.finished_at,
+            tokens_in=run.tokens_in, tokens_out=run.tokens_out, cost_usd=run.cost_usd,
+            quota_refunded=run.quota_refunded,
+        )
+        for run, email in rows
+    ]
 
 
 # --- limits -------------------------------------------------------------------

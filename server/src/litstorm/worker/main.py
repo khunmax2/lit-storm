@@ -15,7 +15,7 @@ import signal
 import threading
 import time
 
-from litstorm import db, settings
+from litstorm import db, settings, trash
 from litstorm import report as report_mod
 from litstorm.db.models import RunEvent
 from litstorm.runner.supervisor import supervise
@@ -24,6 +24,7 @@ from litstorm.worker import queue
 log = logging.getLogger("litstorm.worker")
 
 POLL = 2.0  # seconds between looking for work
+PURGE_EVERY = 600.0  # seconds between emptying expired Trash
 DB_TOUCH = 10.0  # seconds between lease renewals and cancel checks
 
 
@@ -99,8 +100,17 @@ def main():
     signal.signal(signal.SIGTERM, lambda *_: stopping.set())
     threads = []
 
+    def purge():
+        with Session() as session:
+            purged = trash.purge(session, settings.get().runs_dir)
+        if purged:
+            log.info("purged %d run(s) from the Trash", purged)
+
+    purge_now = _Throttle(PURGE_EVERY, purge)
+
     log.info("worker ready")
     while not stopping.is_set():
+        purge_now()
         with Session() as session:
             swept = queue.sweep_interrupted(session)
         if swept:

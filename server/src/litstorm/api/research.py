@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, quota, settings
+from litstorm import limits, quota, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.db.models import (
@@ -120,7 +120,7 @@ def get_project(project_id: uuid.UUID, user=Depends(deps.current_user), session=
     if sessions:
         for run in session.scalars(
             select(Run)
-            .where(Run.session_id.in_([s.id for s in sessions]))
+            .where(Run.session_id.in_([s.id for s in sessions]), Run.trashed_at.is_(None))
             .order_by(Run.queued_at)
         ):
             last[run.session_id] = run.status
@@ -288,7 +288,9 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
 
 
 def session_out(session, rs):
-    runs = session.scalars(select(Run).where(Run.session_id == rs.id).order_by(Run.queued_at.desc()))
+    runs = session.scalars(
+        select(Run).where(Run.session_id == rs.id, Run.trashed_at.is_(None)).order_by(Run.queued_at.desc())
+    )
     return SessionOut(
         id=str(rs.id), project_id=str(rs.project_id), title=rs.title, created_at=rs.created_at,
         runs=[run_out(r) for r in runs],
@@ -475,6 +477,49 @@ def cancel_run(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depen
     if not stopped and not asked and run.status != CANCELLING:
         raise HTTPException(409, "cannot_cancel")
     return run_out(run)
+
+
+# --- the Trash -------------------------------------------------------------------
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+def trash_project(project_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    trash.trash_project(session, deps.own(session, Project, project_id, user))
+    session.commit()
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def trash_session(session_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    trash.trash_session(session, deps.own(session, ResearchSession, session_id, user))
+    session.commit()
+
+
+@router.delete("/runs/{run_id}", status_code=204)
+def trash_run(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    trash.trash_run(session, deps.own(session, Run, run_id, user))
+    session.commit()
+
+
+class TrashItem(BaseModel):
+    kind: str  # "project" | "session" | "run"
+    id: str
+    title: str
+    trashed_at: datetime
+    purge_at: datetime
+
+
+@router.get("/trash", response_model=list[TrashItem])
+def list_trash(user=Depends(deps.current_user), session=Depends(deps.database)):
+    return [
+        TrashItem(kind=k, id=str(i), title=title, trashed_at=at, purge_at=trash.purge_at(at))
+        for k, i, title, at in trash.listing(session, user)
+    ]
+
+
+@router.post("/trash/{kind}/{item_id}/restore", status_code=204)
+def restore(kind: str, item_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    trash.restore(session, user, kind, item_id)
+    session.commit()
 
 
 # --- Reports -------------------------------------------------------------------

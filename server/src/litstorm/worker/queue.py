@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text, update
 
-from litstorm import limits, quota, security
+from litstorm import cost, limits, quota, security
 from litstorm.db.models import (
     ACTIVE,
     CANCELLING,
@@ -46,6 +46,9 @@ class Claim:
     config: RunConfig
     secrets: Secrets
     deadline_seconds: float
+    # The Administrator's price for the model, USD per million tokens.
+    price_in: object = None
+    price_out: object = None
 
 
 def _now():
@@ -123,7 +126,12 @@ def claim(session):
         params=run.config.get("params", {}),
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)
-    return Claim(run.id, token, config, secrets, deadline)
+    model = session.get(LlmModel, run.llm_model_id)
+    return Claim(
+        run.id, token, config, secrets, deadline,
+        price_in=model.price_in_per_mtok if model else None,
+        price_out=model.price_out_per_mtok if model else None,
+    )
 
 
 def _secrets(session, run):
@@ -163,6 +171,7 @@ def set_stage(session, claim, stage):
 
 def finish(session, claim, outcome, report_title=None, source_count=None):
     """Write the final status once. False if the Run was no longer ours."""
+    tokens_in, tokens_out, searches, by_model = cost.totals(outcome.usage)
     done = session.execute(
         update(Run)
         .where(_held(claim))
@@ -175,6 +184,10 @@ def finish(session, claim, outcome, report_title=None, source_count=None):
             lease_expires_at=None,
             report_title=report_title,
             source_count=source_count,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            search_calls=searches,
+            cost_usd=cost.estimate(by_model, claim.price_in, claim.price_out),
         )
     ).rowcount
     session.commit()

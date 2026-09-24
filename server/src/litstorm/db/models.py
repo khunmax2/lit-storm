@@ -8,6 +8,8 @@ join that someone later forgets.
 import uuid
 from datetime import datetime
 
+from decimal import Decimal
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -15,6 +17,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     func,
@@ -115,6 +118,9 @@ class LlmModel(Base):
     max_tokens: Mapped[dict] = mapped_column(JSONB, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    # USD per million tokens, when LiteLLM's price table does not know it.
+    price_in_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    price_out_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
     created_at: Mapped[datetime] = _now()
 
     __table_args__ = (
@@ -181,7 +187,8 @@ class Run(Base):
     __tablename__ = "runs"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("research_sessions.id"), index=True)
+    # Null once purged: the row stays, for quota and cost, without its Session.
+    session_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("research_sessions.id"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     # Set when "try again" made this Run from a failed one.
     parent_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("runs.id"))
@@ -217,12 +224,19 @@ class Run(Base):
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The browser's id for one press of "Start" (see migration 0002).
     request_key: Mapped[str | None] = mapped_column(String(64))
+    # Content deleted for good; what is left is accounting (migration 0003).
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    tokens_in: Mapped[int | None] = mapped_column(BigInteger)
+    tokens_out: Mapped[int | None] = mapped_column(BigInteger)
+    search_calls: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
 
     __table_args__ = (
         Index("runs_queue", "queued_at", postgresql_where=text("status = 'queued'")),
         Index("runs_one_per_request", "owner_id", "request_key", unique=True,
               postgresql_where=text("request_key is not null")),
         Index("runs_owner_month", "owner_id", "quota_month"),
+        Index("runs_trashed", "trashed_at", postgresql_where=text("trashed_at is not null")),
         Index("runs_active_lease", "lease_expires_at", postgresql_where=text("status in ('running','cancelling')")),
     )
 

@@ -19,7 +19,12 @@ from .arxiv_rm import ArxivRM
 RETRIES = 2  # after the first request, so three in all
 TRIES = RETRIES + 1
 
-from litstorm.catalog import LLM_PROVIDERS, SEARCH_PROVIDERS  # noqa: F401 - re-exported
+from litstorm.catalog import (  # noqa: F401 - re-exported
+    LLM_PROVIDERS,
+    SEARCH_PROVIDERS,
+    reasoning_kwargs,
+    routing_kwargs,
+)
 
 # How much one reply may spend. The conversation stages run hundreds of
 # times and answer in a sentence; the writing stages write sections.
@@ -28,26 +33,6 @@ DEFAULT_MAX_TOKENS = {"conversation": 500, "writing": 3000}
 
 class ProviderConfigError(ValueError):
     """The Run's settings do not describe something we can call."""
-
-
-def reasoning_kwargs(value, provider):
-    """The call argument for a saved reasoning setting, or {} for unset.
-
-    OpenRouter is sent its own `reasoning` object: LiteLLM drops
-    `reasoning_effort` for it without a word (see demo_util.reasoning_kwargs).
-    """
-    value = (value or "").strip().lower()
-    if not value:
-        return {}
-    kind, _, detail = value.partition(":")
-    openrouter = provider == "openrouter"
-    if value == "off":
-        return {"reasoning": {"enabled": False}} if openrouter else {"reasoning_effort": "none"}
-    if kind == "effort" and detail:
-        return {"reasoning": {"effort": detail}} if openrouter else {"reasoning_effort": detail}
-    if kind == "budget" and detail.isdigit():
-        return {"reasoning": {"max_tokens": int(detail)}} if openrouter else {}
-    return {}
 
 
 def _permanent(error):
@@ -96,12 +81,7 @@ def build_lm(llm, api_key, max_tokens, timeout):
 
     kwargs = {"temperature": 1.0, "top_p": 0.9}
     kwargs.update(reasoning_kwargs(llm.get("reasoning"), provider))
-    if provider == "openrouter" and "reasoning" in kwargs:
-        # OpenRouter spreads one model over many hosts, and some ignore a
-        # reasoning setting: measured, "enabled: false" still spent 500
-        # tokens thinking when routed to one of them, and the reply came
-        # back empty. Route only to hosts that honour what we send.
-        kwargs["extra_body"] = {"provider": {"require_parameters": True}}
+    kwargs.update(routing_kwargs(provider, kwargs))
 
     if provider == "gemini":
         return BoundedGoogleModel(

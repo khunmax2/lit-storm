@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Info,
   KeyRound,
+  Layers,
   Link2,
   Loader2,
   MoreHorizontal,
@@ -451,11 +452,13 @@ type ModelForm = {
   write: string;
   priceIn: string;
   priceOut: string;
+  // Set by the test; null until tested (server: litstorm.modes).
+  supports_tools: boolean | null;
 };
 
 const emptyModel: ModelForm = {
   label: "", provider: "openrouter", model: "", reasoning: "", enabled: true, is_default: false,
-  talk: "", write: "", priceIn: "", priceOut: "",
+  talk: "", write: "", priceIn: "", priceOut: "", supports_tools: null,
 };
 
 function toForm(m: Schemas["ModelOut"]): ModelForm {
@@ -466,11 +469,12 @@ function toForm(m: Schemas["ModelOut"]): ModelForm {
     talk: String(tokens.conversation ?? ""), write: String(tokens.writing ?? ""),
     priceIn: m.price_in_per_mtok == null ? "" : String(m.price_in_per_mtok),
     priceOut: m.price_out_per_mtok == null ? "" : String(m.price_out_per_mtok),
+    supports_tools: m.supports_tools ?? null,
   };
 }
 
 // The "try it before saving" box both setting dialogs share.
-type DraftResult = Schemas["CheckOut"] & { for: string };
+type DraftResult = Schemas["CheckOut"] & { for: string; tools?: boolean | null };
 
 function DraftTest({
   lead,
@@ -698,6 +702,9 @@ function ModelDialog({
   const info = LLM_INFO[f.provider];
   const result = check.data;
   const stale = !!result && result.for !== modelTestedWith(f, apiKey, apiBase);
+  // What a fresh test learned about tools goes into the form, to be saved.
+  const learned = !stale && result?.tools != null ? result.tools : undefined;
+  if (learned !== undefined && learned !== f.supports_tools) setForm({ ...f, supports_tools: learned });
   const hasKey = !!stored?.key_hint;
   const askKey = !hasKey || changingKey;
 
@@ -938,7 +945,10 @@ function ModelDialog({
               error={check.error}
               result={result}
               stale={stale}
-              okText={(r) => t("modelKind.ok", { reply: r.message, s: r.seconds })}
+              okText={(r) =>
+                t("modelKind.ok", { reply: r.message, s: r.seconds }) +
+                (r.tools == null ? "" : ` · ${r.tools ? t("modelKind.toolsYes") : t("modelKind.toolsNo")}`)
+              }
               failText={t("modelKind.failed")}
             />
 
@@ -955,6 +965,12 @@ function ModelDialog({
                 hint={t("modelKind.defaultHint")}
                 checked={f.is_default}
                 onChange={(is_default) => setForm({ ...f, is_default })}
+              />
+              <SwitchRow
+                label={t("modelKind.tools")}
+                hint={f.supports_tools == null ? t("modelKind.toolsUnknown") : t("modelKind.toolsHint")}
+                checked={f.supports_tools === true}
+                onChange={(supports_tools) => setForm({ ...f, supports_tools })}
               />
             </div>
             {save.error && <ErrorText error={save.error} />}
@@ -1012,6 +1028,7 @@ function Models() {
                     <div className="flex items-center gap-2 font-medium">
                       {m.label}
                       {m.is_default && <Badge variant="secondary">{t("admin.default")}</Badge>}
+                      {m.supports_tools && <Badge variant="outline">{t("modelKind.toolsBadge")}</Badge>}
                     </div>
                     <div className="font-mono text-xs text-muted-foreground">{m.model}</div>
                   </TableCell>
@@ -1537,6 +1554,64 @@ function Search() {
   );
 }
 
+// --- research modes -----------------------------------------------------------------
+
+function Modes() {
+  const { t } = useT();
+  const queryClient = useQueryClient();
+  const onError = useToastError();
+  const engines = useQuery({ queryKey: ["admin-engines"], queryFn: () => call(api.GET("/api/admin/engines")) });
+  const flip = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      call(api.PUT("/api/admin/engines/{engine}", { params: { path: { engine: id } }, body: { enabled } })),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["admin-engines"], data);
+      queryClient.invalidateQueries({ queryKey: ["options"] });
+    },
+    onError,
+  });
+  return (
+    <Card>
+      <CardContent>
+        {engines.isLoading && <LoadingRows />}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("modes.mode")}</TableHead>
+              <TableHead>{t("modes.search")}</TableHead>
+              <TableHead>{t("modes.model")}</TableHead>
+              <TableHead className="text-right">{t("modes.offered")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {engines.data?.map((e) => (
+              <TableRow key={e.id}>
+                <TableCell className="font-medium">{e.label}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{e.search_kinds.join(", ")}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {e.needs_tools ? t("modes.needsTools") : t("modes.anyModel")}
+                </TableCell>
+                <TableCell className="text-right">
+                  {e.ready ? (
+                    <Switch
+                      aria-label={e.label}
+                      checked={e.enabled}
+                      disabled={flip.isPending}
+                      onCheckedChange={(enabled) => flip.mutate({ id: e.id, enabled })}
+                    />
+                  ) : (
+                    <Badge variant="secondary">{t("modes.notYet")}</Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 // --- limits -----------------------------------------------------------------------
 
 function Limits() {
@@ -1806,6 +1881,7 @@ export const SETTINGS = [
   { id: "users", label: "admin.users", lead: "settings.usersLead", icon: UsersRound, page: Users },
   { id: "models", label: "admin.models", lead: "settings.modelsLead", icon: Bot, page: Models },
   { id: "search", label: "admin.search", lead: "settings.searchLead", icon: SearchIcon, page: Search },
+  { id: "modes", label: "modes.title", lead: "modes.lead", icon: Layers, page: Modes },
   { id: "limits", label: "admin.limits", lead: "settings.limitsLead", icon: Gauge, page: Limits },
   { id: "usage", label: "admin.usage", lead: "settings.usageLead", icon: ChartColumn, page: Usage },
 ] as const;

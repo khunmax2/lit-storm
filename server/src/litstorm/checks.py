@@ -53,6 +53,52 @@ def llm(model, credential_key, api_base=None):
     return True, text[:80], seconds
 
 
+_WEATHER = {
+    "type": "function",
+    "function": {
+        "name": "get_weather",
+        "description": "Current weather for a city.",
+        "parameters": {
+            "type": "object",
+            "properties": {"city": {"type": "string"}},
+            "required": ["city"],
+        },
+    },
+}
+
+
+def tools(model, credential_key, api_base=None):
+    """Whether the model calls a tool when one is plainly asked for: the
+    Engines that drive tools (Agent Research) need it (docs/web-app-design.md,
+    รุ่นสอง: กติกาที่ทุก Engine ใช้ร่วมกัน). None when the call itself failed,
+    so an outage is not recorded as "cannot"."""
+    import litellm
+
+    if not credential_key:
+        return None
+    kwargs = {"api_key": credential_key, "timeout": TIMEOUT, "num_retries": 0}
+    if api_base:
+        kwargs["api_base"] = api_base
+    kwargs.update(reasoning_kwargs(model.reasoning, model.provider))
+    kwargs.update(routing_kwargs(model.provider, kwargs))
+    try:
+        response = litellm.completion(
+            model=LLM_PROVIDERS[model.provider]["prefix"] + model.model,
+            messages=[{"role": "user", "content": "What is the weather in Bangkok? Use the tool."}],
+            tools=[_WEATHER],
+            max_tokens=(model.max_tokens or {}).get("conversation", 500),
+            drop_params=True,
+            **kwargs,
+        )
+    except Exception as error:  # noqa: BLE001
+        text = str(error).lower()
+        # A host that says it does not do tools has answered the question.
+        if "tool" in text and ("support" in text or "not" in text):
+            return False
+        return None
+    return bool(getattr(response.choices[0].message, "tool_calls", None))
+
+
 # The client library each retriever imports when a Run builds it. Checked
 # here without importing STORM: a service that answers is no use to a Run
 # that cannot load its client.

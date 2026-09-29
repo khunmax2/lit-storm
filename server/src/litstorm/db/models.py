@@ -121,6 +121,9 @@ class LlmModel(Base):
     # USD per million tokens, when LiteLLM's price table does not know it.
     price_in_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
     price_out_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    # Whether the model called a tool when tested; None until tested. Engines
+    # that drive tools offer only models with True (litstorm.modes).
+    supports_tools: Mapped[bool | None] = mapped_column(Boolean)
     created_at: Mapped[datetime] = _now()
 
     __table_args__ = (

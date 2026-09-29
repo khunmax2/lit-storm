@@ -14,10 +14,10 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import checks, embedding, limits, quota, security
+from litstorm import checks, embedding, limits, modes, quota, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
-from litstorm.catalog import LLM_PROVIDERS, SEARCH_PROVIDERS
+from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
 from litstorm.db.models import AuthSession, LlmCredential, LlmModel, Run, SearchProvider, User
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(deps.admin)])
@@ -198,6 +198,9 @@ class ModelIn(BaseModel):
     # USD per million tokens; leave empty to use LiteLLM's price table.
     price_in_per_mtok: Decimal | None = Field(default=None, ge=0)
     price_out_per_mtok: Decimal | None = Field(default=None, ge=0)
+    # Whether it can call tools: set by the test, which the Administrator
+    # may overrule; None is untested (litstorm.modes).
+    supports_tools: bool | None = None
 
 
 class ModelOut(ModelIn):
@@ -209,6 +212,7 @@ def model_out(m):
         id=str(m.id), label=m.label, provider=m.provider, model=m.model, reasoning=m.reasoning,
         max_tokens=m.max_tokens or {}, enabled=m.enabled, is_default=m.is_default,
         price_in_per_mtok=m.price_in_per_mtok, price_out_per_mtok=m.price_out_per_mtok,
+        supports_tools=m.supports_tools,
     )
 
 
@@ -358,15 +362,25 @@ class CheckOut(BaseModel):
     samples: list[str] = []
 
 
-@router.post("/llm-models/{model_id}/test", response_model=CheckOut)
+class ModelCheckOut(CheckOut):
+    # Whether it called a tool; None when that could not be told.
+    tools: bool | None = None
+
+
+@router.post("/llm-models/{model_id}/test", response_model=ModelCheckOut)
 def test_model(model_id: uuid.UUID, session=Depends(deps.database)):
     model = session.get(LlmModel, model_id)
     if model is None:
         raise HTTPException(404, "not_found")
     credential = session.get(LlmCredential, model.provider)
     key = security.decrypt(credential.api_key_ciphertext) if credential else ""
-    ok, message, seconds = checks.llm(model, key, credential.api_base if credential else None)
-    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+    base = credential.api_base if credential else None
+    ok, message, seconds = checks.llm(model, key, base)
+    tools = checks.tools(model, key, base) if ok else None
+    if tools is not None:
+        model.supports_tools = tools
+        session.commit()
+    return ModelCheckOut(ok=ok, message=message, seconds=round(seconds, 2), tools=tools)
 
 
 class ModelDraftIn(BaseModel):
@@ -379,7 +393,7 @@ class ModelDraftIn(BaseModel):
     api_base: str | None = None
 
 
-@router.post("/llm-models/check", response_model=CheckOut)
+@router.post("/llm-models/check", response_model=ModelCheckOut)
 def check_model_draft(body: ModelDraftIn, session=Depends(deps.database)):
     """Test the model in the dialog before it is saved, with a key typed
     there or the one stored for its provider."""
@@ -389,12 +403,13 @@ def check_model_draft(body: ModelDraftIn, session=Depends(deps.database)):
     key = (body.api_key or "").strip() or (security.decrypt(credential.api_key_ciphertext) if credential else "")
     base = (body.api_base or "").strip() or (credential.api_base if credential else None)
     if LLM_PROVIDERS[body.provider].get("needs_base") and not base:
-        return CheckOut(ok=False, message="this provider needs an API base URL", seconds=0.0)
+        return ModelCheckOut(ok=False, message="this provider needs an API base URL", seconds=0.0)
     draft = SimpleNamespace(
         provider=body.provider, model=body.model.strip(), reasoning=body.reasoning, max_tokens=body.max_tokens
     )
     ok, message, seconds = checks.llm(draft, key, base)
-    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+    tools = checks.tools(draft, key, base) if ok else None
+    return ModelCheckOut(ok=ok, message=message, seconds=round(seconds, 2), tools=tools)
 
 
 @router.post("/search-providers/{provider_id}/test", response_model=CheckOut)
@@ -480,6 +495,50 @@ def check_embedding(body: embedding.Embedding, session=Depends(deps.database)):
         body, embedding.key_for(body, credential), credential.api_base if credential else None
     )
     return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+
+
+# --- research modes ------------------------------------------------------------
+
+
+class EngineOut(BaseModel):
+    id: str
+    label: str
+    ready: bool  # built; not ready yet means no tab whatever is chosen here
+    enabled: bool
+    search_kinds: list[str]
+    needs_tools: bool
+
+
+@router.get("/engines", response_model=list[EngineOut])
+def list_engines(session=Depends(deps.database)):
+    off = set(modes.load(session).disabled)
+    return [
+        EngineOut(id=name, label=e["label"], ready=e["ready"], enabled=name not in off,
+                  search_kinds=list(e["search"]), needs_tools=e["needs_tools"])
+        for name, e in ENGINES.items()
+    ]
+
+
+class EngineSwitch(BaseModel):
+    enabled: bool
+
+
+@router.put("/engines/{engine}", response_model=list[EngineOut])
+def switch_engine(engine: str, body: EngineSwitch, session=Depends(deps.database)):
+    """Offer a mode or stop offering it. Runs already queued keep going."""
+    if engine not in ENGINES:
+        raise HTTPException(404, "not_found")
+    value = modes.load(session)
+    off = set(value.disabled)
+    if body.enabled:
+        off.discard(engine)
+    else:
+        off.add(engine)
+    if not any(e["ready"] and name not in off for name, e in ENGINES.items()):
+        raise HTTPException(409, "last_engine")
+    modes.save(session, modes.EngineSettings(disabled=sorted(off)))
+    session.commit()
+    return list_engines(session)
 
 
 # --- usage ---------------------------------------------------------------------------------------

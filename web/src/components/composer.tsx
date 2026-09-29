@@ -14,7 +14,14 @@ import { cn } from "@/lib/utils";
 
 export type Depth = "fast" | "standard" | "deep";
 const DEPTHS: Depth[] = ["fast", "standard", "deep"];
-export type RunForm = { topic: string; language: string; llm_model_id: string; search_provider_id: string; depth: Depth };
+export type RunForm = {
+  topic: string;
+  language: string;
+  llm_model_id: string;
+  search_provider_id: string;
+  depth: Depth;
+  engine: string;
+};
 
 // One press of Start is one Run: the same key goes with every retry of the
 // request, and a new key is made only after the Run was created.
@@ -30,6 +37,7 @@ export function runBody(form: RunForm, request_key: string) {
     llm_model_id: form.llm_model_id || null,
     search_provider_id: form.search_provider_id || null,
     depth: form.depth,
+    engine: form.engine,
     request_key,
   };
 }
@@ -117,17 +125,26 @@ export function Composer({
   const o = options.data;
   const [focused, setFocused] = useState(false);
 
+  // Only what the mode can use (docs/web-app-design.md, รุ่นสอง: กติกาที่ทุก
+  // Engine ใช้ร่วมกัน): its Search Provider kinds, and models that call tools
+  // when it drives tools.
+  const engine = o?.engines.find((e) => e.id === form.engine);
+  const models = o?.models.filter((m) => !engine?.needs_tools || m.supports_tools === true) ?? [];
+  const providers = o?.search_providers.filter((p) => !engine || engine.search_kinds.includes(p.kind)) ?? [];
+
   useEffect(() => {
-    // Preselect the defaults once options arrive (design: หน้าเริ่มวิจัยเลือก default ไว้ให้).
+    // Preselect the defaults once options arrive (design: หน้าเริ่มวิจัยเลือก default ไว้ให้),
+    // and again when a new mode cannot use what was chosen.
     if (!o) return;
-    const model = form.llm_model_id || o.models.find((m) => m.is_default)?.id || o.models[0]?.id || "";
-    const search =
-      form.search_provider_id || o.search_providers.find((p) => p.is_default)?.id || o.search_providers[0]?.id || "";
+    const pick = <T extends { id: string; is_default: boolean }>(list: T[], current: string) =>
+      list.some((x) => x.id === current) ? current : (list.find((x) => x.is_default)?.id ?? list[0]?.id ?? "");
+    const model = pick(models, form.llm_model_id);
+    const search = pick(providers, form.search_provider_id);
     if (model !== form.llm_model_id || search !== form.search_provider_id)
       setForm({ ...form, llm_model_id: model, search_provider_id: search });
-  }, [o]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [o, form.engine]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unavailable = o && (o.models.length === 0 || o.search_providers.length === 0);
+  const unavailable = o && (models.length === 0 || providers.length === 0);
   // The level's time target, as the Administrator set it.
   const target = o?.depth_levels.find((d) => d.id === form.depth)?.target_minutes ?? 5;
   const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
@@ -151,13 +168,13 @@ export function Composer({
             { value: "en", label: t("lang.en") },
           ]}
         />
-        {o && o.search_providers.length > 0 && (
+        {providers.length > 0 && (
           <Chip
             label={t("run.search")}
             icon={<Search className="size-3.5" />}
             value={form.search_provider_id}
             onChange={(search_provider_id) => setForm({ ...form, search_provider_id })}
-            items={o.search_providers.map((p) => ({ value: p.id, label: p.label }))}
+            items={providers.map((p) => ({ value: p.id, label: p.label }))}
           />
         )}
         <Chip
@@ -201,13 +218,13 @@ export function Composer({
           />
         </div>
         <div className="flex items-center gap-2 px-3 pt-2 pb-3">
-          {o && o.models.length > 0 && (
+          {models.length > 0 && (
             <Chip
               label={t("run.model")}
               icon={<Sparkles className="size-3.5 text-brand" />}
               value={form.llm_model_id}
               onChange={(llm_model_id) => setForm({ ...form, llm_model_id })}
-              items={o.models.map((m) => ({ value: m.id, label: m.label }))}
+              items={models.map((m) => ({ value: m.id, label: m.label }))}
             />
           )}
           <div className="ml-auto flex items-center gap-3">

@@ -403,6 +403,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/engines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Engines */
+        get: operations["list_engines_api_admin_engines_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/engines/{engine}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch Engine
+         * @description Offer a mode or stop offering it. Runs already queued keep going.
+         */
+        put: operations["switch_engine_api_admin_engines__engine__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/usage": {
         parameters: {
             query?: never;
@@ -851,15 +888,6 @@ export interface components {
              */
             samples: string[];
         };
-        /** Choice */
-        Choice: {
-            /** Id */
-            id: string;
-            /** Label */
-            label: string;
-            /** Is Default */
-            is_default: boolean;
-        };
         /** CredentialIn */
         CredentialIn: {
             /** Api Key */
@@ -936,6 +964,42 @@ export interface components {
              * @default false
              */
             has_key: boolean;
+        };
+        /**
+         * EngineChoice
+         * @description A research mode the owner can start, and what it can be started with.
+         */
+        EngineChoice: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Search Kinds */
+            search_kinds: string[];
+            /** Stages */
+            stages: string[];
+            /** Needs Tools */
+            needs_tools: boolean;
+        };
+        /** EngineOut */
+        EngineOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Ready */
+            ready: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Search Kinds */
+            search_kinds: string[];
+            /** Needs Tools */
+            needs_tools: boolean;
+        };
+        /** EngineSwitch */
+        EngineSwitch: {
+            /** Enabled */
+            enabled: boolean;
         };
         /** EventOut */
         EventOut: {
@@ -1035,6 +1099,33 @@ export interface components {
             /** Ui Language */
             ui_language: string;
         };
+        /** ModelCheckOut */
+        ModelCheckOut: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+            /** Seconds */
+            seconds: number;
+            /**
+             * Samples
+             * @default []
+             */
+            samples: string[];
+            /** Tools */
+            tools?: boolean | null;
+        };
+        /** ModelChoice */
+        ModelChoice: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Supports Tools */
+            supports_tools?: boolean | null;
+        };
         /** ModelDraftIn */
         ModelDraftIn: {
             /** Provider */
@@ -1086,6 +1177,8 @@ export interface components {
             price_in_per_mtok?: number | string | null;
             /** Price Out Per Mtok */
             price_out_per_mtok?: number | string | null;
+            /** Supports Tools */
+            supports_tools?: boolean | null;
         };
         /** ModelOut */
         ModelOut: {
@@ -1118,6 +1211,8 @@ export interface components {
             price_in_per_mtok?: string | null;
             /** Price Out Per Mtok */
             price_out_per_mtok?: string | null;
+            /** Supports Tools */
+            supports_tools?: boolean | null;
             /** Id */
             id: string;
         };
@@ -1142,6 +1237,11 @@ export interface components {
              * @enum {string}
              */
             depth: "fast" | "standard" | "deep";
+            /**
+             * Engine
+             * @default storm
+             */
+            engine: string;
             /** Request Key */
             request_key?: string | null;
             /** Project Id */
@@ -1149,10 +1249,12 @@ export interface components {
         };
         /** Options */
         Options: {
+            /** Engines */
+            engines: components["schemas"]["EngineChoice"][];
             /** Models */
-            models: components["schemas"]["Choice"][];
+            models: components["schemas"]["ModelChoice"][];
             /** Search Providers */
-            search_providers: components["schemas"]["Choice"][];
+            search_providers: components["schemas"]["SearchChoice"][];
             /** Languages */
             languages: string[];
             /** Depth Levels */
@@ -1232,6 +1334,10 @@ export interface components {
             topic: string;
             /** Language */
             language: string;
+            /** Engine */
+            engine: string;
+            /** Engine Label */
+            engine_label: string;
             /** Model Label */
             model_label: string;
             /** Search Label */
@@ -1289,6 +1395,11 @@ export interface components {
              * @enum {string}
              */
             depth: "fast" | "standard" | "deep";
+            /**
+             * Engine
+             * @default storm
+             */
+            engine: string;
             /** Request Key */
             request_key?: string | null;
         };
@@ -1304,6 +1415,10 @@ export interface components {
             topic: string;
             /** Language */
             language: string;
+            /** Engine */
+            engine: string;
+            /** Engine Label */
+            engine_label: string;
             /** Model Label */
             model_label: string;
             /** Search Label */
@@ -1342,6 +1457,17 @@ export interface components {
             notes: {
                 [key: string]: unknown;
             };
+        };
+        /** SearchChoice */
+        SearchChoice: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Kind */
+            kind: string;
         };
         /** SearchDraftIn */
         SearchDraftIn: {
@@ -1432,6 +1558,11 @@ export interface components {
              * @enum {string}
              */
             depth: "fast" | "standard" | "deep";
+            /**
+             * Engine
+             * @default storm
+             */
+            engine: string;
             /** Request Key */
             request_key?: string | null;
         };
@@ -2251,7 +2382,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CheckOut"];
+                    "application/json": components["schemas"]["ModelCheckOut"];
                 };
             };
             /** @description Validation Error */
@@ -2284,7 +2415,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CheckOut"];
+                    "application/json": components["schemas"]["ModelCheckOut"];
                 };
             };
             /** @description Validation Error */
@@ -2435,6 +2566,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_engines_api_admin_engines_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineOut"][];
+                };
+            };
+        };
+    };
+    switch_engine_api_admin_engines__engine__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                engine: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngineSwitch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineOut"][];
                 };
             };
             /** @description Validation Error */

@@ -8,31 +8,11 @@ import { useState, type ReactNode } from "react";
 import { api, call } from "@/api/client";
 import { DOT } from "@/components/app-sidebar";
 import { ErrorText, timeAgo } from "@/components/common";
-import { Composer, QuotaLine, runBody, useRequestKey, type RunForm } from "@/components/composer";
+import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Segmented } from "@/components/segmented";
-import { useT } from "@/i18n";
+import { has, useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
-
-// The research engines. Only STORM runs in the first release; the others are
-// the second release's (docs/web-app-implementation-plan.md, ก่อนเริ่มรุ่นสอง).
-const MODES = [
-  { id: "storm", label: "STORM", ready: true },
-  { id: "co-storm", label: "Co-STORM", ready: false },
-  { id: "deep", label: "Deep Research", ready: false },
-  { id: "agent", label: "Agent Research", ready: false },
-] as const;
-type Mode = (typeof MODES)[number]["id"];
-
-const MODE_OPTIONS = MODES.map((m) => ({
-  value: m.id as Mode,
-  label: (
-    <>
-      {m.label}
-      {!m.ready && <span className="size-1.5 rounded-full bg-muted-foreground/40" aria-hidden />}
-    </>
-  ),
-}));
 
 const ACTIVE = new Set(["running", "queued", "cancelling"]);
 
@@ -88,14 +68,25 @@ export function HomePage() {
     queryFn: () => call(api.GET("/api/sessions/recent", { params: { query: { limit: 12 } } })),
     refetchInterval: 15000,
   });
-  const [mode, setMode] = useState<Mode>("storm");
-  const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "", depth: "standard" });
+  const [form, setForm] = useState<RunForm>({
+    topic: "",
+    language: lang,
+    llm_model_id: "",
+    search_provider_id: "",
+    depth: "standard",
+    engine: "storm",
+  });
+  // The tabs are the modes that can be used today: ready Engines the
+  // Administrator has not switched off (docs/web-app-design.md, แท็บโหมด).
+  const engines = useRunOptions().data?.engines ?? [];
+  const mode = engines.some((e) => e.id === form.engine) ? form.engine : (engines[0]?.id ?? "storm");
+  const modeLead = `mode.${mode}`;
   const requestKey = useRequestKey();
 
   // Research from here is filed in no Project; the owner can file it later
   // (as ChatGPT, Claude and Gemini do), or start it from inside a Project.
   const start = useMutation({
-    mutationFn: () => call(api.POST("/api/sessions", { body: runBody(form, requestKey.current()) })),
+    mutationFn: () => call(api.POST("/api/sessions", { body: runBody({ ...form, engine: mode }, requestKey.current()) })),
     onSuccess: (s) => {
       requestKey.next();
       queryClient.invalidateQueries();
@@ -103,7 +94,6 @@ export function HomePage() {
     },
   });
 
-  const current = MODES.find((m) => m.id === mode)!;
   const running = recent.data?.filter((s) => s.last_status && ACTIVE.has(s.last_status)).length ?? 0;
   const latestDone = recent.data?.find((s) => s.last_status === "succeeded");
 
@@ -111,12 +101,14 @@ export function HomePage() {
     <div className="flex flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-5 md:px-6">
         <div className="max-w-full overflow-x-auto [scrollbar-width:none]">
-          <Segmented
-            label={t("mode.label")}
-            value={mode}
-            onChange={setMode}
-            options={MODE_OPTIONS}
-          />
+          {engines.length > 1 && (
+            <Segmented
+              label={t("mode.label")}
+              value={mode}
+              onChange={(engine) => setForm({ ...form, engine })}
+              options={engines.map((e) => ({ value: e.id, label: e.label }))}
+            />
+          )}
         </div>
         <div
           className={cn(
@@ -137,15 +129,16 @@ export function HomePage() {
           <h1 className="font-display text-4xl leading-tight tracking-tight text-balance md:text-6xl">
             {t("home.title")}
           </h1>
-          <p className="mt-3 max-w-xl text-balance text-muted-foreground">{t(`mode.${mode}`)}</p>
+          {has(modeLead) && (
+            <p className="mt-3 max-w-xl text-balance text-muted-foreground">{t(modeLead as Key)}</p>
+          )}
         </div>
 
         <Composer
-          form={form}
+          form={{ ...form, engine: mode }}
           setForm={setForm}
           onSubmit={() => start.mutate()}
           pending={start.isPending}
-          locked={current.ready ? undefined : t("mode.soon")}
           autoFocus
         />
         <div className="mt-3 flex justify-center">

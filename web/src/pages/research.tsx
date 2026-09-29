@@ -78,12 +78,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { has, useT } from "@/i18n";
+import { has, useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 type Run = Schemas["RunOut"];
 const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
-const STAGES = ["research", "outline", "article", "polish"] as const;
+// STORM's stages; every Engine's own list comes with the options.
+const DEFAULT_STAGES = ["research", "outline", "article", "polish"];
 
 /** Ask before doing something that cannot be undone from this page. */
 function useConfirm() {
@@ -230,7 +231,14 @@ export function ProjectPage() {
     queryKey: ["project", projectId],
     queryFn: () => call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
   });
-  const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "", depth: "standard" });
+  const [form, setForm] = useState<RunForm>({
+    topic: "",
+    language: lang,
+    llm_model_id: "",
+    search_provider_id: "",
+    depth: "standard",
+    engine: "storm",
+  });
   const [moving, setMoving] = useState<{ id: string; title: string; project_id: string } | null>(null);
   const requestKey = useRequestKey();
   const start = useMutation({
@@ -501,9 +509,10 @@ export function AllResearchPage() {
 
 // --- a Run --------------------------------------------------------------------------
 
-function Stepper({ stage, status }: { stage: string | null; status: string }) {
+function Stepper({ stage, status, engine }: { stage: string | null; status: string; engine: string }) {
   const { t } = useT();
-  const current = STAGES.indexOf((stage ?? "") as (typeof STAGES)[number]);
+  const STAGES = useRunOptions().data?.engines.find((e) => e.id === engine)?.stages ?? DEFAULT_STAGES;
+  const current = STAGES.indexOf(stage ?? "");
   const done = status === "succeeded";
   return (
     <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
@@ -526,7 +535,7 @@ function Stepper({ stage, status }: { stage: string | null; status: string }) {
               ) : (
                 <Circle className="size-3" />
               )}
-              {t(`stage.${s}`)}
+              {t(`stage.${s}` as Key)}
             </span>
             {i < STAGES.length - 1 && <span className="h-px w-3 bg-border" />}
           </li>
@@ -569,7 +578,7 @@ function LiveProgress({ run }: { run: Run }) {
   if (!live) return null;
   return (
     <div className="space-y-3 rounded-xl bg-muted/50 p-4">
-      <Stepper stage={run.stage} status={run.status} />
+      <Stepper stage={run.stage} status={run.status} engine={run.engine} />
       {browsed.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <Globe className="size-3.5" />
@@ -726,6 +735,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
             </div>
             <div className="font-medium leading-snug">{run.report_title || run.topic}</div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/80">{run.engine_label}</span>
               <span className="flex items-center gap-1">
                 <Globe className="size-3" />
                 {run.language === "th" ? t("lang.th") : t("lang.en")}
@@ -834,7 +844,14 @@ export function SessionPage() {
   const [form, setForm] = useState<RunForm | null>(null);
   useEffect(() => {
     if (latest && !form)
-      setForm({ topic: latest.topic, language: latest.language, llm_model_id: "", search_provider_id: "", depth: latest.depth as Depth });
+      setForm({
+        topic: latest.topic,
+        language: latest.language,
+        llm_model_id: "",
+        search_provider_id: "",
+        depth: latest.depth as Depth,
+        engine: latest.engine,
+      });
   }, [latest]); // eslint-disable-line react-hooks/exhaustive-deps
   const requestKey = useRequestKey();
   const again = useMutation({

@@ -15,9 +15,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, quota, settings, trash
+from litstorm import limits, modes, quota, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
+from litstorm.catalog import ENGINES
 from litstorm.db.models import (
     CANCELLED,
     CANCELLING,
@@ -46,16 +47,43 @@ class Choice(BaseModel):
     is_default: bool
 
 
+class ModelChoice(Choice):
+    supports_tools: bool | None = None
+
+
+class SearchChoice(Choice):
+    kind: str
+
+
 class DepthChoice(BaseModel):
     id: str  # "fast" | "standard" | "deep"
     target_minutes: int
 
 
+class EngineChoice(BaseModel):
+    """A research mode the owner can start, and what it can be started with."""
+
+    id: str
+    label: str
+    search_kinds: list[str]
+    stages: list[str]
+    needs_tools: bool
+
+
 class Options(BaseModel):
-    models: list[Choice]
-    search_providers: list[Choice]
+    engines: list[EngineChoice]
+    models: list[ModelChoice]
+    search_providers: list[SearchChoice]
     languages: list[str]
     depth_levels: list[DepthChoice]
+
+
+def engine_choice(name):
+    e = ENGINES[name]
+    return EngineChoice(
+        id=name, label=e["label"], search_kinds=list(e["search"]), stages=list(e["stages"]),
+        needs_tools=e["needs_tools"],
+    )
 
 
 @router.get("/options", response_model=Options)
@@ -64,8 +92,14 @@ def options(user=Depends(deps.current_user), session=Depends(deps.database)):
     providers = session.scalars(select(SearchProvider).where(SearchProvider.enabled).order_by(SearchProvider.label))
     configured = limits.load(session)
     return Options(
-        models=[Choice(id=str(m.id), label=m.label, is_default=m.is_default) for m in models],
-        search_providers=[Choice(id=str(p.id), label=p.label, is_default=p.is_default) for p in providers],
+        engines=[engine_choice(name) for name in modes.offered(session)],
+        models=[
+            ModelChoice(id=str(m.id), label=m.label, is_default=m.is_default, supports_tools=m.supports_tools)
+            for m in models
+        ],
+        search_providers=[
+            SearchChoice(id=str(p.id), label=p.label, is_default=p.is_default, kind=p.kind) for p in providers
+        ],
         languages=list(report_mod.LANGUAGES),
         depth_levels=[DepthChoice(id=d, target_minutes=configured.depth(d).target_minutes) for d in limits.DEPTHS],
     )
@@ -151,6 +185,7 @@ class RunIn(BaseModel):
     llm_model_id: uuid.UUID | None = None  # default model when absent
     search_provider_id: uuid.UUID | None = None  # default provider when absent
     depth: Literal["fast", "standard", "deep"] = "standard"
+    engine: str = "storm"  # a research mode from GET /api/options
     # The page's id for one press of "Start". Sending the same key again
     # returns the Run it already made instead of making another.
     request_key: str | None = Field(default=None, max_length=64)
@@ -166,6 +201,8 @@ class RunOut(BaseModel):
     parent_run_id: str | None
     topic: str
     language: str
+    engine: str
+    engine_label: str
     model_label: str
     search_label: str
     depth: str
@@ -191,6 +228,8 @@ def run_out(run):
         parent_run_id=str(run.parent_run_id) if run.parent_run_id else None,
         topic=run.topic,
         language=run.language,
+        engine=run.engine,
+        engine_label=ENGINES.get(run.engine, {}).get("label", run.engine),
         model_label=run.config.get("llm", {}).get("label", ""),
         search_label=run.config.get("search", {}).get("label", ""),
         depth=run.config.get("depth", "standard"),
@@ -296,14 +335,22 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
     the owner's row, so the check and the insert are one step
     (docs/web-app-design.md, ส่งงานหนึ่งครั้ง).
     """
+    if body.engine not in modes.offered(session):
+        raise HTTPException(422, "engine_not_available")
     model = _pick(session, LlmModel, body.llm_model_id)
     provider = _pick(session, SearchProvider, body.search_provider_id)
+    # What the page offers for the mode, checked again here: a Run that
+    # could only fail half-way is refused before it takes quota.
+    if not modes.search_fits(body.engine, provider):
+        raise HTTPException(422, "search_not_for_engine")
+    if not modes.model_fits(body.engine, model):
+        raise HTTPException(422, "model_cannot_use_tools")
     quota.check_submit(session, owner)
     run = Run(
         session_id=research_session.id,
         owner_id=owner.id,
         parent_run_id=parent_run_id,
-        engine="storm",
+        engine=body.engine,
         topic=body.topic.strip(),
         language=body.language,
         llm_model_id=model.id,

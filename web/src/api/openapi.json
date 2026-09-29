@@ -795,7 +795,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/CheckOut"
+         "$ref": "#/components/schemas/ModelCheckOut"
         }
        }
       }
@@ -837,7 +837,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/CheckOut"
+         "$ref": "#/components/schemas/ModelCheckOut"
         }
        }
       }
@@ -1025,6 +1025,88 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/CheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/engines": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Engines",
+    "operationId": "list_engines_api_admin_engines_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EngineOut"
+         },
+         "type": "array",
+         "title": "Response List Engines Api Admin Engines Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/engines/{engine}": {
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Switch Engine",
+    "description": "Offer a mode or stop offering it. Runs already queued keep going.",
+    "operationId": "switch_engine_api_admin_engines__engine__put",
+    "parameters": [
+     {
+      "name": "engine",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Engine"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EngineSwitch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/EngineOut"
+         },
+         "title": "Response Switch Engine Api Admin Engines  Engine  Put"
         }
        }
       }
@@ -2336,29 +2418,6 @@
     ],
     "title": "CheckOut"
    },
-   "Choice": {
-    "properties": {
-     "id": {
-      "type": "string",
-      "title": "Id"
-     },
-     "label": {
-      "type": "string",
-      "title": "Label"
-     },
-     "is_default": {
-      "type": "boolean",
-      "title": "Is Default"
-     }
-    },
-    "type": "object",
-    "required": [
-     "id",
-     "label",
-     "is_default"
-    ],
-    "title": "Choice"
-   },
    "CredentialIn": {
     "properties": {
      "api_key": {
@@ -2516,6 +2575,100 @@
     },
     "type": "object",
     "title": "EmbeddingOut"
+   },
+   "EngineChoice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "search_kinds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Search Kinds"
+     },
+     "stages": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Stages"
+     },
+     "needs_tools": {
+      "type": "boolean",
+      "title": "Needs Tools"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "search_kinds",
+     "stages",
+     "needs_tools"
+    ],
+    "title": "EngineChoice",
+    "description": "A research mode the owner can start, and what it can be started with."
+   },
+   "EngineOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "ready": {
+      "type": "boolean",
+      "title": "Ready"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "search_kinds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Search Kinds"
+     },
+     "needs_tools": {
+      "type": "boolean",
+      "title": "Needs Tools"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "ready",
+     "enabled",
+     "search_kinds",
+     "needs_tools"
+    ],
+    "title": "EngineOut"
+   },
+   "EngineSwitch": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled"
+    ],
+    "title": "EngineSwitch"
    },
    "EventOut": {
     "properties": {
@@ -2726,6 +2879,82 @@
     ],
     "title": "MeOut"
    },
+   "ModelCheckOut": {
+    "properties": {
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     },
+     "seconds": {
+      "type": "number",
+      "title": "Seconds"
+     },
+     "samples": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Samples",
+      "default": []
+     },
+     "tools": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tools"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ok",
+     "message",
+     "seconds"
+    ],
+    "title": "ModelCheckOut"
+   },
+   "ModelChoice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default"
+     },
+     "supports_tools": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Supports Tools"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "is_default"
+    ],
+    "title": "ModelChoice"
+   },
    "ModelDraftIn": {
     "properties": {
      "provider": {
@@ -2847,6 +3076,17 @@
        }
       ],
       "title": "Price Out Per Mtok"
+     },
+     "supports_tools": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Supports Tools"
      }
     },
     "type": "object",
@@ -2918,6 +3158,17 @@
        }
       ],
       "title": "Price Out Per Mtok"
+     },
+     "supports_tools": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Supports Tools"
      },
      "id": {
       "type": "string",
@@ -3001,6 +3252,11 @@
       "title": "Depth",
       "default": "standard"
      },
+     "engine": {
+      "type": "string",
+      "title": "Engine",
+      "default": "storm"
+     },
      "request_key": {
       "anyOf": [
        {
@@ -3035,16 +3291,23 @@
    },
    "Options": {
     "properties": {
+     "engines": {
+      "items": {
+       "$ref": "#/components/schemas/EngineChoice"
+      },
+      "type": "array",
+      "title": "Engines"
+     },
      "models": {
       "items": {
-       "$ref": "#/components/schemas/Choice"
+       "$ref": "#/components/schemas/ModelChoice"
       },
       "type": "array",
       "title": "Models"
      },
      "search_providers": {
       "items": {
-       "$ref": "#/components/schemas/Choice"
+       "$ref": "#/components/schemas/SearchChoice"
       },
       "type": "array",
       "title": "Search Providers"
@@ -3066,6 +3329,7 @@
     },
     "type": "object",
     "required": [
+     "engines",
      "models",
      "search_providers",
      "languages",
@@ -3266,6 +3530,14 @@
       "type": "string",
       "title": "Language"
      },
+     "engine": {
+      "type": "string",
+      "title": "Engine"
+     },
+     "engine_label": {
+      "type": "string",
+      "title": "Engine Label"
+     },
      "model_label": {
       "type": "string",
       "title": "Model Label"
@@ -3395,6 +3667,8 @@
      "parent_run_id",
      "topic",
      "language",
+     "engine",
+     "engine_label",
      "model_label",
      "search_label",
      "depth",
@@ -3460,6 +3734,11 @@
       "title": "Depth",
       "default": "standard"
      },
+     "engine": {
+      "type": "string",
+      "title": "Engine",
+      "default": "storm"
+     },
      "request_key": {
       "anyOf": [
        {
@@ -3508,6 +3787,14 @@
      "language": {
       "type": "string",
       "title": "Language"
+     },
+     "engine": {
+      "type": "string",
+      "title": "Engine"
+     },
+     "engine_label": {
+      "type": "string",
+      "title": "Engine Label"
      },
      "model_label": {
       "type": "string",
@@ -3631,6 +3918,8 @@
      "parent_run_id",
      "topic",
      "language",
+     "engine",
+     "engine_label",
      "model_label",
      "search_label",
      "depth",
@@ -3647,6 +3936,34 @@
      "source_count"
     ],
     "title": "RunOut"
+   },
+   "SearchChoice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "is_default": {
+      "type": "boolean",
+      "title": "Is Default"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "is_default",
+     "kind"
+    ],
+    "title": "SearchChoice"
    },
    "SearchDraftIn": {
     "properties": {
@@ -3909,6 +4226,11 @@
       ],
       "title": "Depth",
       "default": "standard"
+     },
+     "engine": {
+      "type": "string",
+      "title": "Engine",
+      "default": "storm"
      },
      "request_key": {
       "anyOf": [

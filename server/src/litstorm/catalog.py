@@ -17,6 +17,42 @@ LLM_PROVIDERS = {
 
 SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv", "tci")
 
+# What each Engine declares (docs/web-app-design.md, รุ่นสอง: กติกาที่ทุก
+# Engine ใช้ร่วมกัน): the Search Provider kinds it can use, its stages for
+# the progress bar, and whether it needs a model that can call tools. An
+# Engine is offered only once `ready`; an Administrator can still switch a
+# ready one off (litstorm.engine_settings). Order is the tabs' order.
+ENGINES = {
+    "storm": {
+        "label": "STORM",
+        "search": SEARCH_PROVIDERS,
+        "stages": ("research", "outline", "article", "polish"),
+        "needs_tools": False,
+        "ready": True,
+    },
+    "co-storm": {
+        "label": "Co-STORM",
+        "search": SEARCH_PROVIDERS,
+        "stages": ("warmup", "discussion", "report"),
+        "needs_tools": False,
+        "ready": False,
+    },
+    "deep": {
+        "label": "Deep Research",
+        "search": ("searxng", "tavily"),
+        "stages": ("research", "report"),
+        "needs_tools": False,
+        "ready": False,
+    },
+    "agent": {
+        "label": "Agent Research",
+        "search": ("searxng", "tavily"),
+        "stages": ("plan", "research", "report"),
+        "needs_tools": True,
+        "ready": False,
+    },
+}
+
 
 def reasoning_kwargs(value, provider):
     """The call argument for a saved reasoning setting, or {} for unset.

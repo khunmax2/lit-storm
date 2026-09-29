@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 import httpx
 from playwright.sync_api import expect, sync_playwright
 
+import ui
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 COMPOSE = ["docker", "compose", "-f", os.path.join(ROOT, "stack", "compose.yml")]
 BASE = "http://127.0.0.1:8090"
@@ -183,15 +185,7 @@ class Acceptance:
 
         code = open(os.path.join(ROOT, "stack", "secrets", "bootstrap_code"), encoding="utf-8").read().strip()
         page = pw.new_page(viewport={"width": 1280, "height": 860}, locale="th-TH")
-        page.goto(BASE)
-        page.wait_for_url(re.compile(r"/setup"))
-        fields = page.locator("form input")
-        fields.nth(0).fill(code)
-        fields.nth(1).fill("ผู้ดูแล")
-        fields.nth(2).fill(ADMIN[0])
-        fields.nth(3).fill(ADMIN[1])
-        page.get_by_role("button").last.click()
-        page.wait_for_url(re.compile(r"/admin"))
+        ui.setup(page, BASE, code, "ผู้ดูแล", *ADMIN)
         self.note(k, f"first Administrator created through the setup page ({self.shot(page, 'a1-after-setup')})")
         page.close()
         r = httpx.post(f"{BASE}/api/setup", json={"code": code, "email": "x@y.org", "name": "X", "password": "long enough 1"})
@@ -246,12 +240,8 @@ class Acceptance:
         browser = pw.new_context(viewport={"width": 1280, "height": 860}, locale="th-TH")
         page = browser.new_page()
         login(page, *ALICE)
-        page.get_by_placeholder(re.compile("ทบทวน")).fill("ตรวจรับ")
-        page.get_by_role("button", name="โปรเจกต์ใหม่").click()
-        page.get_by_role("link", name=re.compile("ตรวจรับ")).click()
-        page.get_by_placeholder("ต้องการค้นคว้าเรื่องอะไร").fill("โมเดลภาษาขนาดใหญ่สำหรับภาษาไทย")
-        page.get_by_role("button", name="เริ่มค้นคว้า").click()
-        page.wait_for_url(re.compile(r"/sessions/"))
+        ui.new_project(page, BASE, "ตรวจรับ")
+        ui.start_research(page, "โมเดลภาษาขนาดใหญ่สำหรับภาษาไทย")
         session_url = page.url
         self.shot(page, "b1-thai-started")
         browser.close()
@@ -282,7 +272,7 @@ class Acceptance:
         page = browser.new_page()
         login(page, *ALICE)
         page.goto(session_url)
-        expect(page.get_by_role("button", name="อ่านรายงาน")).to_be_visible()
+        expect(page.get_by_role("link", name="อ่านรายงาน").first).to_be_visible()
         self.check(k6, True, f"back in a new browser, the Run is done and its report is there ({self.shot(page, 'b2-back-later')})")
         self.ctx["alice_page"] = page
         self.done(k)
@@ -294,13 +284,10 @@ class Acceptance:
         self.criterion(k10, "คลิก citation แล้วอ่านหลักฐานของแหล่งที่ถูกอ้างอิงจากแผงด้านข้างได้")
         self.criterion(k11, "export HTML, Markdown และ PDF ได้ตามตัวเลือกแนบหลักฐาน โดย HTML เปิดอ่านออฟไลน์ได้ตามขอบเขตที่กำหนด")
         page = self.ctx["alice_page"]
-        page.get_by_role("button", name="อ่านรายงาน").click()
-        page.wait_for_url(re.compile(r"/runs/"))
+        ui.open_report(page)
         self.shot(page, "c1-report")
         url_before = page.url
-        page.locator("button.cite").first.click()
-        panel = page.locator("aside")
-        expect(panel).to_be_visible()
+        panel = ui.open_citation(page)
         self.check(k10, page.url == url_before, "the Source panel opens beside the report; the page does not change")
         has_evidence = panel.get_by_text("ข้อความหลักฐาน").count() > 0
         self.check(k10, has_evidence, f"the panel shows the Source and its evidence ({self.shot(page, 'c2-citation-panel', full=False)})")
@@ -508,15 +495,12 @@ class Acceptance:
         alice, a = self.ctx["alice"], self.ctx["a_run"]
         project_id = self.ctx["a_session"]["project_id"]
         page = self.ctx["alice_page"]
-        page.goto(f"{BASE}/projects/{project_id}")
-        page.once("dialog", lambda d: d.accept())
-        page.get_by_role("button", name="ลบโปรเจกต์").click()
-        page.wait_for_url(re.compile(r"/$"))
+        ui.delete_project(page, BASE, project_id)
         self.check(k, alice.get(f"/api/runs/{a['id']}/report").status_code == 404, "deleted: its report is gone from view")
-        page.get_by_role("link", name="ถังขยะ").click()
-        expect(page.get_by_text("ตรวจรับ")).to_be_visible()
+        row = ui.trash_row(page, BASE, "ตรวจรับ")
+        expect(row).to_be_visible()
         self.note(k, f"it is in the Trash with its days left ({self.shot(page, 'd1-trash')})")
-        page.get_by_role("button", name="กู้คืน").first.click()
+        row.get_by_role("button", name="กู้คืน").click()
         expect(page.get_by_text("ถังขยะว่าง")).to_be_visible()
         self.check(k, alice.get(f"/api/runs/{a['id']}/report").status_code == 200, "restored: the report is back")
 
@@ -576,11 +560,7 @@ class Acceptance:
 
 
 def login(page, email, password):
-    page.goto(f"{BASE}/login")
-    page.locator("input").nth(0).fill(email)
-    page.locator("input").nth(1).fill(password)
-    page.get_by_role("button").last.click()
-    page.wait_for_url(re.compile(r"/$"))
+    ui.login(page, BASE, email, password)
 
 
 def attach(acc):

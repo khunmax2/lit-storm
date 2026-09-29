@@ -66,6 +66,55 @@ def is_back_matter(heading):
     return bare in BACK_MATTER
 
 
+def _loose(text):
+    return re.sub(r"[\s_]+", " ", re.sub(r"\(.*?\)", "", text or "")).strip().casefold()
+
+
+def clean_outline(outline, topic):
+    """Tidy the outline before STORM writes from it. Returns what changed.
+
+    STORM writes one section per first-level heading, so the outline decides
+    what gets written — and paid for. Two things go wrong there:
+
+    - The model often heads its outline with the page title. STORM drops that
+      line only when it matches the topic exactly; "ปัญญาประดิษฐ์ (Artificial
+      Intelligence)" for "AI" does not, and the whole outline becomes one
+      section written in a single pass, its planned headings ignored.
+    - "See also" and "References" are written like any section. The model
+      then fills them with prose under a heading of its own choosing, which
+      slips past the back-matter filter that runs on the finished article.
+
+    Works on anything with `.root`, `.section_name` and `.children`, which
+    STORM's StormArticle has. An outline that would be left empty is kept.
+    """
+    root = outline.root
+    changes = []
+
+    def prune(node):
+        kept = []
+        for child in node.children:
+            if is_back_matter(child.section_name):
+                changes.append(f"dropped {child.section_name!r}")
+                continue
+            child.children = prune(child)
+            kept.append(child)
+        return kept
+
+    children = prune(root)
+    # A lone first-level section with sections under it is the page title.
+    while len(children) == 1 and children[0].children:
+        changes.append(f"unwrapped title {children[0].section_name!r}")
+        children = children[0].children
+    # So is a first one named after the topic, even with siblings.
+    if len(children) > 1 and children[0].children and _loose(children[0].section_name) == _loose(topic):
+        changes.append(f"unwrapped title {children[0].section_name!r}")
+        children = children[0].children + children[1:]
+    if not children:
+        return []
+    root.children = children
+    return changes
+
+
 def parse_sections(text):
     """(lead, sections) from STORM's article text."""
     lead_lines = []

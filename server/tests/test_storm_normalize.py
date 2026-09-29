@@ -5,7 +5,7 @@ import json
 import pytest
 
 from litstorm import report
-from litstorm.engines.storm.normalize import POLISHED_REFERENCES, normalize, parse_sections
+from litstorm.engines.storm.normalize import POLISHED_REFERENCES, clean_outline, normalize, parse_sections
 
 ARTICLE = """# summary
 
@@ -159,3 +159,67 @@ def test_empty_report_is_empty():
         "lead": "  ", "sections": [], "sources": [],
     }
     assert report.is_empty(empty)
+
+
+# --- the outline STORM writes from ---------------------------------------------------------
+
+
+class _Node:
+    def __init__(self, name, *children):
+        self.section_name = name
+        self.children = list(children)
+
+
+class _Outline:
+    def __init__(self, *children):
+        self.root = _Node("topic", *children)
+
+
+def _names(node):
+    return [(c.section_name, _names(c)) if c.children else c.section_name for c in node.children]
+
+
+def test_back_matter_is_not_written():
+    # From a real Run: "อ้างอิง" came back as prose under a new heading.
+    outline = _Outline(
+        _Node("บทนำ"),
+        _Node("การประเมินผล", _Node("เกณฑ์มาตรฐาน"), _Node("See also")),
+        _Node("ดูเพิ่ม"),
+        _Node("อ้างอิง"),
+    )
+    changes = clean_outline(outline, "LLMs for low-resource languages")
+    assert _names(outline.root) == ["บทนำ", ("การประเมินผล", ["เกณฑ์มาตรฐาน"])]
+    assert len(changes) == 3
+
+
+def test_a_title_line_that_does_not_match_the_topic_is_unwrapped():
+    # From a real run of the old app: eleven planned sections written as one.
+    outline = _Outline(
+        _Node(
+            "ผลกระทบของปัญญาประดิษฐ์ (Artificial Intelligence) ต่อการศึกษาไทย",
+            _Node("บทนำ", _Node("ความหมาย")),
+            _Node("ผลกระทบเชิงบวก"),
+            _Node("ผลกระทบเชิงลบ"),
+        ),
+        _Node("ดูเพิ่ม"),
+    )
+    clean_outline(outline, "ผลกระทบของ AI ต่อการศึกษาไทย")
+    assert _names(outline.root) == [("บทนำ", ["ความหมาย"]), "ผลกระทบเชิงบวก", "ผลกระทบเชิงลบ"]
+
+
+def test_a_title_named_after_the_topic_is_unwrapped_beside_siblings():
+    outline = _Outline(_Node("Songkran_festival", _Node("History"), _Node("Customs")), _Node("Regional variants"))
+    clean_outline(outline, "Songkran festival")
+    assert _names(outline.root) == ["History", "Customs", "Regional variants"]
+
+
+def test_a_good_outline_is_left_alone():
+    outline = _Outline(_Node("History", _Node("Origins")), _Node("Customs"))
+    assert clean_outline(outline, "Songkran") == []
+    assert _names(outline.root) == [("History", ["Origins"]), "Customs"]
+
+
+def test_an_outline_of_only_back_matter_is_kept_rather_than_emptied():
+    outline = _Outline(_Node("References"))
+    assert clean_outline(outline, "x") == []
+    assert _names(outline.root) == ["References"]

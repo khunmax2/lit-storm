@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   server: {
     port: 5173,
-    proxy: { "/api": "http://127.0.0.1:8000" },
+    // LITSTORM_API points a second dev server at a second API, as the
+    // browser scripts' throwaway environment does.
+    proxy: { "/api": process.env.LITSTORM_API ?? "http://127.0.0.1:8000" },
   },
 });

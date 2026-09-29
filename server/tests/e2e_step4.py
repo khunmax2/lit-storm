@@ -12,6 +12,7 @@ import sys
 
 from playwright.sync_api import expect, sync_playwright
 
+import ui
 from e2e_walkthrough import ADMIN_EMAIL, ADMIN_PASSWORD, BASE
 
 
@@ -21,43 +22,31 @@ def main(out):
     with sync_playwright() as p:
         browser = p.chromium.launch(channel=os.environ.get("LITSTORM_PDF_BROWSER_CHANNEL") or None)
         page = browser.new_page(viewport={"width": 1280, "height": 900}, locale="th-TH")
-        page.goto(f"{BASE}/login")
-        page.locator("input").nth(0).fill(ADMIN_EMAIL)
-        page.locator("input").nth(1).fill(ADMIN_PASSWORD)
-        page.get_by_role("button").last.click()
-        page.wait_for_url(re.compile(r"/$"))
+        ui.login(page, BASE, ADMIN_EMAIL, ADMIN_PASSWORD)
 
         # The Trash: delete a project, find it, restore it.
         name = f"จะลบทิ้ง {os.getpid()}"
-        page.get_by_placeholder(re.compile("ทบทวน")).fill(name)
-        page.get_by_role("button", name="โปรเจกต์ใหม่").click()
-        page.get_by_role("link", name=re.compile(re.escape(name))).click()
-        page.once("dialog", lambda d: d.accept())
-        page.get_by_role("button", name="ลบโปรเจกต์").click()
-        page.wait_for_url(re.compile(r"/$"))
+        project_id = ui.new_project(page, BASE, name)
+        ui.delete_project(page, BASE, project_id)
         expect(page.get_by_role("link", name=re.compile(re.escape(name)))).to_have_count(0)
-        page.get_by_role("link", name="ถังขยะ").click()
-        row = page.locator("li", has_text=name)
+        row = ui.trash_row(page, BASE, name)
         expect(row.get_by_text(re.compile("เหลือ (29|30) วัน"))).to_be_visible()
         shot(page, "s1-trash")
         row.get_by_role("button", name="กู้คืน").click()
-        expect(page.get_by_text(name)).to_have_count(0)
-        page.get_by_role("link", name="โปรเจกต์").first.click()
+        expect(row).to_have_count(0)
+        page.goto(f"{BASE}/projects")
         expect(page.get_by_role("link", name=re.compile(re.escape(name)))).to_be_visible()
 
         # Test buttons.
-        page.get_by_role("link", name="ดูแลระบบ").click()
-        page.get_by_role("button", name="โมเดล").first.click()
-        page.get_by_role("button", name="ทดสอบ").first.click()
-        expect(page.get_by_text(re.compile(r"[✓✕] .* · [\d.]+s")).first).to_be_visible(timeout=60_000)
+        page.goto(f"{BASE}/settings/models")
+        ui.test_button_toast(page)
         shot(page, "s2-model-test")
-        page.get_by_role("button", name="บริการค้นหา").first.click()
-        page.get_by_role("button", name="ทดสอบ").first.click()
-        expect(page.get_by_text(re.compile(r"[✓✕] .* · [\d.]+s")).first).to_be_visible(timeout=60_000)
+        page.goto(f"{BASE}/settings/search")
+        ui.test_button_toast(page)
         shot(page, "s3-search-test")
 
         # Usage.
-        page.get_by_role("button", name="การใช้งาน").click()
+        page.goto(f"{BASE}/settings/usage")
         expect(page.get_by_text("Run ล่าสุด")).to_be_visible()
         expect(page.locator("table").first.get_by_text(ADMIN_EMAIL).first).to_be_visible()
         page.wait_for_timeout(500)

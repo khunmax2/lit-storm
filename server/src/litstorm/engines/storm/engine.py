@@ -173,6 +173,11 @@ class StormEngine:
                     information_table=table, callback_handler=callbacks
                 ),
             )
+            # What STORM writes is decided here; see clean_outline.
+            if normalize.clean_outline(outline, config.topic):
+                outline.dump_outline_to_file(
+                    os.path.join(runner.article_output_dir, "storm_gen_outline.txt")
+                )
             draft = stage(
                 "article",
                 lambda: runner.run_article_generation_module(

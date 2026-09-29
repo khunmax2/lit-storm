@@ -182,14 +182,27 @@ def _names(node):
 def test_back_matter_is_not_written():
     # From a real Run: "อ้างอิง" came back as prose under a new heading.
     outline = _Outline(
-        _Node("บทนำ"),
+        _Node("ความท้าทาย"),
         _Node("การประเมินผล", _Node("เกณฑ์มาตรฐาน"), _Node("See also")),
         _Node("ดูเพิ่ม"),
         _Node("อ้างอิง"),
     )
     changes = clean_outline(outline, "LLMs for low-resource languages")
-    assert _names(outline.root) == ["บทนำ", ("การประเมินผล", ["เกณฑ์มาตรฐาน"])]
+    assert _names(outline.root) == ["ความท้าทาย", ("การประเมินผล", ["เกณฑ์มาตรฐาน"])]
     assert len(changes) == 3
+
+
+def test_an_introduction_or_conclusion_is_left_to_the_lead():
+    # From a real Run: "บทนำ" was written as a second opening under the lead.
+    outline = _Outline(
+        _Node("บทนำ (Introduction)", _Node("นิยามและขอบเขต")),
+        _Node("ประวัติ", _Node("บทสรุปของยุคแรก")),  # a subsection by that name stays
+        _Node("ข้อจำกัด"),
+        _Node("บทสรุป"),
+        _Node("Conclusions and future work"),
+    )
+    clean_outline(outline, "RAG")
+    assert _names(outline.root) == [("ประวัติ", ["บทสรุปของยุคแรก"]), "ข้อจำกัด"]
 
 
 def test_a_title_line_that_does_not_match_the_topic_is_unwrapped():
@@ -204,7 +217,7 @@ def test_a_title_line_that_does_not_match_the_topic_is_unwrapped():
         _Node("ดูเพิ่ม"),
     )
     clean_outline(outline, "ผลกระทบของ AI ต่อการศึกษาไทย")
-    assert _names(outline.root) == [("บทนำ", ["ความหมาย"]), "ผลกระทบเชิงบวก", "ผลกระทบเชิงลบ"]
+    assert _names(outline.root) == ["ผลกระทบเชิงบวก", "ผลกระทบเชิงลบ"]
 
 
 def test_a_title_named_after_the_topic_is_unwrapped_beside_siblings():

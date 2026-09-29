@@ -60,10 +60,30 @@ BACK_MATTER = {
 }
 
 
+def _bare(heading):
+    return re.sub(r"\(.*?\)", "", heading).strip().strip(":").strip().lower()
+
+
 def is_back_matter(heading):
     """True for "See also", "ดูเพิ่ม (See Also)", "References" and the like."""
-    bare = re.sub(r"\(.*?\)", "", heading).strip().strip(":").strip().lower()
-    return bare in BACK_MATTER
+    return _bare(heading) in BACK_MATTER
+
+
+# The polishing stage writes the lead, which is the introduction and the
+# summary both. STORM skips sections by these names so the article does not
+# say it twice — but only in English ("introduction", "conclusion…",
+# "summary…"), so a Thai outline's "บทนำ" was written as a second opening.
+LEAD_LIKE = {
+    "introduction", "conclusion", "conclusions", "summary",
+    "บทนำ", "ความนำ", "บทเกริ่นนำ",
+    "บทสรุป", "สรุป", "ข้อสรุป", "สรุปผล", "บทส่งท้าย",
+}
+
+
+def is_lead_like(heading):
+    """True for an introduction or conclusion the lead already covers."""
+    bare = _bare(heading)
+    return bare in LEAD_LIKE or bare.startswith(("conclusion", "summary"))
 
 
 def _loose(text):
@@ -83,6 +103,10 @@ def clean_outline(outline, topic):
     - "See also" and "References" are written like any section. The model
       then fills them with prose under a heading of its own choosing, which
       slips past the back-matter filter that runs on the finished article.
+    - An introduction or conclusion repeats the lead that polishing writes.
+      STORM leaves these out by their English names only; a Thai "บทนำ"
+      was written as a second opening. Only first-level ones go, as in
+      STORM.
 
     Works on anything with `.root`, `.section_name` and `.children`, which
     STORM's StormArticle has. An outline that would be left empty is kept.
@@ -109,6 +133,9 @@ def clean_outline(outline, topic):
     if len(children) > 1 and children[0].children and _loose(children[0].section_name) == _loose(topic):
         changes.append(f"unwrapped title {children[0].section_name!r}")
         children = children[0].children + children[1:]
+    body = [c for c in children if not is_lead_like(c.section_name)]
+    changes += [f"dropped {c.section_name!r}, which the lead covers" for c in children if c not in body]
+    children = body
     if not children:
         return []
     root.children = children

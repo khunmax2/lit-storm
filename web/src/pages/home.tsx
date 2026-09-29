@@ -10,7 +10,7 @@ import { DOT } from "@/components/app-sidebar";
 import { ErrorText, timeAgo } from "@/components/common";
 import { Composer, QuotaLine, runBody, useRequestKey, type RunForm } from "@/components/composer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Segmented } from "@/components/segmented";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,16 @@ const MODES = [
   { id: "agent", label: "Agent Research", ready: false },
 ] as const;
 type Mode = (typeof MODES)[number]["id"];
+
+const MODE_OPTIONS = MODES.map((m) => ({
+  value: m.id as Mode,
+  label: (
+    <>
+      {m.label}
+      {!m.ready && <span className="size-1.5 rounded-full bg-muted-foreground/40" aria-hidden />}
+    </>
+  ),
+}));
 
 const ACTIVE = new Set(["running", "queued", "cancelling"]);
 
@@ -100,24 +110,14 @@ export function HomePage() {
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-5 md:px-6">
-        <Tabs
-          value={mode}
-          onValueChange={(v) => setMode(v as Mode)}
-          className="max-w-full overflow-x-auto [scrollbar-width:none]"
-        >
-          <TabsList className="h-10 rounded-xl p-1">
-            {MODES.map((m) => (
-              <TabsTrigger
-                key={m.id}
-                value={m.id}
-                className="h-8 rounded-lg px-3.5 data-[state=active]:shadow-sm"
-              >
-                {m.label}
-                {!m.ready && <span className="size-1.5 rounded-full bg-muted-foreground/40" aria-hidden />}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="max-w-full overflow-x-auto [scrollbar-width:none]">
+          <Segmented
+            label={t("mode.label")}
+            value={mode}
+            onChange={setMode}
+            options={MODE_OPTIONS}
+          />
+        </div>
         <div
           className={cn(
             "flex h-9 items-center gap-2 rounded-lg border px-3 text-sm",

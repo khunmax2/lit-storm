@@ -32,6 +32,7 @@ import {
   timeAgo,
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
+import { Segmented } from "@/components/segmented";
 import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
 import {
   AlertDialog,
@@ -408,21 +409,15 @@ export function AllResearchPage() {
           placeholder={t("search.placeholder")}
           className="h-9 max-w-xs"
         />
-        <div className="inline-flex rounded-lg bg-muted p-1 text-sm">
-          {[false, true].map((only) => (
-            <button
-              key={String(only)}
-              type="button"
-              onClick={() => setUnfiledOnly(only)}
-              className={cn(
-                "rounded-md px-3 py-1 transition-colors",
-                unfiledOnly === only ? "bg-background font-medium shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              {only ? t("move.none") : t("all.every")}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label={t("home.project")}
+          value={unfiledOnly ? "unfiled" : "all"}
+          onChange={(v) => setUnfiledOnly(v === "unfiled")}
+          options={[
+            { value: "all", label: t("all.every") },
+            { value: "unfiled", label: t("move.none") },
+          ]}
+        />
       </div>
       {all.isLoading && <LoadingRows />}
       {all.data && rows.length === 0 && (

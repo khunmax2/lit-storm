@@ -118,8 +118,13 @@ export function domainOf(url: string) {
 }
 
 /** Put page-specific content (breadcrumbs, actions) in the app's top bar. */
-export function Toolbar({ children }: { children: ReactNode }) {
+// Renders children into an element a layout left for them, found by id.
+export function PortalTo({ id, children }: { id: string; children: ReactNode }) {
   const [el, setEl] = useState<HTMLElement | null>(null);
-  useEffect(() => setEl(document.getElementById("page-toolbar")), []);
+  useEffect(() => setEl(document.getElementById(id)), [id]);
   return el ? createPortal(children, el) : null;
+}
+
+export function Toolbar({ children }: { children: ReactNode }) {
+  return <PortalTo id="page-toolbar">{children}</PortalTo>;
 }

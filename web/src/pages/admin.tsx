@@ -27,10 +27,10 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { api, call, type Schemas } from "@/api/client";
-import { ErrorText, LoadingRows, PageHeader, StatusBadge, Toolbar, errorMessage, formatDate } from "@/components/common";
+import { ErrorText, LoadingRows, PageHeader, PortalTo, StatusBadge, Toolbar, errorMessage, formatDate } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -286,15 +286,12 @@ function Users() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t("admin.users")}</CardTitle>
-        <CardAction>
-          <Button onClick={() => setCreating(true)}>
-            <UserPlus />
-            {t("admin.newUser")}
-          </Button>
-        </CardAction>
-      </CardHeader>
+      <SectionActions>
+        <Button onClick={() => setCreating(true)}>
+          <UserPlus />
+          {t("admin.newUser")}
+        </Button>
+      </SectionActions>
       <CardContent>
         {users.isLoading && <LoadingRows />}
         <Table>
@@ -578,15 +575,12 @@ function Models() {
   return (
     <div className="grid gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("admin.models")}</CardTitle>
-          <CardAction>
+        <SectionActions>
             <Button onClick={() => setForm({ ...emptyModel })}>
               <Plus />
               {t("admin.addModel")}
             </Button>
-          </CardAction>
-        </CardHeader>
+        </SectionActions>
         <CardContent>
           {models.isLoading && <LoadingRows />}
           <Table>
@@ -768,15 +762,12 @@ function Search() {
   const [form, setForm] = useState<SearchForm | null>(null);
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t("admin.search")}</CardTitle>
-        <CardAction>
+      <SectionActions>
           <Button onClick={() => setForm({ label: "", kind: "searxng", enabled: true, is_default: false })}>
             <Plus />
             {t("admin.addSearch")}
           </Button>
-        </CardAction>
-      </CardHeader>
+      </SectionActions>
       <CardContent>
         <Table>
           <TableHeader>
@@ -854,9 +845,6 @@ function Limits() {
   );
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t("admin.limits")}</CardTitle>
-      </CardHeader>
       <CardContent>
         <form
           className="grid gap-4 sm:grid-cols-2"
@@ -920,10 +908,7 @@ function Usage() {
   return (
     <div className="grid gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle>{t("admin.usage")}</CardTitle>
-          <CardDescription>{t("usage.privacy")}</CardDescription>
-          <CardAction>
+        <SectionActions>
             <Select value={month} onValueChange={setMonth}>
               <SelectTrigger className="w-36">
                 <SelectValue />
@@ -936,8 +921,7 @@ function Usage() {
                 ))}
               </SelectContent>
             </Select>
-          </CardAction>
-        </CardHeader>
+        </SectionActions>
         <CardContent>
           {usage.data?.rows.length === 0 && <p className="text-sm text-muted-foreground">{t("usage.none")}</p>}
           {!!usage.data?.rows.length && (
@@ -1038,6 +1022,11 @@ export const SETTINGS = [
   { id: "limits", label: "admin.limits", lead: "settings.limitsLead", icon: Gauge, page: Limits },
   { id: "usage", label: "admin.usage", lead: "settings.usageLead", icon: ChartColumn, page: Usage },
 ] as const;
+
+// A section's main action sits beside its title at the top of the page.
+function SectionActions({ children }: { children: ReactNode }) {
+  return <PortalTo id="settings-actions">{children}</PortalTo>;
+}
 
 const FOLDED_KEY = "litstorm.settingsNavFolded";
 
@@ -1161,8 +1150,13 @@ export function AdminPage() {
               </BreadcrumbList>
             </Breadcrumb>
           </Toolbar>
-          <PageHeader title={t(current.label)} description={t(current.lead)} />
-          <Page />
+          <PageHeader
+            title={t(current.label)}
+            description={t(current.lead)}
+            actions={<div id="settings-actions" className="flex items-center gap-2" />}
+          />
+          {/* Remount per section so its actions portal into the fresh slot. */}
+          <Page key={current.id} />
         </div>
       </div>
     </div>

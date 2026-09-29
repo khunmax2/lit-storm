@@ -12,6 +12,8 @@ import {
   Link2,
   Loader2,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Plus,
   Search as SearchIcon,
@@ -40,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Breadcrumb,
@@ -50,6 +53,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useT } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 const LLM_PROVIDERS = ["openrouter", "gemini", "openai", "groq", "openai-compatible"];
 const SEARCH_KINDS = ["searxng", "tavily", "arxiv"];
@@ -1025,8 +1029,8 @@ function Usage() {
   );
 }
 
-// The settings sections, each its own address; the sidebar lists them under
-// ตั้งค่าระบบ.
+// The settings sections, each its own address, listed in the settings page's
+// own side column.
 export const SETTINGS = [
   { id: "users", label: "admin.users", lead: "settings.usersLead", icon: UsersRound, page: Users },
   { id: "models", label: "admin.models", lead: "settings.modelsLead", icon: Bot, page: Models },
@@ -1035,32 +1039,132 @@ export const SETTINGS = [
   { id: "usage", label: "admin.usage", lead: "settings.usageLead", icon: ChartColumn, page: Usage },
 ] as const;
 
+const FOLDED_KEY = "litstorm.settingsNavFolded";
+
+function readFolded() {
+  try {
+    return localStorage.getItem(FOLDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+// A second, narrower side column for the sections, as in the design
+// reference; it folds to icons like the main sidebar.
+function SettingsNav({ current }: { current: string }) {
+  const { t } = useT();
+  const [folded, setFolded] = useState(readFolded);
+  const toggle = () => {
+    setFolded(!folded);
+    try {
+      localStorage.setItem(FOLDED_KEY, folded ? "0" : "1");
+    } catch {
+      // Private windows may refuse storage; the column still folds.
+    }
+  };
+  return (
+    <nav
+      className={cn(
+        "sticky top-16 hidden h-[calc(100svh-4rem)] shrink-0 flex-col gap-1.5 overflow-y-auto border-r p-3 transition-[width] duration-200 ease-linear md:flex",
+        folded ? "w-[4.25rem]" : "w-60",
+      )}
+    >
+      <div className={cn("mb-1 flex h-8 items-center", folded ? "justify-center" : "justify-between pl-1")}>
+        {!folded && (
+          <span className="truncate text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {t("nav.admin")}
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          onClick={toggle}
+          aria-label={folded ? t("settings.expand") : t("settings.collapse")}
+        >
+          {folded ? <PanelLeftOpen /> : <PanelLeftClose />}
+        </Button>
+      </div>
+      {SETTINGS.map((x) => {
+        const active = x.id === current;
+        const link = (
+          <Link
+            to="/settings/$section"
+            params={{ section: x.id }}
+            aria-label={t(x.label)}
+            className={cn(
+              "flex h-10 items-center gap-3 rounded-lg border px-3 text-sm transition-colors",
+              active
+                ? "border-transparent bg-muted font-medium"
+                : "bg-background text-foreground/85 shadow-xs hover:bg-muted/50",
+              folded && "justify-center px-0",
+            )}
+          >
+            <x.icon className="size-4 shrink-0" />
+            {!folded && <span className="truncate">{t(x.label)}</span>}
+          </Link>
+        );
+        return folded ? (
+          <Tooltip key={x.id}>
+            <TooltipTrigger asChild>{link}</TooltipTrigger>
+            <TooltipContent side="right">{t(x.label)}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <div key={x.id}>{link}</div>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function AdminPage() {
   const { t } = useT();
   const { section } = useParams({ from: "/app/settings/$section" });
   const current = SETTINGS.find((s) => s.id === section) ?? SETTINGS[0];
   const Page = current.page;
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
-      <Toolbar>
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/settings/$section" params={{ section: "users" }}>
-                  {t("nav.admin")}
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{t(current.label)}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </Toolbar>
-      <PageHeader title={t(current.label)} description={t(current.lead)} />
-      <Page />
+    <div className="flex flex-1">
+      <SettingsNav current={current.id} />
+      <div className="min-w-0 flex-1">
+        {/* Phones have no room for the column: the sections become a row. */}
+        <div className="flex gap-1.5 overflow-x-auto border-b px-4 py-2 [scrollbar-width:none] md:hidden">
+          {SETTINGS.map((x) => (
+            <Link
+              key={x.id}
+              to="/settings/$section"
+              params={{ section: x.id }}
+              className={cn(
+                "flex h-8 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm",
+                x.id === current.id ? "border-transparent bg-muted font-medium" : "bg-background shadow-xs",
+              )}
+            >
+              <x.icon className="size-4" />
+              {t(x.label)}
+            </Link>
+          ))}
+        </div>
+        <div className="mx-auto w-full max-w-5xl px-6 py-8">
+          <Toolbar>
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/settings/$section" params={{ section: "users" }}>
+                      {t("nav.admin")}
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{t(current.label)}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </Toolbar>
+          <PageHeader title={t(current.label)} description={t(current.lead)} />
+          <Page />
+        </div>
+      </div>
     </div>
   );
 }

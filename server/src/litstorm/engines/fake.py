@@ -7,6 +7,7 @@
     {"hang": true}                     never finish, and never look at cancel
     {"fail": "retries_exhausted"}      fail with this reason
     {"crash": true}                    die without a word, as a segfault would
+    {"note": "kind", "data": {...}}    say something, as an Engine's progress note
     {"pid": true}                      note its own process id
     {"write_thai": true}               write Thai the way knowledge_storm does
     {"language_probe": true}           note the article prompt it would use
@@ -62,6 +63,8 @@ class FakeEngine:
                     time.sleep(1)
             elif "fail" in step:
                 raise EngineFailure(step["fail"], f"told to fail: {step['fail']}")
+            elif "note" in step:
+                progress.note(step["note"], **step.get("data", {}))
             elif step.get("pid"):
                 progress.note("pid", pid=os.getpid())
             elif step.get("write_thai"):

@@ -7,6 +7,7 @@ as the stage ends so a Run that fails later still has its cost on record.
 """
 
 import os
+import time
 
 from knowledge_storm.storm_wiki.engine import (
     STORMWikiLMConfigs,
@@ -15,7 +16,7 @@ from knowledge_storm.storm_wiki.engine import (
 )
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 
-from litstorm import outcomes
+from litstorm import outcomes, search_cache
 from litstorm.engines.base import EngineFailure
 
 from . import encoders, language, normalize, providers
@@ -33,6 +34,10 @@ DEFAULT_PARAMS = {
 }
 
 STAGES = ("research", "outline", "article", "polish")
+
+# How much of the depth level's time target research may use before its
+# conversations stop asking; the rest is for writing.
+GATHER_SHARE = 0.8
 
 # Where each stage's cost is filed by knowledge_storm's decorator.
 _METHOD = {
@@ -87,6 +92,10 @@ def build_runner(config, secrets, output_dir):
         )
     except providers.ProviderConfigError as error:
         raise EngineFailure(outcomes.BAD_CONFIGURATION, str(error)) from error
+    if config.search_cache_dir:
+        rm = search_cache.CachedRM(
+            rm, config.search_cache_dir, search_cache.identity(config.search, params["search_top_k"])
+        )
 
     # One model for every stage (docs/web-app-design.md, การเลือก LLM); only
     # the reply budget differs between talking and writing.
@@ -113,6 +122,7 @@ class StormEngine:
     name = "storm"
 
     def run(self, config, secrets, workspace, progress, cancel):
+        started = time.time()
         language.apply(config.language)
         output_dir = os.path.join(workspace, "storm")
         runner = build_runner(config, secrets, output_dir)
@@ -126,6 +136,9 @@ class StormEngine:
         os.makedirs(runner.article_output_dir, exist_ok=True)
 
         callbacks = _ProgressCallbacks(progress)
+        conversations = runner.storm_knowledge_curation_module.conv_simulator
+        if config.target_seconds:
+            conversations.stop_at = started + GATHER_SHARE * config.target_seconds
 
         def stage(name, call):
             cancel.check()
@@ -154,6 +167,15 @@ class StormEngine:
                 "research",
                 lambda: runner.run_knowledge_curation_module(callback_handler=callbacks),
             )
+            cache = runner.retriever.rm
+            if isinstance(cache, search_cache.CachedRM) and cache.hits:
+                progress.note("search_cache", hits=cache.hits, misses=cache.misses)
+            if conversations.cut_short:
+                progress.note(
+                    "research_cut_short",
+                    conversations=conversations.cut_short,
+                    seconds=round(time.time() - started),
+                )
             # Research that found nothing: STORM would go on and crash while
             # ranking an empty table ("Expected 2D array"), after spending
             # on the outline. Stop here and say what happened.

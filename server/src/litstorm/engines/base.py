@@ -28,6 +28,12 @@ class RunConfig:
     # {"provider", "model", "api_base"}; empty or "builtin" is STORM's own model.
     embedding: dict[str, Any] = field(default_factory=dict)
     request_timeout: float = 120.0  # seconds, per LLM or search request
+    # The depth level's time target. At 80% of it an Engine stops gathering
+    # and writes from what it has (docs/web-app-design.md, จบอย่างนุ่มนวล).
+    target_seconds: float | None = None
+    # Where search results are shared between Runs (litstorm.search_cache);
+    # None searches afresh every time.
+    search_cache_dir: str | None = None
 
     @classmethod
     def from_dict(cls, data):

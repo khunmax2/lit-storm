@@ -15,7 +15,7 @@ import signal
 import threading
 import time
 
-from litstorm import db, settings, trash
+from litstorm import db, search_cache, settings, trash
 from litstorm import report as report_mod
 from litstorm.db.models import RunEvent
 from litstorm.runner.supervisor import Spare, supervise
@@ -65,6 +65,8 @@ def run_one(claim, spare=None):
             session.commit()
         if kind == "stage":
             with_session(lambda s: queue.set_stage(s, claim, event["stage"]))
+        elif kind == "note" and event.get("kind") in queue.NOTE_KINDS:
+            with_session(lambda s: queue.add_note(s, claim, event["kind"], data))
 
     log.info("run %s: start (%s)", claim.run_id, claim.config.engine)
     try:
@@ -106,6 +108,7 @@ def main():
             purged = trash.purge(session, settings.get().runs_dir)
         if purged:
             log.info("purged %d run(s) from the Trash", purged)
+        search_cache.sweep(settings.get().search_cache_dir)
 
     purge_now = _Throttle(PURGE_EVERY, purge)
     spare = Spare()

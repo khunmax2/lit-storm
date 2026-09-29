@@ -222,6 +222,10 @@ class Run(Base):
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     report_title: Mapped[str | None] = mapped_column(Text)
     source_count: Mapped[int | None] = mapped_column(Integer)
+    # What the owner should know about how the Run went, by kind: it wrote
+    # from what it had when time ran short, its embedding service failed,
+    # some searches came from the cache (worker.queue.NOTE_KINDS).
+    notes: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The browser's id for one press of "Start" (see migration 0002).
     request_key: Mapped[str | None] = mapped_column(String(64))

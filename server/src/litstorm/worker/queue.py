@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text, update
 
-from litstorm import cost, embedding, limits, quota, security
+from litstorm import cost, embedding, limits, quota, security, settings
 from litstorm.db.models import (
     ACTIVE,
     CANCELLING,
@@ -125,6 +125,8 @@ def claim(session):
         search={k: v for k, v in run.config["search"].items() if k != "label" and v},
         params=run.config.get("params", {}),
         embedding=run.config.get("embedding", {}),
+        target_seconds=60.0 * run.config["target_minutes"] if run.config.get("target_minutes") else None,
+        search_cache_dir=settings.get().search_cache_dir,
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)
     model = session.get(LlmModel, run.llm_model_id)
@@ -179,6 +181,19 @@ def cancel_requested(session, claim):
 
 def set_stage(session, claim, stage):
     session.execute(update(Run).where(_held(claim)).values(stage=stage))
+    session.commit()
+
+
+# The engine's notes an owner is shown on the Run, not only in its log.
+NOTE_KINDS = ("research_cut_short", "embedding", "search_cache")
+
+
+def add_note(session, claim, kind, data):
+    if kind == "embedding" and not data.get("fallback"):
+        return  # the service worked: nothing to tell
+    run = session.scalar(select(Run).where(_held(claim)).with_for_update())
+    if run is not None:
+        run.notes = {**(run.notes or {}), kind: {k: v for k, v in data.items() if k != "kind"}}
     session.commit()
 
 

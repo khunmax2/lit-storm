@@ -127,6 +127,8 @@ def _seed_defaults(session):
     an LLM key (docs/web-app-design.md, บริการที่มีให้ตั้งแต่ติดตั้ง)."""
     import os
 
+    # Thai journals: open, no key, and the one source here with Thai research.
+    session.add(SearchProvider(label="TCI-ThaiJO", kind="tci"))
     url = os.environ.get("LITSTORM_SEARXNG_URL")
     if url:
         session.add(SearchProvider(label="SearXNG", kind="searxng", endpoint=url, is_default=True))

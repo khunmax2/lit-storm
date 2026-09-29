@@ -34,6 +34,10 @@ class Settings:
     def runs_dir(self):
         return os.path.join(self.data_dir, "runs")
 
+    @property
+    def search_cache_dir(self):
+        return os.path.join(self.data_dir, "search-cache")
+
 
 @lru_cache
 def get():

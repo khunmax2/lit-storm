@@ -20,7 +20,8 @@ Upstream is a research codebase you drive from Python. This fork is a web app a 
 - **Reports you can check.** Citations are renumbered in reading order; clicking one opens the source and the excerpt the engine actually used. Export as HTML (opens offline), Markdown or PDF, with or without the evidence.
 - **Thai and English**, for the interface and for the report.
 - **Accounts, quota and a fair queue.** Administrators create accounts and send one-time links. Each person has a monthly quota; the queue takes turns between people and refunds quota when a Run fails for reasons that are not theirs.
-- **Settings on a page.** Models from OpenRouter, Gemini, OpenAI, Groq or any OpenAI-compatible server; search through SearXNG (bundled), Tavily or arXiv. Keys are stored encrypted and never shown again. Every model and search service can be tested before it is saved.
+- **Settings on a page.** Models from OpenRouter, Gemini, OpenAI, Groq or any OpenAI-compatible server; search through SearXNG (bundled), Tavily or arXiv; an embedding service of your choice. Keys are stored encrypted and never shown again. Every model, search and embedding service can be tested before it is saved.
+- **Three depth levels** — fast, standard, deep — each with a time target (2, 5 and 12 minutes). A Run that reaches 80% of its target stops gathering and writes from what it has.
 - **Usage and cost.** Tokens, searches and an estimated cost for every Run, per person and per month — without showing anyone's topics.
 - **A 30-day Trash.**
 
@@ -104,6 +105,25 @@ Browser scripts in `server/tests/` drive the real UI with Playwright against a r
 
 **Aliases move.** Gemini's `-latest` names resolve to whatever Google points them at; on 2026-09-20 `gemini-flash-latest` became a model that took 30–57 seconds on a one-word prompt. Pin a version, and measure before changing it.
 
+## Choosing an embedding service
+
+While it writes, STORM matches the snippets it collected to each section of the report by comparing embeddings. **Settings › Models › Embedding** chooses where they come from, once for every Run:
+
+- **Built in** (the default): `paraphrase-MiniLM-L6-v2`, shipped in the server image, so it needs no setup and no network. It reads English only, so it matches Thai text poorly.
+- **Any OpenAI-style `/embeddings` endpoint.** It uses the provider's API key from the same page. A multilingual model is what makes Thai reports cite well.
+
+Measured on 136 snippets (docs/benchmarks/2026-09-30-speed-1.md):
+
+| service | model | time | cost per Run |
+| --- | --- | --- | --- |
+| OpenRouter | `baai/bge-m3` | 2.7s | about $0.0001 |
+| Ollama on a GTX 1650 | `bge-m3` | 33s | none |
+| built in | MiniLM | 0.6s | none |
+
+Ollama on the same machine works too. Choose *OpenAI-compatible* and use `http://host.docker.internal:11434/v1` as the base URL; the Compose file maps that name to the host, on Docker Desktop and on Linux. A key stored for another OpenAI-compatible server is never sent to this address.
+
+If the service fails during a Run, that Run falls back to the built-in model for every snippet and records that it did. Vectors from two models cannot be compared, so it never mixes them.
+
 ---
 
 ## Changes to the upstream library
@@ -126,6 +146,12 @@ All local to the vendored `knowledge_storm` package. Upstream does not have them
 - `SearXNG` ignored `k` and collected the whole page — twenty or thirty results per query, all of which STORM went on to read. It also had no timeout, needed the `/search` path spelled out, and reported a 403 (JSON output is off by default) as a generic error. Now it honours `k`, times out at 30s, accepts the instance root, and raises `SearXNGConfigError` naming the cause when the address or setup is wrong.
 - `SearXNG` skips blank queries, which STORM's question writer sometimes produces: SearXNG answers an empty query with 400, which used to end the whole run. A 400 for one query is now skipped like any failed search.
 - `DuckDuckGoSearchRM` used `dsp`'s shared `giveup_hdlr`, which reads `err.message` — an attribute only Mistral's SDK exceptions carry. On a DuckDuckGo rate limit it raised `AttributeError` from inside backoff, hiding the real cause.
+
+**`storm_dataclass.py` — an encoder can be handed in.** The information table always built `SentenceTransformer("paraphrase-MiniLM-L6-v2")`, an English model named in code, and imported it (and torch) with the module. Now an encoder set on the table beforehand is used, and the built-in one is imported only when it is needed.
+
+**`persona_generator.py` — Wikipedia with a timeout.** The related Wikipedia pages were fetched one after another with no timeout, so a page that stopped answering held the whole run. They are now fetched side by side, with a 10s timeout and a named User-Agent.
+
+**`knowledge_curation.py` — a stop time.** `ConvSimulator.stop_at`, when set, lets each simulated conversation keep what it has once time is up, instead of asking all its turns. Every conversation still gets its first turn.
 
 **`requirements.txt` — two package changes.** `duckduckgo_search` → `ddgs`: the old package still answers HTTP 200 but returns no results. And a floor of `sentence-transformers>=3`, because unpinned it resolves to 2.2.2, whose `cached_download` import no longer exists in `huggingface_hub`.
 

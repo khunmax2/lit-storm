@@ -3374,6 +3374,12 @@
       ],
       "title": "Source Count"
      },
+     "notes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Notes",
+      "default": {}
+     },
      "events": {
       "items": {
        "$ref": "#/components/schemas/EventOut"
@@ -3610,6 +3616,12 @@
        }
       ],
       "title": "Source Count"
+     },
+     "notes": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Notes",
+      "default": {}
      }
     },
     "type": "object",

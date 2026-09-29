@@ -1263,6 +1263,13 @@ export interface components {
             report_title: string | null;
             /** Source Count */
             source_count: number | null;
+            /**
+             * Notes
+             * @default {}
+             */
+            notes: {
+                [key: string]: unknown;
+            };
             /** Events */
             events: components["schemas"]["EventOut"][];
         };
@@ -1328,6 +1335,13 @@ export interface components {
             report_title: string | null;
             /** Source Count */
             source_count: number | null;
+            /**
+             * Notes
+             * @default {}
+             */
+            notes: {
+                [key: string]: unknown;
+            };
         };
         /** SearchDraftIn */
         SearchDraftIn: {

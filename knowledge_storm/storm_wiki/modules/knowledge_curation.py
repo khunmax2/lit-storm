@@ -1,6 +1,7 @@
 import concurrent.futures
 import logging
 import os
+import time
 from concurrent.futures import as_completed
 from typing import Union, List, Tuple, Optional, Dict
 
@@ -43,6 +44,11 @@ class ConvSimulator(dspy.Module):
             retriever=retriever,
         )
         self.max_turn = max_turn
+        # A wall-clock time (time.time()) after which no conversation starts
+        # another turn, and how many conversations it cut short. Set by the
+        # caller; None asks every conversation for all its turns.
+        self.stop_at = None
+        self.cut_short = 0
 
     def forward(
         self,
@@ -58,6 +64,11 @@ class ConvSimulator(dspy.Module):
         """
         dlg_history: List[DialogueTurn] = []
         for _ in range(self.max_turn):
+            # Out of time: keep what this conversation has, once it has
+            # something, and let the article be written from it.
+            if dlg_history and self.stop_at is not None and time.time() >= self.stop_at:
+                self.cut_short += 1
+                break
             user_utterance = self.wiki_writer(
                 topic=topic, persona=persona, dialogue_turns=dlg_history
             ).question

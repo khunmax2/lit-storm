@@ -180,6 +180,8 @@ class RunOut(BaseModel):
     finished_at: datetime | None
     report_title: str | None
     source_count: int | None
+    # How the Run went, by kind (worker.queue.NOTE_KINDS).
+    notes: dict = {}
 
 
 def run_out(run):
@@ -203,6 +205,7 @@ def run_out(run):
         finished_at=run.finished_at,
         report_title=run.report_title,
         source_count=run.source_count,
+        notes=run.notes or {},
     )
 
 

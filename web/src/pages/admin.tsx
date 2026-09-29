@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   Bot,
+  BookOpenText,
   ChartColumn,
   Check,
   ChevronDown,
@@ -66,7 +67,7 @@ import { useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const LLM_PROVIDERS = ["openrouter", "gemini", "openai", "groq", "openai-compatible"];
-const SEARCH_KINDS = ["searxng", "tavily", "arxiv"];
+const SEARCH_KINDS = ["searxng", "tavily", "arxiv", "tci"];
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
@@ -1218,6 +1219,7 @@ const SEARCH_KIND_INFO: Record<string, { name: string; icon: typeof Globe; lead:
     keyUrl: "https://app.tavily.com/home",
   },
   arxiv: { name: "arXiv", icon: GraduationCap, lead: "searchKind.arxiv", tag: "searchKind.tagFree" },
+  tci: { name: "TCI-ThaiJO", icon: BookOpenText, lead: "searchKind.tci", tag: "searchKind.tagFree" },
 };
 
 // The fields a test depends on; a result is shown only while they match.
@@ -1296,7 +1298,7 @@ function SearchDialog({ form, setForm }: { form: SearchForm | null; setForm: (f:
             {/* 1. What kind of service */}
             <fieldset className="grid gap-2">
               <legend className="mb-2 text-sm font-medium">{t("admin.kind")}</legend>
-              <div role="radiogroup" aria-label={t("admin.kind")} className="grid gap-2 sm:grid-cols-3">
+              <div role="radiogroup" aria-label={t("admin.kind")} className="grid gap-2 sm:grid-cols-2">
                 {SEARCH_KINDS.map((kind) => {
                   const k = SEARCH_KIND_INFO[kind];
                   const active = kind === f.kind;
@@ -1412,6 +1414,12 @@ function SearchDialog({ form, setForm }: { form: SearchForm | null; setForm: (f:
                 <p className="flex gap-2 rounded-lg bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
                   <Info className="mt-0.5 size-4 shrink-0" />
                   {t("searchKind.arxivNote")}
+                </p>
+              )}
+              {f.kind === "tci" && (
+                <p className="flex gap-2 rounded-lg bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 size-4 shrink-0" />
+                  {t("searchKind.tciNote")}
                 </p>
               )}
             </div>

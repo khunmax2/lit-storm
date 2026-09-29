@@ -122,7 +122,7 @@ def test_arxiv_skips_blank_queries(monkeypatch):
     assert rm.refused == 0 and rm.get_usage_and_reset() == {"ArxivRM": 1}
 
 
-@pytest.mark.parametrize("kind", ["searxng", "tavily", "arxiv"])
+@pytest.mark.parametrize("kind", ["searxng", "tavily", "arxiv", "tci"])
 def test_every_search_provider_builds_the_retriever_a_run_uses(kind):
     """The admin's test button calls each service over plain HTTP, so it
     passes even when the retriever a Run builds cannot load its client
@@ -130,7 +130,7 @@ def test_every_search_provider_builds_the_retriever_a_run_uses(kind):
     from litstorm.catalog import SEARCH_PROVIDERS
     from litstorm.engines.storm import providers
 
-    assert set(SEARCH_PROVIDERS) == {"searxng", "tavily", "arxiv"}, "add the new kind to this test"
+    assert set(SEARCH_PROVIDERS) == {"searxng", "tavily", "arxiv", "tci"}, "add the new kind to this test"
     search = {"provider": kind, "endpoint": "http://searxng.test"}
     rm = providers.build_rm(search, api_key="tvly-test-0000", k=3, timeout=5)
     assert rm.k == 3
@@ -223,3 +223,73 @@ def test_tavily_skips_blank_queries_and_one_it_rejects(monkeypatch):
     monkeypatch.setattr(rm.tavily_client, "search", locked)
     with pytest.raises(InvalidAPIKeyError):
         rm.forward("songkran")
+
+
+def _tci(monkeypatch, answers):
+    """A fake ThaiJO: `answers` maps strict=True/False to its result list,
+    or to a status code to answer with."""
+    import requests
+
+    from litstorm.engines.storm import tci_rm
+
+    asked = []
+
+    class Resp:
+        def __init__(self, code, result=None):
+            self.status_code, self._result = code, result
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise requests.HTTPError(f"{self.status_code} Server Error")
+
+        def json(self):
+            return {"result": self._result, "total": len(self._result or [])}
+
+    def post(url, json, timeout, headers):
+        asked.append((json["term"], json["strict"]))
+        answer = answers[json["strict"]]
+        return Resp(answer) if isinstance(answer, int) else Resp(200, answer)
+
+    monkeypatch.setattr(tci_rm.requests, "post", post)
+    monkeypatch.setattr(tci_rm.time, "sleep", lambda s: None)
+    return tci_rm.TciRM(k=2), asked
+
+
+def _article(n, title_th="", title_en="", abstract="บทคัดย่อ"):
+    return {
+        "articleUrl": f"https://so01.tci-thaijo.org/index.php/j/article/view/{n}",
+        "thaijoUrl": "https://so01.tci-thaijo.org/index.php/j",
+        "title": {"th_TH": title_th, "en_US": title_en},
+        "abstract_clean": {"th_TH": abstract, "en_US": ""},
+        "authors": [{"full_name": {"th_TH": "สมชาย ใจดี", "en_US": "Somchai Jaidee"}}],
+        "datePublished": "2025-06-29T17:00:00+0000",
+    }
+
+
+def test_tci_asks_strictly_then_loosely_and_keeps_k(monkeypatch):
+    """ThaiJO's strict search wants every word; STORM's long questions
+    mostly find nothing that way, so the loose search's first k are kept."""
+    rm, asked = _tci(monkeypatch, {True: [], False: [_article(i, f"บทความ {i}") for i in range(5)]})
+    found = rm.forward(["  ", "ผลกระทบของการนอนดึกต่อสุขภาพจิตในวัยรุ่นไทย"])
+    assert asked == [("ผลกระทบของการนอนดึกต่อสุขภาพจิตในวัยรุ่นไทย", True),
+                     ("ผลกระทบของการนอนดึกต่อสุขภาพจิตในวัยรุ่นไทย", False)]
+    assert [r["title"] for r in found] == ["บทความ 0", "บทความ 1"]
+    assert found[0]["url"].endswith("/article/view/0")  # the article, not its journal
+    assert found[0]["snippets"] == ["บทคัดย่อ"]
+    assert found[0]["description"] == "สมชาย ใจดี (2025-06-29)"
+    assert rm.get_usage_and_reset() == {"TciRM": 1}
+
+
+def test_tci_strict_hits_are_enough_and_empty_abstracts_are_skipped(monkeypatch):
+    rm, asked = _tci(monkeypatch, {True: [_article(1, title_en="PM2.5", abstract=""), _article(2, "ฝุ่น")],
+                                  False: [_article(9)]})
+    found = rm.forward("PM2.5 เชียงใหม่")
+    assert [q[1] for q in asked] == [True]
+    assert [r["title"] for r in found] == ["ฝุ่น"]
+
+
+def test_tci_counts_a_refusal(monkeypatch):
+    rm, asked = _tci(monkeypatch, {True: 503, False: 503})
+    assert rm.forward("สงกรานต์") == []
+    assert len(asked) == 3  # three tries in all, then given up
+    assert rm.refused == 1 and "503" in rm.last_refusal

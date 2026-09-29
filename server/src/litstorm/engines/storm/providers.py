@@ -16,6 +16,7 @@ import backoff
 from knowledge_storm.lm import GoogleModel, LitellmModel
 
 from .arxiv_rm import ArxivRM
+from .tci_rm import TciRM
 
 RETRIES = 2  # after the first request, so three in all
 TRIES = RETRIES + 1
@@ -125,6 +126,8 @@ def build_rm(search, api_key, k, timeout):
         return TavilySearchRM(tavily_search_api_key=api_key, k=k, include_raw_content=True)
     if provider == "arxiv":
         return ArxivRM(k=k, timeout=timeout)
+    if provider == "tci":
+        return TciRM(k=k, timeout=timeout)
     raise ProviderConfigError(
         f"{provider!r} is not a Search Provider: {list(SEARCH_PROVIDERS)}"
     )

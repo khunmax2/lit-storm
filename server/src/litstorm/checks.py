@@ -107,6 +107,19 @@ def search(provider, api_key, query="retrieval augmented generation"):
                 for m in (re.search(r"<title>(.*?)</title>", e, re.S) for e in entries)
                 if m
             ]
+        elif provider.kind == "tci":
+            r = requests.post(
+                "https://www.tci-thaijo.org/api/articles/search/",
+                json={"term": query, "page": 1, "size": 3, "strict": False,
+                      "title": True, "author": True, "abstract": True},
+                timeout=TIMEOUT,
+                headers={"User-Agent": "lit-storm/2"},
+            )
+            r.raise_for_status()
+            titles = [
+                (x.get("title") or {}).get("th_TH") or (x.get("title") or {}).get("en_US") or ""
+                for x in r.json().get("result") or []
+            ]
         else:
             return False, f"no check for {provider.kind!r}", 0.0, []
     except Exception as error:  # noqa: BLE001

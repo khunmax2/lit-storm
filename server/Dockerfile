@@ -14,11 +14,11 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 WORKDIR /app
-# knowledge_storm first: it changes less than the server does.
-COPY setup.py requirements.txt README.md ./
-COPY knowledge_storm ./knowledge_storm
+# Third-party packages first, from the lock alone: editing knowledge_storm or
+# the README no longer reinstalls them, Chromium and the embedding model
+# (about ten minutes a build).
 COPY server/pyproject.toml server/uv.lock ./server/
-RUN cd server && uv sync --frozen --no-dev --extra pdf --no-install-project
+RUN cd server && uv sync --frozen --no-dev --extra pdf --no-install-project --no-install-package knowledge-storm
 RUN playwright install --with-deps chromium
 
 # STORM's built-in embedding model, in the image: otherwise every new
@@ -29,6 +29,10 @@ ENV HF_HOME=/opt/hf
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-MiniLM-L6-v2')" \
     && chmod -R a+rX /opt/hf
 ENV HF_HUB_OFFLINE=1
+
+# knowledge_storm, installed editable from here by the sync below.
+COPY setup.py requirements.txt README.md ./
+COPY knowledge_storm ./knowledge_storm
 
 COPY server ./server
 RUN cd server && uv sync --frozen --no-dev --extra pdf

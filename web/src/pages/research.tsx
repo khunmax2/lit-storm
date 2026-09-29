@@ -10,11 +10,14 @@ import {
   FolderPlus,
   Gauge,
   Globe,
+  History,
+  Info,
   Loader2,
   MoreHorizontal,
   RotateCcw,
   Sparkles,
   Square,
+  Timer,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -641,6 +644,39 @@ function ChooseAgain({ run }: { run: Run }) {
   );
 }
 
+// How a Run went, where the owner should know: it wrote from what it had
+// when its time ran short, or matched sources with the fallback model.
+// Cached searches are good news, said quietly.
+function RunNotes({ notes }: { notes: Record<string, unknown> }) {
+  const { t } = useT();
+  const cut = notes.research_cut_short as { seconds?: number } | undefined;
+  const fallback = notes.embedding as { fallback?: boolean } | undefined;
+  const cache = notes.search_cache as { hits?: number } | undefined;
+  if (!cut && !fallback?.fallback && !cache?.hits) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {cut && (
+        <span className="flex items-center gap-1 text-warning">
+          <Timer className="size-3" />
+          {t("run.note.cutShort", { n: Math.round((cut.seconds ?? 0) / 60) || 1 })}
+        </span>
+      )}
+      {fallback?.fallback && (
+        <span className="flex items-center gap-1 text-warning">
+          <Info className="size-3" />
+          {t("run.note.embeddingFallback")}
+        </span>
+      )}
+      {!!cache?.hits && (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <History className="size-3" />
+          {t("run.note.cached", { n: cache.hits })}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: () => void) => void }) {
   const { t, lang } = useT();
   const queryClient = useQueryClient();
@@ -710,6 +746,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                 </span>
               )}
             </div>
+            <RunNotes notes={run.notes ?? {}} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {readable && (

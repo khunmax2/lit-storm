@@ -304,6 +304,7 @@ def test_a_search_provider_can_be_tried_before_it_is_saved(admin, configured, mo
         return Resp()
 
     monkeypatch.setattr(requests, "post", post)
+    before = admin.get("/api/admin/search-providers").json()
     r = admin.post(
         "/api/admin/search-providers/check",
         json={"kind": "tavily", "api_key": "tvly-draft-1234", "query": "songkran"},
@@ -312,7 +313,7 @@ def test_a_search_provider_can_be_tried_before_it_is_saved(admin, configured, mo
     assert (sent["api_key"], sent["query"]) == ("tvly-draft-1234", "songkran")
     assert "tvly-draft-1234" not in str(r)
     # Nothing was saved by trying it.
-    assert [p["kind"] for p in admin.get("/api/admin/search-providers").json()] == ["arxiv"]
+    assert admin.get("/api/admin/search-providers").json() == before
 
 
 def test_editing_tries_the_stored_key_when_none_is_typed(admin, configured, monkeypatch):

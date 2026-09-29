@@ -15,7 +15,7 @@ LLM_PROVIDERS = {
     "openai-compatible": {"prefix": "openai/", "needs_base": True},
 }
 
-SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv")
+SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv", "tci")
 
 
 def reasoning_kwargs(value, provider):

@@ -115,3 +115,38 @@ def test_every_search_provider_builds_the_retriever_a_run_uses(kind):
     search = {"provider": kind, "endpoint": "http://searxng.test"}
     rm = providers.build_rm(search, api_key="tvly-test-0000", k=3, timeout=5)
     assert rm.k == 3
+
+
+def test_searxng_skips_blank_queries_and_one_it_rejects(monkeypatch):
+    """A blank query from STORM once ended a whole Run: SearXNG answers an
+    empty q with 400, which was taken for a wrong address."""
+    import requests
+
+    from knowledge_storm.rm import SearXNG, SearXNGConfigError
+
+    asked = []
+
+    class Resp:
+        def __init__(self, code):
+            self.status_code = code
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [{"url": "https://a.test/" + asked[-1], "title": "A", "content": "c"}]}
+
+    def get(url, headers, params, timeout):
+        asked.append(params["q"])
+        return Resp(400 if params["q"] == "bad" else 200)
+
+    monkeypatch.setattr(requests, "get", get)
+    rm = SearXNG("http://searxng.test", k=1)
+    found = rm.forward(["", "  ", "songkran", "bad", "rag"])
+    assert asked == ["songkran", "bad", "rag"]  # blanks never sent
+    assert [r["url"] for r in found] == ["https://a.test/songkran", "https://a.test/rag"]
+    assert rm.get_usage_and_reset() == {"SearXNG": 3}
+
+    monkeypatch.setattr(requests, "get", lambda *a, **kw: Resp(404))
+    with pytest.raises(SearXNGConfigError):  # a wrong address still says so
+        SearXNG("http://searxng.test/nope", k=1).forward("songkran")

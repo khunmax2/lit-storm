@@ -1076,6 +1076,9 @@ class TavilySearchRM(dspy.Retrieve):
         )
 
         self.usage = 0
+        # Queries Tavily refused, and the last reason (see forward).
+        self.refused = 0
+        self.last_refusal = ""
 
         # Creates client instance that will use search. Full search params are here:
         # https://docs.tavily.com/docs/python-sdk/tavily-search/examples
@@ -1104,22 +1107,38 @@ class TavilySearchRM(dspy.Retrieve):
         Returns:
             a list of Dicts, each dict has keys of 'description', 'snippets' (list of strings), 'title', 'url'
         """
+        from tavily.errors import BadRequestError, TimeoutError as TavilyTimeout
+
         queries = (
             [query_or_queries]
             if isinstance(query_or_queries, str)
             else query_or_queries
         )
+        # STORM's question writer sometimes hands over a blank query, and
+        # Tavily answers it with "Query is missing" — which ended the whole
+        # run. There is nothing to search for; skip it.
+        queries = [q.strip() for q in queries if q and q.strip()]
         self.usage += len(queries)
 
         collected_results = []
 
         for query in queries:
             #  list of dicts that will be parsed to return
-            responseData = self.tavily_client.search(
-                query,
-                max_results=self.k,
-                include_raw_content=self.include_raw_content,
-            )
+            try:
+                responseData = self.tavily_client.search(
+                    query,
+                    max_results=self.k,
+                    include_raw_content=self.include_raw_content,
+                )
+            except (BadRequestError, TavilyTimeout) as e:
+                # About this one query (too long, rejected, slow), not the
+                # key: skip it like any failed search, and count it so a run
+                # that found nothing can say it was refused. A bad key or an
+                # exhausted plan still raises, and says so.
+                self.refused += 1
+                self.last_refusal = f"{type(e).__name__}: {e}"[:200]
+                logging.warning("Tavily refused the query %r: %s", query, e)
+                continue
             results = responseData.get("results")
             for d in results:
                 # assert d is dict

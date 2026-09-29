@@ -193,3 +193,33 @@ def test_searxng_counts_queries_its_engines_refused(monkeypatch):
     assert rm.forward(["songkran", "rag"]) == []
     assert rm.refused == 2
     assert rm.last_refusal == "brave: Suspended: too many requests, duckduckgo: timeout"
+
+
+def test_tavily_skips_blank_queries_and_one_it_rejects(monkeypatch):
+    """Tavily answers a blank query with "Query is missing", which ended two
+    Thai Runs in the benchmark. A bad key must still fail loudly."""
+    from tavily.errors import BadRequestError, InvalidAPIKeyError
+
+    from knowledge_storm.rm import TavilySearchRM
+
+    rm = TavilySearchRM(tavily_search_api_key="tvly-test", k=2)
+    asked = []
+
+    def search(query, **kw):
+        asked.append(query)
+        if query == "bad":
+            raise BadRequestError("Query is too long.")
+        return {"results": [{"url": f"https://a.test/{query}", "title": "A", "content": "c"}]}
+
+    monkeypatch.setattr(rm.tavily_client, "search", search)
+    found = rm.forward(["", "   ", "songkran", "bad"])
+    assert asked == ["songkran", "bad"]  # blanks never sent
+    assert [r["url"] for r in found] == ["https://a.test/songkran"]
+    assert rm.refused == 1 and "too long" in rm.last_refusal
+
+    def locked(query, **kw):
+        raise InvalidAPIKeyError("Unauthorized: missing or invalid API key.")
+
+    monkeypatch.setattr(rm.tavily_client, "search", locked)
+    with pytest.raises(InvalidAPIKeyError):
+        rm.forward("songkran")

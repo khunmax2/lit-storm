@@ -2,7 +2,9 @@
 
     uv run python tests/acceptance.py <output dir>
 
-Wipes the stack (`docker compose down -v`), installs it again, and checks
+Wipes its own stack (Compose project `litstorm-accept` on port 8091, never
+the one in daily use; `docker compose down -v`), installs it again under
+/litstorm as on the host, and checks
 every criterion in docs/web-app-design.md (เกณฑ์รับงานรุ่นแรก), writing
 <output dir>/acceptance.md with a verdict and the evidence for each, plus
 screenshots. Runs real research (costs money, well under a dollar) and
@@ -28,8 +30,22 @@ from playwright.sync_api import expect, sync_playwright
 import ui
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-COMPOSE = ["docker", "compose", "-f", os.path.join(ROOT, "stack", "compose.yml")]
-BASE = "http://127.0.0.1:8090"
+# A stack of its own, so the wipe never touches the one in daily use: its
+# own Compose project (and volumes) and port, set up as it runs on host
+# 203 — behind an nginx at /litstorm (stack/compose.mirror.yml).
+PROJECT = os.environ.get("LITSTORM_ACCEPT_PROJECT", "litstorm-accept")
+PORT = os.environ.get("LITSTORM_ACCEPT_PORT", "8091")
+COMPOSE = [
+    "docker", "compose", "-p", PROJECT,
+    "-f", os.path.join(ROOT, "stack", "compose.yml"),
+    "-f", os.path.join(ROOT, "stack", "compose.mirror.yml"),
+]
+os.environ["LITSTORM_PORT"] = PORT  # read by the Compose files
+BASE = f"http://127.0.0.1:{PORT}/litstorm"
+# The Search Provider the acceptance Runs use: arXiv, or another kind when
+# arXiv is rate-limiting this address (it answered 429 after a day of
+# benchmarks on 2026-09-30); TCI-ThaiJO is seeded at setup and needs no key.
+SEARCH_KIND = os.environ.get("LITSTORM_ACCEPT_SEARCH", "arxiv")
 MODEL = "google/gemini-3.5-flash-lite"
 ADMIN = ("admin@example.org", "acceptance admin pw")
 ALICE = ("alice@example.org", "alice password 1")
@@ -227,17 +243,16 @@ class Acceptance:
         searxng = next(p for p in providers if p["kind"] == "searxng")
         self.check(k, searxng["is_default"], "the stack's SearXNG is seeded as the default Search Provider")
         # SearXNG depends on outside engines that throttle an address after
-        # heavy use; the acceptance Runs use arXiv, which does not.
-        arxiv = admin.post("/api/admin/search-providers",
-                           json={"label": "arXiv", "kind": "arxiv", "is_default": True}).json()
-        self.note(k, "arXiv added through the admin API and made the default for these Runs")
+        # heavy use; the acceptance Runs use arXiv (or SEARCH_KIND) instead.
+        search = _use_search(admin)
+        self.note(k, f"{search['label']} made the default Search Provider for these Runs")
         t = admin.post(f"/api/admin/llm-models/{model['id']}/test").json()
         self.check(k, t["ok"], f"model test button: {t['message']} in {t['seconds']}s")
         t = admin.post(f"/api/admin/search-providers/{searxng['id']}/test").json()
         self.note(k, f"SearXNG test button (outside engines, not scored): {'ok' if t['ok'] else 'no'} — {t['message']}")
-        t = admin.post(f"/api/admin/search-providers/{arxiv['id']}/test").json()
-        self.check(k, t["ok"], f"arXiv test button: {t['message']}")
-        self.ctx.update(model=model, spare=spare, searxng=searxng, arxiv=arxiv)
+        t = admin.post(f"/api/admin/search-providers/{search['id']}/test").json()
+        self.check(k, t["ok"], f"{search['label']} test button: {t['message']}")
+        self.ctx.update(model=model, spare=spare, searxng=searxng, search=search)
 
     # 2 + 6 ----------------------------------------------------------------------------------
     def real_reports(self, pw):
@@ -376,7 +391,7 @@ class Acceptance:
         q2 = alice.get("/api/me/quota").json()
         self.check(k4, q2["reserved"] == q1["reserved"], "a parked Run keeps its reservation")
         r = alice.post(f"/api/runs/{a2['id']}/selection",
-                       json={"llm_model_id": model["id"], "search_provider_id": self.ctx["arxiv"]["id"]})
+                       json={"llm_model_id": model["id"], "search_provider_id": self.ctx["search"]["id"]})
         self.check(k3, r.status_code == 200 and r.json()["status"] == "queued",
                    "choosing again puts the same Run back in the queue")
         self.check(k4, alice.get("/api/me/quota").json()["reserved"] == q1["reserved"], "choosing again charges nothing twice")
@@ -486,7 +501,7 @@ class Acceptance:
         set_limits(admin, run_deadline_minutes=5,
                    depth_levels=standard_depth(admin, {"max_perspective": 8, "max_conv_turn": 8, "search_top_k": 5}))
         _, s = bob.research("Deadline test: retrieval augmented generation", language="en",
-                            search_provider_id=self.ctx["arxiv"]["id"])
+                            search_provider_id=self.ctx["search"]["id"])
         started = time.time()
         final = bob.wait(s["runs"][0]["id"], timeout=600)
         took = int(time.time() - started)
@@ -571,6 +586,16 @@ def login(page, email, password):
     ui.login(page, BASE, email, password)
 
 
+def _use_search(admin):
+    """The provider of SEARCH_KIND, added if the stack has none, made the default."""
+    found = next((p for p in admin.get("/api/admin/search-providers").json() if p["kind"] == SEARCH_KIND), None)
+    body = {"label": {"arxiv": "arXiv", "tci": "TCI-ThaiJO"}.get(SEARCH_KIND, SEARCH_KIND), "kind": SEARCH_KIND,
+            "enabled": True, "is_default": True}
+    if found is None:
+        return admin.post("/api/admin/search-providers", json=body).json()
+    return admin.put(f"/api/admin/search-providers/{found['id']}", json={**found, **body, "label": found["label"]}).json()
+
+
 def attach(acc):
     """Pick up the stack a full run left behind, for --rerun."""
     admin = Api(*ADMIN)
@@ -581,7 +606,7 @@ def attach(acc):
         bob=Api(*BOB),
         model=next(m for m in models if m["is_default"]),
         spare=next(m for m in models if not m["is_default"]),
-        arxiv=next(p for p in admin.get("/api/admin/search-providers").json() if p["kind"] == "arxiv"),
+        search=_use_search(admin),
         limits=admin.get("/api/admin/limits").json(),
     )
     # A Run parked by an earlier attempt still holds its reservation.

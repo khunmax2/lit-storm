@@ -269,6 +269,10 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
    - ถ้าไม่ใส่ `LITSTORM_BASE_PATH` stack รันที่ `/` เหมือนเดิม
    - รายการเดิมของขั้นนี้: nginx ข้างหน้า, base path `/litstorm`, origin เดียว ระบบต้องรองรับ base path ครอบคลุม Vite, router, API, cookie และลิงก์ตั้งรหัสผ่าน
 
+**ตรวจรับช่วง 2.0 ผ่านเมื่อ 2026-09-30:** เกณฑ์รุ่นแรกครบ 12 ข้อบน stack จำลอง host ใต้ `/litstorm` ดู [acceptance/2026-09-30-phase-2.0.md](./acceptance/2026-09-30-phase-2.0.md)
+- สคริปต์ตรวจรับรันบน stack ของตัวเอง (`litstorm-accept`, port 8091) ไม่ลบ stack ที่ใช้ประจำ
+- เลือกบริการค้นหาของ Run ได้ด้วย `LITSTORM_ACCEPT_SEARCH`
+
 ### 2.1 Agent Research
 
 - ติดตั้ง `lit_agents-deep-research` ใน Worker (pin ตาม commit) แล้วเขียน Engine ที่รันใน subprocess

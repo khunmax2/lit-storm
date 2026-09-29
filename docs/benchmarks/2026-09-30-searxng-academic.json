@@ -1,0 +1,26 @@
+[
+  {
+    "run_id": "b2dc561f-96eb-405e-9c02-c946c996295d",
+    "topic": "Retrieval-augmented generation",
+    "language": "en",
+    "status": "succeeded",
+    "reason": "succeeded",
+    "sources": 46,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "SearXNG LDR-academic",
+    "seconds": {
+      "queued": 0.19358015060424805,
+      "startup": 9.01838994026184,
+      "research": 35.0737509727478,
+      "outline": 4.010303974151611,
+      "article": 16.023910999298096,
+      "polish": 2.009019136428833,
+      "normalize": 0.0053348541259765625,
+      "total": 66.14070987701416
+    },
+    "tokens_in": 52181,
+    "tokens_out": 13264,
+    "searches": 36,
+    "cost_usd": 0.032941
+  }
+]

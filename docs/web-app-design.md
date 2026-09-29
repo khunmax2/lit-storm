@@ -325,6 +325,12 @@ needs_selection ─ยกเลิก─▶ cancelled
 ### 2026-09-24 — บริการที่มีให้ตั้งแต่ติดตั้ง
 
 - ติดตั้ง SearXNG ใน compose และตั้งเป็น Search Provider เริ่มต้น เพื่อให้ส่ง Run แรกได้โดยมีแค่ LLM key ตัวเดียว ส่วน Tavily และ arXiv ผู้ดูแลเปิดเพิ่มได้
+- **ปรับเมื่อ 2026-09-30:** SearXNG ยังเป็นค่าเริ่มต้นตามที่เจ้าของโปรเจกต์ต้องการ (ไม่ใช้ Tavily) แต่ปรับตั้งค่าดังนี้
+  - **ค้นเว็บทั่วไป:** ค่าตั้งต้นของ SearXNG เปิดแค่ Brave, DuckDuckGo และ Google CSE สองตัวหลังมักติด CAPTCHA หรือถูกระงับ จึงเหลือ Brave ตัวเดียว และ Run ค้นไม่เจออะไรเมื่อ Brave ถูกระงับด้วย เปิด Google, Bing และ Yahoo เพิ่ม (ทดสอบแล้วตอบทั้งไทยและอังกฤษ) SearXNG ส่งทุกคำค้นไปทุก engine ในหมวด การเปิดเพิ่มจึงไม่ลดภาระต่อ engine แต่มีตัวสำรองเมื่อบางตัวถูกระงับ
+  - **"SearXNG LDR-academic":** เป็น Search Provider ตัวที่สองที่ระบบสร้างให้ตอนติดตั้ง ชี้ไป SearXNG ตัวเดิมแต่ระบุ engine วิชาการชุดเดียวกับที่ fork `searxng-LDR-academic` เปิด ได้แก่ arXiv, Crossref, Europe PMC, Google Scholar, OpenAIRE, OpenAlex, PDBe, PubMed และ Semantic Scholar
+    - engine เหล่านี้อยู่ในหมวด science ซึ่งคำค้นที่ไม่ระบุ engine ไม่เคยใช้ ก่อนหน้านี้จึงเปิดไว้โดยไม่มีผลเลย
+    - ไม่ใช้ตัว fork เอง เพราะ engine 2 ตัวที่มีเฉพาะใน fork ใช้ไม่ได้: BASE ตอบว่า "Access denied" กับ IP ที่ไม่ได้ขออนุญาต และ Library of Congress ค้นได้เฉพาะรูปภาพ
+    - engine วิชาการแทบไม่มีเนื้อหาภาษาไทย หัวข้อไทยควรใช้ SearXNG แบบค้นเว็บ
 - LLM รองรับ Gemini, OpenRouter, Groq, OpenAI และ endpoint ที่เข้ากันได้กับ OpenAI หน้าตั้งค่ามีปุ่มทดสอบการเชื่อมต่อ
 
 ## รุ่นสอง — ข้อสรุปที่ยืนยันแล้ว (2026-09-30)

@@ -26,26 +26,47 @@ search:
     - html
     - json
 
-# The academic engines the "LDR-academic" fork enables are all stock engines
-# switched on in its settings.yml — ten of its twelve are in upstream by name
-# already. Turned on here for the same effect without carrying the fork.
-# Everything else keeps the image's default of on or off.
+# Web search. SearXNG sends every query to every enabled engine in the
+# "general" category, so more engines do not spread the load; they are
+# spares. Out of the box only Brave, DuckDuckGo and Google CSE are on, and
+# with DuckDuckGo behind a CAPTCHA and Google CSE suspended a Run was left
+# with Brave alone, then nothing (2026-09-30). Google, Bing and Yahoo
+# answered in Thai and English when tried; Qwant asked for a CAPTCHA, and
+# Yep and Mwmbl had nothing in Thai.
+#
+# Academic search: the engines searxng-LDR-academic turns on, plus Europe
+# PMC. The fork's other two are left out: BASE answers "Access denied" to an
+# IP it has not approved, and its Library of Congress engine searches photos. They sit in the "science"
+# category, which a query without `engines=` never reaches, so lit-storm
+# offers them as a Search Provider of their own ("SearXNG LDR-academic"),
+# whose engines list names them. That gives the fork's academic search
+# without carrying the fork (see docs/web-app-design.md).
 engines:
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: yahoo
+    disabled: false
   - name: arxiv
+    disabled: false
+  - name: crossref
+    disabled: false
+  - name: europepmc
+    disabled: false
+  - name: google scholar
+    disabled: false
+  - name: openairedatasets
+    disabled: false
+    timeout: 10.0
+  - name: openairepublications
+    disabled: false
+    timeout: 10.0
+  - name: openalex
+    disabled: false
+  - name: pdbe
     disabled: false
   - name: pubmed
     disabled: false
   - name: semantic scholar
-    disabled: false
-  - name: crossref
-    disabled: false
-  - name: openalex
-    disabled: false
-  - name: google scholar
-    disabled: false
-  - name: core.ac.uk
-    disabled: false
-  - name: base
-    disabled: false
-  - name: pdbe
     disabled: false

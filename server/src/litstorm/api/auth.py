@@ -130,6 +130,17 @@ def _seed_defaults(session):
     url = os.environ.get("LITSTORM_SEARXNG_URL")
     if url:
         session.add(SearchProvider(label="SearXNG", kind="searxng", endpoint=url, is_default=True))
+        # The same instance, asked only its academic engines (the set
+        # searxng-LDR-academic turns on; stack/searxng/settings.yml).
+        session.add(
+            SearchProvider(label="SearXNG LDR-academic", kind="searxng", endpoint=url, engines=ACADEMIC_ENGINES)
+        )
+
+
+ACADEMIC_ENGINES = (
+    "arxiv,crossref,europepmc,google scholar,openairedatasets,openairepublications,"
+    "openalex,pdbe,pubmed,semantic scholar"
+)
 
 
 # --- signing in -----------------------------------------------------------

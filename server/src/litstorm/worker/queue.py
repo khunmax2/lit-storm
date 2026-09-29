@@ -128,6 +128,7 @@ def claim(session):
         embedding=run.config.get("embedding", {}),
         target_seconds=60.0 * run.config["target_minutes"] if run.config.get("target_minutes") else None,
         search_cache_dir=settings.get().search_cache_dir,
+        refinement=run.config.get("refinement", []),
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)
     return Claim(run.id, token, config, secrets, deadline, prices=_prices(session, run, fast))

@@ -1711,6 +1711,7 @@ function Limits() {
           {num("max_queued_per_user", t("admin.limit.queued"))}
           {num("monthly_run_quota", t("admin.limit.quota"))}
           {num("run_deadline_minutes", t("admin.limit.deadline"))}
+          {num("refinements_per_day", t("admin.limit.refinements"))}
         </CardContent>
       </Card>
 

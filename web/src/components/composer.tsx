@@ -1,11 +1,12 @@
 // The research composer: a tray of choices around a white box for the topic,
 // the model beside the send button — the layout agent apps have settled on. Used on the home page (with
 // a project picker) and at the foot of a topic (to research it again).
-import { useQuery } from "@tanstack/react-query";
-import { Gauge, Globe, Loader2, Search, SendHorizontal, Sparkles, Timer } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Gauge, Globe, Loader2, MessageCircleQuestion, Search, SendHorizontal, Sparkles, Timer, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
+import { ErrorText } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +22,8 @@ export type RunForm = {
   search_provider_id: string;
   depth: Depth;
   engine: string;
+  // Clarifying questions and the owner's answers, when they asked for them.
+  refinement?: { question: string; answer: string }[];
 };
 
 // One press of Start is one Run: the same key goes with every retry of the
@@ -38,6 +41,7 @@ export function runBody(form: RunForm, request_key: string) {
     search_provider_id: form.search_provider_id || null,
     depth: form.depth,
     engine: form.engine,
+    refinement: (form.refinement ?? []).filter((qa) => qa.answer.trim()),
     request_key,
   };
 }
@@ -149,6 +153,21 @@ export function Composer({
   const target = o?.depth_levels.find((d) => d.id === form.depth)?.target_minutes ?? 5;
   const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
 
+  // Question refinement (docs/web-app-design.md, ขัดเกลาโจทย์): a few
+  // questions from the chosen model, answered or skipped, before starting.
+  const refine = useMutation({
+    mutationFn: () =>
+      call(
+        api.POST("/api/refine", {
+          body: { topic: form.topic.trim(), language: form.language, llm_model_id: form.llm_model_id || null },
+        }),
+      ),
+    onSuccess: (r) => setForm({ ...form, refinement: r.questions.map((question) => ({ question, answer: "" })) }),
+  });
+  const qa = form.refinement ?? [];
+  const setAnswer = (i: number, answer: string) =>
+    setForm({ ...form, refinement: qa.map((x, j) => (j === i ? { ...x, answer } : x)) });
+
   return (
     <form
       onSubmit={(e) => {
@@ -217,6 +236,41 @@ export function Composer({
             )}
           />
         </div>
+        {(qa.length > 0 || refine.error) && (
+          <div className="mx-3 mt-3 grid gap-2.5 rounded-lg border bg-muted/40 p-3">
+            <div className="flex items-center justify-between gap-2 text-sm font-medium">
+              <span className="flex items-center gap-1.5">
+                <MessageCircleQuestion className="size-4 text-brand" />
+                {t("refine.title")}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label={t("refine.clear")}
+                onClick={() => {
+                  refine.reset();
+                  setForm({ ...form, refinement: [] });
+                }}
+              >
+                <X />
+              </Button>
+            </div>
+            {!!refine.error && <ErrorText error={refine.error} />}
+            {qa.map((x, i) => (
+              <label key={i} className="grid gap-1 text-sm">
+                <span className="text-muted-foreground">{x.question}</span>
+                <input
+                  className="h-8 rounded-md border bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
+                  value={x.answer}
+                  placeholder={t("refine.skip")}
+                  onChange={(e) => setAnswer(i, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2 px-3 pt-2 pb-3">
           {models.length > 0 && (
             <Chip
@@ -228,6 +282,19 @@ export function Composer({
             />
           )}
           <div className="ml-auto flex items-center gap-3">
+            {!locked && qa.length === 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-[13px] text-muted-foreground"
+                disabled={!ready || refine.isPending}
+                onClick={() => refine.mutate()}
+              >
+                {refine.isPending ? <Loader2 className="animate-spin" /> : <MessageCircleQuestion />}
+                {t("refine.ask")}
+              </Button>
+            )}
             {locked ? (
               <span className="text-xs text-muted-foreground">{locked}</span>
             ) : (

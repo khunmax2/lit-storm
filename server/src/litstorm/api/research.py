@@ -179,6 +179,48 @@ def get_project(project_id: uuid.UUID, user=Depends(deps.current_user), session=
 # --- Research Sessions and Runs -------------------------------------------------------
 
 
+class QuestionAnswer(BaseModel):
+    question: str = Field(max_length=300)
+    answer: str = Field(default="", max_length=1000)
+
+
+class RefineIn(BaseModel):
+    topic: str = Field(min_length=3, max_length=500)
+    language: str = Field(pattern="^(th|en)$")
+    llm_model_id: uuid.UUID | None = None
+
+
+class RefineOut(BaseModel):
+    questions: list[str]
+
+
+@router.post("/refine", response_model=RefineOut)
+def refine_topic(body: RefineIn, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """A few questions to make the topic clearer before a Run. Takes no
+    quota; counted against a daily cap per User instead."""
+    from litstorm import refine, security
+    from litstorm.db.models import LlmCredential, QuestionRefinement
+
+    day_start = datetime.now(limits.QUOTA_ZONE).replace(hour=0, minute=0, second=0, microsecond=0)
+    asked = session.scalar(
+        select(func.count()).select_from(QuestionRefinement).where(
+            QuestionRefinement.user_id == user.id, QuestionRefinement.created_at >= day_start
+        )
+    )
+    if asked >= limits.load(session).refinements_per_day:
+        raise HTTPException(429, "refine_limit")
+    model = _pick(session, LlmModel, body.llm_model_id)
+    credential = session.get(LlmCredential, model.provider)
+    key = security.decrypt(credential.api_key_ciphertext) if credential else ""
+    session.add(QuestionRefinement(user_id=user.id))
+    session.commit()  # counted whether or not the model answers: it was asked
+    try:
+        found = refine.questions(model, key, credential.api_base if credential else None, body.topic.strip(), body.language)
+    except refine.RefineError:
+        raise HTTPException(502, "refine_failed")
+    return RefineOut(questions=found)
+
+
 class RunIn(BaseModel):
     topic: str = Field(min_length=3, max_length=500)
     language: str = Field(pattern="^(th|en)$")
@@ -186,6 +228,9 @@ class RunIn(BaseModel):
     search_provider_id: uuid.UUID | None = None  # default provider when absent
     depth: Literal["fast", "standard", "deep"] = "standard"
     engine: str = "storm"  # a research mode from GET /api/options
+    # The clarifying questions asked before starting, with the owner's
+    # answers; an unanswered one is skipped (POST /api/refine).
+    refinement: list["QuestionAnswer"] = Field(default_factory=list, max_length=5)
     # The page's id for one press of "Start". Sending the same key again
     # returns the Run it already made instead of making another.
     request_key: str | None = Field(default=None, max_length=64)
@@ -219,6 +264,8 @@ class RunOut(BaseModel):
     source_count: int | None
     # How the Run went, by kind (worker.queue.NOTE_KINDS).
     notes: dict = {}
+    # The clarifying questions the owner answered before it started.
+    refinement: list[QuestionAnswer] = []
 
 
 def run_out(run):
@@ -245,6 +292,7 @@ def run_out(run):
         report_title=run.report_title,
         source_count=run.source_count,
         notes=run.notes or {},
+        refinement=run.config.get("refinement", []),
     )
 
 
@@ -365,7 +413,10 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         language=body.language,
         llm_model_id=model.id,
         search_provider_id=provider.id,
-        config=_snapshot(session, model, provider, body.depth),
+        config={
+            **_snapshot(session, model, provider, body.depth),
+            "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
+        },
         status=QUEUED,
         quota_month=limits.quota_month(),
         request_key=body.request_key,
@@ -579,7 +630,10 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
         language=old.language,
         llm_model_id=old.llm_model_id,
         search_provider_id=old.search_provider_id,
-        config=_snapshot(session, model, provider, old.config.get("depth", "standard")) if available else old.config,
+        config={
+            **_snapshot(session, model, provider, old.config.get("depth", "standard")),
+            "refinement": old.config.get("refinement", []),
+        } if available else old.config,
         status=QUEUED if available else NEEDS_SELECTION,
         quota_month=limits.quota_month(),
     )

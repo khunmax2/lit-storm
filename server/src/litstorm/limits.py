@@ -60,6 +60,9 @@ class Limits(BaseModel):
     max_queued_per_user: int = Field(default=5, ge=1)
     monthly_run_quota: int = Field(default=10, ge=0)
     run_deadline_minutes: int = Field(default=60, ge=5)
+    # Question refinement takes no quota, so it has a cap of its own:
+    # requests per User per Bangkok day (docs/web-app-design.md, ขัดเกลาโจทย์).
+    refinements_per_day: int = Field(default=30, ge=0)
     depth_levels: dict[str, DepthLevel] = Field(default_factory=_default_depths)
 
     def depth(self, name):

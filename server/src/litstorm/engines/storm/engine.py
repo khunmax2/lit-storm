@@ -16,7 +16,7 @@ from knowledge_storm.storm_wiki.engine import (
 )
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 
-from litstorm import outcomes, search_cache
+from litstorm import outcomes, refine, search_cache
 from litstorm.engines.base import EngineFailure
 
 from . import encoders, language, normalize, providers
@@ -170,10 +170,18 @@ class StormEngine:
             return result
 
         try:
-            table = stage(
-                "research",
-                lambda: runner.run_knowledge_curation_module(callback_handler=callbacks),
-            )
+            # The owner's answers to the clarifying questions steer research:
+            # the topic its prompts see carries them. The outline and the
+            # report keep the topic as the owner wrote it.
+            focus = refine.focus(config.refinement)
+            runner.topic = f"{config.topic} (focus: {focus})" if focus else config.topic
+            try:
+                table = stage(
+                    "research",
+                    lambda: runner.run_knowledge_curation_module(callback_handler=callbacks),
+                )
+            finally:
+                runner.topic = config.topic
             cache = runner.retriever.rm
             if isinstance(cache, search_cache.CachedRM) and cache.hits:
                 progress.note("search_cache", hits=cache.hits, misses=cache.misses)

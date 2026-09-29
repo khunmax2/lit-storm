@@ -159,6 +159,8 @@ const en = {
   "admin.saved": "Saved",
 
   "error.generic": "Something went wrong. Try again.",
+  "error.refine_limit": "You have used today's clarifying questions. Start the research as it is, or try tomorrow.",
+  "error.refine_failed": "The model could not suggest questions. Start the research as it is, or try again.",
   "error.model_disabled": "That model is turned off.",
   "error.last_engine": "At least one research mode must stay on.",
   "error.engine_not_available": "That research mode is not offered.",
@@ -323,6 +325,12 @@ const en = {
   "fast.title": "Fast model for research",
   "fast.lead": "Research calls a model dozens of times a Run for short answers; a fast, cheap model can take those. The model the owner chose still writes the report. If this model is turned off, Runs use the owner's model for everything.",
   "fast.none": "The owner's model for every stage",
+  "refine.ask": "Clarify first",
+  "refine.title": "A few questions to sharpen the topic",
+  "refine.skip": "Skip, or type an answer",
+  "refine.clear": "Remove the questions",
+  "refine.answered": "Answered {n} questions before starting",
+  "admin.limit.refinements": "Clarifying questions per user per day",
   "embed.title": "Embedding",
   "embed.lead":
     "Turns text into vectors, so each section of a report is written from the snippets closest to it. One setting for every Run; the key is the provider's under API keys.",
@@ -558,6 +566,8 @@ const th: Record<Key, string> = {
   "admin.saved": "บันทึกแล้ว",
 
   "error.generic": "เกิดข้อผิดพลาด ลองอีกครั้ง",
+  "error.refine_limit": "ใช้ขัดเกลาโจทย์ครบจำนวนของวันนี้แล้ว เริ่มค้นคว้าได้เลย หรือลองใหม่พรุ่งนี้",
+  "error.refine_failed": "โมเดลเสนอคำถามไม่ได้ เริ่มค้นคว้าได้เลย หรือลองใหม่อีกครั้ง",
   "error.model_disabled": "โมเดลนั้นปิดอยู่",
   "error.last_engine": "ต้องเปิดไว้อย่างน้อยหนึ่งโหมด",
   "error.engine_not_available": "โหมดนี้ไม่ได้เปิดให้ใช้",
@@ -722,6 +732,12 @@ const th: Record<Key, string> = {
   "fast.title": "โมเดลเร็วสำหรับค้นคว้า",
   "fast.lead": "ขั้นค้นคว้าเรียกโมเดลหลายสิบครั้งต่อ Run ด้วยคำตอบสั้นๆ ใช้โมเดลที่เร็วและถูกตรงนี้ได้ ส่วนโมเดลที่ผู้ใช้เลือกยังใช้เขียนรายงาน ถ้าปิดโมเดลนี้ Run จะใช้โมเดลที่ผู้ใช้เลือกทั้งหมด",
   "fast.none": "ใช้โมเดลที่ผู้ใช้เลือกทุกขั้น",
+  "refine.ask": "ขัดเกลาโจทย์ก่อน",
+  "refine.title": "คำถามสั้นๆ เพื่อให้โจทย์ชัดขึ้น",
+  "refine.skip": "ข้ามได้ หรือพิมพ์คำตอบ",
+  "refine.clear": "ลบคำถาม",
+  "refine.answered": "ตอบคำถามก่อนเริ่ม {n} ข้อ",
+  "admin.limit.refinements": "จำนวนครั้งที่ขัดเกลาโจทย์ได้ต่อคนต่อวัน",
   "embed.title": "Embedding",
   "embed.lead":
     "แปลงข้อความเป็นเวกเตอร์ เพื่อให้แต่ละส่วนของรายงานเขียนจากข้อมูลที่ตรงกับส่วนนั้นที่สุด ตั้งครั้งเดียวใช้กับทุก Run คีย์ใช้ของผู้ให้บริการใน API key",

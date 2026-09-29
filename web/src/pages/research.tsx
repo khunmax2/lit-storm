@@ -757,6 +757,19 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
               )}
             </div>
             <RunNotes notes={run.notes ?? {}} />
+            {!!run.refinement?.length && (
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer select-none">{t("refine.answered", { n: run.refinement.length })}</summary>
+                <dl className="mt-1.5 grid gap-1 pl-3">
+                  {run.refinement.map((x, i) => (
+                    <div key={i}>
+                      <dt>{x.question}</dt>
+                      <dd className="text-foreground/80">{x.answer}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {readable && (

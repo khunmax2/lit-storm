@@ -37,6 +37,8 @@ class RunConfig:
     # Where search results are shared between Runs (litstorm.search_cache);
     # None searches afresh every time.
     search_cache_dir: str | None = None
+    # The owner's answers to the clarifying questions: [{"question", "answer"}].
+    refinement: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data):

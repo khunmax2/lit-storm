@@ -1504,6 +1504,48 @@
     }
    }
   },
+  "/api/refine": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Refine Topic",
+    "description": "A few questions to make the topic clearer before a Run. Takes no\nquota; counted against a daily cap per User instead.",
+    "operationId": "refine_topic_api_refine_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RefineIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RefineOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/sessions": {
    "post": {
     "tags": [
@@ -2819,6 +2861,12 @@
       "title": "Run Deadline Minutes",
       "default": 60
      },
+     "refinements_per_day": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Refinements Per Day",
+      "default": 30
+     },
      "depth_levels": {
       "additionalProperties": {
        "$ref": "#/components/schemas/DepthLevel"
@@ -3317,6 +3365,14 @@
       "title": "Engine",
       "default": "storm"
      },
+     "refinement": {
+      "items": {
+       "$ref": "#/components/schemas/QuestionAnswer"
+      },
+      "type": "array",
+      "maxItems": 5,
+      "title": "Refinement"
+     },
      "request_key": {
       "anyOf": [
        {
@@ -3468,6 +3524,26 @@
     ],
     "title": "ProjectOut"
    },
+   "QuestionAnswer": {
+    "properties": {
+     "question": {
+      "type": "string",
+      "maxLength": 300,
+      "title": "Question"
+     },
+     "answer": {
+      "type": "string",
+      "maxLength": 1000,
+      "title": "Answer",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "question"
+    ],
+    "title": "QuestionAnswer"
+   },
    "QuotaOut": {
     "properties": {
      "month": {
@@ -3560,6 +3636,55 @@
      "updated_at"
     ],
     "title": "RecentSession"
+   },
+   "RefineIn": {
+    "properties": {
+     "topic": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "pattern": "^(th|en)$",
+      "title": "Language"
+     },
+     "llm_model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Model Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "topic",
+     "language"
+    ],
+    "title": "RefineIn"
+   },
+   "RefineOut": {
+    "properties": {
+     "questions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Questions"
+     }
+    },
+    "type": "object",
+    "required": [
+     "questions"
+    ],
+    "title": "RefineOut"
    },
    "RolesIO": {
     "properties": {
@@ -3729,6 +3854,14 @@
       "title": "Notes",
       "default": {}
      },
+     "refinement": {
+      "items": {
+       "$ref": "#/components/schemas/QuestionAnswer"
+      },
+      "type": "array",
+      "title": "Refinement",
+      "default": []
+     },
      "events": {
       "items": {
        "$ref": "#/components/schemas/EventOut"
@@ -3815,6 +3948,14 @@
       "type": "string",
       "title": "Engine",
       "default": "storm"
+     },
+     "refinement": {
+      "items": {
+       "$ref": "#/components/schemas/QuestionAnswer"
+      },
+      "type": "array",
+      "maxItems": 5,
+      "title": "Refinement"
      },
      "request_key": {
       "anyOf": [
@@ -3986,6 +4127,14 @@
       "type": "object",
       "title": "Notes",
       "default": {}
+     },
+     "refinement": {
+      "items": {
+       "$ref": "#/components/schemas/QuestionAnswer"
+      },
+      "type": "array",
+      "title": "Refinement",
+      "default": []
      }
     },
     "type": "object",
@@ -4308,6 +4457,14 @@
       "type": "string",
       "title": "Engine",
       "default": "storm"
+     },
+     "refinement": {
+      "items": {
+       "$ref": "#/components/schemas/QuestionAnswer"
+      },
+      "type": "array",
+      "maxItems": 5,
+      "title": "Refinement"
      },
      "request_key": {
       "anyOf": [

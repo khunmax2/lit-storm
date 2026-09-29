@@ -187,6 +187,17 @@ WAITING = (QUEUED, NEEDS_SELECTION)
 FINAL = (SUCCEEDED, FAILED, CANCELLED, INTERRUPTED)
 
 
+class QuestionRefinement(Base):
+    """One request for clarifying questions, kept only to count them
+    against the daily cap (limits.refinements_per_day)."""
+
+    __tablename__ = "question_refinements"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = _now()
+
+
 class Run(Base):
     __tablename__ = "runs"
 

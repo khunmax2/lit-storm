@@ -563,6 +563,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/refine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refine Topic
+         * @description A few questions to make the topic clearer before a Run. Takes no
+         *     quota; counted against a daily cap per User instead.
+         */
+        post: operations["refine_topic_api_refine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions": {
         parameters: {
             query?: never;
@@ -1072,6 +1093,11 @@ export interface components {
              * @default 60
              */
             run_deadline_minutes: number;
+            /**
+             * Refinements Per Day
+             * @default 30
+             */
+            refinements_per_day: number;
             /** Depth Levels */
             depth_levels?: {
                 [key: string]: components["schemas"]["DepthLevel"];
@@ -1260,6 +1286,8 @@ export interface components {
              * @default storm
              */
             engine: string;
+            /** Refinement */
+            refinement?: components["schemas"]["QuestionAnswer"][];
             /** Request Key */
             request_key?: string | null;
             /** Project Id */
@@ -1309,6 +1337,16 @@ export interface components {
              */
             created_at: string;
         };
+        /** QuestionAnswer */
+        QuestionAnswer: {
+            /** Question */
+            question: string;
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
+        };
         /** QuotaOut */
         QuotaOut: {
             /** Month */
@@ -1339,6 +1377,20 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** RefineIn */
+        RefineIn: {
+            /** Topic */
+            topic: string;
+            /** Language */
+            language: string;
+            /** Llm Model Id */
+            llm_model_id?: string | null;
+        };
+        /** RefineOut */
+        RefineOut: {
+            /** Questions */
+            questions: string[];
         };
         /** RolesIO */
         RolesIO: {
@@ -1399,6 +1451,11 @@ export interface components {
             notes: {
                 [key: string]: unknown;
             };
+            /**
+             * Refinement
+             * @default []
+             */
+            refinement: components["schemas"]["QuestionAnswer"][];
             /** Events */
             events: components["schemas"]["EventOut"][];
         };
@@ -1423,6 +1480,8 @@ export interface components {
              * @default storm
              */
             engine: string;
+            /** Refinement */
+            refinement?: components["schemas"]["QuestionAnswer"][];
             /** Request Key */
             request_key?: string | null;
         };
@@ -1480,6 +1539,11 @@ export interface components {
             notes: {
                 [key: string]: unknown;
             };
+            /**
+             * Refinement
+             * @default []
+             */
+            refinement: components["schemas"]["QuestionAnswer"][];
         };
         /** SearchChoice */
         SearchChoice: {
@@ -1586,6 +1650,8 @@ export interface components {
              * @default storm
              */
             engine: string;
+            /** Refinement */
+            refinement?: components["schemas"]["QuestionAnswer"][];
             /** Request Key */
             request_key?: string | null;
         };
@@ -2946,6 +3012,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refine_topic_api_refine_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefineIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefineOut"];
+                };
             };
             /** @description Validation Error */
             422: {

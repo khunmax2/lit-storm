@@ -7,7 +7,14 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  FlaskConical,
   Gauge,
+  Globe,
+  GraduationCap,
+  Info,
   KeyRound,
   Link2,
   Loader2,
@@ -17,13 +24,14 @@ import {
   Pencil,
   Plus,
   Search as SearchIcon,
+  Server,
   SlidersHorizontal,
   UserPlus,
   UsersRound,
   XCircle,
   Zap,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { api, call, type Schemas } from "@/api/client";
@@ -52,7 +60,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useT } from "@/i18n";
+import { useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const LLM_PROVIDERS = ["openrouter", "gemini", "openai", "groq", "openai-compatible"];
@@ -667,14 +675,32 @@ function Models() {
 
 // --- Search Providers -----------------------------------------------------------
 
-type SearchForm = Schemas["SearchIn"] & { id?: string };
+type SearchForm = Schemas["SearchIn"] & { id?: string; key_hint?: string };
+
+// What each kind is, shown as cards to choose from.
+const SEARCH_KIND_INFO: Record<string, { name: string; icon: typeof Globe; lead: Key; tag: Key; keyUrl?: string }> = {
+  searxng: { name: "SearXNG", icon: Server, lead: "searchKind.searxng", tag: "searchKind.tagSelf" },
+  tavily: {
+    name: "Tavily",
+    icon: Globe,
+    lead: "searchKind.tavily",
+    tag: "searchKind.tagKey",
+    keyUrl: "https://app.tavily.com/home",
+  },
+  arxiv: { name: "arXiv", icon: GraduationCap, lead: "searchKind.arxiv", tag: "searchKind.tagFree" },
+};
+
+// The fields a test depends on; a result is shown only while they match.
+const testedWith = (f: SearchForm) => JSON.stringify([f.kind, f.endpoint ?? "", f.engines ?? "", f.api_key ?? ""]);
 
 function SearchDialog({ form, setForm }: { form: SearchForm | null; setForm: (f: SearchForm | null) => void }) {
   const { t } = useT();
   const queryClient = useQueryClient();
+  const [showKey, setShowKey] = useState(false);
+  const [query, setQuery] = useState("");
   const save = useMutation({
     mutationFn: () => {
-      const { id, ...body } = form!;
+      const { id, key_hint: _hint, ...body } = form!;
       return id
         ? call(api.PUT("/api/admin/search-providers/{provider_id}", { params: { path: { provider_id: id } }, body }))
         : call(api.POST("/api/admin/search-providers", { body }));
@@ -685,71 +711,280 @@ function SearchDialog({ form, setForm }: { form: SearchForm | null; setForm: (f:
       setForm(null);
     },
   });
+  const check = useMutation({
+    mutationFn: (f: SearchForm) =>
+      call(
+        api.POST("/api/admin/search-providers/check", {
+          body: {
+            kind: f.kind,
+            endpoint: f.endpoint,
+            engines: f.engines,
+            // Blank while editing: try the key already stored.
+            api_key: f.api_key || (f.id ? null : ""),
+            id: f.id ?? null,
+            query: query || null,
+          },
+        }),
+      ).then((r) => ({ ...r, for: testedWith(f) })),
+  });
+  useEffect(() => {
+    if (!form) {
+      check.reset();
+      save.reset();
+      setShowKey(false);
+      setQuery("");
+    }
+  }, [form]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!form) return null;
   const f = form;
+  const info = SEARCH_KIND_INFO[f.kind];
+  const result = check.data;
+  const stale = !!result && result.for !== testedWith(f);
+
+  const chooseKind = (kind: string) => {
+    // Follow the kind with the name, unless the name was typed by hand.
+    const named = !f.label || Object.values(SEARCH_KIND_INFO).some((k) => k.name === f.label);
+    setForm({ ...f, kind, label: named ? SEARCH_KIND_INFO[kind].name : f.label });
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && setForm(null)}>
-      <DialogContent>
+      <DialogContent className="gap-0 p-0 sm:max-w-2xl">
         <form
-          className="grid gap-4"
+          className="flex max-h-[90svh] flex-col"
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate();
           }}
         >
-          <DialogHeader>
-            <DialogTitle>{f.id ? t("admin.editSearch") : t("admin.addSearch")}</DialogTitle>
+          <DialogHeader className="border-b px-6 pt-6 pb-4">
+            <DialogTitle className="text-lg">{f.id ? t("admin.editSearch") : t("admin.addSearch")}</DialogTitle>
+            <DialogDescription>{t("searchKind.lead")}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="s-label" label={t("admin.label")}>
-              <Input id="s-label" value={f.label} onChange={(e) => setForm({ ...f, label: e.target.value })} required />
-            </Field>
-            <Field id="s-kind" label={t("admin.kind")}>
-              <Select value={f.kind} onValueChange={(kind) => setForm({ ...f, kind })}>
-                <SelectTrigger id="s-kind" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SEARCH_KINDS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {k}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          {f.kind === "searxng" && (
-            <>
-              <Field id="s-endpoint" label={t("admin.endpoint")}>
-                <Input id="s-endpoint" value={f.endpoint ?? ""} onChange={(e) => setForm({ ...f, endpoint: e.target.value })} required />
+
+          <div className="grid gap-6 overflow-y-auto px-6 py-5">
+            {/* 1. What kind of service */}
+            <fieldset className="grid gap-2">
+              <legend className="mb-2 text-sm font-medium">{t("admin.kind")}</legend>
+              <div role="radiogroup" aria-label={t("admin.kind")} className="grid gap-2 sm:grid-cols-3">
+                {SEARCH_KINDS.map((kind) => {
+                  const k = SEARCH_KIND_INFO[kind];
+                  const active = kind === f.kind;
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => chooseKind(kind)}
+                      className={cn(
+                        "flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                        active ? "border-foreground/70 bg-muted/40 ring-1 ring-foreground/70" : "hover:bg-muted/40",
+                      )}
+                    >
+                      <span className="flex items-center justify-between">
+                        <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
+                          <k.icon className="size-4" />
+                        </span>
+                        <span
+                          className={cn(
+                            "flex size-4 items-center justify-center rounded-full border",
+                            active && "border-foreground bg-foreground text-background",
+                          )}
+                        >
+                          {active && <Check className="size-3" />}
+                        </span>
+                      </span>
+                      <span className="font-medium">{k.name}</span>
+                      <span className="text-xs leading-snug text-muted-foreground">{t(k.lead)}</span>
+                      <Badge variant="secondary" className="mt-auto w-fit">
+                        {t(k.tag)}
+                      </Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {/* 2. How to reach it */}
+            <div className="grid gap-4">
+              <Field id="s-label" label={t("admin.label")} hint={t("searchKind.labelHint")}>
+                <Input id="s-label" value={f.label} onChange={(e) => setForm({ ...f, label: e.target.value })} required />
               </Field>
-              <Field id="s-engines" label={`${t("admin.engines")} (${t("common.optional")})`}>
-                <Input id="s-engines" value={f.engines ?? ""} onChange={(e) => setForm({ ...f, engines: e.target.value })} />
-              </Field>
-            </>
-          )}
-          {f.kind === "tavily" && (
-            <Field id="s-key" label={t("admin.apiKey")}>
-              <Input id="s-key" type="password" autoComplete="off" value={f.api_key ?? ""} onChange={(e) => setForm({ ...f, api_key: e.target.value })} />
-            </Field>
-          )}
-          <div className="flex gap-6">
-            <Label className="flex items-center gap-2 font-normal">
-              <Switch checked={f.enabled ?? true} onCheckedChange={(enabled) => setForm({ ...f, enabled })} />
-              {t("admin.enabled")}
-            </Label>
-            <Label className="flex items-center gap-2 font-normal">
-              <Switch checked={f.is_default ?? false} onCheckedChange={(is_default) => setForm({ ...f, is_default })} />
-              {t("admin.default")}
-            </Label>
+              {f.kind === "searxng" && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field id="s-endpoint" label={t("admin.endpoint")} hint={t("searchKind.endpointHint")}>
+                    <Input
+                      id="s-endpoint"
+                      placeholder="http://searxng:8080"
+                      value={f.endpoint ?? ""}
+                      onChange={(e) => setForm({ ...f, endpoint: e.target.value })}
+                      required
+                    />
+                  </Field>
+                  <Field
+                    id="s-engines"
+                    label={`${t("admin.engines")} (${t("common.optional")})`}
+                    hint={t("searchKind.enginesHint")}
+                  >
+                    <Input
+                      id="s-engines"
+                      placeholder="arxiv,pubmed,openalex"
+                      value={f.engines ?? ""}
+                      onChange={(e) => setForm({ ...f, engines: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              )}
+              {f.kind === "tavily" && (
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="s-key">{t("admin.apiKey")}</Label>
+                    {info.keyUrl && (
+                      <a
+                        href={info.keyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        {t("searchKind.getKey")}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="s-key"
+                      type={showKey ? "text" : "password"}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="pr-10 font-mono"
+                      placeholder={f.key_hint ? t("searchKind.keepKey", { hint: f.key_hint }) : "tvly-…"}
+                      value={f.api_key ?? ""}
+                      onChange={(e) => setForm({ ...f, api_key: e.target.value })}
+                      required={!f.key_hint}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-1/2 right-1 size-7 -translate-y-1/2 text-muted-foreground"
+                      aria-label={showKey ? t("searchKind.hideKey") : t("searchKind.showKey")}
+                      onClick={() => setShowKey(!showKey)}
+                    >
+                      {showKey ? <EyeOff /> : <Eye />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t("searchKind.keyHint")}</p>
+                </div>
+              )}
+              {f.kind === "arxiv" && (
+                <p className="flex gap-2 rounded-lg bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 size-4 shrink-0" />
+                  {t("searchKind.arxivNote")}
+                </p>
+              )}
+            </div>
+
+            {/* 3. Try it before saving */}
+            <div className="grid gap-3 rounded-xl border bg-muted/30 p-4">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <FlaskConical className="size-4" />
+                  {t("searchKind.testTitle")}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{t("searchKind.testLead")}</p>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  aria-label={t("searchKind.testQuery")}
+                  placeholder="retrieval augmented generation"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      check.mutate(f);
+                    }
+                  }}
+                  className="bg-background"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 bg-background"
+                  disabled={check.isPending}
+                  onClick={() => check.mutate(f)}
+                >
+                  {check.isPending ? <Loader2 className="animate-spin" /> : <Zap />}
+                  {check.isPending ? t("admin.testing") : t("admin.test")}
+                </Button>
+              </div>
+              <div aria-live="polite" className="empty:hidden">
+                {check.error && <ErrorText error={check.error} />}
+                {result && !stale && result.ok && (
+                  <div className="rounded-lg border border-success/30 bg-success-soft p-3 text-sm">
+                    <div className="flex items-center gap-2 font-medium text-success">
+                      <CheckCircle2 className="size-4" />
+                      {t("searchKind.ok", { n: result.samples.length, s: result.seconds })}
+                    </div>
+                    <ul className="mt-2 grid gap-1 pl-6 text-foreground/80">
+                      {result.samples.map((title, i) => (
+                        <li key={i} className="list-disc truncate">
+                          {title}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {result && !stale && !result.ok && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                    <div className="flex items-center gap-2 font-medium text-destructive">
+                      <XCircle className="size-4" />
+                      {t("searchKind.failed")}
+                    </div>
+                    <p className="mt-1 pl-6 font-mono text-xs break-words text-foreground/80">{result.message}</p>
+                  </div>
+                )}
+                {stale && <p className="text-xs text-muted-foreground">{t("searchKind.stale")}</p>}
+              </div>
+            </div>
+
+            {/* 4. Who can use it */}
+            <div className="divide-y rounded-xl border">
+              <label className="flex cursor-pointer items-center justify-between gap-4 p-3">
+                <span>
+                  <span className="block text-sm font-medium">{t("admin.enabled")}</span>
+                  <span className="block text-xs text-muted-foreground">{t("searchKind.enabledHint")}</span>
+                </span>
+                <Switch checked={f.enabled ?? true} onCheckedChange={(enabled) => setForm({ ...f, enabled })} />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-4 p-3">
+                <span>
+                  <span className="block text-sm font-medium">{t("admin.default")}</span>
+                  <span className="block text-xs text-muted-foreground">{t("searchKind.defaultHint")}</span>
+                </span>
+                <Switch
+                  checked={f.is_default ?? false}
+                  onCheckedChange={(is_default) => setForm({ ...f, is_default })}
+                />
+              </label>
+            </div>
+            {save.error && <ErrorText error={save.error} />}
           </div>
-          {save.error && <ErrorText error={save.error} />}
-          <DialogFooter>
+
+          <div className="flex flex-col-reverse gap-2 border-t bg-muted/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+            {result && !stale && !result.ok && (
+              <span className="text-xs text-muted-foreground sm:mr-auto">{t("searchKind.saveAnyway")}</span>
+            )}
+            <Button type="button" variant="outline" onClick={() => setForm(null)}>
+              {t("cancel")}
+            </Button>
             <Button type="submit" disabled={save.isPending}>
+              {save.isPending && <Loader2 className="animate-spin" />}
               {t("save")}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -763,7 +998,7 @@ function Search() {
   return (
     <Card>
       <SectionActions>
-          <Button onClick={() => setForm({ label: "", kind: "searxng", enabled: true, is_default: false })}>
+          <Button onClick={() => setForm({ label: "SearXNG", kind: "searxng", enabled: true, is_default: false })}>
             <Plus />
             {t("admin.addSearch")}
           </Button>
@@ -803,7 +1038,7 @@ function Search() {
                       size="icon"
                       aria-label={t("edit")}
                       onClick={() =>
-                        setForm({ id: p.id, label: p.label, kind: p.kind, endpoint: p.endpoint, engines: p.engines, enabled: p.enabled, is_default: p.is_default })
+                        setForm({ id: p.id, label: p.label, kind: p.kind, endpoint: p.endpoint, engines: p.engines, enabled: p.enabled, is_default: p.is_default, key_hint: p.key_hint })
                       }
                     >
                       <Pencil />

@@ -243,11 +243,74 @@ def test_the_search_test_button(admin, configured, monkeypatch):
 
     class Resp:
         status_code = 200
-        text = "<feed><entry>a</entry><entry>b</entry></feed>"
+        text = (
+            "<feed><title>query</title><entry><title>First\n  paper</title></entry>"
+            "<entry><title>Second</title></entry></feed>"
+        )
 
         def raise_for_status(self):
             pass
 
     monkeypatch.setattr(requests, "get", lambda *a, **kw: Resp())
     r = admin.post(f"/api/admin/search-providers/{configured['search']['id']}/test").json()
-    assert r == {"ok": True, "message": "2 results", "seconds": r["seconds"]}
+    assert r == {"ok": True, "message": "2 results", "seconds": r["seconds"], "samples": ["First paper", "Second"]}
+
+
+def test_a_search_provider_can_be_tried_before_it_is_saved(admin, configured, monkeypatch):
+    import requests
+
+    sent = {}
+
+    class Resp:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [{"title": "A"}, {"title": "B"}]}
+
+    def post(url, json, timeout):
+        sent.update(json)
+        return Resp()
+
+    monkeypatch.setattr(requests, "post", post)
+    r = admin.post(
+        "/api/admin/search-providers/check",
+        json={"kind": "tavily", "api_key": "tvly-draft-1234", "query": "songkran"},
+    ).json()
+    assert r["ok"] and r["samples"] == ["A", "B"]
+    assert (sent["api_key"], sent["query"]) == ("tvly-draft-1234", "songkran")
+    assert "tvly-draft-1234" not in str(r)
+    # Nothing was saved by trying it.
+    assert [p["kind"] for p in admin.get("/api/admin/search-providers").json()] == ["arxiv"]
+
+
+def test_editing_tries_the_stored_key_when_none_is_typed(admin, configured, monkeypatch):
+    import requests
+
+    sent = {}
+
+    class Resp:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [{"title": "A"}]}
+
+    monkeypatch.setattr(requests, "post", lambda url, json, timeout: (sent.update(json), Resp())[1])
+    saved = admin.post(
+        "/api/admin/search-providers", json={"label": "T", "kind": "tavily", "api_key": "tvly-stored-9999"}
+    ).json()
+    r = admin.post("/api/admin/search-providers/check", json={"kind": "tavily", "id": saved["id"]}).json()
+    assert r["ok"] and sent["api_key"] == "tvly-stored-9999"
+
+
+def test_a_draft_without_what_it_needs_says_so(admin, configured):
+    no_key = admin.post("/api/admin/search-providers/check", json={"kind": "tavily"}).json()
+    assert (no_key["ok"], no_key["message"]) == (False, "Tavily needs an API key")
+    no_url = admin.post("/api/admin/search-providers/check", json={"kind": "searxng"}).json()
+    assert (no_url["ok"], no_url["message"]) == (False, "SearXNG needs an endpoint")
+    assert admin.post("/api/admin/search-providers/check", json={"kind": "google"}).status_code == 422

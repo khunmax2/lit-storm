@@ -7,6 +7,7 @@ Stored keys never leave the server: an admin sees the last four characters
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
@@ -353,6 +354,8 @@ class CheckOut(BaseModel):
     ok: bool
     message: str
     seconds: float
+    # A few titles the search found, so the Administrator sees what it returns.
+    samples: list[str] = []
 
 
 @router.post("/llm-models/{model_id}/test", response_model=CheckOut)
@@ -371,8 +374,33 @@ def test_search(provider_id: uuid.UUID, session=Depends(deps.database)):
     provider = session.get(SearchProvider, provider_id)
     if provider is None:
         raise HTTPException(404, "not_found")
-    ok, message, seconds = checks.search(provider, security.decrypt(provider.api_key_ciphertext))
-    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+    ok, message, seconds, samples = checks.search(provider, security.decrypt(provider.api_key_ciphertext))
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2), samples=samples)
+
+
+class SearchDraftIn(BaseModel):
+    kind: str
+    endpoint: str | None = None
+    engines: str | None = None
+    # Absent while editing: test with the key already stored for `id`.
+    api_key: str | None = None
+    id: uuid.UUID | None = None
+    query: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/search-providers/check", response_model=CheckOut)
+def check_search_draft(body: SearchDraftIn, session=Depends(deps.database)):
+    """Test what is in the dialog before it is saved, so a key can be tried
+    where it is typed."""
+    if body.kind not in SEARCH_PROVIDERS:
+        raise HTTPException(422, "unknown_kind")
+    key = body.api_key
+    if key is None and body.id is not None:
+        stored = session.get(SearchProvider, body.id)
+        key = security.decrypt(stored.api_key_ciphertext) if stored else None
+    draft = SimpleNamespace(kind=body.kind, endpoint=(body.endpoint or "").strip(), engines=(body.engines or "").strip())
+    ok, message, seconds, samples = checks.search(draft, (key or "").strip(), body.query)
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2), samples=samples)
 
 
 # --- usage ---------------------------------------------------------------------------------------

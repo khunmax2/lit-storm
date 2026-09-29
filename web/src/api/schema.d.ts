@@ -323,6 +323,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/search-providers/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Search Draft
+         * @description Test what is in the dialog before it is saved, so a key can be tried
+         *     where it is typed.
+         */
+        post: operations["check_search_draft_api_admin_search_providers_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/usage": {
         parameters: {
             query?: never;
@@ -763,6 +784,11 @@ export interface components {
             message: string;
             /** Seconds */
             seconds: number;
+            /**
+             * Samples
+             * @default []
+             */
+            samples: string[];
         };
         /** Choice */
         Choice: {
@@ -1142,6 +1168,21 @@ export interface components {
             report_title: string | null;
             /** Source Count */
             source_count: number | null;
+        };
+        /** SearchDraftIn */
+        SearchDraftIn: {
+            /** Kind */
+            kind: string;
+            /** Endpoint */
+            endpoint?: string | null;
+            /** Engines */
+            engines?: string | null;
+            /** Api Key */
+            api_key?: string | null;
+            /** Id */
+            id?: string | null;
+            /** Query */
+            query?: string | null;
         };
         /** SearchIn */
         SearchIn: {
@@ -2054,6 +2095,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_search_draft_api_admin_search_providers_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchDraftIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

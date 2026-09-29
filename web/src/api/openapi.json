@@ -856,6 +856,48 @@
     }
    }
   },
+  "/api/admin/search-providers/check": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Check Search Draft",
+    "description": "Test what is in the dialog before it is saved, so a key can be tried\nwhere it is typed.",
+    "operationId": "check_search_draft_api_admin_search_providers_check_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SearchDraftIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/usage": {
    "get": {
     "tags": [
@@ -2120,6 +2162,14 @@
      "seconds": {
       "type": "number",
       "title": "Seconds"
+     },
+     "samples": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Samples",
+      "default": []
      }
     },
     "type": "object",
@@ -3234,6 +3284,76 @@
      "source_count"
     ],
     "title": "RunOut"
+   },
+   "SearchDraftIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "endpoint": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Endpoint"
+     },
+     "engines": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Engines"
+     },
+     "api_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key"
+     },
+     "id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "query": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Query"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "SearchDraftIn"
    },
    "SearchIn": {
     "properties": {

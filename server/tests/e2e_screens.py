@@ -39,7 +39,7 @@ def main(out):
             # A topic that has a finished report.
             page.goto(f"{BASE}/")
             page.wait_for_timeout(800)
-            done = page.locator("a[href^='/sessions/']").filter(has_text=re.compile("เสร็จแล้ว|Done")).first
+            done = page.locator("main a[href^='/sessions/']:has(span.bg-success)").first
             done.click()
             page.wait_for_timeout(1200)
             shot("04-session", full=True)

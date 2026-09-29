@@ -1,8 +1,8 @@
-// The research composer: one large box for the topic and a row of choices
-// under it, in the style of Perplexity and ChatGPT. Used on the home page (with
+// The research composer: a tray of choices around a white box for the topic,
+// the model beside the send button — the layout agent apps have settled on. Used on the home page (with
 // a project picker) and at the foot of a topic (to research it again).
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUp, Globe, Loader2, Search, Sparkles, Timer } from "lucide-react";
+import { Globe, Loader2, Search, SendHorizontal, Sparkles, Timer } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
@@ -49,6 +49,10 @@ export function QuotaLine({ className }: { className?: string }) {
   );
 }
 
+// A choice in the composer's tray: a small white button with a hairline border.
+export const CHIP =
+  "h-8 gap-1.5 rounded-lg border bg-background px-2.5 text-[13px] font-normal shadow-xs hover:bg-muted/60 dark:bg-card";
+
 function Chip({
   icon,
   value,
@@ -69,7 +73,7 @@ function Chip({
       <SelectTrigger
         size="sm"
         aria-label={label}
-        className="h-8 gap-1.5 rounded-full border-transparent bg-muted/60 px-3 text-xs shadow-none hover:bg-muted"
+        className={CHIP}
       >
         {icon}
         <SelectValue />
@@ -93,6 +97,7 @@ export function Composer({
   extra,
   autoFocus,
   size = "lg",
+  locked,
 }: {
   form: RunForm;
   setForm: (f: RunForm) => void;
@@ -101,6 +106,8 @@ export function Composer({
   extra?: ReactNode;
   autoFocus?: boolean;
   size?: "lg" | "md";
+  /** Why this composer cannot start a Run yet; shows instead of the send button. */
+  locked?: ReactNode;
 }) {
   const { t } = useT();
   const options = useRunOptions();
@@ -118,7 +125,7 @@ export function Composer({
   }, [o]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unavailable = o && (o.models.length === 0 || o.search_providers.length === 0);
-  const ready = form.topic.trim().length >= 3 && !unavailable && !pending;
+  const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
 
   return (
     <form
@@ -126,31 +133,9 @@ export function Composer({
         e.preventDefault();
         if (ready) onSubmit();
       }}
-      className={cn(
-        "rounded-2xl border bg-card shadow-sm transition-shadow",
-        focused && "shadow-md ring-3 ring-ring/20",
-      )}
+      className="rounded-2xl border bg-muted/60 p-1.5 shadow-xs dark:bg-muted/30"
     >
-      <Textarea
-        autoFocus={autoFocus}
-        value={form.topic}
-        onChange={(e) => setForm({ ...form, topic: e.target.value })}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            if (ready) onSubmit();
-          }
-        }}
-        placeholder={t("home.placeholder")}
-        maxLength={500}
-        className={cn(
-          "resize-none border-0 bg-transparent px-4 pt-4 shadow-none focus-visible:ring-0 dark:bg-transparent",
-          size === "lg" ? "min-h-28 text-base md:text-base" : "min-h-16",
-        )}
-      />
-      <div className="flex flex-wrap items-center gap-1.5 px-3 pb-3">
+      <div className="flex flex-wrap items-center gap-1.5 px-1 pt-0.5 pb-2">
         <Chip
           label={t("run.language")}
           icon={<Globe className="size-3.5" />}
@@ -161,15 +146,6 @@ export function Composer({
             { value: "en", label: t("lang.en") },
           ]}
         />
-        {o && o.models.length > 0 && (
-          <Chip
-            label={t("run.model")}
-            icon={<Sparkles className="size-3.5" />}
-            value={form.llm_model_id}
-            onChange={(llm_model_id) => setForm({ ...form, llm_model_id })}
-            items={o.models.map((m) => ({ value: m.id, label: m.label }))}
-          />
-        )}
         {o && o.search_providers.length > 0 && (
           <Chip
             label={t("run.search")}
@@ -180,17 +156,64 @@ export function Composer({
           />
         )}
         {extra}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-            <Timer className="size-3.5" />
-            {t("home.estimate")}
-          </span>
-          <Button type="submit" size="icon" className="rounded-full" disabled={!ready} aria-label={t("run.start")}>
-            {pending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
-          </Button>
+      </div>
+      <div
+        className={cn(
+          "rounded-xl border bg-card shadow-sm transition-shadow",
+          focused && "shadow-md ring-3 ring-ring/15",
+        )}
+      >
+        <div className="flex items-start gap-3 px-4 pt-4">
+          <span
+            aria-hidden
+            className="mt-1 size-5 shrink-0 rounded-full bg-linear-to-br from-sky-300 via-fuchsia-300 to-amber-200 shadow-[inset_0_-2px_4px_rgb(0_0_0/0.08)]"
+          />
+          <Textarea
+            autoFocus={autoFocus}
+            value={form.topic}
+            onChange={(e) => setForm({ ...form, topic: e.target.value })}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                if (ready) onSubmit();
+              }
+            }}
+            placeholder={t("home.placeholder")}
+            maxLength={500}
+            className={cn(
+              "resize-none rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 dark:bg-transparent",
+              size === "lg" ? "min-h-20 text-base md:text-base" : "min-h-12",
+            )}
+          />
+        </div>
+        <div className="flex items-center gap-2 px-3 pt-2 pb-3">
+          {o && o.models.length > 0 && (
+            <Chip
+              label={t("run.model")}
+              icon={<Sparkles className="size-3.5 text-brand" />}
+              value={form.llm_model_id}
+              onChange={(llm_model_id) => setForm({ ...form, llm_model_id })}
+              items={o.models.map((m) => ({ value: m.id, label: m.label }))}
+            />
+          )}
+          <div className="ml-auto flex items-center gap-3">
+            {locked ? (
+              <span className="text-xs text-muted-foreground">{locked}</span>
+            ) : (
+              <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+                <Timer className="size-3.5" />
+                {t("home.estimate")}
+              </span>
+            )}
+            <Button type="submit" size="icon" className="size-9 rounded-lg" disabled={!ready} aria-label={t("run.start")}>
+              {pending ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
+            </Button>
+          </div>
         </div>
       </div>
-      {unavailable && <p className="px-4 pb-3 text-sm text-warning">{t("run.noOptions")}</p>}
+      {unavailable && <p className="px-3 pt-2 text-sm text-warning">{t("run.noOptions")}</p>}
     </form>
   );
 }

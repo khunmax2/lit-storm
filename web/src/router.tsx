@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { Outlet, createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { Link, Outlet, createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
+import { Loader2, Moon, Plus, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 import { ApiError, api, call } from "@/api/client";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SearchDialog } from "@/components/search-dialog";
+import { Button } from "@/components/ui/button";
+import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useT, type Lang } from "@/i18n";
 import { AdminPage } from "@/pages/admin";
 import { LoginPage, SetPasswordPage, SetupPage } from "@/pages/auth";
@@ -15,11 +17,41 @@ import { ReportPage } from "@/pages/report";
 import { ProjectPage, ProjectsPage, SessionPage } from "@/pages/research";
 import { TrashPage } from "@/pages/trash";
 
+// The bar over every page: new research on the left, then whatever the page
+// puts in its toolbar, and the theme switch on the right.
+function Header() {
+  const { t } = useT();
+  const { state, isMobile } = useSidebar();
+  const { resolvedTheme, setTheme } = useTheme();
+  return (
+    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur">
+      {(isMobile || state === "collapsed") && <SidebarTrigger className="size-9 rounded-lg border shadow-xs" />}
+      <Button variant="outline" className="h-9 rounded-lg shadow-xs" asChild>
+        <Link to="/">
+          <Plus />
+          <span className="hidden sm:inline">{t("nav.home")}</span>
+        </Link>
+      </Button>
+      <div id="page-toolbar" className="flex min-w-0 flex-1 items-center gap-2 pl-1" />
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-9 rounded-lg shadow-xs"
+        aria-label={t("theme.label")}
+        onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      >
+        {resolvedTheme === "dark" ? <Sun /> : <Moon />}
+      </Button>
+    </header>
+  );
+}
+
 // Everything behind sign-in. Not signed in: the first-run setup page if the
 // system has no Administrator yet, otherwise the sign-in page.
 function SignedIn() {
   const { lang, setLang } = useT();
   const navigate = useNavigate();
+  const [searching, setSearching] = useState(false);
   const me = useQuery({ queryKey: ["me"], queryFn: () => call(api.GET("/api/me")), retry: false });
   const unauthorised = me.error instanceof ApiError && me.error.status === 401;
 
@@ -41,15 +73,12 @@ function SignedIn() {
     );
   return (
     <SidebarProvider>
-      <AppSidebar me={me.data} />
+      <AppSidebar me={me.data} onSearch={() => setSearching(true)} />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
-          <div id="page-toolbar" className="flex min-w-0 flex-1 items-center gap-2" />
-        </header>
+        <Header />
         <Outlet />
       </SidebarInset>
+      <SearchDialog me={me.data} open={searching} setOpen={setSearching} />
     </SidebarProvider>
   );
 }

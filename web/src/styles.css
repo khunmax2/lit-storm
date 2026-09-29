@@ -5,6 +5,8 @@
 @import "@fontsource/ibm-plex-sans-thai/400.css";
 @import "@fontsource/ibm-plex-sans-thai/500.css";
 @import "@fontsource/ibm-plex-sans-thai/600.css";
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource-variable/noto-serif-thai";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -37,7 +39,7 @@
   --warning: oklch(0.62 0.15 70);
   --warning-soft: oklch(0.97 0.05 85);
   --cite: oklch(0.95 0.08 95);
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: oklch(0.982 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -87,6 +89,8 @@
   /* Geist for Latin; Thai letters fall through to IBM Plex Sans Thai. */
   --font-sans: "Geist Variable", "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-sans);
+  /* The home page headline: a condensed serif, Thai in Noto Serif Thai. */
+  --font-display: "Instrument Serif", "Noto Serif Thai Variable", ui-serif, Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

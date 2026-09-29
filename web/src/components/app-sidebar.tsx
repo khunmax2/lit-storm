@@ -1,21 +1,23 @@
-// The app shell's left rail: new research, the workspace, recent topics, and
-// the account menu — the same layout people know from Perplexity and ChatGPT.
+// The app shell's left rail: the brand, search, the workspace, recent topics,
+// and the account card at the foot.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   BookOpenText,
   ChevronsUpDown,
   FolderOpen,
+  House,
   Languages,
   LogOut,
   Monitor,
   Moon,
-  Plus,
+  Search,
   Settings,
   Sun,
   Trash2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import type { ReactNode } from "react";
 
 import { api, call, type Schemas } from "@/api/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +34,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Kbd } from "@/components/ui/kbd";
 import {
   Sidebar,
   SidebarContent,
@@ -45,19 +48,44 @@ import {
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useT, type Lang } from "@/i18n";
 
-const DOT: Record<string, string> = {
+export const DOT: Record<string, string> = {
+  succeeded: "bg-success",
   running: "bg-brand animate-pulse",
   cancelling: "bg-warning animate-pulse",
   queued: "bg-muted-foreground/50",
   needs_selection: "bg-warning",
   failed: "bg-destructive",
   interrupted: "bg-destructive",
+  cancelled: "bg-muted-foreground/40",
 };
 
-export function AppSidebar({ me }: { me: Schemas["MeOut"] }) {
+// The page you are on sits on a raised white card, as in the design reference.
+const ITEM =
+  "h-9 text-sidebar-foreground/80 data-[active=true]:bg-background data-[active=true]:font-medium " +
+  "data-[active=true]:text-sidebar-foreground data-[active=true]:shadow-xs data-[active=true]:ring-1 " +
+  "data-[active=true]:ring-sidebar-border";
+
+function NavItem({ to, icon, label, active }: { to: string; icon: ReactNode; label: string; active: boolean }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} tooltip={label} className={ITEM}>
+        <Link to={to}>
+          {icon}
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: () => void }) {
   const { t, lang, setLang } = useT();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
@@ -91,86 +119,75 @@ export function AppSidebar({ me }: { me: Schemas["MeOut"] }) {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="gap-3 p-3">
+        <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center">
+          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2.5 group-data-[collapsible=icon]:flex-none">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <BookOpenText className="size-4" />
+            </div>
+            <span className="truncate text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+              lit-storm
+            </span>
+          </Link>
+          <SidebarTrigger className="text-muted-foreground group-data-[collapsible=icon]:hidden" />
+        </div>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link to="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <BookOpenText className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold">lit-storm</span>
-                  <span className="truncate text-xs text-muted-foreground">{t("auth.tagline")}</span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={t("nav.home")} className="mt-2 border bg-background shadow-xs">
-              <Link to="/">
-                <Plus />
-                <span>{t("nav.home")}</span>
-              </Link>
+            <SidebarMenuButton
+              onClick={onSearch}
+              tooltip={t("search.label")}
+              className="h-9 border bg-background text-muted-foreground shadow-xs hover:bg-background hover:text-foreground"
+            >
+              <Search />
+              <span className="flex-1">{t("search.placeholder")}</span>
+              <Kbd className="group-data-[collapsible=icon]:hidden">{isMac ? "⌘ K" : "Ctrl K"}</Kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      <SidebarSeparator className="mx-3" />
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>{t("nav.workspace")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={path.startsWith("/projects")} tooltip={t("nav.projects")}>
-                  <Link to="/projects">
-                    <FolderOpen />
-                    <span>{t("nav.projects")}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={path === "/trash"} tooltip={t("nav.trash")}>
-                  <Link to="/trash">
-                    <Trash2 />
-                    <span>{t("nav.trash")}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {me.role === "admin" && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={path === "/admin"} tooltip={t("nav.admin")}>
-                    <Link to="/admin">
-                      <Settings />
-                      <span>{t("nav.admin")}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
+              <NavItem to="/" icon={<House />} label={t("nav.homePage")} active={path === "/"} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarGroup className="pt-0">
+          <SidebarGroupLabel className="uppercase tracking-wide">{t("nav.research")}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <NavItem
+                to="/projects"
+                icon={<FolderOpen />}
+                label={t("nav.projects")}
+                active={path.startsWith("/projects")}
+              />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator className="mx-3" />
+
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel>{t("nav.recent")}</SidebarGroupLabel>
+          <SidebarGroupLabel className="uppercase tracking-wide">{t("nav.recent")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {recent.isLoading && Array.from({ length: 4 }, (_, i) => <SidebarMenuSkeleton key={i} />)}
               {recent.data?.length === 0 && (
                 <p className="px-2 py-1 text-xs text-muted-foreground">{t("nav.noRecent")}</p>
               )}
-              {recent.data?.map((s) => (
+              {recent.data?.slice(0, 8).map((s) => (
                 <SidebarMenuItem key={s.id}>
-                  <SidebarMenuButton asChild isActive={path === `/sessions/${s.id}`} className="h-auto py-1.5">
+                  <SidebarMenuButton asChild isActive={path === `/sessions/${s.id}`} className={ITEM}>
                     <Link to="/sessions/$sessionId" params={{ sessionId: s.id }}>
-                      <span className="grid min-w-0 flex-1">
-                        <span className="truncate">{s.title}</span>
-                        <span className="truncate text-xs text-muted-foreground">{s.project_name}</span>
-                      </span>
-                      {s.last_status && DOT[s.last_status] && (
-                        <span className={`size-2 shrink-0 rounded-full ${DOT[s.last_status]}`} />
-                      )}
+                      <span
+                        className={`ml-1 size-1.5 shrink-0 rounded-full ${DOT[s.last_status ?? ""] ?? "bg-muted-foreground/40"}`}
+                      />
+                      <span className="truncate">{s.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -180,20 +197,29 @@ export function AppSidebar({ me }: { me: Schemas["MeOut"] }) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="gap-3 p-3">
+        <SidebarMenu>
+          <NavItem to="/trash" icon={<Trash2 />} label={t("nav.trash")} active={path === "/trash"} />
+          {me.role === "admin" && (
+            <NavItem to="/admin" icon={<Settings />} label={t("nav.admin")} active={path === "/admin"} />
+          )}
+        </SidebarMenu>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
-                  <Avatar className="size-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg">{initials || "?"}</AvatarFallback>
+                <SidebarMenuButton
+                  size="lg"
+                  className="h-14 border bg-background shadow-xs data-[state=open]:bg-background group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:shadow-none"
+                >
+                  <Avatar className="size-9 rounded-lg">
+                    <AvatarFallback className="rounded-lg bg-brand-soft text-brand">{initials || "?"}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{me.name}</span>
                     <span className="truncate text-xs text-muted-foreground">{me.email}</span>
                   </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
+                  <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-(--radix-dropdown-menu-trigger-width) min-w-56">

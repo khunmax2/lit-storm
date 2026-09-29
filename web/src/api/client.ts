@@ -23,7 +23,10 @@ const csrf: Middleware = {
   },
 };
 
-export const api = createClient<paths>({ baseUrl: "" });
+// The API lives beside the app, under the same base path ("" at the root).
+export const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+export const api = createClient<paths>({ baseUrl: BASE });
 api.use(csrf);
 
 export class ApiError extends Error {

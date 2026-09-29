@@ -35,6 +35,15 @@ class Settings:
         return os.path.join(self.data_dir, "runs")
 
     @property
+    def base_path(self):
+        """The path the app is served under, from public_url: "/" at the
+        root, "/litstorm" behind host 203's nginx. Cookies are scoped to it,
+        so they are not sent to the other apps on the same host."""
+        from urllib.parse import urlparse
+
+        return urlparse(self.public_url).path.rstrip("/") or "/"
+
+    @property
     def search_cache_dir(self):
         return os.path.join(self.data_dir, "search-cache")
 

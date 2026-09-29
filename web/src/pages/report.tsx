@@ -8,7 +8,7 @@ import MarkdownIt from "markdown-it";
 import { ChevronLeft, Download, ExternalLink, FileCode2, FileText, FileType2, Quote } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 
-import { api, call } from "@/api/client";
+import { api, BASE, call } from "@/api/client";
 import { ErrorText, LoadingRows, Toolbar, domainOf } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ function Body({ sections, level = 2 }: { sections: Section[]; level?: number }) 
 function ExportMenu({ runId }: { runId: string }) {
   const { t } = useT();
   const [evidence, setEvidence] = useState(false);
-  const href = (format: string) => `/api/runs/${runId}/export?format=${format}&evidence=${evidence}`;
+  const href = (format: string) => `${BASE}/api/runs/${runId}/export?format=${format}&evidence=${evidence}`;
   const item = (format: string, label: string, Icon: typeof FileText) => (
     <DropdownMenuItem asChild>
       <a href={href(format)}>

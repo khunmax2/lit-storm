@@ -258,7 +258,16 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
    - แท็บโหมดแสดงตาม Engine ที่พร้อม และผู้ดูแลปิดได้
    - แสดงชื่อ Engine บนการ์ดของ Run และรายงาน
    - ขั้นขัดเกลาโจทย์
-6. **stack จำลอง host:** nginx ข้างหน้า, base path `/litstorm`, origin เดียว ระบบต้องรองรับ base path ครอบคลุม Vite, router, API, cookie และลิงก์ตั้งรหัสผ่าน
+6. **stack จำลอง host** ✅ เสร็จเมื่อ 2026-09-30 ใช้ `docker compose -f stack/compose.yml -f stack/compose.mirror.yml up -d --build` แล้วเปิด http://localhost:8090/litstorm/
+   - **nginx ข้างหน้า (`stack/edge/`):** ทำหน้าที่แทน nginx ของ host ที่ `/` ตอบ 404 เพราะบน host เป็นที่ของ DeepWitya
+   - **base path:** ตั้งตอน build (`LITSTORM_BASE_PATH`) ครอบคลุม Vite, router, ตัวเรียก API, ลิงก์ export และ nginx ใน image เว็บ
+   - **cookie:** path ตาม `LITSTORM_PUBLIC_URL` จึงไม่ถูกส่งไปให้แอปอื่นบน host เดียวกัน
+   - **ตรวจแล้วบน mirror:**
+     - เข้าสู่ระบบ, deep link, reload และ export ผ่านเบราว์เซอร์จริง
+     - ไม่มีคำขอใดออกนอก `/litstorm`
+     - Run จริงสำเร็จใน 42 วินาที
+   - ถ้าไม่ใส่ `LITSTORM_BASE_PATH` stack รันที่ `/` เหมือนเดิม
+   - รายการเดิมของขั้นนี้: nginx ข้างหน้า, base path `/litstorm`, origin เดียว ระบบต้องรองรับ base path ครอบคลุม Vite, router, API, cookie และลิงก์ตั้งรหัสผ่าน
 
 ### 2.1 Agent Research
 

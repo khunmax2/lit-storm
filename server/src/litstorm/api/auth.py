@@ -42,12 +42,13 @@ def _start_session(response, session, user):
         )
     )
     secure = settings.get().cookie_secure
+    path = settings.get().base_path
     max_age = SESSION_DAYS * 24 * 3600
     response.set_cookie(
-        deps.SESSION_COOKIE, token, httponly=True, samesite="lax", secure=secure, max_age=max_age, path="/"
+        deps.SESSION_COOKIE, token, httponly=True, samesite="lax", secure=secure, max_age=max_age, path=path
     )
     response.set_cookie(
-        deps.CSRF_COOKIE, csrf, httponly=False, samesite="lax", secure=secure, max_age=max_age, path="/"
+        deps.CSRF_COOKIE, csrf, httponly=False, samesite="lax", secure=secure, max_age=max_age, path=path
     )
 
 
@@ -176,8 +177,8 @@ def logout(request: Request, response: Response, session=Depends(deps.database))
     if token:
         session.execute(delete(AuthSession).where(AuthSession.token_hash == security.hash_token(token)))
         session.commit()
-    response.delete_cookie(deps.SESSION_COOKIE, path="/")
-    response.delete_cookie(deps.CSRF_COOKIE, path="/")
+    response.delete_cookie(deps.SESSION_COOKIE, path=settings.get().base_path)
+    response.delete_cookie(deps.CSRF_COOKIE, path=settings.get().base_path)
 
 
 @router.get("/me", response_model=MeOut)

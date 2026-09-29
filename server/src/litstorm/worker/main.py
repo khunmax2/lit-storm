@@ -18,7 +18,7 @@ import time
 from litstorm import db, settings, trash
 from litstorm import report as report_mod
 from litstorm.db.models import RunEvent
-from litstorm.runner.supervisor import supervise
+from litstorm.runner.supervisor import Spare, supervise
 from litstorm.worker import queue
 
 log = logging.getLogger("litstorm.worker")
@@ -42,7 +42,7 @@ class _Throttle:
         return self.last
 
 
-def run_one(claim):
+def run_one(claim, spare=None):
     Session = db.sessions()
     run_dir = os.path.join(settings.get().runs_dir, str(claim.run_id))
 
@@ -77,6 +77,7 @@ def run_one(claim):
             should_cancel=_Throttle(DB_TOUCH / 2, should_cancel),
             on_event=on_event,
             poll_interval=1.0,
+            spare=spare,
         )
     except Exception as error:  # noqa: BLE001 - the Run must still end
         log.exception("run %s: supervisor failed", claim.run_id)
@@ -107,6 +108,8 @@ def main():
             log.info("purged %d run(s) from the Trash", purged)
 
     purge_now = _Throttle(PURGE_EVERY, purge)
+    spare = Spare()
+    spare.refill()
 
     log.info("worker ready")
     while not stopping.is_set():
@@ -121,7 +124,9 @@ def main():
                 claim = queue.claim(session)
             if claim is None:
                 break
-            thread = threading.Thread(target=run_one, args=(claim,), name=f"run-{claim.run_id}", daemon=True)
+            thread = threading.Thread(
+                target=run_one, args=(claim, spare), name=f"run-{claim.run_id}", daemon=True
+            )
             thread.start()
             threads.append(thread)
 
@@ -131,6 +136,7 @@ def main():
     # A Worker told to stop leaves its Runs to be swept as interrupted:
     # they are not restarted, by design.
     log.info("worker stopping with %d run(s) in progress", len(threads))
+    spare.close()
 
 
 if __name__ == "__main__":

@@ -37,6 +37,9 @@ services:
       # Only the api service sees the setup code.
       LITSTORM_BOOTSTRAP_CODE_FILE: /run/secrets/bootstrap_code
     secrets: [secret_key, bootstrap_code]
+    # Services on the machine itself (Ollama for embeddings) are reached as
+    # host.docker.internal, on Docker Desktop and on Linux alike.
+    extra_hosts: &host ["host.docker.internal:host-gateway"]
     volumes:
       - run-data:/data
     depends_on:
@@ -48,6 +51,7 @@ services:
     command: ["python", "-m", "litstorm.worker.main"]
     environment: *server-env
     secrets: [secret_key]
+    extra_hosts: *host
     volumes:
       - run-data:/data
     depends_on:

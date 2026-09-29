@@ -221,3 +221,39 @@ def test_thai_files_can_be_written_whatever_the_host_locale(tmp_path):
     outcome = fast(tmp_path, config([{"write_thai": True}]))
     assert outcome.status == "succeeded", outcome.message
     assert (tmp_path / "work" / "thai.txt").read_text(encoding="utf-8") == "สงกรานต์"
+
+
+def test_a_spare_process_takes_the_next_run(tmp_path):
+    """The Worker keeps one process loaded ahead of time; a Run handed to it
+    ends as any other does, and a new spare starts behind it."""
+    from litstorm.runner.supervisor import Spare
+
+    spare = Spare(preload=())
+    spare.refill()
+    first = spare._proc
+    try:
+        outcome = fast(tmp_path / "a", config([{"stage": "research"}]), spare=spare)
+        assert outcome.status == "succeeded" and outcome.report_path
+        assert first.returncode == 0  # the spare ran it
+        assert spare._proc is not None and spare._proc is not first  # and was replaced
+        # Its stderr went to the Run's directory, as a fresh process's does.
+        assert (tmp_path / "a" / "stderr.log").exists()
+        for path in (tmp_path / "a").rglob("*"):
+            if path.is_file():
+                assert "sk-secret" not in path.read_text(encoding="utf-8", errors="ignore"), path
+    finally:
+        spare.close()
+
+
+def test_a_dead_spare_is_not_used(tmp_path):
+    from litstorm.runner.supervisor import Spare
+
+    spare = Spare(preload=())
+    spare.refill()
+    spare._proc.kill()
+    spare._proc.wait()
+    try:
+        outcome = fast(tmp_path, config([{"stage": "research"}]), spare=spare)
+        assert outcome.status == "succeeded"
+    finally:
+        spare.close()

@@ -4,7 +4,6 @@ from collections import OrderedDict
 from typing import Union, Optional, Any, List, Tuple, Dict
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ...interface import Information, InformationTable, Article, ArticleSectionNode
@@ -107,7 +106,14 @@ class StormInformationTable(InformationTable):
         return cls(conversations)
 
     def prepare_table_for_retrieval(self):
-        self.encoder = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+        # An encoder set on the table beforehand wins: anything with
+        # SentenceTransformer's `encode` (a str gives one vector, a list a
+        # matrix). Without one, the model STORM ships with — imported only
+        # then, since it loads torch.
+        if getattr(self, "encoder", None) is None:
+            from sentence_transformers import SentenceTransformer
+
+            self.encoder = SentenceTransformer("paraphrase-MiniLM-L6-v2")
         self.collected_urls = []
         self.collected_snippets = []
         for url, information in self.url_to_info.items():

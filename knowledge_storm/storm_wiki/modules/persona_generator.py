@@ -1,5 +1,6 @@
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Union, List
 
 import dspy
@@ -10,7 +11,12 @@ from bs4 import BeautifulSoup
 def get_wiki_page_title_and_toc(url):
     """Get the main title and table of contents from an url of a Wikipedia page."""
 
-    response = requests.get(url)
+    # A timeout, or a page that stops answering holds the Run open with it;
+    # a named client, as Wikimedia's policy asks of scripts.
+    response = requests.get(
+        url, timeout=10, headers={"User-Agent": "lit-storm/2 (https://github.com/khunmax2/lit-storm)"}
+    )
+    response.raise_for_status()
     soup = BeautifulSoup(response.content, "html.parser")
 
     # Get the main title from the first h1 tag
@@ -82,14 +88,18 @@ class CreateWriterWithPersona(dspy.Module):
             for s in related_topics.split("\n"):
                 if "http" in s:
                     urls.append(s[s.find("http") :])
-            examples = []
-            for url in urls:
+            # The pages are fetched side by side; the examples keep the
+            # model's order.
+            def fetch(url):
                 try:
                     title, toc = get_wiki_page_title_and_toc(url)
-                    examples.append(f"Title: {title}\nTable of Contents: {toc}")
+                    return f"Title: {title}\nTable of Contents: {toc}"
                 except Exception as e:
                     logging.error(f"Error occurs when processing {url}: {e}")
-                    continue
+                    return None
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                examples = [e for e in pool.map(fetch, urls[:8]) if e]
             if len(examples) == 0:
                 examples.append("N/A")
             gen_persona_output = self.gen_persona(

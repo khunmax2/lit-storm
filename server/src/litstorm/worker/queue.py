@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text, update
 
-from litstorm import cost, limits, quota, security
+from litstorm import cost, embedding, limits, quota, security
 from litstorm.db.models import (
     ACTIVE,
     CANCELLING,
@@ -124,6 +124,7 @@ def claim(session):
         llm=llm,
         search={k: v for k, v in run.config["search"].items() if k != "label" and v},
         params=run.config.get("params", {}),
+        embedding=run.config.get("embedding", {}),
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)
     model = session.get(LlmModel, run.llm_model_id)
@@ -145,7 +146,19 @@ def _secrets(session, run):
             llm["api_base"] = credential.api_base
     provider = session.get(SearchProvider, run.search_provider_id)
     search_key = security.decrypt(provider.api_key_ciphertext) if provider else ""
-    return Secrets(llm_api_key=llm_key, search_api_key=search_key), llm
+    return Secrets(
+        llm_api_key=llm_key, search_api_key=search_key, embedding_api_key=_embedding_key(session, run)
+    ), llm
+
+
+def _embedding_key(session, run):
+    """The key for the embedding service the Run was started with, from the
+    LLM credential of its provider (litstorm.embedding.key_for)."""
+    kept = run.config.get("embedding") or {}
+    if kept.get("provider", embedding.BUILTIN) == embedding.BUILTIN:
+        return ""
+    value = embedding.Embedding(provider=kept["provider"], model=kept.get("model", ""), api_base=kept.get("api_base"))
+    return embedding.key_for(value, session.get(LlmCredential, value.provider))
 
 
 def _held(claim):

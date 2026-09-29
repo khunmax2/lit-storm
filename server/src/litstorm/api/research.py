@@ -250,10 +250,20 @@ def _snapshot(session, model, provider, depth="standard"):
             "engines": provider.engines,
         },
         "params": params,
+        "embedding": _embedding(session),
         "depth": depth,
         "target_minutes": level.target_minutes,
         "deadline_minutes": configured.run_deadline_minutes,
     }
+
+
+def _embedding(session):
+    from litstorm import embedding
+    from litstorm.db.models import LlmCredential
+
+    value = embedding.load(session)
+    credential = session.get(LlmCredential, value.provider) if value.provider != embedding.BUILTIN else None
+    return embedding.snapshot(value, credential)
 
 
 def _existing(session, owner, request_key):

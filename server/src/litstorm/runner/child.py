@@ -5,6 +5,7 @@ stdin, runs the Engine, and writes outcome.json last. The supervisor treats a
 process that exits without outcome.json as having crashed.
 """
 
+import importlib
 import json
 import os
 import sys
@@ -113,11 +114,32 @@ def _exit_when_orphaned(parent_pid):
     os._exit(4)
 
 
-def main():
-    run_dir = sys.argv[1]
-    parent_pid = int(sys.argv[2]) if len(sys.argv) > 2 else os.getppid()
-    raw = json.loads(sys.stdin.read() or "{}")
+def _spare(parent_pid, preload):
+    """Load the libraries a Run needs, then wait to be given one
+    (supervisor.Spare). The Run's directory arrives with the credentials."""
     threading.Thread(target=_exit_when_orphaned, args=(parent_pid,), daemon=True).start()
+    for name in preload:
+        try:
+            importlib.import_module(name)
+        except Exception:  # noqa: BLE001 - the Run will import it again and say what is wrong
+            pass
+    raw = json.loads(sys.stdin.readline() or "{}")
+    run_dir = raw.pop("run_dir")
+    # What an ordinary Run's process writes to stderr.log from its start.
+    log = os.open(files.path(run_dir, "stderr.log"), os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+    os.dup2(log, 2)
+    os.close(log)
+    return run_dir, raw
+
+
+def main():
+    if sys.argv[1] == "--spare":
+        run_dir, raw = _spare(int(sys.argv[2]), sys.argv[3:])
+    else:
+        run_dir = sys.argv[1]
+        parent_pid = int(sys.argv[2]) if len(sys.argv) > 2 else os.getppid()
+        raw = json.loads(sys.stdin.read() or "{}")
+        threading.Thread(target=_exit_when_orphaned, args=(parent_pid,), daemon=True).start()
     run(run_dir, Secrets(**raw))
     sys.stderr.flush()
     # Skip the interpreter's shutdown: STORM's thread pools can keep it

@@ -1034,6 +1034,8 @@ function Models() {
         </CardContent>
       </Card>
 
+      <EmbeddingCard />
+
       <Card>
         <CardHeader>
           <CardTitle>{t("admin.keys")}</CardTitle>
@@ -1073,6 +1075,131 @@ function Models() {
       <KeyDialog provider={keyFor} onOpenChange={(o) => !o && setKeyFor(null)} />
       <ModelDialog form={form} setForm={setForm} keys={keys.data ?? []} />
     </div>
+  );
+}
+
+// --- embedding service ------------------------------------------------------------
+
+// Which providers can embed: Groq cannot. The key is the provider's API key.
+const EMBED_PROVIDERS = ["builtin", "openrouter", "openai", "gemini", "openai-compatible"];
+const EMBED_EXAMPLE: Record<string, string> = {
+  openrouter: "baai/bge-m3",
+  openai: "text-embedding-3-small",
+  gemini: "gemini-embedding-001",
+  "openai-compatible": "bge-m3",
+};
+type EmbeddingForm = Schemas["Embedding"];
+const embedTestedWith = (f: EmbeddingForm) => JSON.stringify([f.provider, f.model, f.api_base ?? ""]);
+
+function EmbeddingCard() {
+  const { t } = useT();
+  const queryClient = useQueryClient();
+  const stored = useQuery({ queryKey: ["admin-embedding"], queryFn: () => call(api.GET("/api/admin/embedding")) });
+  const [form, setForm] = useState<EmbeddingForm | null>(null);
+  const current: EmbeddingForm | undefined = form ?? stored.data;
+  const save = useMutation({
+    mutationFn: () => call(api.PUT("/api/admin/embedding", { body: current! })),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-embedding"] });
+      setForm(null);
+      toast.success(t("common.saved"));
+    },
+  });
+  const check = useMutation({
+    mutationFn: (f: EmbeddingForm) =>
+      call(api.POST("/api/admin/embedding/check", { body: f })).then((r) => ({ ...r, for: embedTestedWith(f) })),
+  });
+  if (!current) return <LoadingRows />;
+  const f = current;
+  const builtin = f.provider === "builtin";
+  const set = (patch: Partial<EmbeddingForm>) => setForm({ ...f, ...patch });
+  const result = check.data;
+  // What is saved is what the page shows until the form changes.
+  const showing = form === null ? stored.data : undefined;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("embed.title")}</CardTitle>
+        <CardDescription>{t("embed.lead")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="embed-provider" label={t("admin.provider")} hint={builtin ? t("embed.builtinHint") : undefined}>
+              <Select
+                value={f.provider}
+                onValueChange={(provider) => set({ provider, model: provider === "builtin" ? "" : f.model })}
+              >
+                <SelectTrigger id="embed-provider" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMBED_PROVIDERS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p === "builtin" ? t("embed.builtin") : LLM_INFO[p].name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {!builtin && (
+              <Field id="embed-model" label={t("embed.model")}>
+                <Input
+                  id="embed-model"
+                  className="font-mono"
+                  placeholder={EMBED_EXAMPLE[f.provider]}
+                  value={f.model ?? ""}
+                  onChange={(e) => set({ model: e.target.value })}
+                />
+              </Field>
+            )}
+          </div>
+          {!builtin && (
+            <Field
+              id="embed-base"
+              label={t("embed.base")}
+              hint={f.provider === "openai-compatible" ? t("embed.baseHint") : t("embed.baseOptional")}
+            >
+              <Input
+                id="embed-base"
+                className="font-mono"
+                placeholder={showing?.resolved_base || "http://host.docker.internal:11434/v1"}
+                value={f.api_base ?? ""}
+                onChange={(e) => set({ api_base: e.target.value || null })}
+              />
+            </Field>
+          )}
+          {!builtin && showing && !showing.has_key && f.provider !== "openai-compatible" && (
+            <p className="text-sm text-muted-foreground">{t("embed.noKey")}</p>
+          )}
+          {!builtin && (
+            <DraftTest
+              lead={t("embed.testLead")}
+              onTest={() => check.mutate(f)}
+              pending={check.isPending}
+              error={check.error}
+              result={result}
+              stale={!!result && result.for !== embedTestedWith(f)}
+              okText={(r) => `${r.message} · ${r.seconds}s`}
+              failText={t("embed.failed")}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">{t("embed.fallback")}</p>
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={save.isPending || form === null}>
+              {t("save")}
+            </Button>
+            {save.error && <ErrorText error={save.error} />}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -18,7 +18,7 @@ from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 from litstorm import outcomes
 from litstorm.engines.base import EngineFailure
 
-from . import language, normalize, providers
+from . import encoders, language, normalize, providers
 
 # Settings an Administrator can change for every Run (docs/web-app-design.md,
 # ค่าที่ผู้ใช้เลือกได้ต่อ Run). Owners do not see these.
@@ -178,12 +178,13 @@ class StormEngine:
                 outline.dump_outline_to_file(
                     os.path.join(runner.article_output_dir, "storm_gen_outline.txt")
                 )
-            draft = stage(
-                "article",
-                lambda: runner.run_article_generation_module(
+            def write():
+                encoders.attach(table, outline, config, secrets, progress)
+                return runner.run_article_generation_module(
                     outline=outline, information_table=table, callback_handler=callbacks
-                ),
-            )
+                )
+
+            draft = stage("article", write)
             polished = stage(
                 "polish",
                 lambda: runner.run_article_polishing_module(

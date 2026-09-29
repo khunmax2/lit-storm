@@ -17,6 +17,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -71,28 +72,93 @@ def write_config(run_dir, config):
         json.dump(config.__dict__, f, ensure_ascii=False, indent=2)
 
 
-def start(run_dir, secrets):
-    """Launch the child. Credentials go through stdin, never to disk.
+def _secrets_json(secrets, **extra):
+    return json.dumps(
+        {
+            "llm_api_key": secrets.llm_api_key,
+            "search_api_key": secrets.search_api_key,
+            "embedding_api_key": secrets.embedding_api_key,
+            **extra,
+        }
+    ).encode()
+
+
+# knowledge_storm opens its files without naming an encoding; on a Windows
+# host that is cp1252, which cannot hold Thai.
+_ENV = {**os.environ, "PYTHONUTF8": "1"}
+
+
+def start(run_dir, secrets, spare=None):
+    """Launch the child, or hand the Run to a spare one. Credentials go
+    through stdin, never to disk.
 
     The child is told our pid, and exits if we do (child._exit_when_orphaned).
     """
+    proc = spare.take() if spare else None
+    if proc is not None:
+        try:
+            proc.stdin.write(_secrets_json(secrets, run_dir=run_dir) + b"\n")
+            proc.stdin.close()
+        except OSError:
+            # It died between being checked and being handed the Run: start
+            # one the ordinary way.
+            proc.kill()
+        else:
+            spare.refill()
+            return proc
     with open(files.path(run_dir, "stderr.log"), "wb") as stderr:
         proc = subprocess.Popen(
             [sys.executable, "-m", "litstorm.runner.child", run_dir, str(os.getpid())],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=stderr,
-            # knowledge_storm opens its files without naming an encoding;
-            # on a Windows host that is cp1252, which cannot hold Thai.
-            env={**os.environ, "PYTHONUTF8": "1"},
+            env=_ENV,
         )
-    proc.stdin.write(
-        json.dumps(
-            {"llm_api_key": secrets.llm_api_key, "search_api_key": secrets.search_api_key}
-        ).encode()
-    )
+    proc.stdin.write(_secrets_json(secrets))
     proc.stdin.close()
+    if spare:
+        spare.refill()
     return proc
+
+
+class Spare:
+    """One Run process started ahead of time, its libraries already loaded.
+
+    Loading STORM takes about 8 seconds, every Run, before any work starts
+    (docs/benchmarks/2026-09-30-baseline.md). A spare pays that while nothing
+    is waiting; the next Run takes it and a new spare starts behind it. The
+    spare exits if the Worker does, like any Run's process.
+    """
+
+    def __init__(self, preload=("litstorm.engines.storm.engine", "sentence_transformers")):
+        self.preload = tuple(preload)
+        self._lock = threading.Lock()
+        self._proc = None
+
+    def refill(self):
+        with self._lock:
+            if self._proc is None or self._proc.poll() is not None:
+                self._proc = subprocess.Popen(
+                    [sys.executable, "-m", "litstorm.runner.child", "--spare", str(os.getpid()), *self.preload],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    # Until it is given a Run it has nowhere to write; the
+                    # child points this at the Run's stderr.log then.
+                    stderr=subprocess.DEVNULL,
+                    env=_ENV,
+                )
+
+    def take(self):
+        """The spare, if one is alive; None otherwise."""
+        with self._lock:
+            proc, self._proc = self._proc, None
+        return proc if proc is not None and proc.poll() is None else None
+
+    def close(self):
+        proc = self.take()
+        if proc is not None:
+            proc.kill()
+            proc.wait()
 
 
 def supervise(
@@ -106,10 +172,11 @@ def supervise(
     heartbeat=lambda: None,
     on_event=lambda event: None,
     poll_interval=0.5,
+    spare=None,
 ):
     """Run `config` to its end and say how it ended."""
     write_config(run_dir, config)
-    proc = start(run_dir, secrets)
+    proc = start(run_dir, secrets, spare)
     tail = _EventTail(files.path(run_dir, files.EVENTS))
     usage = []
     started = time.monotonic()

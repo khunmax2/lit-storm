@@ -365,6 +365,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/embedding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Embedding */
+        get: operations["get_embedding_api_admin_embedding_get"];
+        /** Put Embedding */
+        put: operations["put_embedding_api_admin_embedding_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/embedding/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Embedding
+         * @description Test the setting in the form before it is saved.
+         */
+        post: operations["check_embedding_api_admin_embedding_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/usage": {
         parameters: {
             query?: never;
@@ -858,6 +896,46 @@ export interface components {
             storm: {
                 [key: string]: unknown;
             };
+        };
+        /** Embedding */
+        Embedding: {
+            /**
+             * Provider
+             * @default builtin
+             */
+            provider: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /** Api Base */
+            api_base?: string | null;
+        };
+        /** EmbeddingOut */
+        EmbeddingOut: {
+            /**
+             * Provider
+             * @default builtin
+             */
+            provider: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /** Api Base */
+            api_base?: string | null;
+            /**
+             * Resolved Base
+             * @default
+             */
+            resolved_base: string;
+            /**
+             * Has Key
+             * @default false
+             */
+            has_key: boolean;
         };
         /** EventOut */
         EventOut: {
@@ -2247,6 +2325,92 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SearchDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_embedding_api_admin_embedding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingOut"];
+                };
+            };
+        };
+    };
+    put_embedding_api_admin_embedding_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Embedding"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_embedding_api_admin_embedding_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Embedding"];
             };
         };
         responses: {

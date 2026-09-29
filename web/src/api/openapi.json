@@ -940,6 +940,108 @@
     }
    }
   },
+  "/api/admin/embedding": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Get Embedding",
+    "operationId": "get_embedding_api_admin_embedding_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EmbeddingOut"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Put Embedding",
+    "operationId": "put_embedding_api_admin_embedding_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Embedding"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EmbeddingOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/embedding/check": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Check Embedding",
+    "description": "Test the setting in the form before it is saved.",
+    "operationId": "check_embedding_api_admin_embedding_check_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Embedding"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/usage": {
    "get": {
     "tags": [
@@ -2350,6 +2452,70 @@
     ],
     "title": "DepthLevel",
     "description": "What one depth level means (docs/web-app-design.md, รุ่นสอง: ระดับ\nความลึก). Owners choose the level; the numbers behind it are the\nAdministrator's, so a Run's cost still has a ceiling."
+   },
+   "Embedding": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "title": "Provider",
+      "default": "builtin"
+     },
+     "model": {
+      "type": "string",
+      "title": "Model",
+      "default": ""
+     },
+     "api_base": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Base"
+     }
+    },
+    "type": "object",
+    "title": "Embedding"
+   },
+   "EmbeddingOut": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "title": "Provider",
+      "default": "builtin"
+     },
+     "model": {
+      "type": "string",
+      "title": "Model",
+      "default": ""
+     },
+     "api_base": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Base"
+     },
+     "resolved_base": {
+      "type": "string",
+      "title": "Resolved Base",
+      "default": ""
+     },
+     "has_key": {
+      "type": "boolean",
+      "title": "Has Key",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "EmbeddingOut"
    },
    "EventOut": {
     "properties": {

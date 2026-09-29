@@ -14,7 +14,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import checks, limits, quota, security
+from litstorm import checks, embedding, limits, quota, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import LLM_PROVIDERS, SEARCH_PROVIDERS
@@ -429,6 +429,57 @@ def check_search_draft(body: SearchDraftIn, session=Depends(deps.database)):
     draft = SimpleNamespace(kind=body.kind, endpoint=(body.endpoint or "").strip(), engines=(body.engines or "").strip())
     ok, message, seconds, samples = checks.search(draft, (key or "").strip(), body.query)
     return CheckOut(ok=ok, message=message, seconds=round(seconds, 2), samples=samples)
+
+
+# --- embedding service ------------------------------------------------------
+# One for the whole system (litstorm.embedding). Its key is the LLM
+# credential of its provider, so there is no key field of its own.
+
+
+class EmbeddingOut(embedding.Embedding):
+    # The address a Run would call, once the provider's and the stored
+    # credential's are taken into account; empty for the built-in model.
+    resolved_base: str = ""
+    has_key: bool = False
+
+
+def _embedding_out(session, value):
+    credential = session.get(LlmCredential, value.provider) if value.provider != embedding.BUILTIN else None
+    return EmbeddingOut(
+        **value.model_dump(),
+        resolved_base="" if value.provider == embedding.BUILTIN else embedding.base_url(
+            value, credential.api_base if credential else None
+        ),
+        has_key=bool(embedding.key_for(value, credential)),
+    )
+
+
+@router.get("/embedding", response_model=EmbeddingOut)
+def get_embedding(session=Depends(deps.database)):
+    return _embedding_out(session, embedding.load(session))
+
+
+@router.put("/embedding", response_model=EmbeddingOut)
+def put_embedding(body: embedding.Embedding, session=Depends(deps.database)):
+    body = body.model_copy(update={"model": body.model.strip(), "api_base": (body.api_base or "").strip() or None})
+    credential = session.get(LlmCredential, body.provider)
+    wrong = embedding.problem(body, credential.api_base if credential else None)
+    if wrong:
+        raise HTTPException(422, wrong)
+    embedding.save(session, body)
+    session.commit()
+    return _embedding_out(session, body)
+
+
+@router.post("/embedding/check", response_model=CheckOut)
+def check_embedding(body: embedding.Embedding, session=Depends(deps.database)):
+    """Test the setting in the form before it is saved."""
+    body = body.model_copy(update={"model": body.model.strip(), "api_base": (body.api_base or "").strip() or None})
+    credential = session.get(LlmCredential, body.provider)
+    ok, message, seconds = embedding.check(
+        body, embedding.key_for(body, credential), credential.api_base if credential else None
+    )
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
 
 
 # --- usage ---------------------------------------------------------------------------------------

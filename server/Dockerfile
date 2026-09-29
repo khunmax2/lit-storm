@@ -21,6 +21,15 @@ COPY server/pyproject.toml server/uv.lock ./server/
 RUN cd server && uv sync --frozen --no-dev --extra pdf --no-install-project
 RUN playwright install --with-deps chromium
 
+# STORM's built-in embedding model, in the image: otherwise every new
+# container fetched it from Hugging Face on its first Run, and every Run
+# asked the Hub about it again (30 requests, seconds each Run), failing the
+# article stage whenever the Hub could not be reached.
+ENV HF_HOME=/opt/hf
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-MiniLM-L6-v2')" \
+    && chmod -R a+rX /opt/hf
+ENV HF_HUB_OFFLINE=1
+
 COPY server ./server
 RUN cd server && uv sync --frozen --no-dev --extra pdf
 

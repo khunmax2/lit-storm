@@ -118,6 +118,10 @@ class ArxivRM(dspy.Retrieve):
             if isinstance(query_or_queries, str)
             else list(query_or_queries)
         )
+        # STORM sometimes hands over a blank query. Searching "all:" spends
+        # one of arXiv's three-second turns and counts as a refusal, which a
+        # Run with nothing found would then blame on the provider.
+        queries = [q.strip() for q in queries if q and q.strip()]
         exclude_urls = set(exclude_urls or [])
         self.usage += len(queries)
 

@@ -103,6 +103,25 @@ def test_arxiv_does_not_retry_a_bad_request(monkeypatch):
     assert len(calls) == 1
 
 
+def test_arxiv_skips_blank_queries(monkeypatch):
+    from litstorm.engines.storm import arxiv_rm
+
+    asked = []
+
+    class Resp:
+        status_code, text = 200, "<feed></feed>"
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(arxiv_rm.requests, "get", lambda url, **kw: asked.append(url) or Resp())
+    monkeypatch.setattr(arxiv_rm, "_wait_turn", lambda: None)
+    rm = arxiv_rm.ArxivRM(k=2)
+    rm.forward(["", "   ", "graph neural networks"])
+    assert len(asked) == 1 and "graph" in asked[0]
+    assert rm.refused == 0 and rm.get_usage_and_reset() == {"ArxivRM": 1}
+
+
 @pytest.mark.parametrize("kind", ["searxng", "tavily", "arxiv"])
 def test_every_search_provider_builds_the_retriever_a_run_uses(kind):
     """The admin's test button calls each service over plain HTTP, so it

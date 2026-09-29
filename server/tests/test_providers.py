@@ -101,3 +101,17 @@ def test_arxiv_does_not_retry_a_bad_request(monkeypatch):
     monkeypatch.setattr(arxiv_rm, "_wait_turn", lambda: None)
     arxiv_rm.ArxivRM(k=2).forward("x")
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("kind", ["searxng", "tavily", "arxiv"])
+def test_every_search_provider_builds_the_retriever_a_run_uses(kind):
+    """The admin's test button calls each service over plain HTTP, so it
+    passes even when the retriever a Run builds cannot load its client
+    library. Build the real one for every kind on offer."""
+    from litstorm.catalog import SEARCH_PROVIDERS
+    from litstorm.engines.storm import providers
+
+    assert set(SEARCH_PROVIDERS) == {"searxng", "tavily", "arxiv"}, "add the new kind to this test"
+    search = {"provider": kind, "endpoint": "http://searxng.test"}
+    rm = providers.build_rm(search, api_key="tvly-test-0000", k=3, timeout=5)
+    assert rm.k == 3

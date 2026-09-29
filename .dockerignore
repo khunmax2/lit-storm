@@ -1,19 +1,16 @@
-# Everything the image does not need. The two that matter most are .venv,
-# which is 1.3GB of a different platform's wheels, and DEMO_WORKING_DIR,
-# which is members' reports — neither belongs in a layer that gets pushed.
+# The server image builds from the repository root (stack/compose.yml) and
+# copies only knowledge_storm/ and server/. Everything else stays out of the
+# build context: local environments, secrets, and state.
 
 .venv/
 venv/
 env/
 
-# Members' reports and the admin's saved settings. Both are state; both
-# arrive as mounts at runtime. Baking them in would ship one deployment's
-# data to every other one.
-frontend/demo_light/DEMO_WORKING_DIR/
-frontend/demo_light/.streamlit/secrets.toml
-frontend/demo_light/.streamlit/secrets.toml.*
-frontend/demo_light/.streamlit/model_settings.json
-frontend/demo_light/.streamlit/search_sources.json
+# Keys and secrets never enter a build context, even one that does not copy
+# them: stack/.env holds the scripts' API key, stack/secrets/ the stack's own.
+*.env
+.env*
+stack/secrets/
 
 .git/
 .gitignore
@@ -25,14 +22,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Other people's stacks, and the compose files that start them. The image is
-# the app; how it is run is not part of it.
-deploy/
-
 docs/
 examples/
 assets/
-tests/
 
 .claude/
 .vscode/
@@ -43,10 +35,7 @@ tests/
 .DS_Store
 Thumbs.db
 
-# The web app that replaces Streamlit (server/, web/, stack/): their local
-# environments and secrets never go into an image.
 server/.venv/
 server/data/
 web/node_modules/
 web/dist/
-stack/secrets/

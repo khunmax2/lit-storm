@@ -14,7 +14,7 @@ docker compose -f stack/compose.yml up -d --build
 ```
 
 Open http://localhost:8090 and enter the code in `stack/secrets/bootstrap_code`
-to create the first Administrator. Then, under Administration:
+to create the first Administrator. Then, under Settings:
 
 1. **Models** — add an API key (for example OpenRouter), then a model. For
    `google/gemini-3.5-flash-lite` set reasoning to `effort:minimal` and the

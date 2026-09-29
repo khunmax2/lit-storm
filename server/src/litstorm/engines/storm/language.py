@@ -1,7 +1,9 @@
 """Write a STORM report in a language other than English.
 
-Copied from frontend/demo_light/article_language.py (STORM half only; the
-Co-STORM half comes back with Discussion in the second release).
+Copied from the Streamlit app's article_language.py (STORM half only). The
+Co-STORM half comes back with Discussion in the second release; the app was
+removed on 2026-09-30, and the file is in git history:
+``git log --diff-filter=D -- frontend/demo_light/article_language.py``.
 
 STORM's prompts live as docstrings on its ``dspy.Signature`` classes, and DSPy
 reads ``Signature.instructions`` straight off ``__doc__`` every time it builds a

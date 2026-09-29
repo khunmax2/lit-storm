@@ -6,7 +6,7 @@ Wipes the stack (`docker compose down -v`), installs it again, and checks
 every criterion in docs/web-app-design.md (เกณฑ์รับงานรุ่นแรก), writing
 <output dir>/acceptance.md with a verdict and the evidence for each, plus
 screenshots. Runs real research (costs money, well under a dollar) and
-reads the OpenRouter key from deploy/.env.
+reads the OpenRouter key from stack/.env.
 
 Two things cannot be shown on a live stack without moving its clock: the
 month rolling over, and a Run booked in one month finishing in the next.
@@ -126,10 +126,10 @@ def set_limits(admin, **changes):
 
 
 def openrouter_key():
-    for line in open(os.path.join(ROOT, "deploy", ".env"), encoding="utf-8"):
+    for line in open(os.path.join(ROOT, "stack", ".env"), encoding="utf-8"):
         if line.startswith("OPENROUTER_API_KEY="):
             return line.split("=", 1)[1].strip().strip("\"'")
-    raise SystemExit("no OPENROUTER_API_KEY in deploy/.env")
+    raise SystemExit("no OPENROUTER_API_KEY in stack/.env")
 
 
 @dataclass

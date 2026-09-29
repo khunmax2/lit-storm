@@ -1,8 +1,9 @@
 """Build STORM's language model and retriever from a Run's settings.
 
-The provider table is copied from frontend/demo_light/demo_util.py and the
-retrievers from search_sources.py, minus everything that read settings off
-disk: here every value arrives in the RunConfig or the Secrets.
+The provider table is copied from the Streamlit app's demo_util.py and the
+retrievers from its search_sources.py (the app was removed on 2026-09-30),
+minus everything that read settings off disk: here every value arrives in
+the RunConfig or the Secrets.
 
 Retries follow docs/web-app-design.md: one request and at most two more
 (three in all), with growing gaps. LiteLLM counts `num_retries` on top of the

@@ -213,11 +213,17 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 
 ### 2.0 เตรียมพื้นก่อนเริ่ม
 
-1. **ลบระบบเก่า**
-   - export รายงานเก่า 3 ชิ้นเป็น HTML ไว้นอก git
-   - ลบ container, volume และ image ของ compose `lit-storm` เก่า
-   - ลบ `frontend/` และ compose ใน `deploy/` ออกจาก repo
-   - ย้าย key ที่สคริปต์ทดสอบใช้ไป `stack/.env`
+1. **ลบระบบเก่า** ✅ เสร็จเมื่อ 2026-09-30
+   - **สำรองไว้นอก git** ที่ `D:\Vscode\deep_research_lit\_archive\lit-storm-streamlit-2026-09-30\`
+     - รายงานเก่า **7 ชิ้น** เป็น HTML แบบ interactive สร้างด้วยโค้ดของแอปเดิม (ที่เคยบอกว่า 3 ชิ้นนับแค่หัวข้อที่มีไฟล์โครงร่าง)
+     - ไฟล์ดิบของทุก Run, state ของแอป และ `pg_dumpall` ของ Supabase
+     - การตั้งค่าเดิม (`secrets.toml`, `deploy/.env`)
+   - ลบ container, volume (ชื่อแบบระบุเอง 4 ตัว) และ image ของระบบเก่า รวม image ของ research-ui เดิม เก็บไว้เฉพาะ image ทั่วไปที่ stack อื่นใช้ร่วม (nginx, searxng, postgres)
+   - ลบออกจาก repo: `frontend/`, `deploy/`, `Dockerfile` และ `tests/` ของรากที่ทดสอบแอปเดิม
+     - ย้ายเทสต์ Gemini ของ `knowledge_storm` ไป `server/tests/test_google_model.py`
+     - ย้ายเอกสารยุค Streamlit ไป `docs/archive/streamlit/` และลบ `docs/supabase-schema.sql`
+     - เขียน `README.md` ใหม่สำหรับเว็บ ความรู้เรื่องโมเดลที่คิดจนไม่ตอบยังอยู่ใน README ส่วนความเสี่ยงของ Co-STORM ย้ายมาไว้ในหัวข้อ 2.3 ข้างล่าง
+   - ย้าย key ที่สคริปต์ทดสอบใช้ไป `stack/.env` และ `.dockerignore` กัน `*.env` ออกจาก build context
    - ลบฐานข้อมูลทดสอบ `litstorm_e2e`
 2. **สคริปต์วัดผล:** รันหัวข้อชุดเดียวกัน บันทึกเวลา ค่าใช้จ่าย และจำนวน Source ต่อ Engine ต่อระดับ ใช้วัด STORM ปัจจุบันเป็นเส้นฐาน
 3. **ระดับความลึกกับ STORM:** เร็ว / มาตรฐาน / ลึก บนกล่องพิมพ์ ผู้ดูแลแก้ตัวเลขได้ในหน้าขีดจำกัด
@@ -256,7 +262,11 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 - Turn เป็นงานในคิวที่ได้คิวก่อน Run ใหม่ เก็บ/โหลดสถานะของ runner
 - โควตา 1 หน่วยต่อ 20 Turn และปุ่ม "ต่อเวลา"
 - หน้าแชต + แผงแผนผังความคิด พร้อมปุ่มพิมพ์แทรก / คุยต่อ 1 รอบ / ให้คุยเอง 3 รอบ / สร้างรายงาน (หลายครั้งได้)
-- สลับภาษาของ Co-STORM แบบเดียวกับ STORM
+- สลับภาษาของ Co-STORM แบบเดียวกับ STORM ครึ่งของ Co-STORM อยู่ใน `article_language.py` ของแอป Streamlit ซึ่งอยู่ใน git history
+- **ความเสี่ยงที่รู้แล้ว** (จาก README ของแอป Streamlit)
+  - `CoStormRunner.from_dict()` ของ upstream มี FIXME: ไม่ใช้ `lm_config` ที่บันทึกไว้ แต่เรียก `lm_config.init(lm_type=os.getenv("OPENAI_API_TYPE"))` ซึ่งล้มบน Gemini ต้องเขียนทางโหลดสถานะกลับเองก่อน การเก็บสถานะหลังจบทุก Turn จึงจะใช้ได้
+  - Discussion หนึ่งครั้งเรียกโมเดล 70–100 ครั้ง ช่วงเตรียมการ (warm start) อาจนานถึง 15 นาที ต้องเข้าเป้าเวลาของระดับความลึกด้วย `warmstart_max_num_experts`, `max_search_queries_per_turn` และ `max_search_thread`
+  - แผนผังความคิดต้องใช้ embedding แต่ OpenRouter และ Groq ไม่มี endpoint นี้ ต้องมีบริการ embedding แยก เช่น Gemini, OpenAI หรือ Ollama บนเครื่อง
 - **ตรวจรับ:** สนทนาจริงไทยและอังกฤษ, กลับมาคุยต่อหลังปิดเว็บ, Worker ล่มกลาง Turn เสียแค่ Turn นั้น, Discussion ในถังขยะและ Project ทำงาน, เกณฑ์รุ่นแรกยังผ่าน
 
 ### 2.4 ฟีเจอร์เสริม

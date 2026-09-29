@@ -4,16 +4,9 @@
 
 # lit-storm
 
-A deployable research assistant built on [stanford-oval/storm](https://github.com/stanford-oval/storm). Give it a topic; it researches from several perspectives, gathers sources from the web, and writes a cited, encyclopedia-style article.
+A self-hosted research assistant built on [stanford-oval/storm](https://github.com/stanford-oval/storm). Give it a topic; it researches from several perspectives, gathers sources, and writes a cited, encyclopedia-style report you can check claim by claim.
 
-Upstream is a research codebase you drive from Python. This fork turns it into something a team can sign in to and use: accounts and per-member quotas, a settings UI instead of code edits, two research engines behind one door, and a self-contained HTML report you can mail to someone.
-
-| | STORM | Co-STORM | Deep Research |
-| --- | --- | --- | --- |
-| How it runs | Start to finish on its own | A panel discusses, one turn at a time | Iterates: search, read, ask, search again |
-| Your role | Give a topic, wait | Watch, interrupt, steer | Answer its clarifying questions, watch the tree grow |
-| Report | Handed back at the end | Written when you decide the table has covered enough | Written from the tree when it stops |
-| What it is | This app | This app | A sibling application, framed — [deploy/research-ui](deploy/research-ui/README.md) |
+Upstream is a research codebase you drive from Python. This fork is a web app a small team signs in to: accounts and monthly quotas, a queue that keeps working when you close the tab, a settings page instead of code edits, and reports whose every citation opens the evidence behind it.
 
 <p align="center">
 | <a href="https://arxiv.org/abs/2402.14207"><b>STORM paper</b></a> | <a href="https://www.arxiv.org/abs/2408.15232"><b>Co-STORM paper</b></a> | <a href="https://storm-project.stanford.edu/"><b>Upstream project site</b></a> |
@@ -21,232 +14,95 @@ Upstream is a research codebase you drive from Python. This fork turns it into s
 
 ---
 
-## What this fork adds
+## What it does
 
-Diffed against upstream `fb951af` (2025-09-30), where upstream stopped. This fork is 50 commits ahead and behind by none.
+- **Research that runs on its own.** A topic becomes a Run on a background Worker, one process per Run. Close the page; come back to the report. Runs can be cancelled, retried, and filed in Projects — or left unfiled, as in ChatGPT or Claude.
+- **Reports you can check.** Citations are renumbered in reading order; clicking one opens the source and the excerpt the engine actually used. Export as HTML (opens offline), Markdown or PDF, with or without the evidence.
+- **Thai and English**, for the interface and for the report.
+- **Accounts, quota and a fair queue.** Administrators create accounts and send one-time links. Each person has a monthly quota; the queue takes turns between people and refunds quota when a Run fails for reasons that are not theirs.
+- **Settings on a page.** Models from OpenRouter, Gemini, OpenAI, Groq or any OpenAI-compatible server; search through SearXNG (bundled), Tavily or arXiv. Keys are stored encrypted and never shown again. Every model and search service can be tested before it is saved.
+- **Usage and cost.** Tokens, searches and an estimated cost for every Run, per person and per month — without showing anyone's topics.
+- **A 30-day Trash.**
 
-**A Streamlit application** (`frontend/demo_light/`, ~8,900 lines) — sign-in, a library, a member roster, settings pages:
-
-- **Accounts on Supabase** — `member` / `admin` roles, monthly research quotas, suspension, and an audit log recording who changed what with before and after values. Row-level security keeps one account's reports out of another's reach.
-- **Co-STORM as a first-class engine** — a round table where experts talk in the open and you can interrupt at any point.
-- **Search sources chosen from a page** — test the key before saving; a saved key is never sent back to the browser. Upstream requires a code edit.
-- **Per-run options** — depth (fast / standard / deep), which of the admin-offered sources to search, and which admin-offered model writes. Untouched, a run is exactly what the admin configured.
-- **Self-contained HTML reports** — the article, its live citations, the evidence behind each one, and the interviews that produced it, in one file that opens with no server and no network.
-- **Thai and English**, for both the interface and the generated article.
-- **Provider-agnostic models** — Gemini, OpenRouter, Groq, OpenAI, or anything speaking the OpenAI API.
-
-**Fixes to the upstream library** (12 files, +169/−123 excluding formatting) — several are bugs that make upstream unusable on a non-OpenAI deployment. See [below](#changes-to-the-upstream-library).
-
-**42 tests**, covering article storage, account isolation, member management, and the database's own permission rules. Upstream has none for this surface.
+| Engine | Status |
+| --- | --- |
+| STORM — a Wikipedia-style report from simulated expert interviews | Available |
+| Agent Research, Deep Research, Co-STORM (a live discussion) | Second release — see the [design](docs/web-app-design.md) |
 
 ---
 
 ## Quick start
 
-Requires Python 3.11–3.14. From the project root:
-
-macOS and Linux:
+Requires Docker with Compose v2.
 
 ```bash
-python3.14 -m venv .venv
-.venv/bin/pip install -e .
-.venv/bin/pip install -r requirements.txt -r frontend/demo_light/requirements.txt watchdog
-cp frontend/demo_light/.streamlit/secrets.toml.example \
-   frontend/demo_light/.streamlit/secrets.toml
+sh stack/init-secrets.sh
+docker compose -f stack/compose.yml up -d --build
 ```
 
-Windows (PowerShell):
+Open http://localhost:8090 and enter the code from `stack/secrets/bootstrap_code` to create the first Administrator. Then under **Settings**: add a model (with its provider's API key), check that the bundled SearXNG answers under **Search providers**, and create accounts under **Users**. Details, backups and data: [stack/README.md](stack/README.md).
 
-```powershell
-uv venv --python 3.14
-.venv\Scripts\pip install -e .
-.venv\Scripts\pip install -r requirements.txt -r frontend\demo_light\requirements.txt watchdog
-Copy-Item frontend\demo_light\.streamlit\secrets.toml.example frontend\demo_light\.streamlit\secrets.toml
-```
-
-Fill in the settings file, then run — macOS and Linux:
-
-```bash
-cd frontend/demo_light
-../../.venv/bin/streamlit run storm.py --server.runOnSave true
-```
-
-Windows (PowerShell), from the project root:
-
-```powershell
-.venv\Scripts\streamlit run frontend\demo_light\storm.py --server.runOnSave true
-```
-
-`-e .` is not optional — the app runs from inside `frontend/demo_light`, where Python cannot otherwise see `knowledge_storm`.
-
-**`--server.runOnSave` is not cosmetic.** Without it Streamlit reloads only the main script, not *imported modules* like `demo_util.py` — so an edit appears to do nothing until you restart. `watchdog` must be installed or file watching does not work at all. The cost of having it on: saving a file while Co-STORM is warming up restarts the script and **destroys the run in progress**, which can be fifteen minutes of work.
-
-**It does not cover `knowledge_storm/`.** Streamlit watches only modules under the folder holding the main script, which is `frontend/demo_light` — so an edit to the engine is loaded when the server starts and never again. The symptom is the confusing one: the page reloads, shows your new UI, and the engine behind it still behaves the old way. Restart the server after touching anything outside `frontend/demo_light`.
-
-### Or run it as a container
-
-The app has an image of its own, which is what a deployment should use — the
-other three services here were always containers and this one was a host
-process with nothing to pin.
-
-```
-docker build -t lit-storm/app:dev .
-cd deploy && cp .env.example .env    # then fill it in
-docker compose up -d --build
-```
-
-The image carries **no `secrets.toml`**, deliberately: a value in that file
-cannot be overridden by an environment variable, so mounting one would make
-the container quietly ignore half of `.env`. Settings come from `.env`, and
-what the admin pages save lives in a volume rather than in `.streamlit`,
-where a mount would take `config.toml` and the theme with it. That is what
-`STORM_STATE_DIR` moves; unset, it is `.streamlit` beside the app as before.
-
-Details, including why the image is 3.2GB and what keeps it from being 5:
-[deploy/app/README.md](deploy/app/README.md).
-
-Full walkthrough, including Windows commands and the Supabase setup: [frontend/demo_light/README.md](frontend/demo_light/README.md) (Thai).
+**Back up `stack/secrets/secret_key`.** It encrypts every stored API key; without it they must all be entered again.
 
 ---
 
-## Configuration
+## Layout
 
-[`secrets.toml.example`](frontend/demo_light/.streamlit/secrets.toml.example) is the reference for the settings it carries — providers, model names, Supabase keys, dev flags — each documented in place. This section covers only what that file does not, plus the traps worth knowing before you hit them.
+| Path | What it is |
+| --- | --- |
+| `server/` | FastAPI API and the Worker (Python 3.12, `uv`). Migrations with Alembic. |
+| `web/` | The web app: React, TypeScript, Vite, Tailwind and shadcn/ui. The API client is generated from the server's OpenAPI. |
+| `stack/` | Docker Compose: Postgres, API, Worker, nginx serving the web app, SearXNG. |
+| `knowledge_storm/` | The vendored STORM library, with the fixes listed below. |
+| `docs/` | Glossary, design, plan, decisions (ADRs) and acceptance records. |
 
-Settings are read by `setting()` in `frontend/demo_light/auth.py`: **`secrets.toml` first, environment second.**
+---
 
-> A value present in `secrets.toml` cannot be overridden by an environment variable. Anything you vary per launch — `STORM_DEV_USER` especially — belongs in the environment only, or you cannot turn it off.
+## Development
 
-### Gemini's `-latest` aliases move without warning
+```bash
+# Postgres for development (any Postgres 17 will do)
+docker run -d --name litstorm-pg-dev -p 55432:5432 \
+  -e POSTGRES_USER=litstorm -e POSTGRES_PASSWORD=litstorm -e POSTGRES_DB=litstorm postgres:17-alpine
 
-The shipped defaults are `gemini-flash-lite-latest` and `gemini-flash-latest`, because Google returns 404 for pinned 2.x ids such as `gemini-2.5-flash` on recently created keys, even though `list_models()` still lists them.
+cd server
+uv sync --extra pdf        # --extra pdf keeps Playwright, which renders PDF exports
+export LITSTORM_DATABASE_URL=postgresql+psycopg://litstorm:litstorm@127.0.0.1:55432/litstorm
+uv run alembic upgrade head
+uv run uvicorn litstorm.api:app --port 8000          # the API
+uv run python -m litstorm.worker.main                # the Worker, in another shell
 
-But as of 2026-09-20 `gemini-flash-latest` resolved to `gemini-3.7-flash`, which returned frequent 503s and took 30–57 seconds on a one-word prompt where other models answered in 1–8. Pin the strong role off the alias:
-
-```toml
-LLM_STRONG_MODEL = "gemini-3.6-flash"
+cd ../web
+npm install
+npm run dev                                          # http://localhost:5173, proxies /api to :8000
 ```
 
-Measure response times before unpinning. A newer model is not automatically a faster one.
+The server also reads `LITSTORM_SECRET_KEY_FILE`, `LITSTORM_BOOTSTRAP_CODE_FILE`, `LITSTORM_DATA_DIR` and `LITSTORM_PUBLIC_URL` (see `server/src/litstorm/settings.py`). After changing the API, regenerate the web client: write the OpenAPI document to `web/src/api/openapi.json` and run `npm run api`.
 
-### A thinking model on the fast role can answer nothing at all
+### Tests
 
-The two roles get different budgets, from `ROLE_TOKENS` in
-`frontend/demo_light/demo_util.py`: **500 tokens for the fast role**, which
-runs hundreds of times in a research and answers in a sentence, and **3000
-for the strong one**, which writes the article.
-
-A model that writes out its thinking spends it from that same budget. On 500
-tokens that can be the whole of it: `deepseek/deepseek-v4.1-flash` and
-`qwen/qwen3.7-flash`, asked a real question with a Thai topic in it, both
-used all 500 thinking and returned nothing — `finish_reason: length`, a call
-that succeeded, was billed, and said nothing. The same prompt in English left
-room to answer. Thai makes these models think longer.
-
-So either pick a model that does not think, or switch its thinking off:
-
-```toml
-LLM_FAST_MODEL = "meta-llama/llama-4-scout"    # does not think
-LLM_FAST_REASONING = "off"                     # or tell one not to
+```bash
+cd server
+uv run pytest            # everything; tests marked db start a throwaway Postgres (needs Docker)
+uv run pytest -m "not db"
 ```
 
-`LLM_FAST_REASONING` / `LLM_STRONG_REASONING` send OpenRouter's
-`reasoning: {enabled: false}`. Unset sends nothing at all, which is what a
-model with no thinking to turn off needs — the two are not opposites.
+Browser scripts in `server/tests/` drive the real UI with Playwright against a running stack: `e2e_walkthrough.py` (setup to report, one real Run), `e2e_step4.py`, `e2e_queue_rules.py`, `e2e_screens.py` (screenshots of every page), and `acceptance.py` (the first-release acceptance criteria — it wipes the stack it runs against). Their selectors live in `server/tests/ui.py`. Scripts that make real Runs read the OpenRouter key from `stack/.env` (`OPENROUTER_API_KEY=…`, ignored by git).
 
-On the Models page the switch is drawn only when a test has **observed** that
-model thinking, so it never appears where it would do nothing. That is
-measured, not looked up: the probe reads `reasoning_tokens` back off the call
-it just made, which works for any provider that reports it, where a
-capability catalogue would only cover OpenRouter and would describe what a
-model can do rather than what it just did.
+---
 
-Measured here, on the fast role's 500 tokens with a Thai prompt:
+## Choosing models
 
-| model | thinking | result | per call |
+**A thinking model can answer nothing at all.** A model that writes out its thinking spends it from the same token budget as its answer. On a small budget that can be all of it: `deepseek/deepseek-v4.1-flash` and `qwen/qwen3.7-flash`, asked a short question with a Thai topic, used all 500 tokens thinking and returned nothing — a call that succeeded, was billed, and said nothing. Thai makes these models think longer. Set the model's reasoning to `off` or a low effort in Settings, or pick a model that does not think; the test button reports an empty answer instead of a pass.
+
+| model | thinking | on 500 tokens, Thai prompt | per call |
 | --- | --- | --- | --- |
 | `qwen/qwen3.7-flash` | on (default) | **nothing, 3/3** | $0.000067 |
 | `qwen/qwen3.7-flash` | off | good Thai, 1.1s | $0.000005 |
 | `meta-llama/llama-4-scout` | none to switch | good Thai, 1.0s | $0.000014 |
 | `deepseek/deepseek-v4.1-flash` | on (default) | **nothing, 3/3** | $0.000622 |
 
-Leave thinking on for the strong role unless you have a reason: 3000 tokens
-is usually room for both, and it tends to improve the writing.
-
-### Embeddings — Co-STORM only
-
-Co-STORM files every snippet it collects into a mind map by **similarity**, not by asking a model where it belongs. That needs an embedding service, separate from chat completions.
-
-It defaults to your chat provider, because for Gemini and OpenAI the same key buys both. But **OpenRouter and Groq have no embedding endpoint at all**, so those deployments must name a service of their own:
-
-```toml
-ENCODER_PROVIDER = "gemini"     # gemini, openai, azure, or ollama
-```
-
-The key comes from that provider's usual variable. `ollama` needs none: it embeds with a model on the machine itself, so nothing leaves the host and there is no quota. It reads `OLLAMA_EMBEDDING_MODEL` (default `bge-m3:latest`, which has to be a model Ollama has pulled) and `OLLAMA_API_BASE`, whose default follows where the app is running: `http://localhost:11434` on a laptop, and `http://host.docker.internal:11434` inside the container, because there `localhost` is the container and Ollama is on the host.
-
-If a key is missing, the app says so before the discussion starts rather than failing partway through. STORM does not need this; Co-STORM cannot run without it.
-
-### Search sources
-
-The default is DuckDuckGo via `ddgs`, which needs no key. Admins change the source from the **Search sources** page — no code edit, no restart.
-
-| Source | Key |
-| --- | --- |
-| DuckDuckGo, arXiv | none |
-| Tavily | `TAVILY_API_KEY` |
-| Serper (Google) | `SERPER_API_KEY` |
-| Brave Search | `BRAVE_API_KEY` |
-| You.com | `YDC_API_KEY` |
-| SearXNG | `SEARXNG_URL` — an instance address, see [deploy/searxng](deploy/searxng/README.md) |
-
-STORM takes one retriever, so the admin's page picks one — but a run can tick several from the list the admin has put on offer, and a `MultiRM` fans each query out to all of them and merges the results by URL. `SearXNG — academic` is the same instance restricted to its scholarly engines via `engines=`, not a second deployment. DuckDuckGo rate-limits aggressively; the app backs off and skips a query that keeps failing rather than ending the run. If search quality matters, a Tavily or Serper key is the cheapest improvement available.
-
-### Sessions
-
-Sign-in is restored from a cookie holding only a Supabase refresh token — no password — with `SameSite=Strict`, and `Secure` over HTTPS.
-
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| `SESSION_IDLE_MINUTES` | 30 | Idle time before sign-out |
-| `SESSION_MAX_HOURS` | 12 | Absolute lifetime, even if active |
-
-### Database setup
-
-`SUPABASE_URL` and `SUPABASE_ANON_KEY` alone are not enough — the schema has to be applied:
-
-1. Paste all of [docs/supabase-schema.sql](docs/supabase-schema.sql) into Supabase's **SQL Editor** and run it. This creates the profile, run-history and member-audit tables with their row-level security policies. Re-running it on an existing project is safe and preserves data.
-2. Sign up through the app, then promote yourself:
-
-   ```sql
-   update public.profiles set role = 'admin' where email = 'you@example.com';
-   ```
-
-Quota is separate from role — `monthly_run_limit` on the profile, adjustable per account. Failed runs still count, because they may already have spent API calls.
-
----
-
-## Running Co-STORM
-
-**A discussion is 70–100 model calls.** Roughly 21 for expert interviews, 2 for the outline, 21–40 to file snippets into the mind map, then one call per mind-map node twice over — once to draft the report, once to turn it into the opening conversation. The last two scale with the map, which is why warm start can take fifteen minutes.
-
-To trim it, pass `warmstart_max_num_experts` (default 3), `max_search_queries_per_turn` (default 3) or `max_search_thread` (default 5) to `RunnerArgument(...)` in `frontend/demo_light/costorm.py`.
-
-A discussion lives in Streamlit session state and **does not survive a browser refresh**. `CoStormRunner.to_dict()` exists upstream, but `from_dict()` carries a FIXME — it ignores the saved `lm_config` and calls `lm_config.init(lm_type=os.getenv("OPENAI_API_TYPE"))`, which fails on Gemini. Persisting a discussion means writing the way back by hand.
-
----
-
-## Tests
-
-```bash
-.venv/bin/python -m unittest discover -s tests -v
-```
-
-`tests/test_member_database.py` checks the database's own rules — that an admin cannot demote or suspend themselves, that members cannot touch the audit log — by standing up a **temporary PostgreSQL cluster of its own** with `initdb`. It never touches Supabase, so running PostgreSQL in Docker does not help; install PostgreSQL or set `STORM_POSTGRES_BIN`, or these tests skip.
-
-The cluster listens on 127.0.0.1 on a free port, with scram auth and a password generated per run, rather than on a Unix socket — Windows has none, and one code path keeps both platforms running the same test.
-
-> **One test still does not run on Windows.** `test_article_store.py` has a symlink-escape check that needs symlink privileges and errors with `WinError 1314` unless Developer Mode is on. Expect 41 passing and 1 error.
+**Aliases move.** Gemini's `-latest` names resolve to whatever Google points them at; on 2026-09-20 `gemini-flash-latest` became a model that took 30–57 seconds on a one-word prompt. Pin a version, and measure before changing it.
 
 ---
 
@@ -262,17 +118,18 @@ All local to the vendored `knowledge_storm` package. Upstream does not have them
 
 **`dataclass.py` — `[-1]` markers reaching readers.** `replace("[-1]", "")` was called twice with both results discarded, inside a loop that does not run for a turn citing nothing. The marker for "no source found" survived every time.
 
-**`rm.py` — five fixes.**
+**`rm.py` — six fixes.**
 
 - `TavilySearchRM` named `result` in its own `except` clause, where it is unbound if the *first* result is the one that failed — turning a skippable result into an `UnboundLocalError` that killed the entire search.
 - `TavilySearchRM` built an `args` dict and never passed it, so `k` and `include_raw_content` had never once been honoured.
 - `TavilySearchRM` read `raw_body_content` where Tavily sends `raw_content`.
-- `SearXNG` ignored `k` and collected the whole page — twenty or thirty results per query, all of which STORM went on to read. It also had no timeout, so a hung instance held the run open indefinitely; needed the `/search` path spelled out or `.json()` failed on the HTML front page; and reported a 403 — JSON output is off by default, and public instances almost never enable it — as a generic error indistinguishable from "no results". Now honours `k`, times out at 30s, accepts the instance root, and raises a `SearXNGConfigError` naming the cause for any 4xx.
-- `DuckDuckGoSearchRM` used `dsp`'s shared `giveup_hdlr`, which reads `err.message` — an attribute only Mistral's SDK exceptions carry. On a DuckDuckGo rate limit it raised `AttributeError` from inside backoff, and *that* is what surfaced, killing the run and hiding the real cause.
+- `SearXNG` ignored `k` and collected the whole page — twenty or thirty results per query, all of which STORM went on to read. It also had no timeout, needed the `/search` path spelled out, and reported a 403 (JSON output is off by default) as a generic error. Now it honours `k`, times out at 30s, accepts the instance root, and raises `SearXNGConfigError` naming the cause when the address or setup is wrong.
+- `SearXNG` skips blank queries, which STORM's question writer sometimes produces: SearXNG answers an empty query with 400, which used to end the whole run. A 400 for one query is now skipped like any failed search.
+- `DuckDuckGoSearchRM` used `dsp`'s shared `giveup_hdlr`, which reads `err.message` — an attribute only Mistral's SDK exceptions carry. On a DuckDuckGo rate limit it raised `AttributeError` from inside backoff, hiding the real cause.
 
-**`requirements.txt` — two package changes.** `duckduckgo_search` → `ddgs`: the old package still imports and still answers HTTP 200, but returns no results, so the system looks like it is working while gathering nothing. And a floor of `sentence-transformers>=3`, because unpinned it resolves to 2.2.2, which calls `cached_download` — removed from `huggingface_hub` in 0.26 — and the resulting `ImportError` stops the app from starting at all. That one bites any fresh install on any OS.
+**`requirements.txt` — two package changes.** `duckduckgo_search` → `ddgs`: the old package still answers HTTP 200 but returns no results. And a floor of `sentence-transformers>=3`, because unpinned it resolves to 2.2.2, whose `cached_download` import no longer exists in `huggingface_hub`.
 
-The rest of the diff against upstream is Black formatting and line-ending normalization, which accounts for most of the raw line count.
+The rest of the diff against upstream is Black formatting and line-ending normalization.
 
 ---
 
@@ -280,14 +137,13 @@ The rest of the diff against upstream is Black formatting and line-ending normal
 
 | Document | Contents |
 | --- | --- |
-| This file | Overview, upstream differences, configuration not covered elsewhere |
-| [`secrets.toml.example`](frontend/demo_light/.streamlit/secrets.toml.example) | Every setting it carries, documented in place |
-| [frontend/demo_light/README.md](frontend/demo_light/README.md) | Full usage guide (Thai) — install, member management, Co-STORM, reports |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptom-to-fix guide (Thai) |
-| [docs/supabase-schema.sql](docs/supabase-schema.sql) | Schema and row-level security policies |
-| [deploy/supabase](deploy/supabase/README.md) | Self-hosted Supabase in four containers |
-| [deploy/searxng](deploy/searxng/README.md) | Self-hosted metasearch, and why there is no academic fork |
-| [deploy/research-ui](deploy/research-ui/README.md) | deep-research-web-ui as a framed sibling application, searching the same SearXNG |
+| [docs/CONTEXT.md](docs/CONTEXT.md) | Glossary: Project, Research Session, Run, Engine, Report, Source, Evidence… (Thai) |
+| [docs/web-app-design.md](docs/web-app-design.md) | Every design decision, first and second release (Thai) |
+| [docs/web-app-implementation-plan.md](docs/web-app-implementation-plan.md) | Build order and what each step delivered (Thai) |
+| [docs/adr/](docs/adr/) | Decisions that are hard to reverse, with the options not taken |
+| [docs/acceptance/](docs/acceptance/) | Acceptance runs and their evidence |
+| [stack/README.md](stack/README.md) | Running the stack, secrets, data |
+| [docs/archive/streamlit/](docs/archive/streamlit/) | The Streamlit app this replaced, for the record |
 
 ---
 

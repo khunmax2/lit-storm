@@ -22,7 +22,7 @@ def reasoning_kwargs(value, provider):
     """The call argument for a saved reasoning setting, or {} for unset.
 
     OpenRouter is sent its own `reasoning` object: LiteLLM drops
-    `reasoning_effort` for it without a word (see demo_util.reasoning_kwargs).
+    `reasoning_effort` for it without a word (found in the Streamlit app).
     """
     value = (value or "").strip().lower()
     if not value:

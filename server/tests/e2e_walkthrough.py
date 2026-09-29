@@ -1,7 +1,7 @@
 """Walk the whole first-release path through the web UI, with screenshots.
 
     LITSTORM_E2E_URL=http://localhost:5173 LITSTORM_E2E_SETUP_CODE=... \
-    LITSTORM_E2E_OPENROUTER_KEY_FILE=../deploy/.env \
+    LITSTORM_E2E_OPENROUTER_KEY_FILE=../stack/.env \
     uv run python tests/e2e_walkthrough.py <screenshot dir>
 
 Setup → admin configures a model and a Search Provider → creates a User →

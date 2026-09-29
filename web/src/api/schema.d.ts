@@ -306,6 +306,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/llm-models/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Model Draft
+         * @description Test the model in the dialog before it is saved, with a key typed
+         *     there or the one stored for its provider.
+         */
+        post: operations["check_model_draft_api_admin_llm_models_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/search-providers/{provider_id}/test": {
         parameters: {
             query?: never;
@@ -912,6 +933,26 @@ export interface components {
             role: string;
             /** Ui Language */
             ui_language: string;
+        };
+        /** ModelDraftIn */
+        ModelDraftIn: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /**
+             * Reasoning
+             * @default
+             */
+            reasoning: string;
+            /** Max Tokens */
+            max_tokens?: {
+                [key: string]: unknown;
+            };
+            /** Api Key */
+            api_key?: string | null;
+            /** Api Base */
+            api_base?: string | null;
         };
         /** ModelIn */
         ModelIn: {
@@ -2064,6 +2105,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_model_draft_api_admin_llm_models_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelDraftIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

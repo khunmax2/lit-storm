@@ -369,6 +369,34 @@ def test_model(model_id: uuid.UUID, session=Depends(deps.database)):
     return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
 
 
+class ModelDraftIn(BaseModel):
+    provider: str
+    model: str = Field(min_length=1, max_length=200)
+    reasoning: str = ""
+    max_tokens: dict = Field(default_factory=dict)
+    # Absent: test with the key and base already stored for the provider.
+    api_key: str | None = None
+    api_base: str | None = None
+
+
+@router.post("/llm-models/check", response_model=CheckOut)
+def check_model_draft(body: ModelDraftIn, session=Depends(deps.database)):
+    """Test the model in the dialog before it is saved, with a key typed
+    there or the one stored for its provider."""
+    if body.provider not in LLM_PROVIDERS:
+        raise HTTPException(422, "unknown_provider")
+    credential = session.get(LlmCredential, body.provider)
+    key = (body.api_key or "").strip() or (security.decrypt(credential.api_key_ciphertext) if credential else "")
+    base = (body.api_base or "").strip() or (credential.api_base if credential else None)
+    if LLM_PROVIDERS[body.provider].get("needs_base") and not base:
+        return CheckOut(ok=False, message="this provider needs an API base URL", seconds=0.0)
+    draft = SimpleNamespace(
+        provider=body.provider, model=body.model.strip(), reasoning=body.reasoning, max_tokens=body.max_tokens
+    )
+    ok, message, seconds = checks.llm(draft, key, base)
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+
+
 @router.post("/search-providers/{provider_id}/test", response_model=CheckOut)
 def test_search(provider_id: uuid.UUID, session=Depends(deps.database)):
     provider = session.get(SearchProvider, provider_id)

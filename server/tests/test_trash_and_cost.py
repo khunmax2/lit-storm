@@ -238,6 +238,34 @@ def test_the_model_test_button(admin, configured, monkeypatch):
     assert r["ok"] is False and "no text" in r["message"]
 
 
+def test_a_model_can_be_tried_before_it_is_saved(admin, configured, monkeypatch):
+    import litellm
+
+    sent = {}
+    monkeypatch.setattr(litellm, "completion", lambda **kw: (sent.update(kw), _Reply("ok"))[1])
+    draft = {"provider": "openrouter", "model": "b/new", "reasoning": "off", "max_tokens": {"conversation": 300}}
+
+    # With no key typed, the one stored for the provider.
+    r = admin.post("/api/admin/llm-models/check", json=draft).json()
+    assert r["ok"] and sent["api_key"] == "sk-test-0000" and sent["model"] == "openrouter/b/new"
+    assert sent["max_tokens"] == 300 and sent["reasoning"] == {"enabled": False}
+
+    # A key typed in the dialog wins, and is not repeated back.
+    r = admin.post("/api/admin/llm-models/check", json={**draft, "api_key": "sk-typed-1234"}).json()
+    assert r["ok"] and sent["api_key"] == "sk-typed-1234" and "sk-typed" not in str(r)
+    assert [m["model"] for m in admin.get("/api/admin/llm-models").json()] == ["a/m"]  # nothing saved
+
+
+def test_a_model_draft_without_what_it_needs_says_so(admin, configured):
+    no_key = admin.post("/api/admin/llm-models/check", json={"provider": "groq", "model": "x"}).json()
+    assert (no_key["ok"], no_key["message"]) == (False, "no API key stored for this provider")
+    no_base = admin.post(
+        "/api/admin/llm-models/check", json={"provider": "openai-compatible", "model": "x", "api_key": "k"}
+    ).json()
+    assert (no_base["ok"], no_base["message"]) == (False, "this provider needs an API base URL")
+    assert admin.post("/api/admin/llm-models/check", json={"provider": "nope", "model": "x"}).status_code == 422
+
+
 def test_the_search_test_button(admin, configured, monkeypatch):
     import requests
 

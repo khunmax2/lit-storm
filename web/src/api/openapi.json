@@ -813,6 +813,48 @@
     }
    }
   },
+  "/api/admin/llm-models/check": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Check Model Draft",
+    "description": "Test the model in the dialog before it is saved, with a key typed\nthere or the one stored for its provider.",
+    "operationId": "check_model_draft_api_admin_llm_models_check_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelDraftIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/search-providers/{provider_id}/test": {
    "post": {
     "tags": [
@@ -2464,6 +2506,58 @@
      "ui_language"
     ],
     "title": "MeOut"
+   },
+   "ModelDraftIn": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "title": "Provider"
+     },
+     "model": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Model"
+     },
+     "reasoning": {
+      "type": "string",
+      "title": "Reasoning",
+      "default": ""
+     },
+     "max_tokens": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Max Tokens"
+     },
+     "api_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key"
+     },
+     "api_base": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Base"
+     }
+    },
+    "type": "object",
+    "required": [
+     "provider",
+     "model"
+    ],
+    "title": "ModelDraftIn"
    },
    "ModelIn": {
     "properties": {

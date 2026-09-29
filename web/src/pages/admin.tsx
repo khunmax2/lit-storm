@@ -5,6 +5,7 @@ import {
   Bot,
   ChartColumn,
   Check,
+  ChevronDown,
   CheckCircle2,
   Copy,
   ExternalLink,
@@ -49,6 +50,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -68,7 +70,7 @@ const SEARCH_KINDS = ["searxng", "tavily", "arxiv"];
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid content-start gap-2">
       <Label htmlFor={id}>{label}</Label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -466,12 +468,184 @@ function toForm(m: Schemas["ModelOut"]): ModelForm {
   };
 }
 
-function ModelDialog({ form, setForm }: { form: ModelForm | null; setForm: (f: ModelForm | null) => void }) {
+// The "try it before saving" box both setting dialogs share.
+type DraftResult = Schemas["CheckOut"] & { for: string };
+
+function DraftTest({
+  lead,
+  onTest,
+  pending,
+  error,
+  result,
+  stale,
+  okText,
+  failText,
+  query,
+}: {
+  lead: string;
+  onTest: () => void;
+  pending: boolean;
+  error: unknown;
+  result: DraftResult | undefined;
+  stale: boolean;
+  okText: (r: DraftResult) => string;
+  failText: string;
+  /** A search's test query; models have none. */
+  query?: { value: string; set: (v: string) => void; placeholder: string };
+}) {
+  const { t } = useT();
+  const button = (
+    <Button type="button" variant="outline" className="shrink-0 bg-background" disabled={pending} onClick={onTest}>
+      {pending ? <Loader2 className="animate-spin" /> : <Zap />}
+      {pending ? t("admin.testing") : t("admin.test")}
+    </Button>
+  );
+  return (
+    <div className="grid gap-3 rounded-xl border bg-muted/30 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <FlaskConical className="size-4" />
+            {t("searchKind.testTitle")}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{lead}</p>
+        </div>
+        {!query && button}
+      </div>
+      {query && (
+        <div className="flex gap-2">
+          <Input
+            aria-label={t("searchKind.testQuery")}
+            placeholder={query.placeholder}
+            value={query.value}
+            onChange={(e) => query.set(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onTest();
+              }
+            }}
+            className="bg-background"
+          />
+          {button}
+        </div>
+      )}
+      <div aria-live="polite" className="empty:hidden">
+        {!!error && <ErrorText error={error} />}
+        {result && !stale && result.ok && (
+          <div className="rounded-lg border border-success/30 bg-success-soft p-3 text-sm">
+            <div className="flex items-center gap-2 font-medium text-success">
+              <CheckCircle2 className="size-4" />
+              {okText(result)}
+            </div>
+            {!!result.samples?.length && (
+              <ul className="mt-2 grid gap-1 pl-6 text-foreground/80">
+                {result.samples.map((title, i) => (
+                  <li key={i} className="list-disc truncate">
+                    {title}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {result && !stale && !result.ok && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <div className="flex items-center gap-2 font-medium text-destructive">
+              <XCircle className="size-4" />
+              {failText}
+            </div>
+            <p className="mt-1 pl-6 font-mono text-xs break-words text-foreground/80">{result.message}</p>
+          </div>
+        )}
+        {stale && <p className="text-xs text-muted-foreground">{t("searchKind.stale")}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** A switch row with what it does under its name. */
+function SwitchRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-4 p-3">
+      <span>
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="block text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </label>
+  );
+}
+
+// What each LLM provider is, shown as cards.
+const LLM_INFO: Record<string, { name: string; lead: Key; example: string; keyUrl?: string; modelsUrl?: string }> = {
+  openrouter: {
+    name: "OpenRouter",
+    lead: "modelKind.openrouter",
+    example: "google/gemini-3.5-flash-lite",
+    keyUrl: "https://openrouter.ai/settings/keys",
+    modelsUrl: "https://openrouter.ai/models",
+  },
+  gemini: {
+    name: "Gemini",
+    lead: "modelKind.gemini",
+    example: "gemini-2.5-flash",
+    keyUrl: "https://aistudio.google.com/apikey",
+    modelsUrl: "https://ai.google.dev/gemini-api/docs/models",
+  },
+  openai: {
+    name: "OpenAI",
+    lead: "modelKind.openai",
+    example: "gpt-5-mini",
+    keyUrl: "https://platform.openai.com/api-keys",
+    modelsUrl: "https://platform.openai.com/docs/models",
+  },
+  groq: {
+    name: "Groq",
+    lead: "modelKind.groq",
+    example: "llama-3.3-70b-versatile",
+    keyUrl: "https://console.groq.com/keys",
+    modelsUrl: "https://console.groq.com/docs/models",
+  },
+  "openai-compatible": { name: "OpenAI-compatible", lead: "modelKind.compatible", example: "my-model" },
+};
+
+const REASONING_PRESETS = ["", "off", "effort:minimal", "effort:low", "effort:medium"];
+
+// The fields a model test depends on.
+const modelTestedWith = (f: ModelForm, key: string, base: string) =>
+  JSON.stringify([f.provider, f.model, f.reasoning, f.talk, key, base]);
+
+function ModelDialog({
+  form,
+  setForm,
+  keys,
+}: {
+  form: ModelForm | null;
+  setForm: (f: ModelForm | null) => void;
+  keys: Schemas["CredentialOut"][];
+}) {
   const { t } = useT();
   const queryClient = useQueryClient();
+  // The provider's key, typed here: saved for the provider with the model.
+  const [apiKey, setApiKey] = useState("");
+  const [apiBase, setApiBase] = useState("");
+  const [changingKey, setChangingKey] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
+  const stored = keys.find((k) => k.provider === form?.provider);
+  const needsBase = form?.provider === "openai-compatible";
+
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const { id, talk, write, priceIn, priceOut, ...rest } = form!;
+      if (apiKey.trim())
+        await call(
+          api.PUT("/api/admin/llm-credentials/{provider}", {
+            params: { path: { provider: rest.provider } },
+            body: { api_key: apiKey.trim(), api_base: (apiBase.trim() || stored?.api_base) ?? null },
+          }),
+        );
       const max_tokens: Record<string, number> = {};
       if (talk) max_tokens.conversation = Number(talk);
       if (write) max_tokens.writing = Number(write);
@@ -487,87 +661,316 @@ function ModelDialog({ form, setForm }: { form: ModelForm | null; setForm: (f: M
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-models"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-keys"] });
       toast.success(t("common.saved"));
       setForm(null);
     },
   });
+  const check = useMutation({
+    mutationFn: (f: ModelForm) =>
+      call(
+        api.POST("/api/admin/llm-models/check", {
+          body: {
+            provider: f.provider,
+            model: f.model,
+            reasoning: f.reasoning,
+            max_tokens: f.talk ? { conversation: Number(f.talk) } : {},
+            api_key: apiKey.trim() || null,
+            api_base: apiBase.trim() || null,
+          },
+        }),
+      ).then((r) => ({ ...r, for: modelTestedWith(f, apiKey, apiBase) })),
+  });
+  useEffect(() => {
+    if (!form) {
+      check.reset();
+      save.reset();
+      setApiKey("");
+      setApiBase("");
+      setChangingKey(false);
+      setShowKey(false);
+      setAdvanced(false);
+    }
+  }, [form]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!form) return null;
   const f = form;
+  const info = LLM_INFO[f.provider];
+  const result = check.data;
+  const stale = !!result && result.for !== modelTestedWith(f, apiKey, apiBase);
+  const hasKey = !!stored?.key_hint;
+  const askKey = !hasKey || changingKey;
+
+  const chooseProvider = (provider: string) => {
+    setForm({ ...f, provider });
+    setApiKey("");
+    setApiBase("");
+    setChangingKey(false);
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && setForm(null)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="gap-0 p-0 sm:max-w-2xl">
         <form
-          className="grid gap-4"
+          className="flex max-h-[90svh] flex-col"
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate();
           }}
         >
-          <DialogHeader>
-            <DialogTitle>{f.id ? t("admin.editModel") : t("admin.addModel")}</DialogTitle>
+          <DialogHeader className="border-b px-6 pt-6 pb-4">
+            <DialogTitle className="text-lg">{f.id ? t("admin.editModel") : t("admin.addModel")}</DialogTitle>
+            <DialogDescription>{t("modelKind.lead")}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="m-label" label={t("admin.label")}>
-              <Input id="m-label" value={f.label} onChange={(e) => setForm({ ...f, label: e.target.value })} required />
-            </Field>
-            <Field id="m-provider" label={t("admin.provider")}>
-              <Select value={f.provider} onValueChange={(provider) => setForm({ ...f, provider })}>
-                <SelectTrigger id="m-provider" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LLM_PROVIDERS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field id="m-model" label={t("admin.modelId")}>
-            <Input
-              id="m-model"
-              placeholder="google/gemini-3.5-flash-lite"
-              className="font-mono text-sm"
-              value={f.model}
-              onChange={(e) => setForm({ ...f, model: e.target.value })}
-              required
+
+          <div className="grid gap-6 overflow-y-auto px-6 py-5">
+            {/* 1. Who serves it */}
+            <fieldset className="grid gap-2">
+              <legend className="mb-2 text-sm font-medium">{t("admin.provider")}</legend>
+              <div role="radiogroup" aria-label={t("admin.provider")} className="grid gap-2 sm:grid-cols-3">
+                {LLM_PROVIDERS.map((p) => {
+                  const k = LLM_INFO[p];
+                  const active = p === f.provider;
+                  const hint = keys.find((c) => c.provider === p)?.key_hint;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => chooseProvider(p)}
+                      className={cn(
+                        "flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                        active ? "border-foreground/70 bg-muted/40 ring-1 ring-foreground/70" : "hover:bg-muted/40",
+                      )}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{k.name}</span>
+                        <span
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                            active && "border-foreground bg-foreground text-background",
+                          )}
+                        >
+                          {active && <Check className="size-3" />}
+                        </span>
+                      </span>
+                      <span className="text-xs leading-snug text-muted-foreground">{t(k.lead)}</span>
+                      <span className="mt-auto flex items-center gap-1.5 pt-1 text-xs">
+                        <span className={cn("size-1.5 rounded-full", hint ? "bg-success" : "bg-warning")} />
+                        {hint ? (
+                          <span className="font-mono text-muted-foreground">{hint}</span>
+                        ) : (
+                          <span className="text-muted-foreground">{t("admin.noKey")}</span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {/* 2. Which model, and what people see */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="m-model">{t("admin.modelId")}</Label>
+                  {info.modelsUrl && (
+                    <a
+                      href={info.modelsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      {t("modelKind.browse")}
+                      <ExternalLink className="size-3" />
+                    </a>
+                  )}
+                </div>
+                <Input
+                  id="m-model"
+                  placeholder={info.example}
+                  className="font-mono text-sm"
+                  value={f.model}
+                  onChange={(e) => setForm({ ...f, model: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">{t("modelKind.modelHint", { provider: info.name })}</p>
+              </div>
+              <Field id="m-label" label={t("admin.label")} hint={t("modelKind.labelHint")}>
+                <Input
+                  id="m-label"
+                  placeholder="Gemini 3.5 Flash Lite"
+                  value={f.label}
+                  onChange={(e) => setForm({ ...f, label: e.target.value })}
+                  required
+                />
+              </Field>
+            </div>
+
+            {/* 3. The provider's key */}
+            <div className="grid gap-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <KeyRound className="size-4" />
+                    {t("modelKind.keyTitle", { provider: info.name })}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("modelKind.keyLead", { provider: info.name })}</p>
+                </div>
+                {info.keyUrl && (
+                  <a
+                    href={info.keyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {t("searchKind.getKey")}
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
+              </div>
+              {!askKey ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-success" />
+                    {t("modelKind.keyStored")}
+                    <span className="font-mono text-xs text-muted-foreground">{stored?.key_hint}</span>
+                  </span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setChangingKey(true)}>
+                    {t("modelKind.changeKey")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    aria-label={t("admin.apiKey")}
+                    type={showKey ? "text" : "password"}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="pr-10 font-mono"
+                    placeholder={hasKey ? t("searchKind.keepKey", { hint: stored!.key_hint }) : "sk-…"}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1/2 right-1 size-7 -translate-y-1/2 text-muted-foreground"
+                    aria-label={showKey ? t("searchKind.hideKey") : t("searchKind.showKey")}
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    {showKey ? <EyeOff /> : <Eye />}
+                  </Button>
+                </div>
+              )}
+              {needsBase && (
+                <Field id="m-base" label={t("admin.apiBase")} hint={t("modelKind.baseHint")}>
+                  <Input
+                    id="m-base"
+                    placeholder={stored?.api_base || "http://localhost:11434/v1"}
+                    value={apiBase}
+                    onChange={(e) => setApiBase(e.target.value)}
+                  />
+                </Field>
+              )}
+            </div>
+
+            {/* 4. Tuning, folded away */}
+            <Collapsible open={advanced} onOpenChange={setAdvanced} className="rounded-xl border">
+              <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-3 text-left text-sm font-medium">
+                <span>
+                  {t("modelKind.advanced")}
+                  <span className="block text-xs font-normal text-muted-foreground">{t("modelKind.advancedLead")}</span>
+                </span>
+                <ChevronDown className={cn("size-4 shrink-0 transition-transform", advanced && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="grid gap-4 border-t p-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="m-reasoning">{t("admin.reasoning")}</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {REASONING_PRESETS.map((r) => (
+                      <button
+                        key={r || "none"}
+                        type="button"
+                        onClick={() => setForm({ ...f, reasoning: r })}
+                        className={cn(
+                          "rounded-md border px-2 py-1 font-mono text-xs transition-colors",
+                          f.reasoning === r ? "border-foreground bg-foreground text-background" : "hover:bg-muted",
+                        )}
+                      >
+                        {r || t("modelKind.reasoningDefault")}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    id="m-reasoning"
+                    className="font-mono text-sm"
+                    placeholder="budget:800"
+                    value={f.reasoning}
+                    onChange={(e) => setForm({ ...f, reasoning: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">{t("modelKind.reasoningHint")}</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field id="m-talk" label={t("modelKind.talkTokens")} hint={t("modelKind.talkHint")}>
+                    <Input id="m-talk" type="number" min={100} placeholder="500" value={f.talk} onChange={(e) => setForm({ ...f, talk: e.target.value })} />
+                  </Field>
+                  <Field id="m-write" label={t("modelKind.writeTokens")} hint={t("modelKind.writeHint")}>
+                    <Input id="m-write" type="number" min={100} placeholder="3000" value={f.write} onChange={(e) => setForm({ ...f, write: e.target.value })} />
+                  </Field>
+                  <Field id="m-price-in" label={t("modelKind.priceIn")} hint={t("admin.priceHelp")}>
+                    <Input id="m-price-in" type="number" min={0} step="any" placeholder="0.10" value={f.priceIn} onChange={(e) => setForm({ ...f, priceIn: e.target.value })} />
+                  </Field>
+                  <Field id="m-price-out" label={t("modelKind.priceOut")}>
+                    <Input id="m-price-out" type="number" min={0} step="any" placeholder="0.40" value={f.priceOut} onChange={(e) => setForm({ ...f, priceOut: e.target.value })} />
+                  </Field>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* 5. Try it before saving */}
+            <DraftTest
+              lead={t("modelKind.testLead")}
+              onTest={() => check.mutate(f)}
+              pending={check.isPending}
+              error={check.error}
+              result={result}
+              stale={stale}
+              okText={(r) => t("modelKind.ok", { reply: r.message, s: r.seconds })}
+              failText={t("modelKind.failed")}
             />
-          </Field>
-          <Field id="m-reasoning" label={t("admin.reasoning")} hint={t("admin.reasoningHelp")}>
-            <Input id="m-reasoning" value={f.reasoning} onChange={(e) => setForm({ ...f, reasoning: e.target.value })} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="m-talk" label={t("admin.maxTokens")}>
-              <div className="flex gap-2">
-                <Input id="m-talk" type="number" min={100} placeholder="500" value={f.talk} onChange={(e) => setForm({ ...f, talk: e.target.value })} />
-                <Input type="number" min={100} placeholder="3000" value={f.write} onChange={(e) => setForm({ ...f, write: e.target.value })} />
-              </div>
-            </Field>
-            <Field id="m-price" label={t("admin.price")} hint={t("admin.priceHelp")}>
-              <div className="flex gap-2">
-                <Input id="m-price" type="number" min={0} step="any" value={f.priceIn} onChange={(e) => setForm({ ...f, priceIn: e.target.value })} />
-                <Input type="number" min={0} step="any" value={f.priceOut} onChange={(e) => setForm({ ...f, priceOut: e.target.value })} />
-              </div>
-            </Field>
+
+            {/* 6. Who can use it */}
+            <div className="divide-y rounded-xl border">
+              <SwitchRow
+                label={t("admin.enabled")}
+                hint={t("modelKind.enabledHint")}
+                checked={f.enabled}
+                onChange={(enabled) => setForm({ ...f, enabled })}
+              />
+              <SwitchRow
+                label={t("admin.default")}
+                hint={t("modelKind.defaultHint")}
+                checked={f.is_default}
+                onChange={(is_default) => setForm({ ...f, is_default })}
+              />
+            </div>
+            {save.error && <ErrorText error={save.error} />}
           </div>
-          <div className="flex gap-6">
-            <Label className="flex items-center gap-2 font-normal">
-              <Switch checked={f.enabled} onCheckedChange={(enabled) => setForm({ ...f, enabled })} />
-              {t("admin.enabled")}
-            </Label>
-            <Label className="flex items-center gap-2 font-normal">
-              <Switch checked={f.is_default} onCheckedChange={(is_default) => setForm({ ...f, is_default })} />
-              {t("admin.default")}
-            </Label>
-          </div>
-          {save.error && <ErrorText error={save.error} />}
-          <DialogFooter>
+
+          <div className="flex flex-col-reverse gap-2 border-t bg-muted/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+            {result && !stale && !result.ok && (
+              <span className="text-xs text-muted-foreground sm:mr-auto">{t("searchKind.saveAnyway")}</span>
+            )}
+            <Button type="button" variant="outline" onClick={() => setForm(null)}>
+              {t("cancel")}
+            </Button>
             <Button type="submit" disabled={save.isPending}>
+              {save.isPending && <Loader2 className="animate-spin" />}
               {t("save")}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -668,7 +1071,7 @@ function Models() {
         </CardContent>
       </Card>
       <KeyDialog provider={keyFor} onOpenChange={(o) => !o && setKeyFor(null)} />
-      <ModelDialog form={form} setForm={setForm} />
+      <ModelDialog form={form} setForm={setForm} keys={keys.data ?? []} />
     </div>
   );
 }
@@ -887,88 +1290,32 @@ function SearchDialog({ form, setForm }: { form: SearchForm | null; setForm: (f:
             </div>
 
             {/* 3. Try it before saving */}
-            <div className="grid gap-3 rounded-xl border bg-muted/30 p-4">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <FlaskConical className="size-4" />
-                  {t("searchKind.testTitle")}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{t("searchKind.testLead")}</p>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  aria-label={t("searchKind.testQuery")}
-                  placeholder="retrieval augmented generation"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      check.mutate(f);
-                    }
-                  }}
-                  className="bg-background"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="shrink-0 bg-background"
-                  disabled={check.isPending}
-                  onClick={() => check.mutate(f)}
-                >
-                  {check.isPending ? <Loader2 className="animate-spin" /> : <Zap />}
-                  {check.isPending ? t("admin.testing") : t("admin.test")}
-                </Button>
-              </div>
-              <div aria-live="polite" className="empty:hidden">
-                {check.error && <ErrorText error={check.error} />}
-                {result && !stale && result.ok && (
-                  <div className="rounded-lg border border-success/30 bg-success-soft p-3 text-sm">
-                    <div className="flex items-center gap-2 font-medium text-success">
-                      <CheckCircle2 className="size-4" />
-                      {t("searchKind.ok", { n: result.samples.length, s: result.seconds })}
-                    </div>
-                    <ul className="mt-2 grid gap-1 pl-6 text-foreground/80">
-                      {result.samples.map((title, i) => (
-                        <li key={i} className="list-disc truncate">
-                          {title}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {result && !stale && !result.ok && (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                    <div className="flex items-center gap-2 font-medium text-destructive">
-                      <XCircle className="size-4" />
-                      {t("searchKind.failed")}
-                    </div>
-                    <p className="mt-1 pl-6 font-mono text-xs break-words text-foreground/80">{result.message}</p>
-                  </div>
-                )}
-                {stale && <p className="text-xs text-muted-foreground">{t("searchKind.stale")}</p>}
-              </div>
-            </div>
+            <DraftTest
+              lead={t("searchKind.testLead")}
+              onTest={() => check.mutate(f)}
+              pending={check.isPending}
+              error={check.error}
+              result={result}
+              stale={stale}
+              okText={(r) => t("searchKind.ok", { n: r.samples?.length ?? 0, s: r.seconds })}
+              failText={t("searchKind.failed")}
+              query={{ value: query, set: setQuery, placeholder: "retrieval augmented generation" }}
+            />
 
             {/* 4. Who can use it */}
             <div className="divide-y rounded-xl border">
-              <label className="flex cursor-pointer items-center justify-between gap-4 p-3">
-                <span>
-                  <span className="block text-sm font-medium">{t("admin.enabled")}</span>
-                  <span className="block text-xs text-muted-foreground">{t("searchKind.enabledHint")}</span>
-                </span>
-                <Switch checked={f.enabled ?? true} onCheckedChange={(enabled) => setForm({ ...f, enabled })} />
-              </label>
-              <label className="flex cursor-pointer items-center justify-between gap-4 p-3">
-                <span>
-                  <span className="block text-sm font-medium">{t("admin.default")}</span>
-                  <span className="block text-xs text-muted-foreground">{t("searchKind.defaultHint")}</span>
-                </span>
-                <Switch
-                  checked={f.is_default ?? false}
-                  onCheckedChange={(is_default) => setForm({ ...f, is_default })}
-                />
-              </label>
+              <SwitchRow
+                label={t("admin.enabled")}
+                hint={t("searchKind.enabledHint")}
+                checked={f.enabled ?? true}
+                onChange={(enabled) => setForm({ ...f, enabled })}
+              />
+              <SwitchRow
+                label={t("admin.default")}
+                hint={t("searchKind.defaultHint")}
+                checked={f.is_default ?? false}
+                onChange={(is_default) => setForm({ ...f, is_default })}
+              />
             </div>
             {save.error && <ErrorText error={save.error} />}
           </div>

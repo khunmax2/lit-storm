@@ -202,9 +202,10 @@ def test_admins_see_usage_but_not_research(admin, browser, configured, db):
     run_fake(db, run["id"])
     usage = admin.get("/api/admin/usage").json()
     row = next(r for r in usage["rows"] if r["email"] == "alice@example.org")
-    assert (row["runs"], row["succeeded"], row["tokens_in"]) == (1, 1, 20)
+    assert (row["runs"], row["succeeded"], row["tokens_in"], row["search_calls"]) == (1, 1, 20, 2)
     runs = admin.get("/api/admin/runs").json()
     assert runs[0]["email"] == "alice@example.org" and runs[0]["status"] == "succeeded"
+    assert (runs[0]["tokens_in"], runs[0]["search_calls"]) == (20, 2)  # each Run's own counts too
     assert "private" not in str(runs) and "private" not in str(usage)
     user = make_user(admin, browser, "bob@example.org")
     assert user.get("/api/admin/usage").status_code == 403

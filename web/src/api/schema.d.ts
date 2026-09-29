@@ -792,6 +792,8 @@ export interface components {
             tokens_in: number | null;
             /** Tokens Out */
             tokens_out: number | null;
+            /** Search Calls */
+            search_calls: number | null;
             /** Cost Usd */
             cost_usd: string | null;
             /** Quota Refunded */

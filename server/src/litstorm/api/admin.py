@@ -502,6 +502,7 @@ class AdminRunOut(BaseModel):
     finished_at: datetime | None
     tokens_in: int | None
     tokens_out: int | None
+    search_calls: int | None
     cost_usd: Decimal | None
     quota_refunded: bool
 
@@ -516,8 +517,8 @@ def recent_runs(limit: int = Query(default=100, le=500), session=Depends(deps.da
             id=str(run.id), email=email, status=run.status, reason=run.reason,
             model_label=run.config.get("llm", {}).get("label", ""),
             queued_at=run.queued_at, started_at=run.started_at, finished_at=run.finished_at,
-            tokens_in=run.tokens_in, tokens_out=run.tokens_out, cost_usd=run.cost_usd,
-            quota_refunded=run.quota_refunded,
+            tokens_in=run.tokens_in, tokens_out=run.tokens_out, search_calls=run.search_calls,
+            cost_usd=run.cost_usd, quota_refunded=run.quota_refunded,
         )
         for run, email in rows
     ]

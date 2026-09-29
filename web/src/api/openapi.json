@@ -2157,6 +2157,17 @@
       ],
       "title": "Tokens Out"
      },
+     "search_calls": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Calls"
+     },
      "cost_usd": {
       "anyOf": [
        {
@@ -2186,6 +2197,7 @@
      "finished_at",
      "tokens_in",
      "tokens_out",
+     "search_calls",
      "cost_usd",
      "quota_refunded"
     ],

@@ -1568,6 +1568,7 @@ function Usage() {
                 <TableHead>{t("common.status")}</TableHead>
                 <TableHead>{t("run.model")}</TableHead>
                 <TableHead className={right}>{t("usage.tokens")}</TableHead>
+                <TableHead className={right}>{t("usage.searches")}</TableHead>
                 <TableHead className={right}>{t("usage.cost")}</TableHead>
               </TableRow>
             </TableHeader>
@@ -1584,6 +1585,7 @@ function Usage() {
                   </TableCell>
                   <TableCell className="text-xs">{r.model_label}</TableCell>
                   <TableCell className={right}>{r.tokens_in != null ? `${n(r.tokens_in)} / ${n(r.tokens_out ?? 0)}` : "–"}</TableCell>
+                  <TableCell className={right}>{r.search_calls != null ? n(r.search_calls) : "–"}</TableCell>
                   <TableCell className={right}>{usd(r.cost_usd)}</TableCell>
                 </TableRow>
               ))}

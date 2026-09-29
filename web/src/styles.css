@@ -1,0 +1,197 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource/ibm-plex-sans-thai/400.css";
+@import "@fontsource/ibm-plex-sans-thai/500.css";
+@import "@fontsource/ibm-plex-sans-thai/600.css";
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource-variable/noto-serif-thai";
+
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn/ui neutral tokens, with one blue brand colour for what is
+   interactive in the research itself: citations, progress, links. */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+  --brand: oklch(0.546 0.215 262.9);
+  --brand-soft: oklch(0.955 0.025 262);
+  --success: oklch(0.55 0.14 155);
+  --success-soft: oklch(0.96 0.04 155);
+  --warning: oklch(0.62 0.15 70);
+  --warning-soft: oklch(0.97 0.05 85);
+  --cite: oklch(0.95 0.08 95);
+  --sidebar: oklch(0.982 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.955 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.185 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --brand: oklch(0.707 0.165 254.6);
+  --brand-soft: oklch(0.28 0.06 262);
+  --success: oklch(0.72 0.15 155);
+  --success-soft: oklch(0.27 0.05 155);
+  --warning: oklch(0.8 0.14 80);
+  --warning-soft: oklch(0.3 0.05 80);
+  --cite: oklch(0.4 0.08 95);
+  --sidebar: oklch(0.175 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  /* Geist for Latin; Thai letters fall through to IBM Plex Sans Thai. */
+  --font-sans: "Geist Variable", "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  /* The home page headline: a condensed serif, Thai in Noto Serif Thai. */
+  --font-display: "Instrument Serif", "Noto Serif Thai Variable", ui-serif, Georgia, serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* The report body: long-form reading, Thai-friendly line height. */
+.prose-report {
+  font-size: 1.0625rem;
+  line-height: 1.9;
+}
+.prose-report p {
+  margin: 0 0 1.1rem;
+}
+.prose-report ul,
+.prose-report ol {
+  margin: 0 0 1.1rem;
+  padding-left: 1.4rem;
+}
+.prose-report ul {
+  list-style: disc;
+}
+.prose-report ol {
+  list-style: decimal;
+}
+.prose-report li {
+  margin: 0.3rem 0;
+}
+.prose-report strong {
+  font-weight: 600;
+}
+.prose-report a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-report button.cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.15rem;
+  margin: 0 0.1rem;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1;
+  vertical-align: 0.15em;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.prose-report button.cite:hover,
+.prose-report button.cite[data-active="true"] {
+  background: var(--brand);
+  color: white;
+}

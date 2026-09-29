@@ -715,6 +715,10 @@ class SearXNG(dspy.Retrieve):
             if isinstance(query_or_queries, str)
             else query_or_queries
         )
+        # STORM's question writer sometimes hands over a blank query, and
+        # SearXNG answers an empty q with 400 — which read as a wrong address
+        # and ended the whole run. There is nothing to search for; skip it.
+        queries = [q.strip() for q in queries if q and q.strip()]
         self.usage += len(queries)
         collected_results = []
         headers = (
@@ -745,6 +749,11 @@ class SearXNG(dspy.Retrieve):
                         "format=json. Its settings.yml needs 'json' under "
                         "search.formats, or use an instance that has it."
                     )
+                if response.status_code == 400:
+                    # A query SearXNG will not take. That is about this query,
+                    # not the instance: skip it like any failed search.
+                    logging.warning("SearXNG rejected the query %r (400)", query)
+                    continue
                 if 400 <= response.status_code < 500:
                     # Any other 4xx is the address being wrong — a typo, a
                     # path that is not /search — and will be wrong for every

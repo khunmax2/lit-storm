@@ -1,0 +1,51 @@
+# SearXNG for lit-storm. Layered on the image's defaults; only what differs
+# from stock is here.
+#
+# The one setting that matters is `search.formats`. JSON is off by default,
+# and without it every request from the app gets a 403 and a page of HTML.
+
+use_default_settings: true
+
+general:
+  instance_name: "lit-storm search"
+  # Nothing here is exposed to the public, so no need to advertise.
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+server:
+  # Read from SEARXNG_SECRET in the environment; see docker-compose.yml.
+  secret_key: "changeme-overridden-by-env"
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+# The academic engines the "LDR-academic" fork enables are all stock engines
+# switched on in its settings.yml — ten of its twelve are in upstream by name
+# already. Turned on here for the same effect without carrying the fork.
+# Everything else keeps the image's default of on or off.
+engines:
+  - name: arxiv
+    disabled: false
+  - name: pubmed
+    disabled: false
+  - name: semantic scholar
+    disabled: false
+  - name: crossref
+    disabled: false
+  - name: openalex
+    disabled: false
+  - name: google scholar
+    disabled: false
+  - name: core.ac.uk
+    disabled: false
+  - name: base
+    disabled: false
+  - name: pdbe
+    disabled: false

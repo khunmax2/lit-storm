@@ -1,0 +1,84 @@
+# The web app that replaces Streamlit, on one machine (docs/web-app-design.md,
+# การติดตั้งและการเข้าถึง). One port is published, on localhost only.
+#
+#   ./stack/init-secrets.sh            # once: the two secrets below
+#   docker compose -f stack/compose.yml up -d --build
+#   open http://localhost:8090 and enter stack/secrets/bootstrap_code
+#
+# Data lives in named volumes and survives `down` and rebuilds; `down -v`
+# deletes it.
+name: litstorm
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litstorm
+      POSTGRES_PASSWORD: litstorm  # reachable only inside this network
+      POSTGRES_DB: litstorm
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litstorm"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: { context: .., dockerfile: server/Dockerfile }
+    image: litstorm/server:dev
+    restart: unless-stopped
+    environment:
+      <<: &server-env
+        LITSTORM_DATABASE_URL: postgresql+psycopg://litstorm:litstorm@db:5432/litstorm
+        LITSTORM_SECRET_KEY_FILE: /run/secrets/secret_key
+        LITSTORM_PUBLIC_URL: http://localhost:${LITSTORM_PORT:-8090}
+        LITSTORM_SEARXNG_URL: http://searxng:8080/search
+      # Only the api service sees the setup code.
+      LITSTORM_BOOTSTRAP_CODE_FILE: /run/secrets/bootstrap_code
+    secrets: [secret_key, bootstrap_code]
+    volumes:
+      - run-data:/data
+    depends_on:
+      db: { condition: service_healthy }
+
+  worker:
+    image: litstorm/server:dev
+    restart: unless-stopped
+    command: ["python", "-m", "litstorm.worker.main"]
+    environment: *server-env
+    secrets: [secret_key]
+    volumes:
+      - run-data:/data
+    depends_on:
+      api: { condition: service_started }  # the api service runs the migrations
+    # A stopped Worker's Runs are marked interrupted, never restarted; give
+    # it a moment to exit cleanly.
+    stop_grace_period: 20s
+
+  web:
+    build: { context: ../web }
+    image: litstorm/web:dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LITSTORM_PORT:-8090}:80"
+    depends_on: [api]
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-litstorm-local-not-for-production}
+
+secrets:
+  secret_key:
+    file: ./secrets/secret_key
+  bootstrap_code:
+    file: ./secrets/bootstrap_code
+
+volumes:
+  db-data:
+  run-data:

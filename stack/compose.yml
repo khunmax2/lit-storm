@@ -25,7 +25,13 @@ services:
       retries: 20
 
   api:
-    build: { context: .., dockerfile: server/Dockerfile }
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      # The Agent Research engine's source, a sibling checkout of
+      # khunmax2/lit_agents-deep-research.
+      additional_contexts:
+        agents: ../../agents-deep-research
     image: litstorm/server:dev
     restart: unless-stopped
     environment:

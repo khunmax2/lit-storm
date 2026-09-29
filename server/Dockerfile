@@ -18,7 +18,8 @@ WORKDIR /app
 # the README no longer reinstalls them, Chromium and the embedding model
 # (about ten minutes a build).
 COPY server/pyproject.toml server/uv.lock ./server/
-RUN cd server && uv sync --frozen --no-dev --extra pdf --no-install-project --no-install-package knowledge-storm
+RUN cd server && uv sync --frozen --no-dev --extra pdf --no-install-project \
+    --no-install-package knowledge-storm --no-install-package deep-researcher
 RUN playwright install --with-deps chromium
 
 # STORM's built-in embedding model, in the image: otherwise every new
@@ -33,6 +34,11 @@ ENV HF_HUB_OFFLINE=1
 # knowledge_storm, installed editable from here by the sync below.
 COPY setup.py requirements.txt README.md ./
 COPY knowledge_storm ./knowledge_storm
+# Agent Research (khunmax2/lit_agents-deep-research), from a second build
+# context named "agents" (stack/compose.yml), where server/pyproject.toml's
+# path ../../agents-deep-research finds it.
+COPY --from=agents setup.py requirements.txt README.md MANIFEST.in /agents-deep-research/
+COPY --from=agents deep_researcher /agents-deep-research/deep_researcher
 
 COPY server ./server
 RUN cd server && uv sync --frozen --no-dev --extra pdf

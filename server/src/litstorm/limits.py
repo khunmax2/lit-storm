@@ -29,6 +29,9 @@ class DepthLevel(BaseModel):
     target_minutes: int = Field(ge=1)
     # STORM's knobs (engines/storm/engine.py DEFAULT_PARAMS).
     storm: dict
+    # Agent Research's: "iterative" with max_iterations rounds, or "deep",
+    # which plans sections and researches each (engines/agent/engine.py).
+    agent: dict = Field(default_factory=dict)
 
 
 def _default_depths():
@@ -40,16 +43,19 @@ def _default_depths():
             target_minutes=2,
             storm={"max_perspective": 2, "max_conv_turn": 2, "max_search_queries_per_turn": 2,
                    "search_top_k": 3, "retrieve_top_k": 3},
+            agent={"mode": "iterative", "max_iterations": 2},
         ),
         "standard": DepthLevel(
             target_minutes=5,
             storm={"max_perspective": 3, "max_conv_turn": 3, "max_search_queries_per_turn": 3,
                    "search_top_k": 3, "retrieve_top_k": 3},
+            agent={"mode": "iterative", "max_iterations": 4},
         ),
         "deep": DepthLevel(
             target_minutes=12,
             storm={"max_perspective": 5, "max_conv_turn": 4, "max_search_queries_per_turn": 4,
                    "search_top_k": 5, "retrieve_top_k": 8},
+            agent={"mode": "deep", "max_iterations": 2},
         ),
     }
 
@@ -66,8 +72,13 @@ class Limits(BaseModel):
     depth_levels: dict[str, DepthLevel] = Field(default_factory=_default_depths)
 
     def depth(self, name):
-        """A level's settings; a level the Administrator never saved gets its default."""
-        return self.depth_levels.get(name) or _default_depths()[name]
+        """A level's settings; a level the Administrator never saved gets its
+        default, and so does an Engine's part saved before that Engine existed."""
+        level = self.depth_levels.get(name)
+        default = _default_depths()[name]
+        if level is None:
+            return default
+        return level if level.agent else level.model_copy(update={"agent": default.agent})
 
 
 def load(session):

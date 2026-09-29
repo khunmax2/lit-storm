@@ -318,12 +318,12 @@ def _pick(session, table, wanted_id):
     return row
 
 
-def _snapshot(session, model, provider, depth="standard"):
+def _snapshot(session, model, provider, depth="standard", engine="storm"):
     """The parts of a Run's config that come from the current settings,
-    including what its depth level means today."""
+    including what its depth level means today for its Engine."""
     configured = limits.load(session)
     level = configured.depth(depth)
-    params = dict(level.storm)
+    params = dict(level.agent if engine == "agent" else level.storm)
     if model.max_tokens:
         params["max_tokens"] = model.max_tokens
     return {
@@ -414,7 +414,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         llm_model_id=model.id,
         search_provider_id=provider.id,
         config={
-            **_snapshot(session, model, provider, body.depth),
+            **_snapshot(session, model, provider, body.depth, body.engine),
             "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
         },
         status=QUEUED,
@@ -586,7 +586,7 @@ def choose_again(
     run = deps.own(session, Run, run_id, user)
     model = _pick(session, LlmModel, body.llm_model_id)
     provider = _pick(session, SearchProvider, body.search_provider_id)
-    snapshot = {**run.config, **_snapshot(session, model, provider, run.config.get("depth", "standard"))}
+    snapshot = {**run.config, **_snapshot(session, model, provider, run.config.get("depth", "standard"), run.engine)}
     moved = session.execute(
         update(Run)
         .where(Run.id == run.id, Run.status == NEEDS_SELECTION)
@@ -631,7 +631,7 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
         llm_model_id=old.llm_model_id,
         search_provider_id=old.search_provider_id,
         config={
-            **_snapshot(session, model, provider, old.config.get("depth", "standard")),
+            **_snapshot(session, model, provider, old.config.get("depth", "standard"), old.engine),
             "refinement": old.config.get("refinement", []),
         } if available else old.config,
         status=QUEUED if available else NEEDS_SELECTION,

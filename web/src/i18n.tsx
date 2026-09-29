@@ -331,6 +331,11 @@ const en = {
   "refine.clear": "Remove the questions",
   "refine.answered": "Answered {n} questions before starting",
   "admin.limit.refinements": "Clarifying questions per user per day",
+  "depth.agentLead": "How Agent Research works at each level. Iterative searches and reflects round by round; deep plans sections and researches them side by side.",
+  "depth.agent.mode": "Way of working",
+  "depth.agent.rounds": "Rounds",
+  "depth.agent.iterative": "Iterative",
+  "depth.agent.deep": "Deep (by section)",
   "embed.title": "Embedding",
   "embed.lead":
     "Turns text into vectors, so each section of a report is written from the snippets closest to it. One setting for every Run; the key is the provider's under API keys.",
@@ -738,6 +743,11 @@ const th: Record<Key, string> = {
   "refine.clear": "ลบคำถาม",
   "refine.answered": "ตอบคำถามก่อนเริ่ม {n} ข้อ",
   "admin.limit.refinements": "จำนวนครั้งที่ขัดเกลาโจทย์ได้ต่อคนต่อวัน",
+  "depth.agentLead": "Agent Research ในแต่ละระดับ แบบวนรอบคือค้นแล้วทบทวนทีละรอบ แบบเจาะลึกคือวางแผนเป็นหัวข้อแล้วค้นแต่ละหัวข้อพร้อมกัน",
+  "depth.agent.mode": "วิธีทำงาน",
+  "depth.agent.rounds": "จำนวนรอบ",
+  "depth.agent.iterative": "วนรอบ",
+  "depth.agent.deep": "เจาะลึกตามหัวข้อ",
   "embed.title": "Embedding",
   "embed.lead":
     "แปลงข้อความเป็นเวกเตอร์ เพื่อให้แต่ละส่วนของรายงานเขียนจากข้อมูลที่ตรงกับส่วนนั้นที่สุด ตั้งครั้งเดียวใช้กับทุก Run คีย์ใช้ของผู้ให้บริการใน API key",

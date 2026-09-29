@@ -1,6 +1,6 @@
 """How long research takes, what it costs, and how much it finds.
 
-    uv run python tests/benchmark.py <output dir> [--search SearXNG,arXiv] [--topics 4] [--level standard]
+    uv run python tests/benchmark.py <output dir> [--search SearXNG,arXiv] [--topics 4] [--level standard] [--engine agent]
 
 Runs a fixed set of topics through the API of a running stack, one Run at a
 time, and writes <output dir>/benchmark.json and benchmark.md: per Run the
@@ -78,8 +78,8 @@ def timings(run):
     return out
 
 
-def one(api, topic, language, search_id, level):
-    body = {"topic": topic, "language": language, "search_provider_id": search_id}
+def one(api, topic, language, search_id, level, engine="storm"):
+    body = {"topic": topic, "language": language, "search_provider_id": search_id, "engine": engine}
     if level:
         body["depth"] = level
     session = api.post("/api/sessions", body)
@@ -99,6 +99,7 @@ def one(api, topic, language, search_id, level):
         "sources": run["source_count"],
         "model": run["model_label"],
         "search": run["search_label"],
+        "engine": run.get("engine", "storm"),
         "seconds": timings(run),
         "tokens_in": usage.get("tokens_in"),
         "tokens_out": usage.get("tokens_out"),
@@ -149,6 +150,7 @@ def main():
     ap.add_argument("--topics", type=int, default=len(TOPICS), help="how many of the fixed topics")
     ap.add_argument("--level", default=None, help="depth level, once Runs take one")
     ap.add_argument("--note", default="", help="what this run measures, for the report")
+    ap.add_argument("--engine", default="storm", help="research mode: storm, agent, ...")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
 
@@ -158,7 +160,7 @@ def main():
     for label in args.search.split(","):
         for topic, language in TOPICS[: args.topics]:
             print(f"{label:>8} · {topic} ...", flush=True)
-            r = one(api, topic, language, providers[label], args.level)
+            r = one(api, topic, language, providers[label], args.level, args.engine)
             s = r["seconds"]
             print(f"         {r['status']} in {_fmt(s.get('total'))}s (start {_fmt(s.get('startup'))}, "
                   f"research {_fmt(s.get('research'))}), {r['searches']} searches, ${_fmt(r['cost_usd'], 4)}", flush=True)

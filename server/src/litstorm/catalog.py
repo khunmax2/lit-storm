@@ -49,7 +49,7 @@ ENGINES = {
         "search": ("searxng", "tavily"),
         "stages": ("plan", "research", "report"),
         "needs_tools": True,
-        "ready": False,
+        "ready": True,
     },
 }
 

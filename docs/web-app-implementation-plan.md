@@ -275,6 +275,22 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 
 ### 2.1 Agent Research
 
+✅ **เสร็จและตรวจรับผ่านเมื่อ 2026-09-30** ดู [acceptance/2026-09-30-phase-2.1.md](./acceptance/2026-09-30-phase-2.1.md) และ [benchmarks/2026-09-30-agent.md](./benchmarks/2026-09-30-agent.md)
+- **Engine:** `engines/agent/`
+  - สร้างโมเดลจากค่าของ Run เอง ไม่อ่าน env ของ library
+  - การตั้ง reasoning ของโมเดลใส่ไว้ในทุกคำขอ
+  - นับ token ต่อโมเดล จำนวนการค้น และหน้าที่เปิด และเช็กคำสั่งยกเลิกทุกต้นรอบ
+  - ระดับเร็วและมาตรฐานใช้แบบวนรอบ 2 และ 4 รอบ ระดับลึกใช้ DeepResearcher
+  - ผู้ดูแลแก้ได้ในหน้าตั้งค่า › ขีดจำกัด
+  - จบอย่างนุ่มนวลใช้ `max_time_minutes` ของ library ตั้งที่ 80% ของเป้า และ 60% สำหรับแบบเจาะลึก
+- **แปลงผล:** `engines/agent/normalize.py` แปลง markdown เป็น `report.json` เรียงเลขอ้างอิงใหม่ และไม่มี Evidence ตามที่ออกแบบไว้
+- **fork:** เพิ่ม Tavily, รายการ engine ของ SearXNG, timeout ตอนค้นและเปิดหน้า และตัด dependency `asyncio` กับ `md2pdf` ออก
+- **การติดตั้ง fork:**
+  - ตอนพัฒนา server อ้าง fork เป็น path (`../../agents-deep-research`)
+  - Docker ได้ fork จาก build context ที่ชื่อ `agents` (`stack/compose.yml`, `additional_contexts`)
+  - fork ต้อง checkout อยู่ข้าง lit-storm ที่ commit ที่ต้องการ
+  - workflow ของ GHCR (สายโครงสร้าง) ต้อง checkout fork ตาม SHA ที่ปักไว้
+
 - ติดตั้ง `lit_agents-deep-research` ใน Worker (pin ตาม commit) แล้วเขียน Engine ที่รันใน subprocess
 - แปลงผลเป็น `report.json` ซึ่งไม่มี Evidence
 - ระดับความลึก: Iterative 2 รอบ / 4 รอบ / DeepResearcher

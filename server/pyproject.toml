@@ -21,6 +21,7 @@ dependencies = [
     # Pulled in by knowledge_storm (sentence-transformers). Named here only
     # so Linux images take the CPU build below instead of several GB of CUDA.
     "torch",
+    "deep-researcher",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +38,7 @@ litstorm = "litstorm.cli:main"
 [tool.uv.sources]
 knowledge-storm = { path = "..", editable = true }
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+deep-researcher = { path = "../../agents-deep-research" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

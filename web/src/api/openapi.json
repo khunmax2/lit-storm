@@ -2604,6 +2604,11 @@
       "additionalProperties": true,
       "type": "object",
       "title": "Storm"
+     },
+     "agent": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Agent"
      }
     },
     "type": "object",

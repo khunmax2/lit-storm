@@ -8,6 +8,10 @@ def get(name):
         from .storm.engine import StormEngine
 
         return StormEngine()
+    if name == "agent":
+        from .agent.engine import AgentEngine
+
+        return AgentEngine()
     if name == "fake":
         from .fake import FakeEngine
 

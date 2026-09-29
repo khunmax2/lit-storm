@@ -963,6 +963,10 @@ export interface components {
             storm: {
                 [key: string]: unknown;
             };
+            /** Agent */
+            agent?: {
+                [key: string]: unknown;
+            };
         };
         /** Embedding */
         Embedding: {

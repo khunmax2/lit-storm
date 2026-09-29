@@ -124,13 +124,16 @@ class Api:
     def run(self, run_id):
         return self.get(f"/api/runs/{run_id}").json()
 
-    def wait(self, run_id, until=FINAL, timeout=900, stage=None):
+    def wait(self, run_id, until=FINAL, timeout=900, stage=None, every=5):
+        """Until the Run is in one of `until`, or at a stage in `stage` (a
+        name or a tuple of names)."""
+        stages = (stage,) if isinstance(stage, str) else tuple(stage or ())
         deadline = time.time() + timeout
         while time.time() < deadline:
             r = self.run(run_id)
-            if r["status"] in until or (stage and r.get("stage") == stage):
+            if r["status"] in until or r.get("stage") in stages:
                 return r
-            time.sleep(5)
+            time.sleep(every)
         raise TimeoutError(f"run {run_id} still {r['status']}/{r.get('stage')} after {timeout}s")
 
 
@@ -470,11 +473,14 @@ class Acceptance:
         bob = self.ctx["bob"]
         _, s = bob.research("Privacy in federated learning", language="en")
         run_id = s["runs"][0]["id"]
-        at_kill = bob.wait(run_id, until=FINAL, stage="outline", timeout=300)
+        # Runs are quick now (a spare process, 2-second searches): the outline
+        # can last under the old 5-second poll, so look every second, and
+        # the article stage will do as well.
+        at_kill = bob.wait(run_id, until=FINAL, stage=("outline", "article"), timeout=300, every=1)
         if not self.check(k, at_kill["status"] == "running", f"the Run is running ({at_kill['stage']}) when the Worker dies"):
             return
         compose("kill", "worker")
-        self.note(k, "the worker container was killed while the Run was in its outline stage")
+        self.note(k, f"the worker container was killed while the Run was in its {at_kill['stage']} stage")
         time.sleep(75)  # past the 60-second lease
         self.check(k, bob.run(run_id)["status"] in ("running", "cancelling"), "with no Worker, nothing has marked it yet")
         compose("start", "worker")
@@ -496,12 +502,18 @@ class Acceptance:
         k = "deadline"
         self.criterion(k, "Run ที่เกินเพดานเวลารวมถูกหยุด และคืนโควตาตามตาราง")
         admin, bob = self.ctx["admin"], self.ctx["bob"]
-        # arXiv answers one request every three seconds; a deep research
-        # plan through it takes well over the shortest ceiling allowed.
-        set_limits(admin, run_deadline_minutes=5,
-                   depth_levels=standard_depth(admin, {"max_perspective": 8, "max_conv_turn": 8, "search_top_k": 5}))
-        _, s = bob.research("Deadline test: retrieval augmented generation", language="en",
-                            search_provider_id=self.ctx["search"]["id"])
+        # What is under test is the ceiling, not an Engine's speed: the Run
+        # is given, before the Worker takes it, the test Engine that never
+        # finishes and never looks at a stop (engines/fake.py, "hang"). Any
+        # real Engine is now too quick to outlast 5 minutes on purpose.
+        set_limits(admin, run_deadline_minutes=5)
+        compose("stop", "worker")
+        _, s = bob.research("Deadline test: a Run that never finishes", language="en")
+        hang = json.dumps({"script": [{"stage": "research"}, {"hang": True}]})
+        psql(f"update runs set engine = 'fake', config = jsonb_set(config, '{{params}}', '{hang}'::jsonb) "
+             f"where id = '{s['runs'][0]['id']}'")
+        self.note(k, "the Run was given the test Engine that never finishes, before the Worker took it")
+        compose("start", "worker")
         started = time.time()
         final = bob.wait(s["runs"][0]["id"], timeout=600)
         took = int(time.time() - started)

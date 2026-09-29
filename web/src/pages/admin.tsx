@@ -1761,6 +1761,55 @@ function Limits() {
         </CardContent>
       </Card>
 
+      {/* Agent Research's side of each level: how it researches, and for how many rounds. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Research</CardTitle>
+          <CardDescription>{t("depth.agentLead")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("depth.label")}</TableHead>
+                <TableHead>{t("depth.agent.mode")}</TableHead>
+                <TableHead className="text-right">{t("depth.agent.rounds")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(["fast", "standard", "deep"] as const).map((depth) => {
+                const level = levels[depth] as DepthLevelForm | undefined;
+                if (!level) return null;
+                const agent = level.agent ?? {};
+                const setAgent = (patch: Record<string, unknown>) =>
+                  setLevel(depth, (l) => ({ ...l, agent: { ...(l.agent ?? {}), ...patch } }));
+                return (
+                  <TableRow key={depth}>
+                    <TableCell className="font-medium">{t(`depth.${depth}`)}</TableCell>
+                    <TableCell>
+                      <Select value={String(agent.mode ?? "iterative")} onValueChange={(mode) => setAgent({ mode })}>
+                        <SelectTrigger aria-label={`${t(`depth.${depth}`)} · ${t("depth.agent.mode")}`} className="h-8 w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="iterative">{t("depth.agent.iterative")}</SelectItem>
+                          <SelectItem value="deep">{t("depth.agent.deep")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {levelInput(depth, t("depth.agent.rounds"), agent.max_iterations as number | undefined, (n) =>
+                        setAgent({ max_iterations: n }),
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={save.isPending}>
           {t("save")}
@@ -1771,7 +1820,7 @@ function Limits() {
   );
 }
 
-type DepthLevelForm = { target_minutes: number; storm: Record<string, unknown> };
+type DepthLevelForm = { target_minutes: number; storm: Record<string, unknown>; agent?: Record<string, unknown> };
 
 // The STORM settings behind each depth level, in the order they matter for time.
 const STORM_KNOBS = [

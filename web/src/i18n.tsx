@@ -159,6 +159,7 @@ const en = {
   "admin.saved": "Saved",
 
   "error.generic": "Something went wrong. Try again.",
+  "error.model_disabled": "That model is turned off.",
   "error.last_engine": "At least one research mode must stay on.",
   "error.engine_not_available": "That research mode is not offered.",
   "error.search_not_for_engine": "That search provider cannot be used with this mode.",
@@ -319,6 +320,9 @@ const en = {
   "modes.anyModel": "Any model",
   "modes.offered": "Offered",
   "modes.notYet": "Not built yet",
+  "fast.title": "Fast model for research",
+  "fast.lead": "Research calls a model dozens of times a Run for short answers; a fast, cheap model can take those. The model the owner chose still writes the report. If this model is turned off, Runs use the owner's model for everything.",
+  "fast.none": "The owner's model for every stage",
   "embed.title": "Embedding",
   "embed.lead":
     "Turns text into vectors, so each section of a report is written from the snippets closest to it. One setting for every Run; the key is the provider's under API keys.",
@@ -554,6 +558,7 @@ const th: Record<Key, string> = {
   "admin.saved": "บันทึกแล้ว",
 
   "error.generic": "เกิดข้อผิดพลาด ลองอีกครั้ง",
+  "error.model_disabled": "โมเดลนั้นปิดอยู่",
   "error.last_engine": "ต้องเปิดไว้อย่างน้อยหนึ่งโหมด",
   "error.engine_not_available": "โหมดนี้ไม่ได้เปิดให้ใช้",
   "error.search_not_for_engine": "บริการค้นหานี้ใช้กับโหมดนี้ไม่ได้",
@@ -714,6 +719,9 @@ const th: Record<Key, string> = {
   "modes.anyModel": "ใช้ได้ทุกโมเดล",
   "modes.offered": "เปิดใช้",
   "modes.notYet": "ยังไม่พร้อม",
+  "fast.title": "โมเดลเร็วสำหรับค้นคว้า",
+  "fast.lead": "ขั้นค้นคว้าเรียกโมเดลหลายสิบครั้งต่อ Run ด้วยคำตอบสั้นๆ ใช้โมเดลที่เร็วและถูกตรงนี้ได้ ส่วนโมเดลที่ผู้ใช้เลือกยังใช้เขียนรายงาน ถ้าปิดโมเดลนี้ Run จะใช้โมเดลที่ผู้ใช้เลือกทั้งหมด",
+  "fast.none": "ใช้โมเดลที่ผู้ใช้เลือกทุกขั้น",
   "embed.title": "Embedding",
   "embed.lead":
     "แปลงข้อความเป็นเวกเตอร์ เพื่อให้แต่ละส่วนของรายงานเขียนจากข้อมูลที่ตรงกับส่วนนั้นที่สุด ตั้งครั้งเดียวใช้กับทุก Run คีย์ใช้ของผู้ให้บริการใน API key",

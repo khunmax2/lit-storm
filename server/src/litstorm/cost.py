@@ -39,16 +39,24 @@ def _table_price(model, prompt_tokens, completion_tokens):
     return Decimal(str(cost_in)) + Decimal(str(cost_out))
 
 
-def estimate(by_model, price_in=None, price_out=None):
+def estimate(by_model, price_in=None, price_out=None, prices=None):
     """US dollars for the tokens used, or None when no price is known.
 
-    `price_in`/`price_out` are the Administrator's USD per million tokens for
-    the Run's model and win over the table when set.
+    `prices` maps a model's name, as its usage is reported, to the
+    Administrator's (in, out) USD per million tokens, which win over the
+    table; under "*", the price for any name not listed (the Run's main
+    model, whose usage a provider may report under a name of its own).
+    `price_in`/`price_out` price every model alike (one-model Runs).
     """
     if not by_model:
         return Decimal(0)
     total = Decimal(0)
     for model, (p, c) in by_model.items():
+        chosen = (prices or {}).get(model) or (prices or {}).get("*")
+        if chosen:
+            price_in_m, price_out_m = chosen
+            total += Decimal(p) * Decimal(price_in_m) / 1_000_000 + Decimal(c) * Decimal(price_out_m) / 1_000_000
+            continue
         if price_in is not None and price_out is not None:
             total += Decimal(p) * Decimal(price_in) / 1_000_000 + Decimal(c) * Decimal(price_out) / 1_000_000
             continue

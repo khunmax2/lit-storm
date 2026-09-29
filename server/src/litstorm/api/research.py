@@ -292,11 +292,21 @@ def _snapshot(session, model, provider, depth="standard"):
             "engines": provider.engines,
         },
         "params": params,
+        # The research model, when the Administrator set one other than this
+        # Run's model (litstorm.roles).
+        **_fast(session, model),
         "embedding": _embedding(session),
         "depth": depth,
         "target_minutes": level.target_minutes,
         "deadline_minutes": configured.run_deadline_minutes,
     }
+
+
+def _fast(session, model):
+    from litstorm import roles
+
+    fast = roles.fast_model(session)
+    return {"fast_llm": roles.snapshot(fast)} if fast is not None and fast.id != model.id else {}
 
 
 def _embedding(session):

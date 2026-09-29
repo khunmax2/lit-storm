@@ -25,6 +25,9 @@ class RunConfig:
     llm: dict[str, Any]  # {"provider", "model", optional "api_base", "reasoning"}
     search: dict[str, Any]  # {"provider", optional "endpoint", "engines"}
     params: dict[str, Any] = field(default_factory=dict)  # engine knobs, set by admins
+    # The model for research's short calls, like `llm` plus "max_tokens";
+    # empty: `llm` does everything (docs/adr/0006).
+    fast_llm: dict[str, Any] = field(default_factory=dict)
     # {"provider", "model", "api_base"}; empty or "builtin" is STORM's own model.
     embedding: dict[str, Any] = field(default_factory=dict)
     request_timeout: float = 120.0  # seconds, per LLM or search request
@@ -47,6 +50,7 @@ class Secrets:
     llm_api_key: str = ""
     search_api_key: str = ""
     embedding_api_key: str = ""
+    fast_llm_api_key: str = ""
 
     def __repr__(self):
         return "Secrets(<redacted>)"

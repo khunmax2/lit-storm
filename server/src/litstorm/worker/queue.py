@@ -14,7 +14,7 @@ Runs does not make everyone else wait for all ten.
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text, update
@@ -46,9 +46,9 @@ class Claim:
     config: RunConfig
     secrets: Secrets
     deadline_seconds: float
-    # The Administrator's price for the model, USD per million tokens.
-    price_in: object = None
-    price_out: object = None
+    # The Administrator's prices, USD per million tokens, by the name each
+    # model reports its usage under (cost.estimate).
+    prices: dict = field(default_factory=dict)
 
 
 def _now():
@@ -113,7 +113,7 @@ def claim(session):
     run.lease_expires_at = now + LEASE
     run.stage = None
     session.execute(update(User).where(User.id == run.owner_id).values(last_run_started_at=now))
-    secrets, llm = _secrets(session, run)
+    secrets, llm, fast = _secrets(session, run)
     session.commit()
 
     config = RunConfig(
@@ -124,17 +124,28 @@ def claim(session):
         llm=llm,
         search={k: v for k, v in run.config["search"].items() if k != "label" and v},
         params=run.config.get("params", {}),
+        fast_llm=fast,
         embedding=run.config.get("embedding", {}),
         target_seconds=60.0 * run.config["target_minutes"] if run.config.get("target_minutes") else None,
         search_cache_dir=settings.get().search_cache_dir,
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)
-    model = session.get(LlmModel, run.llm_model_id)
-    return Claim(
-        run.id, token, config, secrets, deadline,
-        price_in=model.price_in_per_mtok if model else None,
-        price_out=model.price_out_per_mtok if model else None,
-    )
+    return Claim(run.id, token, config, secrets, deadline, prices=_prices(session, run, fast))
+
+
+def _prices(session, run, fast):
+    """Each model's price as the Administrator set it, if they did."""
+    from litstorm.catalog import LLM_PROVIDERS
+
+    prices = {}
+    for model_id in (run.llm_model_id, fast.get("id") if fast else None):
+        model = session.get(LlmModel, uuid.UUID(str(model_id))) if model_id else None
+        if model is not None and model.price_in_per_mtok is not None and model.price_out_per_mtok is not None:
+            name = LLM_PROVIDERS.get(model.provider, {}).get("prefix", "") + model.model
+            prices[name] = (model.price_in_per_mtok, model.price_out_per_mtok)
+            if model.id == run.llm_model_id:
+                prices["*"] = prices[name]  # any name not listed is the main model's
+    return prices
 
 
 def _secrets(session, run):
@@ -148,9 +159,30 @@ def _secrets(session, run):
             llm["api_base"] = credential.api_base
     provider = session.get(SearchProvider, run.search_provider_id)
     search_key = security.decrypt(provider.api_key_ciphertext) if provider else ""
+    fast, fast_key = _fast(session, run)
     return Secrets(
-        llm_api_key=llm_key, search_api_key=search_key, embedding_api_key=_embedding_key(session, run)
-    ), llm
+        llm_api_key=llm_key,
+        search_api_key=search_key,
+        embedding_api_key=_embedding_key(session, run),
+        fast_llm_api_key=fast_key,
+    ), llm, fast
+
+
+def _fast(session, run):
+    """The fast model the Run was started with, and its key, if that model
+    is still on; otherwise nothing, and the main model does it all
+    (litstorm.roles)."""
+    kept = run.config.get("fast_llm") or {}
+    model = session.get(LlmModel, uuid.UUID(kept["id"])) if kept.get("id") else None
+    if model is None or not model.enabled:
+        return {}, ""
+    fast = {k: v for k, v in kept.items() if k != "label" and v}
+    credential = session.get(LlmCredential, fast["provider"])
+    if credential is None:
+        return {}, ""
+    if credential.api_base:
+        fast["api_base"] = credential.api_base
+    return fast, security.decrypt(credential.api_key_ciphertext)
 
 
 def _embedding_key(session, run):
@@ -215,7 +247,7 @@ def finish(session, claim, outcome, report_title=None, source_count=None):
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             search_calls=searches,
-            cost_usd=cost.estimate(by_model, claim.price_in, claim.price_out),
+            cost_usd=cost.estimate(by_model, prices=claim.prices),
         )
     ).rowcount
     session.commit()

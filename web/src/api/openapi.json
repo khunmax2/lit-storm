@@ -940,6 +940,66 @@
     }
    }
   },
+  "/api/admin/model-roles": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Get Roles",
+    "operationId": "get_roles_api_admin_model_roles_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RolesIO"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Put Roles",
+    "operationId": "put_roles_api_admin_model_roles_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RolesIO"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RolesIO"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/embedding": {
    "get": {
     "tags": [
@@ -3500,6 +3560,23 @@
      "updated_at"
     ],
     "title": "RecentSession"
+   },
+   "RolesIO": {
+    "properties": {
+     "fast_model_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fast Model Id"
+     }
+    },
+    "type": "object",
+    "title": "RolesIO"
    },
    "RunDetail": {
     "properties": {

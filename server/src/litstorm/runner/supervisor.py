@@ -78,6 +78,7 @@ def _secrets_json(secrets, **extra):
             "llm_api_key": secrets.llm_api_key,
             "search_api_key": secrets.search_api_key,
             "embedding_api_key": secrets.embedding_api_key,
+            "fast_llm_api_key": secrets.fast_llm_api_key,
             **extra,
         }
     ).encode()

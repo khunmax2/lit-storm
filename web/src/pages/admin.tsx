@@ -1052,6 +1052,8 @@ function Models() {
         </CardContent>
       </Card>
 
+      <FastModelCard models={models.data ?? []} />
+
       <EmbeddingCard />
 
       <Card>
@@ -1093,6 +1095,51 @@ function Models() {
       <KeyDialog provider={keyFor} onOpenChange={(o) => !o && setKeyFor(null)} />
       <ModelDialog form={form} setForm={setForm} keys={keys.data ?? []} />
     </div>
+  );
+}
+
+// --- the fast model ------------------------------------------------------------------
+
+// Research's many short calls go to one model the Administrator picks; the
+// owner's chosen model writes (docs/adr/0006).
+function FastModelCard({ models }: { models: Schemas["ModelOut"][] }) {
+  const { t } = useT();
+  const queryClient = useQueryClient();
+  const onError = useToastError();
+  const roles = useQuery({ queryKey: ["admin-roles"], queryFn: () => call(api.GET("/api/admin/model-roles")) });
+  const save = useMutation({
+    mutationFn: (fast_model_id: string | null) => call(api.PUT("/api/admin/model-roles", { body: { fast_model_id } })),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["admin-roles"], data);
+      toast.success(t("common.saved"));
+    },
+    onError,
+  });
+  const current = roles.data?.fast_model_id ?? "none";
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("fast.title")}</CardTitle>
+        <CardDescription>{t("fast.lead")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Select value={current} onValueChange={(v) => v !== current && save.mutate(v === "none" ? null : v)}>
+          <SelectTrigger aria-label={t("fast.title")} className="w-full sm:w-80">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">{t("fast.none")}</SelectItem>
+            {models
+              .filter((m) => m.enabled)
+              .map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.label}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </CardContent>
+    </Card>
   );
 }
 

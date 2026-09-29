@@ -14,7 +14,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import checks, embedding, limits, modes, quota, security
+from litstorm import checks, embedding, limits, modes, quota, roles, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
@@ -444,6 +444,35 @@ def check_search_draft(body: SearchDraftIn, session=Depends(deps.database)):
     draft = SimpleNamespace(kind=body.kind, endpoint=(body.endpoint or "").strip(), engines=(body.engines or "").strip())
     ok, message, seconds, samples = checks.search(draft, (key or "").strip(), body.query)
     return CheckOut(ok=ok, message=message, seconds=round(seconds, 2), samples=samples)
+
+
+# --- the fast model ----------------------------------------------------------
+# One for the whole system, for research's short calls (litstorm.roles).
+
+
+class RolesIO(BaseModel):
+    fast_model_id: str | None = None
+
+
+@router.get("/model-roles", response_model=RolesIO)
+def get_roles(session=Depends(deps.database)):
+    return RolesIO(**roles.load(session).model_dump())
+
+
+@router.put("/model-roles", response_model=RolesIO)
+def put_roles(body: RolesIO, session=Depends(deps.database)):
+    if body.fast_model_id:
+        try:
+            model = session.get(LlmModel, uuid.UUID(body.fast_model_id))
+        except ValueError:
+            model = None
+        if model is None:
+            raise HTTPException(404, "not_found")
+        if not model.enabled:
+            raise HTTPException(422, "model_disabled")
+    roles.save(session, roles.Roles(fast_model_id=body.fast_model_id or None))
+    session.commit()
+    return get_roles(session)
 
 
 # --- embedding service ------------------------------------------------------

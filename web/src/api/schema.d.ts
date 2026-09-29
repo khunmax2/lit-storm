@@ -365,6 +365,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/model-roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Roles */
+        get: operations["get_roles_api_admin_model_roles_get"];
+        /** Put Roles */
+        put: operations["put_roles_api_admin_model_roles_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/embedding": {
         parameters: {
             query?: never;
@@ -1321,6 +1339,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** RolesIO */
+        RolesIO: {
+            /** Fast Model Id */
+            fast_model_id?: string | null;
         };
         /** RunDetail */
         RunDetail: {
@@ -2480,6 +2503,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_roles_api_admin_model_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolesIO"];
+                };
+            };
+        };
+    };
+    put_roles_api_admin_model_roles_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolesIO"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolesIO"];
                 };
             };
             /** @description Validation Error */

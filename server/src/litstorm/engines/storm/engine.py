@@ -72,12 +72,19 @@ def _params(config):
 def build_runner(config, secrets, output_dir):
     params = _params(config)
     try:
-        talk = providers.build_lm(
-            config.llm,
-            secrets.llm_api_key,
-            params["max_tokens"]["conversation"],
-            config.request_timeout,
-        )
+        # Research's many short calls go to the fast model when the Run has
+        # one, with that model's own reply budget (docs/adr/0006).
+        if config.fast_llm:
+            fast = {k: v for k, v in config.fast_llm.items() if k not in ("id", "max_tokens")}
+            budget = (config.fast_llm.get("max_tokens") or {}).get("conversation") or params["max_tokens"]["conversation"]
+            talk = providers.build_lm(fast, secrets.fast_llm_api_key, budget, config.request_timeout)
+        else:
+            talk = providers.build_lm(
+                config.llm,
+                secrets.llm_api_key,
+                params["max_tokens"]["conversation"],
+                config.request_timeout,
+            )
         write = providers.build_lm(
             config.llm,
             secrets.llm_api_key,
@@ -97,8 +104,8 @@ def build_runner(config, secrets, output_dir):
             rm, config.search_cache_dir, search_cache.identity(config.search, params["search_top_k"])
         )
 
-    # One model for every stage (docs/web-app-design.md, การเลือก LLM); only
-    # the reply budget differs between talking and writing.
+    # The owner's model writes; research talks with the fast model if the
+    # Run has one, else the owner's model with a smaller reply budget.
     lm_configs = STORMWikiLMConfigs()
     lm_configs.set_conv_simulator_lm(talk)
     lm_configs.set_question_asker_lm(talk)

@@ -54,9 +54,10 @@ def article_paths(article_dir):
 # (See Also)" and gets through.
 BACK_MATTER = {
     "see also", "references", "reference", "notes", "external links",
-    "further reading", "bibliography", "sources",
+    "external resources", "further reading", "bibliography", "sources",
     "ดูเพิ่ม", "อ้างอิง", "การอ้างอิง", "แหล่งอ้างอิง", "เอกสารอ้างอิง",
-    "แหล่งข้อมูลอื่น", "อ่านเพิ่มเติม", "บรรณานุกรม", "หมายเหตุ",
+    "แหล่งข้อมูลอื่น", "แหล่งข้อมูลภายนอก", "ลิงก์ภายนอก", "แหล่งข้อมูลเพิ่มเติม",
+    "อ่านเพิ่มเติม", "บรรณานุกรม", "หมายเหตุ",
 }
 
 

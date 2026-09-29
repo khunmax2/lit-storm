@@ -186,10 +186,11 @@ def test_back_matter_is_not_written():
         _Node("การประเมินผล", _Node("เกณฑ์มาตรฐาน"), _Node("See also")),
         _Node("ดูเพิ่ม"),
         _Node("อ้างอิง"),
+        _Node("แหล่งข้อมูลภายนอก"),  # also from a real Run
     )
     changes = clean_outline(outline, "LLMs for low-resource languages")
     assert _names(outline.root) == ["ความท้าทาย", ("การประเมินผล", ["เกณฑ์มาตรฐาน"])]
-    assert len(changes) == 3
+    assert len(changes) == 4
 
 
 def test_an_introduction_or_conclusion_is_left_to_the_lead():

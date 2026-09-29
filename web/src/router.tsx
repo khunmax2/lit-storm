@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, Outlet, createRootRoute, createRoute, createRouter, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute, createRoute, createRouter, redirect, useNavigate } from "@tanstack/react-router";
 import { Loader2, Moon, Plus, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -74,7 +74,8 @@ function SignedIn() {
   return (
     <SidebarProvider>
       <AppSidebar me={me.data} onSearch={() => setSearching(true)} />
-      <SidebarInset>
+      {/* min-w-0: a wide table scrolls inside its card instead of widening the page. */}
+      <SidebarInset className="min-w-0">
         <Header />
         <Outlet />
       </SidebarInset>
@@ -95,14 +96,22 @@ const projectsRoute = createRoute({ getParentRoute: () => appRoute, path: "proje
 const projectRoute = createRoute({ getParentRoute: () => appRoute, path: "projects/$projectId", component: ProjectPage });
 const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "sessions/$sessionId", component: SessionPage });
 const reportRoute = createRoute({ getParentRoute: () => appRoute, path: "runs/$runId", component: ReportPage });
-const adminRoute = createRoute({ getParentRoute: () => appRoute, path: "admin", component: AdminPage });
+const settingsRoute = createRoute({ getParentRoute: () => appRoute, path: "settings/$section", component: AdminPage });
+// The old address of the settings, kept for links people saved.
+const adminRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "admin",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/$section", params: { section: "users" } });
+  },
+});
 const trashRoute = createRoute({ getParentRoute: () => appRoute, path: "trash", component: TrashPage });
 
 const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
   setPasswordRoute,
-  appRoute.addChildren([homeRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, adminRoute, trashRoute]),
+  appRoute.addChildren([homeRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, trashRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

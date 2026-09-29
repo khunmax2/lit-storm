@@ -62,7 +62,7 @@ export function SetupPage() {
     mutationFn: () => call(api.POST("/api/setup", { body: form })),
     onSuccess: async () => {
       await queryClient.invalidateQueries();
-      navigate({ to: "/admin" });
+      navigate({ to: "/settings/$section", params: { section: "users" } });
     },
   });
   const submit = (e: FormEvent) => {

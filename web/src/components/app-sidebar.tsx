@@ -1,9 +1,10 @@
-// The app shell's left rail: the brand, search, the workspace, recent topics,
-// and the account card at the foot.
+// The app shell's left rail: the brand, search, folding sections for research
+// and settings, recent topics, and the account card at the foot.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   BookOpenText,
+  ChevronDown,
   ChevronsUpDown,
   FolderOpen,
   House,
@@ -17,10 +18,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { api, call, type Schemas } from "@/api/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,11 +49,17 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useT, type Lang } from "@/i18n";
+import { cn } from "@/lib/utils";
+import { SETTINGS } from "@/pages/admin";
 
 export const DOT: Record<string, string> = {
   succeeded: "bg-success",
@@ -80,6 +88,86 @@ function NavItem({ to, icon, label, active }: { to: string; icon: ReactNode; lab
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  );
+}
+
+// A sidebar section whose heading folds it away, as in the design reference.
+// Collapsed to icons, the headings are gone, so every section stays open.
+function Group({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
+  const { state, isMobile } = useSidebar();
+  const [open, setOpen] = useState(true);
+  const iconOnly = state === "collapsed" && !isMobile;
+  return (
+    <Collapsible
+      open={open || iconOnly}
+      onOpenChange={setOpen}
+      className={cn("group/collapsible", className)}
+    >
+      <SidebarGroup className="py-1">
+        <SidebarGroupLabel
+          asChild
+          className="cursor-pointer gap-1 tracking-wide uppercase hover:text-sidebar-foreground"
+        >
+          <CollapsibleTrigger>
+            <ChevronDown className="size-3.5! transition-transform group-data-[state=closed]/collapsible:-rotate-90" />
+            {label}
+          </CollapsibleTrigger>
+        </SidebarGroupLabel>
+        <CollapsibleContent>
+          <SidebarGroupContent>{children}</SidebarGroupContent>
+        </CollapsibleContent>
+      </SidebarGroup>
+    </Collapsible>
+  );
+}
+
+// Settings with its sections folded under it. With the rail collapsed to
+// icons there is no room for the sections, so the icon opens the first one.
+function SettingsItem({ path }: { path: string }) {
+  const { t } = useT();
+  const navigate = useNavigate();
+  const { state, isMobile } = useSidebar();
+  const inside = path.startsWith("/settings");
+  const [open, setOpen] = useState(inside);
+  useEffect(() => {
+    if (inside) setOpen(true);
+  }, [inside]);
+  const iconOnly = state === "collapsed" && !isMobile;
+  return (
+    <Collapsible asChild open={open} onOpenChange={setOpen} className="group/settings">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            tooltip={t("nav.admin")}
+            isActive={inside && (iconOnly || !open)}
+            className={ITEM}
+            onClick={(e) => {
+              if (!iconOnly) return;
+              e.preventDefault();
+              navigate({ to: "/settings/$section", params: { section: "users" } });
+            }}
+          >
+            <Settings />
+            <span>{t("nav.admin")}</span>
+            <ChevronDown className="ml-auto transition-transform group-data-[state=open]/settings:rotate-180" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub className="mt-1 mr-0 gap-1 pr-0">
+            {SETTINGS.map((x) => (
+              <SidebarMenuSubItem key={x.id}>
+                <SidebarMenuSubButton asChild isActive={path === `/settings/${x.id}`} className={cn(ITEM, "h-8")}>
+                  <Link to="/settings/$section" params={{ section: x.id }}>
+                    <x.icon />
+                    <span>{t(x.label)}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
   );
 }
 
@@ -156,54 +244,51 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="pt-0">
-          <SidebarGroupLabel className="uppercase tracking-wide">{t("nav.research")}</SidebarGroupLabel>
-          <SidebarGroupContent>
+        <Group label={t("nav.research")}>
+          <SidebarMenu>
+            <NavItem
+              to="/projects"
+              icon={<FolderOpen />}
+              label={t("nav.projects")}
+              active={path.startsWith("/projects")}
+            />
+            <NavItem to="/trash" icon={<Trash2 />} label={t("nav.trash")} active={path === "/trash"} />
+          </SidebarMenu>
+        </Group>
+
+        {me.role === "admin" && (
+          <Group label={t("nav.system")}>
             <SidebarMenu>
-              <NavItem
-                to="/projects"
-                icon={<FolderOpen />}
-                label={t("nav.projects")}
-                active={path.startsWith("/projects")}
-              />
+              <SettingsItem path={path} />
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          </Group>
+        )}
 
         <SidebarSeparator className="mx-3" />
 
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel className="uppercase tracking-wide">{t("nav.recent")}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {recent.isLoading && Array.from({ length: 4 }, (_, i) => <SidebarMenuSkeleton key={i} />)}
-              {recent.data?.length === 0 && (
-                <p className="px-2 py-1 text-xs text-muted-foreground">{t("nav.noRecent")}</p>
-              )}
-              {recent.data?.slice(0, 8).map((s) => (
-                <SidebarMenuItem key={s.id}>
-                  <SidebarMenuButton asChild isActive={path === `/sessions/${s.id}`} className={ITEM}>
-                    <Link to="/sessions/$sessionId" params={{ sessionId: s.id }}>
-                      <span
-                        className={`ml-1 size-1.5 shrink-0 rounded-full ${DOT[s.last_status ?? ""] ?? "bg-muted-foreground/40"}`}
-                      />
-                      <span className="truncate">{s.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <Group label={t("nav.recent")} className="group-data-[collapsible=icon]:hidden">
+          <SidebarMenu>
+            {recent.isLoading && Array.from({ length: 4 }, (_, i) => <SidebarMenuSkeleton key={i} />)}
+            {recent.data?.length === 0 && (
+              <p className="px-2 py-1 text-xs text-muted-foreground">{t("nav.noRecent")}</p>
+            )}
+            {recent.data?.slice(0, 8).map((s) => (
+              <SidebarMenuItem key={s.id}>
+                <SidebarMenuButton asChild isActive={path === `/sessions/${s.id}`} className={ITEM}>
+                  <Link to="/sessions/$sessionId" params={{ sessionId: s.id }}>
+                    <span
+                      className={`ml-1 size-1.5 shrink-0 rounded-full ${DOT[s.last_status ?? ""] ?? "bg-muted-foreground/40"}`}
+                    />
+                    <span className="truncate">{s.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </Group>
       </SidebarContent>
 
-      <SidebarFooter className="gap-3 p-3">
-        <SidebarMenu>
-          <NavItem to="/trash" icon={<Trash2 />} label={t("nav.trash")} active={path === "/trash"} />
-          {me.role === "admin" && (
-            <NavItem to="/admin" icon={<Settings />} label={t("nav.admin")} active={path === "/admin"} />
-          )}
-        </SidebarMenu>
+      <SidebarFooter className="p-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

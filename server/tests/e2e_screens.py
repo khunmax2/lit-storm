@@ -53,15 +53,22 @@ def main(out):
             page.goto(f"{BASE}/trash")
             page.wait_for_timeout(800)
             shot("07-trash")
-            page.goto(f"{BASE}/admin")
+            page.goto(f"{BASE}/admin")  # the old address forwards to the first section
             page.wait_for_timeout(1000)
-            shot("08-admin-users")
-            page.get_by_role("tab", name=re.compile("โมเดล|Models")).click()
+            shot("08-settings-users")
+            page.get_by_role("link", name=re.compile("^(โมเดล|Models)$")).click()
             page.wait_for_timeout(800)
-            shot("09-admin-models", full=True)
-            page.get_by_role("tab", name=re.compile("การใช้งาน|Usage")).click()
+            shot("09-settings-models", full=True)
+            page.get_by_role("link", name=re.compile("การใช้งาน|Usage")).click()
             page.wait_for_timeout(1000)
-            shot("10-admin-usage", full=True)
+            shot("10-settings-usage", full=True)
+            if scheme == "light":
+                # A narrow window: wide tables scroll inside their card.
+                page.set_viewport_size({"width": 1000, "height": 800})
+                page.goto(f"{BASE}/settings/users")
+                page.wait_for_timeout(800)
+                shot("10b-settings-narrow")
+                page.set_viewport_size({"width": 1440, "height": 900})
             if scheme == "light":
                 page.set_viewport_size({"width": 390, "height": 844})
                 page.goto(f"{BASE}/")

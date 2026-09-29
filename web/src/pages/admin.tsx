@@ -1,17 +1,23 @@
-// Administration: tabs of tables, with every form in a dialog.
+// Settings: one page per section, tables with every form in a dialog.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams } from "@tanstack/react-router";
 import {
+  Bot,
+  ChartColumn,
   Check,
   CheckCircle2,
   Copy,
+  Gauge,
   KeyRound,
   Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
+  Search as SearchIcon,
   SlidersHorizontal,
   UserPlus,
+  UsersRound,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -35,7 +41,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { useT } from "@/i18n";
 
 const LLM_PROVIDERS = ["openrouter", "gemini", "openai", "groq", "openai-compatible"];
@@ -1012,38 +1025,42 @@ function Usage() {
   );
 }
 
+// The settings sections, each its own address; the sidebar lists them under
+// ตั้งค่าระบบ.
+export const SETTINGS = [
+  { id: "users", label: "admin.users", lead: "settings.usersLead", icon: UsersRound, page: Users },
+  { id: "models", label: "admin.models", lead: "settings.modelsLead", icon: Bot, page: Models },
+  { id: "search", label: "admin.search", lead: "settings.searchLead", icon: SearchIcon, page: Search },
+  { id: "limits", label: "admin.limits", lead: "settings.limitsLead", icon: Gauge, page: Limits },
+  { id: "usage", label: "admin.usage", lead: "settings.usageLead", icon: ChartColumn, page: Usage },
+] as const;
+
 export function AdminPage() {
   const { t } = useT();
+  const { section } = useParams({ from: "/app/settings/$section" });
+  const current = SETTINGS.find((s) => s.id === section) ?? SETTINGS[0];
+  const Page = current.page;
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
       <Toolbar>
-        <span className="text-sm font-medium">{t("nav.admin")}</span>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/settings/$section" params={{ section: "users" }}>
+                  {t("nav.admin")}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{t(current.label)}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
       </Toolbar>
-      <PageHeader title={t("nav.admin")} description={t("admin.subtitle")} />
-      <Tabs defaultValue="users">
-        <TabsList className="mb-4">
-          <TabsTrigger value="users">{t("admin.users")}</TabsTrigger>
-          <TabsTrigger value="models">{t("admin.models")}</TabsTrigger>
-          <TabsTrigger value="search">{t("admin.search")}</TabsTrigger>
-          <TabsTrigger value="limits">{t("admin.limits")}</TabsTrigger>
-          <TabsTrigger value="usage">{t("admin.usage")}</TabsTrigger>
-        </TabsList>
-        <TabsContent value="users">
-          <Users />
-        </TabsContent>
-        <TabsContent value="models">
-          <Models />
-        </TabsContent>
-        <TabsContent value="search">
-          <Search />
-        </TabsContent>
-        <TabsContent value="limits">
-          <Limits />
-        </TabsContent>
-        <TabsContent value="usage">
-          <Usage />
-        </TabsContent>
-      </Tabs>
+      <PageHeader title={t(current.label)} description={t(current.lead)} />
+      <Page />
     </div>
   );
 }

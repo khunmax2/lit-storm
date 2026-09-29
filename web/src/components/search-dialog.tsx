@@ -5,7 +5,6 @@ import {
   FolderOpen,
   House,
   MessagesSquare,
-  Settings,
   Trash2,
 } from "lucide-react";
 import { useEffect } from "react";
@@ -23,6 +22,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useT } from "@/i18n";
+import { SETTINGS } from "@/pages/admin";
 
 export function SearchDialog({
   me,
@@ -90,12 +90,17 @@ export function SearchDialog({
               <Trash2 />
               {t("nav.trash")}
             </CommandItem>
-            {me.role === "admin" && (
-              <CommandItem onSelect={() => go("/admin")}>
-                <Settings />
-                {t("nav.admin")}
-              </CommandItem>
-            )}
+            {me.role === "admin" &&
+              SETTINGS.map((x) => (
+                <CommandItem
+                  key={x.id}
+                  value={`${t("nav.admin")} ${t(x.label)}`}
+                  onSelect={() => go("/settings/$section", { section: x.id })}
+                >
+                  <x.icon />
+                  {t("nav.admin")} › {t(x.label)}
+                </CommandItem>
+              ))}
           </CommandGroup>
           {!!recent.data?.length && (
             <>

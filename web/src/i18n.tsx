@@ -39,7 +39,7 @@ const en = {
   "pw.weak": "Use at least 10 characters.",
 
   "nav.projects": "Projects",
-  "nav.admin": "Administration",
+  "nav.admin": "Settings",
 
   "projects.title": "Projects",
   "projects.new": "New project",
@@ -219,6 +219,12 @@ const en = {
   "home.viewAll": "All projects",
   "home.estimate": "Usually 1–3 minutes",
   "nav.homePage": "Home",
+  "nav.system": "System",
+  "settings.usersLead": "Accounts, roles, monthly quotas and sign-in links.",
+  "settings.modelsLead": "The language models people can choose, their prices, and provider keys.",
+  "settings.searchLead": "Where research looks for sources.",
+  "settings.limitsLead": "Queue ceilings, monthly quota and the time limit per Run, for everyone.",
+  "settings.usageLead": "Runs, tokens and cost per person each month. Topics are never shown.",
   "nav.research": "Research",
   "search.label": "Search",
   "search.placeholder": "Search…",
@@ -310,7 +316,7 @@ const th: Record<Key, string> = {
   "pw.weak": "ใช้อย่างน้อย 10 ตัวอักษร",
 
   "nav.projects": "โปรเจกต์",
-  "nav.admin": "ดูแลระบบ",
+  "nav.admin": "ตั้งค่าระบบ",
 
   "projects.title": "โปรเจกต์",
   "projects.new": "โปรเจกต์ใหม่",
@@ -490,6 +496,12 @@ const th: Record<Key, string> = {
   "home.viewAll": "ดูทุกโปรเจกต์",
   "home.estimate": "ปกติใช้เวลา 1–3 นาที",
   "nav.homePage": "หน้าแรก",
+  "nav.system": "ระบบ",
+  "settings.usersLead": "บัญชี บทบาท โควตารายเดือน และลิงก์ตั้งรหัสผ่าน",
+  "settings.modelsLead": "โมเดลภาษาที่ผู้ใช้เลือกได้ ราคา และคีย์ของผู้ให้บริการ",
+  "settings.searchLead": "แหล่งที่งานวิจัยใช้ค้นหาข้อมูล",
+  "settings.limitsLead": "เพดานคิว โควตารายเดือน และเวลาสูงสุดต่อ Run ของทั้งระบบ",
+  "settings.usageLead": "จำนวน Run, token และค่าใช้จ่ายของแต่ละคนรายเดือน โดยไม่แสดงหัวข้อ",
   "nav.research": "งานวิจัย",
   "search.label": "ค้นหา",
   "search.placeholder": "ค้นหา…",

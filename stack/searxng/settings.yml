@@ -19,6 +19,13 @@ server:
   limiter: false
   image_proxy: false
 
+# How long a query waits for each engine. SearXNG answers when the slowest
+# engine has, and an engine that is refusing (DuckDuckGo, Wikipedia on
+# 2026-09-30) times out every query: at the stock 3 s that was most of a
+# search's 3.4 s average, while Bing answered in 0.3 s and Yahoo in 1 s.
+outgoing:
+  request_timeout: 2.0
+
 search:
   safe_search: 0
   autocomplete: ""
@@ -36,8 +43,9 @@ search:
 #
 # Academic search: the engines searxng-LDR-academic turns on, plus Europe
 # PMC. The fork's other two are left out: BASE answers "Access denied" to an
-# IP it has not approved, and its Library of Congress engine searches photos. They sit in the "science"
-# category, which a query without `engines=` never reaches, so lit-storm
+# IP it has not approved, and its Library of Congress engine searches
+# photos. They sit in the "science" category, which a query without
+# `engines=` never reaches, so lit-storm
 # offers them as a Search Provider of their own ("SearXNG LDR-academic"),
 # whose engines list names them. That gives the fork's academic search
 # without carrying the fork (see docs/web-app-design.md).
@@ -48,20 +56,27 @@ engines:
     disabled: false
   - name: yahoo
     disabled: false
+  # Its own 3 s would set every general query's wait (SearXNG waits for the
+  # largest engine timeout), whatever request_timeout says.
+  - name: wikidata
+    timeout: 2.0
   - name: arxiv
     disabled: false
+  # Stock gives Crossref 30 s, and one slow answer held an academic query
+  # past the 30 s the app waits: the whole query was lost.
   - name: crossref
     disabled: false
+    timeout: 6.0
   - name: europepmc
     disabled: false
   - name: google scholar
     disabled: false
   - name: openairedatasets
     disabled: false
-    timeout: 10.0
+    timeout: 6.0
   - name: openairepublications
     disabled: false
-    timeout: 10.0
+    timeout: 6.0
   - name: openalex
     disabled: false
   - name: pdbe

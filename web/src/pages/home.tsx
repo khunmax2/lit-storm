@@ -2,20 +2,17 @@
 // recent research under it.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, History, FolderOpen, Sparkles } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { ArrowRight, History, Sparkles } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
 import { DOT } from "@/components/app-sidebar";
 import { ErrorText, timeAgo } from "@/components/common";
-import { CHIP, Composer, QuotaLine, runBody, useRequestKey, type RunForm } from "@/components/composer";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Composer, QuotaLine, runBody, useRequestKey, type RunForm } from "@/components/composer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
-
-const NEW = "__new__";
 
 // The research engines. Only STORM runs in the first release; the others are
 // the second release's (docs/web-app-implementation-plan.md, ก่อนเริ่มรุ่นสอง).
@@ -83,27 +80,12 @@ export function HomePage() {
   });
   const [mode, setMode] = useState<Mode>("storm");
   const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "" });
-  const [projectId, setProjectId] = useState("");
   const requestKey = useRequestKey();
 
-  useEffect(() => {
-    if (!projectId && projects.data) setProjectId(projects.data[0]?.id ?? NEW);
-  }, [projects.data, projectId]);
-
+  // Research from here is filed in no Project; the owner can file it later
+  // (as ChatGPT, Claude and Gemini do), or start it from inside a Project.
   const start = useMutation({
-    mutationFn: async () => {
-      let id = projectId;
-      if (!id || id === NEW) {
-        const created = await call(api.POST("/api/projects", { body: { name: t("home.defaultProject") } }));
-        id = created.id;
-      }
-      return call(
-        api.POST("/api/projects/{project_id}/sessions", {
-          params: { path: { project_id: id } },
-          body: runBody(form, requestKey.current()),
-        }),
-      );
-    },
+    mutationFn: () => call(api.POST("/api/sessions", { body: runBody(form, requestKey.current()) })),
     onSuccess: (s) => {
       requestKey.next();
       queryClient.invalidateQueries();
@@ -114,25 +96,6 @@ export function HomePage() {
   const current = MODES.find((m) => m.id === mode)!;
   const running = recent.data?.filter((s) => s.last_status && ACTIVE.has(s.last_status)).length ?? 0;
   const latestDone = recent.data?.find((s) => s.last_status === "succeeded");
-
-  const projectPicker = (
-    <Select value={projectId} onValueChange={setProjectId}>
-      <SelectTrigger size="sm" aria-label={t("home.project")} className={cn(CHIP, "max-w-52")}>
-        <FolderOpen className="size-3.5" />
-        <SelectValue placeholder={t("home.project")} />
-      </SelectTrigger>
-      <SelectContent>
-        {projects.data?.map((p) => (
-          <SelectItem key={p.id} value={p.id}>
-            {p.name}
-          </SelectItem>
-        ))}
-        <SelectItem value={NEW}>
-          {projects.data?.length ? t("home.newProject") : t("home.defaultProject")}
-        </SelectItem>
-      </SelectContent>
-    </Select>
-  );
 
   return (
     <div className="flex flex-1 flex-col">
@@ -182,7 +145,6 @@ export function HomePage() {
           setForm={setForm}
           onSubmit={() => start.mutate()}
           pending={start.isPending}
-          extra={projectPicker}
           locked={current.ready ? undefined : t("mode.soon")}
           autoFocus
         />
@@ -237,7 +199,9 @@ export function HomePage() {
                       className={cn("size-1.5 shrink-0 rounded-full", DOT[s.last_status ?? ""] ?? "bg-muted-foreground/40")}
                     />
                     <span className="truncate">{s.title}</span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:inline">· {s.project_name}</span>
+                    {s.project_name && (
+                      <span className="hidden truncate text-xs text-muted-foreground sm:inline">· {s.project_name}</span>
+                    )}
                     <span className="ml-auto shrink-0 text-xs text-muted-foreground">{timeAgo(s.updated_at, lang)}</span>
                   </Link>
                 </li>
@@ -245,7 +209,7 @@ export function HomePage() {
             </ul>
           )}
           {!!recent.data?.length && (
-            <Link to="/projects" className="mt-2 ml-8 inline-block text-sm font-medium hover:underline">
+            <Link to="/research" className="mt-2 ml-8 inline-block text-sm font-medium hover:underline">
               {t("home.seeMore")}
             </Link>
           )}

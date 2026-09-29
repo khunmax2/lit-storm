@@ -428,6 +428,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description Every live topic, filed or not, for the All research page.
+         */
+        get: operations["list_sessions_api_sessions_get"];
+        put?: never;
+        /**
+         * Create Unfiled Session
+         * @description Research from the home page: a Project is optional, as in ChatGPT,
+         *     Claude and Gemini, and the Session can be filed later.
+         */
+        post: operations["create_unfiled_session_api_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/sessions": {
         parameters: {
             query?: never;
@@ -454,7 +479,7 @@ export interface paths {
         };
         /**
          * Recent Sessions
-         * @description The owner's topics with the latest activity first, for the sidebar.
+         * @description The latest topics, for the sidebar and the home page.
          */
         get: operations["recent_sessions_api_sessions_recent_get"];
         put?: never;
@@ -480,7 +505,12 @@ export interface paths {
         delete: operations["trash_session_api_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Move Session
+         * @description File a topic in a Project, move it to another, or take it out. Its
+         *     Runs and Reports go with it; nothing about them changes.
+         */
+        patch: operations["move_session_api_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/sessions/{session_id}/runs": {
@@ -923,6 +953,26 @@ export interface components {
             /** Id */
             id: string;
         };
+        /** MoveIn */
+        MoveIn: {
+            /** Project Id */
+            project_id: string | null;
+        };
+        /** NewSessionIn */
+        NewSessionIn: {
+            /** Topic */
+            topic: string;
+            /** Language */
+            language: string;
+            /** Llm Model Id */
+            llm_model_id?: string | null;
+            /** Search Provider Id */
+            search_provider_id?: string | null;
+            /** Request Key */
+            request_key?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+        };
         /** Options */
         Options: {
             /** Models */
@@ -983,9 +1033,9 @@ export interface components {
             /** Title */
             title: string;
             /** Project Id */
-            project_id: string;
+            project_id: string | null;
             /** Project Name */
-            project_name: string;
+            project_name: string | null;
             /** Last Status */
             last_status: string | null;
             /**
@@ -1169,7 +1219,9 @@ export interface components {
             /** Id */
             id: string;
             /** Project Id */
-            project_id: string;
+            project_id: string | null;
+            /** Project Name */
+            project_name: string | null;
             /** Title */
             title: string;
             /**
@@ -2271,6 +2323,70 @@ export interface operations {
             };
         };
     };
+    list_sessions_api_sessions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentSession"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_unfiled_session_api_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_session_api_projects__project_id__sessions_post: {
         parameters: {
             query?: never;
@@ -2385,6 +2501,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_session_api_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
             };
             /** @description Validation Error */
             422: {

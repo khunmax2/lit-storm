@@ -14,7 +14,7 @@ import { AdminPage } from "@/pages/admin";
 import { LoginPage, SetPasswordPage, SetupPage } from "@/pages/auth";
 import { HomePage } from "@/pages/home";
 import { ReportPage } from "@/pages/report";
-import { ProjectPage, ProjectsPage, SessionPage } from "@/pages/research";
+import { AllResearchPage, ProjectPage, ProjectsPage, SessionPage } from "@/pages/research";
 import { TrashPage } from "@/pages/trash";
 
 // The bar over every page: new research on the left, then whatever the page
@@ -92,6 +92,7 @@ const setPasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: "s
 
 const appRoute = createRoute({ getParentRoute: () => rootRoute, id: "app", component: SignedIn });
 const homeRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: HomePage });
+const allResearchRoute = createRoute({ getParentRoute: () => appRoute, path: "research", component: AllResearchPage });
 const projectsRoute = createRoute({ getParentRoute: () => appRoute, path: "projects", component: ProjectsPage });
 const projectRoute = createRoute({ getParentRoute: () => appRoute, path: "projects/$projectId", component: ProjectPage });
 const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "sessions/$sessionId", component: SessionPage });
@@ -111,7 +112,7 @@ const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
   setPasswordRoute,
-  appRoute.addChildren([homeRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, trashRoute]),
+  appRoute.addChildren([homeRoute, allResearchRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, trashRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

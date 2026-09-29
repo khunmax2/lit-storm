@@ -5,6 +5,7 @@ import {
   Check,
   Circle,
   FileText,
+  FolderInput,
   FolderOpen,
   FolderPlus,
   Globe,
@@ -30,6 +31,7 @@ import {
   formatDate,
   timeAgo,
 } from "@/components/common";
+import { MoveSessionDialog } from "@/components/move-session";
 import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
 import {
   AlertDialog,
@@ -224,6 +226,7 @@ export function ProjectPage() {
     queryFn: () => call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
   });
   const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "" });
+  const [moving, setMoving] = useState<{ id: string; title: string; project_id: string } | null>(null);
   const requestKey = useRequestKey();
   const start = useMutation({
     mutationFn: () =>
@@ -264,6 +267,7 @@ export function ProjectPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
       {dialog}
+      <MoveSessionDialog session={moving} onOpenChange={(open) => !open && setMoving(null)} />
       <Toolbar>
         <Breadcrumb>
           <BreadcrumbList>
@@ -321,7 +325,8 @@ export function ProjectPage() {
               <TableRow>
                 <TableHead className="pl-4">{t("run.topic")}</TableHead>
                 <TableHead className="w-44">{t("common.status")}</TableHead>
-                <TableHead className="w-36 pr-4 text-right">{t("common.created")}</TableHead>
+                <TableHead className="w-36 text-right">{t("common.created")}</TableHead>
+                <TableHead className="w-12 pr-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -335,8 +340,155 @@ export function ProjectPage() {
                     <div className="truncate font-medium">{s.title}</div>
                   </TableCell>
                   <TableCell>{s.last_status && <StatusBadge status={s.last_status} />}</TableCell>
-                  <TableCell className="pr-4 text-right text-xs text-muted-foreground">
+                  <TableCell className="text-right text-xs text-muted-foreground">
                     {timeAgo(s.created_at, lang)}
+                  </TableCell>
+                  <TableCell className="pr-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      aria-label={t("move.title")}
+                      onClick={() => setMoving({ id: s.id, title: s.title, project_id: p.id })}
+                    >
+                      <FolderInput />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// --- all research ---------------------------------------------------------------------
+
+type Listed = Schemas["RecentSession"];
+
+/** Every topic, filed or not, like ChatGPT's and Perplexity's library. */
+export function AllResearchPage() {
+  const { t, lang } = useT();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { confirm, dialog } = useConfirm();
+  const all = useQuery({ queryKey: ["sessions"], queryFn: () => call(api.GET("/api/sessions")) });
+  const [unfiledOnly, setUnfiledOnly] = useState(false);
+  const [query, setQuery] = useState("");
+  const [moving, setMoving] = useState<Listed | null>(null);
+  const remove = useMutation({
+    mutationFn: (id: string) => call(api.DELETE("/api/sessions/{session_id}", { params: { path: { session_id: id } } })),
+    onSuccess: () => {
+      toast.success(t("common.deleted"));
+      queryClient.invalidateQueries();
+    },
+    onError: (e) => toast.error(errorMessage(e, t)),
+  });
+  const q = query.trim().toLowerCase();
+  const rows = (all.data ?? []).filter(
+    (s) =>
+      (!unfiledOnly || !s.project_id) &&
+      (!q || s.title.toLowerCase().includes(q) || (s.project_name ?? "").toLowerCase().includes(q)),
+  );
+
+  return (
+    <div className="mx-auto w-full max-w-5xl px-6 py-8">
+      {dialog}
+      <MoveSessionDialog session={moving} onOpenChange={(open) => !open && setMoving(null)} />
+      <Toolbar>
+        <span className="text-sm font-medium">{t("nav.allResearch")}</span>
+      </Toolbar>
+      <PageHeader title={t("nav.allResearch")} description={t("all.lead")} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("search.placeholder")}
+          className="h-9 max-w-xs"
+        />
+        <div className="inline-flex rounded-lg bg-muted p-1 text-sm">
+          {[false, true].map((only) => (
+            <button
+              key={String(only)}
+              type="button"
+              onClick={() => setUnfiledOnly(only)}
+              className={cn(
+                "rounded-md px-3 py-1 transition-colors",
+                unfiledOnly === only ? "bg-background font-medium shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              {only ? t("move.none") : t("all.every")}
+            </button>
+          ))}
+        </div>
+      </div>
+      {all.isLoading && <LoadingRows />}
+      {all.data && rows.length === 0 && (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <BookOpen />
+            </EmptyMedia>
+            <EmptyDescription>{all.data.length ? t("search.empty") : t("projects.empty")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+      {rows.length > 0 && (
+        <Card className="py-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">{t("run.topic")}</TableHead>
+                <TableHead className="w-48">{t("home.project")}</TableHead>
+                <TableHead className="w-36">{t("common.status")}</TableHead>
+                <TableHead className="w-32 text-right">{t("all.updated")}</TableHead>
+                <TableHead className="w-12 pr-4" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } })}
+                >
+                  <TableCell className="max-w-0 pl-4">
+                    <div className="truncate font-medium">{s.title}</div>
+                  </TableCell>
+                  <TableCell className="max-w-0">
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <FolderOpen className="size-3.5 shrink-0" />
+                      <span className="truncate">{s.project_name ?? "—"}</span>
+                    </span>
+                  </TableCell>
+                  <TableCell>{s.last_status && <StatusBadge status={s.last_status} />}</TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">
+                    {timeAgo(s.updated_at, lang)}
+                  </TableCell>
+                  <TableCell className="pr-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8" aria-label={t("run.more")}>
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setMoving(s)}>
+                          <FolderInput />
+                          {t("move.title")}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => confirm(t("delete.confirmSession"), () => remove.mutate(s.id))}
+                        >
+                          <Trash2 />
+                          {t("delete.session")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
@@ -640,12 +792,7 @@ export function SessionPage() {
     queryFn: () => call(api.GET("/api/sessions/{session_id}", { params: { path: { session_id: sessionId } } })),
     refetchInterval: (q) => (q.state.data?.runs.some((r) => !FINAL.has(r.status)) ? 4000 : false),
   });
-  const project = useQuery({
-    queryKey: ["project", session.data?.project_id],
-    queryFn: () =>
-      call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: session.data!.project_id } } })),
-    enabled: !!session.data,
-  });
+  const [moving, setMoving] = useState(false);
   const latest = session.data?.runs[0];
   const [form, setForm] = useState<RunForm | null>(null);
   useEffect(() => {
@@ -675,7 +822,8 @@ export function SessionPage() {
       const projectId = session.data!.project_id;
       toast.success(t("common.deleted"));
       queryClient.invalidateQueries();
-      navigate({ to: "/projects/$projectId", params: { projectId } });
+      if (projectId) navigate({ to: "/projects/$projectId", params: { projectId } });
+      else navigate({ to: "/research" });
     },
   });
   if (session.isLoading)
@@ -695,14 +843,19 @@ export function SessionPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-8">
       {dialog}
+      <MoveSessionDialog session={moving ? s : null} onOpenChange={setMoving} />
       <Toolbar>
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem className="hidden sm:inline-flex">
               <BreadcrumbLink asChild>
-                <Link to="/projects/$projectId" params={{ projectId: s.project_id }}>
-                  {project.data?.name ?? t("home.project")}
-                </Link>
+                {s.project_id ? (
+                  <Link to="/projects/$projectId" params={{ projectId: s.project_id }}>
+                    {s.project_name}
+                  </Link>
+                ) : (
+                  <Link to="/research">{t("nav.allResearch")}</Link>
+                )}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden sm:inline-flex" />
@@ -714,6 +867,16 @@ export function SessionPage() {
       </Toolbar>
       <PageHeader
         title={s.title}
+        eyebrow={
+          <button
+            type="button"
+            onClick={() => setMoving(true)}
+            className="inline-flex items-center gap-1.5 hover:text-foreground"
+          >
+            <FolderOpen className="size-3.5" />
+            {s.project_name ?? t("move.none")}
+          </button>
+        }
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -722,6 +885,11 @@ export function SessionPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setMoving(true)}>
+                <FolderInput />
+                {t("move.title")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => confirm(t("delete.confirmSession"), () => remove.mutate())}

@@ -1,6 +1,7 @@
 """The Trash: 30 days to change your mind (docs/web-app-design.md, ถังขยะ).
 
-Deleting a Project, a Research Session or a Report moves it here. Only the
+Deleting a Project, a Research Session or a Report moves it here. A Session
+filed in no Project has only itself to be deleted with. Only the
 thing deleted is marked; what is inside it is hidden because its parent is.
 Restoring the parent brings everything back as it was.
 
@@ -53,6 +54,8 @@ def purge_at(trashed_at):
 def session_alive(session, rs):
     if rs is None or rs.trashed_at is not None:
         return False
+    if rs.project_id is None:
+        return True
     project = session.get(Project, rs.project_id)
     return project is not None and project.trashed_at is None
 
@@ -101,6 +104,12 @@ def trash_run(session, run):
 # --- listing and restoring ------------------------------------------------------------
 
 
+def _project_alive():
+    """For a query outer-joined to Project: filed nowhere, or filed in a
+    Project that is not in the Trash."""
+    return or_(ResearchSession.project_id.is_(None), Project.trashed_at.is_(None))
+
+
 def listing(session, owner):
     """What the owner can restore: things they deleted themselves, not the
     contents of something they deleted."""
@@ -111,24 +120,24 @@ def listing(session, owner):
         items.append(("project", p.id, p.name, p.trashed_at))
     for rs in session.scalars(
         select(ResearchSession)
-        .join(Project, Project.id == ResearchSession.project_id)
+        .outerjoin(Project, Project.id == ResearchSession.project_id)
         .where(
             ResearchSession.owner_id == owner.id,
             ResearchSession.trashed_at.is_not(None),
-            Project.trashed_at.is_(None),
+            _project_alive(),
         )
     ):
         items.append(("session", rs.id, rs.title, rs.trashed_at))
     for run in session.scalars(
         select(Run)
         .join(ResearchSession, ResearchSession.id == Run.session_id)
-        .join(Project, Project.id == ResearchSession.project_id)
+        .outerjoin(Project, Project.id == ResearchSession.project_id)
         .where(
             Run.owner_id == owner.id,
             Run.trashed_at.is_not(None),
             Run.purged_at.is_(None),
             ResearchSession.trashed_at.is_(None),
-            Project.trashed_at.is_(None),
+            _project_alive(),
         )
     ):
         items.append(("run", run.id, run.report_title or run.topic, run.trashed_at))
@@ -163,7 +172,7 @@ def purge(session, runs_dir, now=None):
     runs = session.scalars(
         select(Run)
         .join(ResearchSession, ResearchSession.id == Run.session_id)
-        .join(Project, Project.id == ResearchSession.project_id)
+        .outerjoin(Project, Project.id == ResearchSession.project_id)
         # A Run still stopping is left for next time, so it cannot write
         # into a directory that is gone.
         .where(Run.purged_at.is_(None), Run.status.not_in(ACTIVE), expired)

@@ -1176,6 +1176,96 @@
     }
    }
   },
+  "/api/sessions": {
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Create Unfiled Session",
+    "description": "Research from the home page: a Project is optional, as in ChatGPT,\nClaude and Gemini, and the Session can be filed later.",
+    "operationId": "create_unfiled_session_api_sessions_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NewSessionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "List Sessions",
+    "description": "Every live topic, filed or not, for the All research page.",
+    "operationId": "list_sessions_api_sessions_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 200,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/RecentSession"
+         },
+         "title": "Response List Sessions Api Sessions Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/projects/{project_id}/sessions": {
    "post": {
     "tags": [
@@ -1235,7 +1325,7 @@
      "research"
     ],
     "summary": "Recent Sessions",
-    "description": "The owner's topics with the latest activity first, for the sidebar.",
+    "description": "The latest topics, for the sidebar and the home page.",
     "operationId": "recent_sessions_api_sessions_recent_get",
     "parameters": [
      {
@@ -1280,6 +1370,58 @@
    }
   },
   "/api/sessions/{session_id}": {
+   "patch": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Move Session",
+    "description": "File a topic in a Project, move it to another, or take it out. Its\nRuns and Reports go with it; nothing about them changes.",
+    "operationId": "move_session_api_sessions__session_id__patch",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MoveIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
    "get": {
     "tags": [
      "research"
@@ -2428,6 +2570,96 @@
     ],
     "title": "ModelOut"
    },
+   "MoveIn": {
+    "properties": {
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "project_id"
+    ],
+    "title": "MoveIn"
+   },
+   "NewSessionIn": {
+    "properties": {
+     "topic": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "pattern": "^(th|en)$",
+      "title": "Language"
+     },
+     "llm_model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Model Id"
+     },
+     "search_provider_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Provider Id"
+     },
+     "request_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Key"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "topic",
+     "language"
+    ],
+    "title": "NewSessionIn"
+   },
    "Options": {
     "properties": {
      "models": {
@@ -2575,11 +2807,25 @@
       "title": "Title"
      },
      "project_id": {
-      "type": "string",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Project Id"
      },
      "project_name": {
-      "type": "string",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Project Name"
      },
      "last_status": {
@@ -3199,8 +3445,26 @@
       "title": "Id"
      },
      "project_id": {
-      "type": "string",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Project Id"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name"
      },
      "title": {
       "type": "string",
@@ -3223,6 +3487,7 @@
     "required": [
      "id",
      "project_id",
+     "project_name",
      "title",
      "created_at",
      "runs"

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from litstorm import limits, quota, settings, trash
@@ -196,7 +196,8 @@ def run_out(run):
 
 class SessionOut(BaseModel):
     id: str
-    project_id: str
+    project_id: str | None  # None: filed in no Project
+    project_name: str | None
     title: str
     created_at: datetime
     runs: list[RunOut]
@@ -291,21 +292,41 @@ def session_out(session, rs):
     runs = session.scalars(
         select(Run).where(Run.session_id == rs.id, Run.trashed_at.is_(None)).order_by(Run.queued_at.desc())
     )
+    project = session.get(Project, rs.project_id) if rs.project_id else None
     return SessionOut(
-        id=str(rs.id), project_id=str(rs.project_id), title=rs.title, created_at=rs.created_at,
+        id=str(rs.id),
+        project_id=str(project.id) if project else None,
+        project_name=project.name if project else None,
+        title=rs.title,
+        created_at=rs.created_at,
         runs=[run_out(r) for r in runs],
     )
+
+
+class NewSessionIn(SessionIn):
+    project_id: uuid.UUID | None = None  # None: filed in no Project
+
+
+@router.post("/sessions", response_model=SessionOut, status_code=201)
+def create_unfiled_session(body: NewSessionIn, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """Research from the home page: a Project is optional, as in ChatGPT,
+    Claude and Gemini, and the Session can be filed later."""
+    project = deps.own(session, Project, body.project_id, user) if body.project_id else None
+    return _start_session(session, user, project, body)
 
 
 @router.post("/projects/{project_id}/sessions", response_model=SessionOut, status_code=201)
 def create_session(
     project_id: uuid.UUID, body: SessionIn, user=Depends(deps.current_user), session=Depends(deps.database)
 ):
-    project = deps.own(session, Project, project_id, user)
+    return _start_session(session, user, deps.own(session, Project, project_id, user), body)
+
+
+def _start_session(session, user, project, body):
     earlier = _existing(session, user, body.request_key)
     if earlier:
         return session_out(session, session.get(ResearchSession, earlier.session_id))
-    rs = ResearchSession(project_id=project.id, owner_id=user.id, title=body.topic.strip()[:300])
+    rs = ResearchSession(project_id=project.id if project else None, owner_id=user.id, title=body.topic.strip()[:300])
     session.add(rs)
     session.flush()
     new_run(session, user, rs, body)
@@ -318,37 +339,36 @@ def create_session(
 class RecentSession(BaseModel):
     id: str
     title: str
-    project_id: str
-    project_name: str
+    project_id: str | None
+    project_name: str | None
     last_status: str | None
     updated_at: datetime
 
 
-@router.get("/sessions/recent", response_model=list[RecentSession])
-def recent_sessions(
-    limit: int = Query(12, ge=1, le=50), user=Depends(deps.current_user), session=Depends(deps.database)
-):
-    """The owner's topics with the latest activity first, for the sidebar."""
+def _sessions(session, user, limit):
+    """The owner's live topics, latest activity first. A topic with no Run
+    left outside the Trash counts from when it was made."""
     latest = (
         select(Run.session_id, func.max(Run.queued_at).label("at"))
         .where(Run.owner_id == user.id, Run.trashed_at.is_(None), Run.session_id.is_not(None))
         .group_by(Run.session_id)
         .subquery()
     )
+    at = func.coalesce(latest.c.at, ResearchSession.created_at)
     rows = session.execute(
-        select(ResearchSession, Project.name, latest.c.at)
-        .join(Project, Project.id == ResearchSession.project_id)
-        .join(latest, latest.c.session_id == ResearchSession.id)
+        select(ResearchSession, Project.name, at)
+        .outerjoin(Project, Project.id == ResearchSession.project_id)
+        .outerjoin(latest, latest.c.session_id == ResearchSession.id)
         .where(
             ResearchSession.owner_id == user.id,
             ResearchSession.trashed_at.is_(None),
-            Project.trashed_at.is_(None),
+            or_(ResearchSession.project_id.is_(None), Project.trashed_at.is_(None)),
         )
-        .order_by(latest.c.at.desc())
+        .order_by(at.desc())
         .limit(limit)
     ).all()
     out = []
-    for rs, project_name, at in rows:
+    for rs, project_name, updated in rows:
         status = session.scalar(
             select(Run.status)
             .where(Run.session_id == rs.id, Run.trashed_at.is_(None))
@@ -357,11 +377,44 @@ def recent_sessions(
         )
         out.append(
             RecentSession(
-                id=str(rs.id), title=rs.title, project_id=str(rs.project_id),
-                project_name=project_name, last_status=status, updated_at=at,
+                id=str(rs.id), title=rs.title, project_id=str(rs.project_id) if rs.project_id else None,
+                project_name=project_name, last_status=status, updated_at=updated,
             )
         )
     return out
+
+
+@router.get("/sessions/recent", response_model=list[RecentSession])
+def recent_sessions(
+    limit: int = Query(12, ge=1, le=50), user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """The latest topics, for the sidebar and the home page."""
+    return _sessions(session, user, limit)
+
+
+@router.get("/sessions", response_model=list[RecentSession])
+def list_sessions(
+    limit: int = Query(200, ge=1, le=500), user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """Every live topic, filed or not, for the All research page."""
+    return _sessions(session, user, limit)
+
+
+class MoveIn(BaseModel):
+    project_id: uuid.UUID | None  # None: take it out of its Project
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionOut)
+def move_session(
+    session_id: uuid.UUID, body: MoveIn, user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """File a topic in a Project, move it to another, or take it out. Its
+    Runs and Reports go with it; nothing about them changes."""
+    rs = deps.own(session, ResearchSession, session_id, user)
+    project = deps.own(session, Project, body.project_id, user) if body.project_id else None
+    rs.project_id = project.id if project else None
+    session.commit()
+    return session_out(session, rs)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)

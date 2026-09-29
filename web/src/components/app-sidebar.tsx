@@ -8,6 +8,7 @@ import {
   FolderOpen,
   House,
   Languages,
+  Library,
   LogOut,
   Monitor,
   Moon,
@@ -160,6 +161,12 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
           <SidebarGroupLabel className="uppercase tracking-wide">{t("nav.research")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <NavItem
+                to="/research"
+                icon={<Library />}
+                label={t("nav.allResearch")}
+                active={path === "/research"}
+              />
               <NavItem
                 to="/projects"
                 icon={<FolderOpen />}

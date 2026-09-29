@@ -687,6 +687,12 @@ class SearXNG(dspy.Retrieve):
         self.searxng_api_url = url
         self.searxng_api_key = searxng_api_key
         self.usage = 0
+        # Queries that came back empty because the instance's engines were
+        # refusing (rate limits, timeouts), and the last reason given. A run
+        # that found nothing can then say it was refused rather than that the
+        # topic has no sources.
+        self.refused = 0
+        self.last_refusal = ""
 
         if is_valid_source:
             self.is_valid_source = is_valid_source
@@ -795,6 +801,8 @@ class SearXNG(dspy.Retrieve):
                         named = ", ".join(
                             f"{engine}: {reason}" for engine, reason in refusing
                         )
+                        self.refused += 1
+                        self.last_refusal = named
                         logging.warning(
                             "SearXNG returned nothing for %r — its engines are "
                             "not answering (%s)",

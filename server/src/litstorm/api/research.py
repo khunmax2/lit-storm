@@ -7,6 +7,7 @@ import os
 import tempfile
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
@@ -45,20 +46,28 @@ class Choice(BaseModel):
     is_default: bool
 
 
+class DepthChoice(BaseModel):
+    id: str  # "fast" | "standard" | "deep"
+    target_minutes: int
+
+
 class Options(BaseModel):
     models: list[Choice]
     search_providers: list[Choice]
     languages: list[str]
+    depth_levels: list[DepthChoice]
 
 
 @router.get("/options", response_model=Options)
 def options(user=Depends(deps.current_user), session=Depends(deps.database)):
     models = session.scalars(select(LlmModel).where(LlmModel.enabled).order_by(LlmModel.label))
     providers = session.scalars(select(SearchProvider).where(SearchProvider.enabled).order_by(SearchProvider.label))
+    configured = limits.load(session)
     return Options(
         models=[Choice(id=str(m.id), label=m.label, is_default=m.is_default) for m in models],
         search_providers=[Choice(id=str(p.id), label=p.label, is_default=p.is_default) for p in providers],
         languages=list(report_mod.LANGUAGES),
+        depth_levels=[DepthChoice(id=d, target_minutes=configured.depth(d).target_minutes) for d in limits.DEPTHS],
     )
 
 
@@ -141,6 +150,7 @@ class RunIn(BaseModel):
     language: str = Field(pattern="^(th|en)$")
     llm_model_id: uuid.UUID | None = None  # default model when absent
     search_provider_id: uuid.UUID | None = None  # default provider when absent
+    depth: Literal["fast", "standard", "deep"] = "standard"
     # The page's id for one press of "Start". Sending the same key again
     # returns the Run it already made instead of making another.
     request_key: str | None = Field(default=None, max_length=64)
@@ -158,6 +168,7 @@ class RunOut(BaseModel):
     language: str
     model_label: str
     search_label: str
+    depth: str
     status: str
     quota_month: str
     stage: str | None
@@ -180,6 +191,7 @@ def run_out(run):
         language=run.language,
         model_label=run.config.get("llm", {}).get("label", ""),
         search_label=run.config.get("search", {}).get("label", ""),
+        depth=run.config.get("depth", "standard"),
         status=run.status,
         quota_month=run.quota_month,
         stage=run.stage,
@@ -216,10 +228,12 @@ def _pick(session, table, wanted_id):
     return row
 
 
-def _snapshot(session, model, provider):
-    """The parts of a Run's config that come from the current settings."""
+def _snapshot(session, model, provider, depth="standard"):
+    """The parts of a Run's config that come from the current settings,
+    including what its depth level means today."""
     configured = limits.load(session)
-    params = dict(configured.storm_params)
+    level = configured.depth(depth)
+    params = dict(level.storm)
     if model.max_tokens:
         params["max_tokens"] = model.max_tokens
     return {
@@ -236,6 +250,8 @@ def _snapshot(session, model, provider):
             "engines": provider.engines,
         },
         "params": params,
+        "depth": depth,
+        "target_minutes": level.target_minutes,
         "deadline_minutes": configured.run_deadline_minutes,
     }
 
@@ -279,7 +295,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         language=body.language,
         llm_model_id=model.id,
         search_provider_id=provider.id,
-        config=_snapshot(session, model, provider),
+        config=_snapshot(session, model, provider, body.depth),
         status=QUEUED,
         quota_month=limits.quota_month(),
         request_key=body.request_key,
@@ -449,7 +465,7 @@ def choose_again(
     run = deps.own(session, Run, run_id, user)
     model = _pick(session, LlmModel, body.llm_model_id)
     provider = _pick(session, SearchProvider, body.search_provider_id)
-    snapshot = {**run.config, **_snapshot(session, model, provider)}
+    snapshot = {**run.config, **_snapshot(session, model, provider, run.config.get("depth", "standard"))}
     moved = session.execute(
         update(Run)
         .where(Run.id == run.id, Run.status == NEEDS_SELECTION)
@@ -493,7 +509,7 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
         language=old.language,
         llm_model_id=old.llm_model_id,
         search_provider_id=old.search_provider_id,
-        config=_snapshot(session, model, provider) if available else old.config,
+        config=_snapshot(session, model, provider, old.config.get("depth", "standard")) if available else old.config,
         status=QUEUED if available else NEEDS_SELECTION,
         quota_month=limits.quota_month(),
     )

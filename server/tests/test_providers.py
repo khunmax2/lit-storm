@@ -169,3 +169,27 @@ def test_searxng_skips_blank_queries_and_one_it_rejects(monkeypatch):
     monkeypatch.setattr(requests, "get", lambda *a, **kw: Resp(404))
     with pytest.raises(SearXNGConfigError):  # a wrong address still says so
         SearXNG("http://searxng.test/nope", k=1).forward("songkran")
+
+
+def test_searxng_counts_queries_its_engines_refused(monkeypatch):
+    """When every engine behind the instance is refusing, a run that found
+    nothing should say so, not that the topic has no sources."""
+    import requests
+
+    from knowledge_storm.rm import SearXNG
+
+    class Resp:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [], "unresponsive_engines": [["brave", "Suspended: too many requests"],
+                                                            ["duckduckgo", "timeout"]]}
+
+    monkeypatch.setattr(requests, "get", lambda *a, **kw: Resp())
+    rm = SearXNG("http://searxng.test", k=3)
+    assert rm.forward(["songkran", "rag"]) == []
+    assert rm.refused == 2
+    assert rm.last_refusal == "brave: Suspended: too many requests, duckduckgo: timeout"

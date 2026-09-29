@@ -2,7 +2,7 @@
 // the model beside the send button — the layout agent apps have settled on. Used on the home page (with
 // a project picker) and at the foot of a topic (to research it again).
 import { useQuery } from "@tanstack/react-query";
-import { Globe, Loader2, Search, SendHorizontal, Sparkles, Timer } from "lucide-react";
+import { Gauge, Globe, Loader2, Search, SendHorizontal, Sparkles, Timer } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
@@ -12,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-export type RunForm = { topic: string; language: string; llm_model_id: string; search_provider_id: string };
+export type Depth = "fast" | "standard" | "deep";
+const DEPTHS: Depth[] = ["fast", "standard", "deep"];
+export type RunForm = { topic: string; language: string; llm_model_id: string; search_provider_id: string; depth: Depth };
 
 // One press of Start is one Run: the same key goes with every retry of the
 // request, and a new key is made only after the Run was created.
@@ -27,6 +29,7 @@ export function runBody(form: RunForm, request_key: string) {
     language: form.language,
     llm_model_id: form.llm_model_id || null,
     search_provider_id: form.search_provider_id || null,
+    depth: form.depth,
     request_key,
   };
 }
@@ -125,6 +128,8 @@ export function Composer({
   }, [o]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unavailable = o && (o.models.length === 0 || o.search_providers.length === 0);
+  // The level's time target, as the Administrator set it.
+  const target = o?.depth_levels.find((d) => d.id === form.depth)?.target_minutes ?? 5;
   const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
 
   return (
@@ -155,6 +160,13 @@ export function Composer({
             items={o.search_providers.map((p) => ({ value: p.id, label: p.label }))}
           />
         )}
+        <Chip
+          label={t("depth.label")}
+          icon={<Gauge className="size-3.5" />}
+          value={form.depth}
+          onChange={(depth) => setForm({ ...form, depth: depth as Depth })}
+          items={DEPTHS.map((d) => ({ value: d, label: t(`depth.${d}`) }))}
+        />
         {extra}
       </div>
       <div
@@ -204,7 +216,7 @@ export function Composer({
             ) : (
               <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
                 <Timer className="size-3.5" />
-                {t("home.estimate")}
+                {t("depth.estimate", { n: target })}
               </span>
             )}
             <Button type="submit" size="icon" className="size-9 rounded-lg" disabled={!ready} aria-label={t("run.start")}>

@@ -89,7 +89,7 @@ export function HomePage() {
     refetchInterval: 15000,
   });
   const [mode, setMode] = useState<Mode>("storm");
-  const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "" });
+  const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "", depth: "standard" });
   const requestKey = useRequestKey();
 
   // Research from here is filed in no Project; the owner can file it later

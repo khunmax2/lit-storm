@@ -838,6 +838,27 @@ export interface components {
             /** Api Base */
             api_base: string | null;
         };
+        /** DepthChoice */
+        DepthChoice: {
+            /** Id */
+            id: string;
+            /** Target Minutes */
+            target_minutes: number;
+        };
+        /**
+         * DepthLevel
+         * @description What one depth level means (docs/web-app-design.md, รุ่นสอง: ระดับ
+         *     ความลึก). Owners choose the level; the numbers behind it are the
+         *     Administrator's, so a Run's cost still has a ceiling.
+         */
+        DepthLevel: {
+            /** Target Minutes */
+            target_minutes: number;
+            /** Storm */
+            storm: {
+                [key: string]: unknown;
+            };
+        };
         /** EventOut */
         EventOut: {
             /** Id */
@@ -891,9 +912,9 @@ export interface components {
              * @default 60
              */
             run_deadline_minutes: number;
-            /** Storm Params */
-            storm_params?: {
-                [key: string]: unknown;
+            /** Depth Levels */
+            depth_levels?: {
+                [key: string]: components["schemas"]["DepthLevel"];
             };
         };
         /** LinkOut */
@@ -1037,6 +1058,12 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /**
+             * Depth
+             * @default standard
+             * @enum {string}
+             */
+            depth: "fast" | "standard" | "deep";
             /** Request Key */
             request_key?: string | null;
             /** Project Id */
@@ -1050,6 +1077,8 @@ export interface components {
             search_providers: components["schemas"]["Choice"][];
             /** Languages */
             languages: string[];
+            /** Depth Levels */
+            depth_levels: components["schemas"]["DepthChoice"][];
         };
         /** ProjectDetail */
         ProjectDetail: {
@@ -1129,6 +1158,8 @@ export interface components {
             model_label: string;
             /** Search Label */
             search_label: string;
+            /** Depth */
+            depth: string;
             /** Status */
             status: string;
             /** Quota Month */
@@ -1167,6 +1198,12 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /**
+             * Depth
+             * @default standard
+             * @enum {string}
+             */
+            depth: "fast" | "standard" | "deep";
             /** Request Key */
             request_key?: string | null;
         };
@@ -1186,6 +1223,8 @@ export interface components {
             model_label: string;
             /** Search Label */
             search_label: string;
+            /** Depth */
+            depth: string;
             /** Status */
             status: string;
             /** Quota Month */
@@ -1295,6 +1334,12 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /**
+             * Depth
+             * @default standard
+             * @enum {string}
+             */
+            depth: "fast" | "standard" | "deep";
             /** Request Key */
             request_key?: string | null;
         };

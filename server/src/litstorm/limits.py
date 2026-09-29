@@ -16,17 +16,55 @@ KEY = "limits"
 QUOTA_ZONE = ZoneInfo("Asia/Bangkok")
 
 
+DEPTHS = ("fast", "standard", "deep")
+
+
+class DepthLevel(BaseModel):
+    """What one depth level means (docs/web-app-design.md, รุ่นสอง: ระดับ
+    ความลึก). Owners choose the level; the numbers behind it are the
+    Administrator's, so a Run's cost still has a ceiling."""
+
+    # The time the level is meant to take; the second release's graceful
+    # finish aims at it. The hard deadline is run_deadline_minutes.
+    target_minutes: int = Field(ge=1)
+    # STORM's knobs (engines/storm/engine.py DEFAULT_PARAMS).
+    storm: dict
+
+
+def _default_depths():
+    # "standard" is exactly what every Run used before levels existed, so
+    # measurements from before and after compare. The others are the Streamlit
+    # app's levels (run_options.py), which were tried with users.
+    return {
+        "fast": DepthLevel(
+            target_minutes=2,
+            storm={"max_perspective": 2, "max_conv_turn": 2, "max_search_queries_per_turn": 2,
+                   "search_top_k": 3, "retrieve_top_k": 3},
+        ),
+        "standard": DepthLevel(
+            target_minutes=5,
+            storm={"max_perspective": 3, "max_conv_turn": 3, "max_search_queries_per_turn": 3,
+                   "search_top_k": 3, "retrieve_top_k": 3},
+        ),
+        "deep": DepthLevel(
+            target_minutes=12,
+            storm={"max_perspective": 5, "max_conv_turn": 4, "max_search_queries_per_turn": 4,
+                   "search_top_k": 5, "retrieve_top_k": 8},
+        ),
+    }
+
+
 class Limits(BaseModel):
     max_concurrent_total: int = Field(default=2, ge=1)
     max_concurrent_per_user: int = Field(default=1, ge=1)
     max_queued_per_user: int = Field(default=5, ge=1)
     monthly_run_quota: int = Field(default=10, ge=0)
     run_deadline_minutes: int = Field(default=60, ge=5)
-    # STORM's knobs (engines/storm/engine.py DEFAULT_PARAMS); owners do not
-    # choose these.
-    storm_params: dict = Field(
-        default_factory=lambda: {"max_conv_turn": 3, "max_perspective": 3, "search_top_k": 3}
-    )
+    depth_levels: dict[str, DepthLevel] = Field(default_factory=_default_depths)
+
+    def depth(self, name):
+        """A level's settings; a level the Administrator never saved gets its default."""
+        return self.depth_levels.get(name) or _default_depths()[name]
 
 
 def load(session):

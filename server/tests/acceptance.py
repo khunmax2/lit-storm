@@ -118,6 +118,13 @@ class Api:
         raise TimeoutError(f"run {run_id} still {r['status']}/{r.get('stage')} after {timeout}s")
 
 
+def standard_depth(admin, storm):
+    """The limits' depth levels with the standard level's STORM knobs replaced."""
+    levels = admin.get("/api/admin/limits").json()["depth_levels"]
+    levels["standard"] = {**levels["standard"], "storm": storm}
+    return levels
+
+
 def set_limits(admin, **changes):
     current = admin.get("/api/admin/limits").json()
     r = admin.put("/api/admin/limits", json={**current, **changes})
@@ -347,7 +354,8 @@ class Acceptance:
         self.criterion(k4, "โควตาจอง นับ คืน และเปลี่ยนรอบเดือนตามกติกา รวมถึงงานข้ามเดือน")
         admin, alice, bob = self.ctx["admin"], self.ctx["alice"], self.ctx["bob"]
         spare, model = self.ctx["spare"], self.ctx["model"]
-        saved = set_limits(admin, max_concurrent_total=1, max_concurrent_per_user=1, storm_params=SMALL)
+        saved = set_limits(admin, max_concurrent_total=1, max_concurrent_per_user=1,
+                           depth_levels=standard_depth(admin, SMALL))
         self.ctx["limits"] = saved
 
         compose("stop", "worker")
@@ -476,7 +484,7 @@ class Acceptance:
         # arXiv answers one request every three seconds; a deep research
         # plan through it takes well over the shortest ceiling allowed.
         set_limits(admin, run_deadline_minutes=5,
-                   storm_params={"max_perspective": 8, "max_conv_turn": 8, "search_top_k": 5})
+                   depth_levels=standard_depth(admin, {"max_perspective": 8, "max_conv_turn": 8, "search_top_k": 5}))
         _, s = bob.research("Deadline test: retrieval augmented generation", language="en",
                             search_provider_id=self.ctx["arxiv"]["id"])
         started = time.time()

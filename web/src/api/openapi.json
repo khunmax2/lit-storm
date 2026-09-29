@@ -2312,6 +2312,45 @@
     ],
     "title": "CredentialOut"
    },
+   "DepthChoice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "target_minutes": {
+      "type": "integer",
+      "title": "Target Minutes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "target_minutes"
+    ],
+    "title": "DepthChoice"
+   },
+   "DepthLevel": {
+    "properties": {
+     "target_minutes": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Target Minutes"
+     },
+     "storm": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Storm"
+     }
+    },
+    "type": "object",
+    "required": [
+     "target_minutes",
+     "storm"
+    ],
+    "title": "DepthLevel",
+    "description": "What one depth level means (docs/web-app-design.md, รุ่นสอง: ระดับ\nความลึก). Owners choose the level; the numbers behind it are the\nAdministrator's, so a Run's cost still has a ceiling."
+   },
    "EventOut": {
     "properties": {
      "id": {
@@ -2401,10 +2440,12 @@
       "title": "Run Deadline Minutes",
       "default": 60
      },
-     "storm_params": {
-      "additionalProperties": true,
+     "depth_levels": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/DepthLevel"
+      },
       "type": "object",
-      "title": "Storm Params"
+      "title": "Depth Levels"
      }
     },
     "type": "object",
@@ -2784,6 +2825,16 @@
       ],
       "title": "Search Provider Id"
      },
+     "depth": {
+      "type": "string",
+      "enum": [
+       "fast",
+       "standard",
+       "deep"
+      ],
+      "title": "Depth",
+      "default": "standard"
+     },
      "request_key": {
       "anyOf": [
        {
@@ -2838,13 +2889,21 @@
       },
       "type": "array",
       "title": "Languages"
+     },
+     "depth_levels": {
+      "items": {
+       "$ref": "#/components/schemas/DepthChoice"
+      },
+      "type": "array",
+      "title": "Depth Levels"
      }
     },
     "type": "object",
     "required": [
      "models",
      "search_providers",
-     "languages"
+     "languages",
+     "depth_levels"
     ],
     "title": "Options"
    },
@@ -3049,6 +3108,10 @@
       "type": "string",
       "title": "Search Label"
      },
+     "depth": {
+      "type": "string",
+      "title": "Depth"
+     },
      "status": {
       "type": "string",
       "title": "Status"
@@ -3162,6 +3225,7 @@
      "language",
      "model_label",
      "search_label",
+     "depth",
      "status",
      "quota_month",
      "stage",
@@ -3213,6 +3277,16 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "depth": {
+      "type": "string",
+      "enum": [
+       "fast",
+       "standard",
+       "deep"
+      ],
+      "title": "Depth",
+      "default": "standard"
      },
      "request_key": {
       "anyOf": [
@@ -3270,6 +3344,10 @@
      "search_label": {
       "type": "string",
       "title": "Search Label"
+     },
+     "depth": {
+      "type": "string",
+      "title": "Depth"
      },
      "status": {
       "type": "string",
@@ -3377,6 +3455,7 @@
      "language",
      "model_label",
      "search_label",
+     "depth",
      "status",
      "quota_month",
      "stage",
@@ -3642,6 +3721,16 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "depth": {
+      "type": "string",
+      "enum": [
+       "fast",
+       "standard",
+       "deep"
+      ],
+      "title": "Depth",
+      "default": "standard"
      },
      "request_key": {
       "anyOf": [

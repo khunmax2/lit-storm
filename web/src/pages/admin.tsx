@@ -1425,36 +1425,104 @@ function Limits() {
       />
     </Field>
   );
+  // One depth level's number, read and written in place.
+  const levels = current.depth_levels ?? {};
+  const setLevel = (depth: string, patch: (l: DepthLevelForm) => DepthLevelForm) =>
+    setForm({ ...current, depth_levels: { ...levels, [depth]: patch(levels[depth] as DepthLevelForm) } });
+  const levelInput = (depth: string, label: string, value: number | undefined, write: (n: number) => void) => (
+    <Input
+      aria-label={`${t(`depth.${depth}` as Key)} · ${label}`}
+      type="number"
+      min={1}
+      className="h-8 w-20 text-right tabular-nums"
+      value={value ?? ""}
+      onChange={(e) => write(Number(e.target.value))}
+    />
+  );
   return (
-    <Card>
-      <CardContent>
-        <form
-          className="grid gap-4 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-        >
+    <form
+      className="grid gap-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <Card>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           {num("max_concurrent_total", t("admin.limit.total"))}
           {num("max_concurrent_per_user", t("admin.limit.perUser"))}
           {num("max_queued_per_user", t("admin.limit.queued"))}
           {num("monthly_run_quota", t("admin.limit.quota"))}
           {num("run_deadline_minutes", t("admin.limit.deadline"))}
-          <div className="flex items-end sm:col-span-2">
-            <Button type="submit" disabled={save.isPending}>
-              {t("save")}
-            </Button>
-          </div>
-          {save.error && (
-            <div className="sm:col-span-2">
-              <ErrorText error={save.error} />
-            </div>
-          )}
-        </form>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("depth.label")}</CardTitle>
+          <CardDescription>{t("depth.adminLead")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("depth.label")}</TableHead>
+                <TableHead className="text-right">{t("depth.target")}</TableHead>
+                {STORM_KNOBS.map(([, label]) => (
+                  <TableHead key={label} className="text-right">
+                    {t(label)}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(["fast", "standard", "deep"] as const).map((depth) => {
+                const level = levels[depth] as DepthLevelForm | undefined;
+                if (!level) return null;
+                return (
+                  <TableRow key={depth}>
+                    <TableCell className="font-medium">{t(`depth.${depth}`)}</TableCell>
+                    <TableCell className="text-right">
+                      {levelInput(depth, t("depth.target"), level.target_minutes, (n) =>
+                        setLevel(depth, (l) => ({ ...l, target_minutes: n })),
+                      )}
+                    </TableCell>
+                    {STORM_KNOBS.map(([knob, label]) => (
+                      <TableCell key={knob} className="text-right">
+                        {levelInput(depth, t(label), level.storm[knob] as number | undefined, (n) =>
+                          setLevel(depth, (l) => ({ ...l, storm: { ...l.storm, [knob]: n } })),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <p className="mt-3 text-xs text-muted-foreground">{t("depth.adminNote")}</p>
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={save.isPending}>
+          {t("save")}
+        </Button>
+        {save.error && <ErrorText error={save.error} />}
+      </div>
+    </form>
   );
 }
+
+type DepthLevelForm = { target_minutes: number; storm: Record<string, unknown> };
+
+// The STORM settings behind each depth level, in the order they matter for time.
+const STORM_KNOBS = [
+  ["max_perspective", "depth.knob.perspectives"],
+  ["max_conv_turn", "depth.knob.turns"],
+  ["max_search_queries_per_turn", "depth.knob.queries"],
+  ["search_top_k", "depth.knob.results"],
+  ["retrieve_top_k", "depth.knob.snippets"],
+] as const;
 
 // --- usage ----------------------------------------------------------------------------
 

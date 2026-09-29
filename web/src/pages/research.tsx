@@ -8,6 +8,7 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  Gauge,
   Globe,
   Loader2,
   MoreHorizontal,
@@ -33,7 +34,7 @@ import {
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
 import { Segmented } from "@/components/segmented";
-import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
+import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type Depth, type RunForm } from "@/components/composer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -226,7 +227,7 @@ export function ProjectPage() {
     queryKey: ["project", projectId],
     queryFn: () => call(api.GET("/api/projects/{project_id}", { params: { path: { project_id: projectId } } })),
   });
-  const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "" });
+  const [form, setForm] = useState<RunForm>({ topic: "", language: lang, llm_model_id: "", search_provider_id: "", depth: "standard" });
   const [moving, setMoving] = useState<{ id: string; title: string; project_id: string } | null>(null);
   const requestKey = useRequestKey();
   const start = useMutation({
@@ -698,6 +699,10 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                 {run.model_label}
               </span>
               <span>{run.search_label}</span>
+              <span className="flex items-center gap-1">
+                <Gauge className="size-3" />
+                {t(`depth.${run.depth as Depth}`)}
+              </span>
               {run.source_count != null && (
                 <span className="flex items-center gap-1">
                   <BookOpen className="size-3" />
@@ -792,7 +797,7 @@ export function SessionPage() {
   const [form, setForm] = useState<RunForm | null>(null);
   useEffect(() => {
     if (latest && !form)
-      setForm({ topic: latest.topic, language: latest.language, llm_model_id: "", search_provider_id: "" });
+      setForm({ topic: latest.topic, language: latest.language, llm_model_id: "", search_provider_id: "", depth: latest.depth as Depth });
   }, [latest]); // eslint-disable-line react-hooks/exhaustive-deps
   const requestKey = useRequestKey();
   const again = useMutation({

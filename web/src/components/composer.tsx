@@ -112,17 +112,77 @@ export function useRunOptions() {
   return useQuery({ queryKey: ["options"], queryFn: () => call(api.GET("/api/options")) });
 }
 
+/** The level's usual time: the clock and the minutes, the words before
+ *  them sliding out on hover or a tap. */
+function Estimate({ minutes }: { minutes: number }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={t("depth.estimate", { n: minutes })}
+      aria-expanded={open}
+      onClick={() => setOpen(!open)}
+      onBlur={() => setOpen(false)}
+      className="group/est flex items-center rounded-md px-1 py-1 text-xs whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+    >
+      <Timer className="mr-1 size-3.5" />
+      <span
+        aria-hidden
+        className="max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-300 ease-out group-hover/est:max-w-32 group-hover/est:opacity-100 group-aria-expanded/est:max-w-32 group-aria-expanded/est:opacity-100 motion-reduce:transition-none"
+      >
+        {t("depth.estimatePrefix")}&nbsp;
+      </span>
+      <span key={minutes} aria-hidden className="animate-in duration-300 fade-in-0 motion-reduce:animate-none">
+        {t("depth.minutesShort", { n: minutes })}
+      </span>
+    </button>
+  );
+}
+
+/** What is left of the month's Runs, as a bar; the words show on hover or
+ *  a tap. Out of Runs, the reason stays in words. */
 export function QuotaLine({ className }: { className?: string }) {
   const { t } = useT();
   const quota = useQuery({ queryKey: ["quota"], queryFn: () => call(api.GET("/api/me/quota")) });
+  const [open, setOpen] = useState(false);
   const q = quota.data;
   if (!q) return null;
-  const full = q.remaining === 0;
+  if (q.remaining === 0 && q.reserved === 0) return <p className={cn("text-xs text-warning", className)}>{t("quota.full")}</p>;
+  const share = q.limit > 0 ? Math.min(1, q.remaining / q.limit) : 0;
+  const low = share <= 0.1;
+  const words = t("quota.tip", { remaining: q.remaining, limit: q.limit });
   return (
-    <p className={cn("text-xs", full ? "text-warning" : "text-muted-foreground", className)}>
-      {full && q.reserved === 0 ? t("quota.full") : t("quota.line", { remaining: q.remaining, limit: q.limit })}
-      {q.reserved > 0 && ` · ${t("quota.reserved", { reserved: q.reserved })}`}
-    </p>
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={q.reserved > 0 ? `${words} · ${t("quota.reserved", { reserved: q.reserved })}` : words}
+          // A tap keeps it open rather than the trigger's own close on press.
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => setOpen((v) => !v)}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+            className,
+          )}
+        >
+          {t("quota.label")}:
+          <span className="relative h-1.5 w-28 overflow-hidden rounded-full bg-muted-foreground/15">
+            <span
+              className={cn(
+                "absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none",
+                low ? "bg-warning" : "bg-brand",
+              )}
+              style={{ width: `${share * 100}%` }}
+            />
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="flex-col items-start gap-0.5">
+        <span>{words}</span>
+        {q.reserved > 0 && <span className="opacity-70">{t("quota.reserved", { reserved: q.reserved })}</span>}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -130,9 +190,9 @@ export function QuotaLine({ className }: { className?: string }) {
 // border that lifts under the pointer, gives a little when pressed and stays
 // lit while its menu is open.
 export const CHIP = cn(
-  "h-8 gap-1.5 rounded-lg border bg-background px-2.5 text-[13px] font-normal shadow-xs dark:bg-card",
+  "h-8 gap-1.5 rounded-lg border border-input bg-background px-2.5 text-[13px] font-normal shadow-xs dark:bg-input/30",
   "transition-[background-color,box-shadow,transform,color] duration-200 ease-out",
-  "hover:-translate-y-px hover:bg-muted/60 hover:shadow-sm active:translate-y-0 active:scale-[0.96]",
+  "hover:-translate-y-px hover:bg-muted/60 hover:shadow-sm active:translate-y-0 active:scale-[0.96] dark:hover:bg-input/50",
   "aria-expanded:bg-muted/70 aria-expanded:shadow-sm",
   "motion-reduce:transform-none motion-reduce:transition-none",
 );
@@ -152,20 +212,30 @@ function Chip({
   onChange,
   items,
   label,
+  compact,
 }: {
   icon: ReactNode;
   value: string;
   onChange: (v: string) => void;
   items: { value: string; label: string }[];
   label: string;
+  /** Only the icon, no chevron, until pointed at or opened; the name slides out then. */
+  compact?: boolean;
 }) {
   return (
     // Radix may echo a value while its items mount; passing that on would
     // write a stale copy of the form over the defaults just chosen.
     <Select value={value} onValueChange={(v) => v && v !== value && onChange(v)}>
-      <SelectTrigger size="sm" aria-label={label} className={cn(CHIP, FLIP)}>
+      <SelectTrigger size="sm" aria-label={label} className={cn(CHIP, FLIP, "data-[size=sm]:h-8 data-[size=sm]:rounded-lg", compact && "group/chip justify-center px-[8.5px] [&>svg:last-child]:hidden")}>
         {icon}
-        <SelectValue />
+        {/* Radix drops a className on SelectValue: the sliding is on a wrapper. */}
+        {compact ? (
+          <span className="-ml-1.5 flex max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity,margin] duration-300 ease-out group-hover/chip:mr-0.5 group-hover/chip:ml-0 group-hover/chip:max-w-56 group-hover/chip:opacity-100 group-focus-visible/chip:mr-0.5 group-focus-visible/chip:ml-0 group-focus-visible/chip:max-w-56 group-focus-visible/chip:opacity-100 group-aria-expanded/chip:mr-0.5 group-aria-expanded/chip:ml-0 group-aria-expanded/chip:max-w-56 group-aria-expanded/chip:opacity-100 motion-reduce:transition-none">
+            <SelectValue />
+          </span>
+        ) : (
+          <SelectValue />
+        )}
       </SelectTrigger>
       <SelectContent className={MENU}>
         {items.map((i) => (
@@ -352,7 +422,8 @@ export function Composer({
   // The owner's headings (docs/web-app-design.md, หัวข้อที่ต้องการ): where the
   // mode at this depth uses them.
   const sectionsOn = !!engine?.sections_at?.includes(form.depth);
-  const [sectionsOpen, setSectionsOpen] = useState(false);
+  // Open at first when headings came filled in (research again).
+  const [sectionsOpen, setSectionsOpen] = useState(() => !!form.sections_text?.trim());
 
   useEffect(() => {
     // One update for all of it: two effects each writing a copy of the same
@@ -385,7 +456,10 @@ export function Composer({
   // Each level's time target, as the Administrator set it.
   const minutes = (d: Depth) => o?.depth_levels.find((x) => x.id === d)?.target_minutes ?? 5;
   const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
-  const showSections = sectionsOn && (sectionsOpen || !!form.sections_text?.trim());
+  const showSections = sectionsOn && sectionsOpen;
+  // Headings typed in are used whether the panel shows or not; the chip says so.
+  const sectionCount = (form.sections_text ?? "").split("\n").filter((l) => l.trim()).length;
+  const sectionsSet = sectionsOn && sectionCount > 0;
 
   // Question refinement (docs/web-app-design.md, ขัดเกลาโจทย์): a few
   // questions from the chosen model, answered or skipped, before starting.
@@ -438,12 +512,28 @@ export function Composer({
             type="button"
             variant="ghost"
             size="sm"
-            className={cn(CHIP, showSections && "bg-muted hover:bg-muted")}
+            className={cn(
+              CHIP,
+              "transition-[background-color,box-shadow,transform,color,border-color]",
+              showSections && "bg-muted hover:bg-muted",
+              sectionsSet && "border-brand text-brand shadow-[0_0_0_3px_var(--brand-soft)] hover:text-brand dark:border-brand",
+            )}
             aria-expanded={showSections}
+            title={sectionsSet ? t("sections.set", { n: sectionCount }) : undefined}
             onClick={() => setSectionsOpen(!showSections)}
           >
-            <ListOrdered className={cn("size-3.5 transition-colors duration-200", showSections && "text-brand")} />
+            <ListOrdered
+              className={cn("size-3.5 transition-colors duration-200", (showSections || sectionsSet) && "text-brand")}
+            />
             {t("sections.chip")}
+            {sectionsSet && (
+              <span
+                key={sectionCount}
+                className="rounded-md bg-brand-soft px-1.5 text-xs animate-in duration-200 zoom-in-75 fade-in-0 motion-reduce:animate-none"
+              >
+                {sectionCount}
+              </span>
+            )}
           </Button>
         )}
         {extra}
@@ -454,11 +544,7 @@ export function Composer({
           focused && "shadow-md ring-3 ring-ring/15",
         )}
       >
-        <div className="flex items-start gap-3 px-4 pt-4">
-          <span
-            aria-hidden
-            className="mt-1 size-5 shrink-0 rounded-full bg-linear-to-br from-sky-300 via-fuchsia-300 to-amber-200 shadow-[inset_0_-2px_4px_rgb(0_0_0/0.08)]"
-          />
+        <div className="px-4 pt-4">
           <Textarea
             autoFocus={autoFocus}
             value={form.topic}
@@ -480,19 +566,47 @@ export function Composer({
           />
         </div>
         {showSections && (
-          <label className="mx-3 mt-3 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm animate-in duration-300 ease-out fade-in-0 slide-in-from-top-2 motion-reduce:animate-none">
-            <span className="flex items-center gap-1.5 font-medium">
-              <ListOrdered className="size-4 text-brand" />
-              {t("sections.title")}
-            </span>
+          <div className="mx-3 mt-3 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm animate-in duration-300 ease-out fade-in-0 slide-in-from-top-2 motion-reduce:animate-none">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 font-medium">
+                <ListOrdered className="size-4 text-brand" />
+                {t("sections.title")}
+              </span>
+              <span className="flex items-center gap-0.5">
+                {sectionCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground animate-in fade-in-0"
+                    onClick={() => setForm({ ...form, sections_text: "" })}
+                  >
+                    {t("sections.clear")}
+                  </Button>
+                )}
+                {/* Hides the panel; headings typed in are still used. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 transition-transform duration-200 hover:rotate-90 motion-reduce:transform-none"
+                  aria-label={t("sections.hide")}
+                  title={t("sections.hide")}
+                  onClick={() => setSectionsOpen(false)}
+                >
+                  <X />
+                </Button>
+              </span>
+            </div>
             <span className="text-xs text-muted-foreground">{t("sections.lead")}</span>
             <textarea
+              aria-label={t("sections.title")}
               className="min-h-24 rounded-md border bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
               value={form.sections_text ?? ""}
               placeholder={t("sections.placeholder")}
               onChange={(e) => setForm({ ...form, sections_text: e.target.value })}
             />
-          </label>
+          </div>
         )}
         {(qa.length > 0 || refine.error) && (
           <div className="mx-3 mt-3 grid gap-2.5 rounded-lg border bg-muted/40 p-3 animate-in duration-300 ease-out fade-in-0 slide-in-from-top-2 motion-reduce:animate-none">
@@ -537,6 +651,7 @@ export function Composer({
               value={form.llm_model_id}
               onChange={(llm_model_id) => setForm({ ...form, llm_model_id })}
               items={models.map((m) => ({ value: m.id, label: m.label }))}
+              compact
             />
           )}
           <div className="ml-auto flex items-center gap-3">
@@ -557,10 +672,7 @@ export function Composer({
             {locked ? (
               <span className="text-xs text-muted-foreground">{locked}</span>
             ) : (
-              <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-                <Timer className="size-3.5" />
-                {t("depth.estimate", { n: minutes(form.depth) })}
-              </span>
+              <Estimate minutes={minutes(form.depth)} />
             )}
             {/* Lights up once there is a topic; leans forward under the pointer. */}
             <Button

@@ -83,6 +83,9 @@ class Limits(BaseModel):
     # Question refinement takes no quota, so it has a cap of its own:
     # requests per User per Bangkok day (docs/web-app-design.md, ขัดเกลาโจทย์).
     refinements_per_day: int = Field(default=30, ge=0)
+    # Drawing a report's visual blocks takes no quota either: its own cap,
+    # requests per User per Bangkok day (litstorm.visuals).
+    visuals_per_day: int = Field(default=10, ge=0)
     # A Discussion's Turns per quota unit, the report included
     # (docs/web-app-design.md, รุ่นสอง: Discussion).
     turns_per_quota: int = Field(default=20, ge=1)

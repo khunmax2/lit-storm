@@ -213,6 +213,17 @@ class QuestionRefinement(Base):
     created_at: Mapped[datetime] = _now()
 
 
+class VisualsRequest(Base):
+    """One request to draw a report's visual blocks, kept only to count them
+    against the daily cap (limits.visuals_per_day)."""
+
+    __tablename__ = "visuals_requests"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = _now()
+
+
 class Run(Base):
     __tablename__ = "runs"
 

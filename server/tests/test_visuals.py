@@ -194,3 +194,23 @@ def test_page_furniture_and_references_are_not_facts():
     assert any("soft power strategy by 2023" in t for t in texts)
     assert not any("http" in t or "logo" in t or "##" in t for t in texts)
     assert not any("Appadurai" in t or "Becker" in t for t in texts)
+
+
+def test_a_line_is_not_made_of_citation_years_or_one_repeated_figure():
+    report = copy.deepcopy(REPORT)
+    report["sources"][0]["evidence"] = [
+        "ระหว่าง ค.ศ. 1990-1997 การผลิตเมล็ดพืชเพิ่มเฉลี่ย 1 เปอร์เซ็นต์ต่อปี",
+        "อัตราการเพิ่มของประชากรเฉลี่ย 1.3 เปอร์เซ็นต์ (Hinrichsen and Robey, 2000) ซึ่งคล้อยตามทฤษฎีของมัลทัส",
+    ]
+    facts = visuals.facts(report)
+    grain, people = _fact(facts, "1990-1997"), _fact(facts, "Hinrichsen")
+    line = {"type": "chart", "chart": "line", "series": [
+        {"name": "เมล็ดพืช", "points": [{"x": "1990", "y": 1, "fact": grain}, {"x": "1997", "y": 1, "fact": grain}]},
+        {"name": "ประชากร", "points": [{"x": "2000", "y": 1.3, "fact": people}, {"x": "2001", "y": 1.3, "fact": people}]},
+    ]}
+    blocks, dropped = visuals.check([line], report, facts)
+    assert not blocks and dropped[0]["type"] == "chart"
+    # Nor is a timeline dated by the paper it cites.
+    blocks, _ = visuals.check([{"type": "timeline", "events": [
+        {"date": "2000", "label": "a", "fact": people}, {"date": "1990", "label": "b", "fact": grain}]}], report, facts)
+    assert not blocks

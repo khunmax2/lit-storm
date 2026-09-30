@@ -225,13 +225,19 @@ def _number_in(value, text):
     return any(math.isclose(value, n, rel_tol=1e-9, abs_tol=1e-9) for n in numbers_in(text))
 
 
+# "(Hinrichsen and Robey, 2000)": the year a paper came out, not an event's.
+_IN_TEXT_CITATION = re.compile(r"\([^()]{0,80}?,\s*(?:\d{4}[a-z]?|n\.d\.)\)")
+
+
 def _year_in(date, text):
-    """A date's year is in the passage, in either era (2024 or 2567)."""
+    """A date's year is in the passage, in either era (2024 or 2567) — and
+    not only as the year of a paper it cites."""
     match = re.match(r"^\s*(\d{4})", _normal(date))
     if not match:
         return False
     year = int(match.group(1))
     years = {year, year + 543, year - 543}
+    text = _IN_TEXT_CITATION.sub(" ", text)
     return any(int(n) in years for n in numbers_in(text) if n.is_integer())
 
 
@@ -327,12 +333,22 @@ class _Checker:
             if len(series) != 1 or any(p["y"] < 0 for p in series[0]["points"]):
                 kind = "bar"  # a pie of several series, or of negatives, is no pie
         if kind == "line":
-            # A line joins points in order: they must be years or dates.
+            # A line joins points in order: they must be years or dates, each
+            # year in its own fact. A series needs two such points, and not
+            # one passage's single figure repeated (an average over 1990-1997
+            # is not a value in 1990 and another in 1997).
             if not all(re.match(r"^\s*\d{4}", p["x"]) for s in series for p in s["points"]):
                 kind = "bar"
             else:
                 for s in series:
-                    s["points"].sort(key=lambda p: p["x"])
+                    s["points"] = [p for p in s["points"] if _year_in(p["x"], p["cite"]["text"])]
+                    s["points"].sort(key=lambda p: _when(p["x"]))
+                series = [
+                    s for s in series
+                    if len(s["points"]) >= 2 and len({(p["cite"]["fact"], p["y"]) for p in s["points"]}) > 1
+                ]
+                if sum(len(s["points"]) for s in series) < 2:
+                    return None, "no series with two dated values of their own"
         return {
             "chart": kind,
             "unit": _text(b.get("unit"), MAX_TEXT["unit"]),
@@ -450,6 +466,164 @@ def check(raw_blocks, report, facts_):
             "sources": sorted({c["source"] for c in cites}),
         })
     return blocks, dropped
+
+
+# --- asking the model --------------------------------------------------------
+
+TIMEOUT = 150
+MAX_OUTPUT_TOKENS = 6000
+
+PROMPT = """You are adding a few figures to a finished research report, to help a reader \
+see what the text says. You may only use the numbered FACTS below; each belongs to a source.
+
+Report title: {title}
+Report language: {language}. Write every title, label and definition in {language}.
+
+Sections (use an id as "anchor" to place a figure after that section, or "lead"):
+{outline}
+
+Choose between 0 and {max_blocks} blocks, only where a figure genuinely helps; fewer good \
+blocks are better than many weak ones. Types:
+{types}
+
+Rules:
+- Every value, event, row and term names the one fact it comes from, as "fact": "F12".
+- A number must be written in its fact exactly (same value; you may drop thousands \
+separators). Never compute, convert, sum or estimate. A date's year must be in its fact.
+- A glossary term must appear word for word in its fact.
+- Do not put numbers from different units, years or definitions in one chart.
+- Plain text only: no markdown, no HTML, no links.
+
+FACTS:
+{facts}
+
+Answer with one JSON object and nothing else:
+{{"blocks": [ ... ]}}"""
+
+TYPE_HELP = {
+    "stat_cards": '{"type":"stat_cards","anchor":"s1","title":"...","items":[{"label":"...","value":42.5,"unit":"%","as_of":"2024","fact":"F3"}]}  (1-6 key figures)',
+    "chart": '{"type":"chart","chart":"bar|line|pie","anchor":"s2","title":"...","unit":"...","x_label":"...","y_label":"...","series":[{"name":"...","points":[{"x":"2023","y":120,"fact":"F5"}]}]}  (line only over years; pie only for parts of one whole; 2-12 points)',
+    "timeline": '{"type":"timeline","anchor":"s1","title":"...","events":[{"date":"2019","label":"...","detail":"...","fact":"F7"}]}  (2-12 dated events)',
+    "comparison": '{"type":"comparison","anchor":"s3","title":"...","columns":["...","..."],"rows":[{"label":"...","cells":["...","..."],"fact":"F9"}]}  (2-8 rows, 1-4 columns, cells as short text)',
+    "diagram": '{"type":"diagram","kind":"flow|cycle|hierarchy","anchor":"s2","title":"...","nodes":[{"id":"a","label":"..."}],"edges":[{"from":"a","to":"b","label":"..."}],"facts":["F4","F8"]}  (3-10 steps; ids are short lowercase words)',
+    "glossary": '{"type":"glossary","anchor":"lead","title":"...","terms":[{"term":"...","definition":"...","fact":"F2"}]}  (2-8 terms the report uses)',
+}
+
+LANGUAGE = {"th": "Thai", "en": "English"}
+
+
+def prompt(report, facts_):
+    """What the model is asked. Numeric blocks are not offered for a report
+    without Evidence: they would be dropped anyway."""
+    numeric = has_evidence(report)
+    outline = "\n".join(
+        f"- {s['id']}: {s['heading']}" for s in report_mod.walk(report["sections"])
+    ) or "- (none)"
+    types = "\n".join(f"- {TYPE_HELP[t]}" for t in TYPES if numeric or t not in NUMERIC)
+    lines = "\n".join(f"{f['id']} [source {f['source']}]: {f['text']}" for f in facts_)
+    return PROMPT.format(
+        title=report["title"],
+        language=LANGUAGE.get(report["language"], "English"),
+        outline=outline,
+        max_blocks=MAX_BLOCKS,
+        types=types,
+        facts=lines or "(none)",
+    )
+
+
+class GenerateError(RuntimeError):
+    """The model could not be asked, or said nothing usable."""
+
+
+def parse(text):
+    """The blocks in a reply: the JSON object (or bare list) in it, if any."""
+    text = (text or "").strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    for pattern in (r"\{.*\}", r"\[.*\]"):
+        match = re.search(pattern, text, re.S)
+        if not match:
+            continue
+        try:
+            found = json.loads(match.group(0))
+        except ValueError:
+            continue
+        if isinstance(found, dict) and isinstance(found.get("blocks"), list):
+            return found["blocks"]
+        if isinstance(found, list):
+            return found
+    return None
+
+
+def _ask(model, api_key, api_base, messages):
+    import litellm
+
+    from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
+
+    kwargs = {"api_key": api_key, "timeout": TIMEOUT, "num_retries": 1}
+    if api_base:
+        kwargs["api_base"] = api_base
+    kwargs.update(reasoning_kwargs(model.reasoning, model.provider))
+    kwargs.update(routing_kwargs(model.provider, kwargs))
+    name = LLM_PROVIDERS[model.provider]["prefix"] + model.model
+    response = litellm.completion(
+        model=name,
+        messages=messages,
+        max_tokens=MAX_OUTPUT_TOKENS,
+        response_format={"type": "json_object"},
+        drop_params=True,
+        **kwargs,
+    )
+    usage = getattr(response, "usage", None)
+    used = (int(getattr(usage, "prompt_tokens", 0) or 0), int(getattr(usage, "completion_tokens", 0) or 0))
+    return response.choices[0].message.content or "", name, used
+
+
+def generate(model, api_key, api_base, report):
+    """Ask once, repair unreadable JSON once, keep what the facts bear out.
+
+    Returns (visuals, tokens) where tokens maps the model's name to
+    [prompt_tokens, completion_tokens], as litstorm.cost counts them.
+    """
+    if not api_key:
+        raise GenerateError("no API key stored for this model's provider")
+    facts_ = facts(report)
+    messages = [{"role": "user", "content": prompt(report, facts_)}]
+    tokens = {}
+
+    def ask(msgs):
+        try:
+            text, name, (p, c) = _ask(model, api_key, api_base, msgs)
+        except Exception as error:  # noqa: BLE001 - the report still reads without figures
+            raise GenerateError(f"{type(error).__name__}: {error}"[:300]) from error
+        t = tokens.setdefault(name, [0, 0])
+        t[0] += p
+        t[1] += c
+        return text
+
+    reply = ask(messages)
+    raw = parse(reply)
+    if raw is None:
+        # One repair, on the reply alone: cheaper than asking again.
+        reply = ask(messages + [
+            {"role": "assistant", "content": reply[:8000]},
+            {"role": "user", "content": 'That was not valid JSON. Answer again with only the JSON object {"blocks": [...]}.'},
+        ])
+        raw = parse(reply)
+    if raw is None:
+        raise GenerateError("the model gave no readable blocks")
+    blocks, dropped = check(raw, report, facts_)
+    from datetime import datetime, timezone
+
+    return {
+        "schema": SCHEMA,
+        "report": report_hash(report),
+        "model": model.label,
+        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "blocks": blocks,
+        "dropped": dropped,
+        "hidden": [],
+        "facts": len(facts_),
+    }, tokens
 
 
 # --- the file ----------------------------------------------------------------

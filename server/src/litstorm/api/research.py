@@ -942,6 +942,144 @@ def _filename(report, ext):
     return f"{safe or 'report'}.{ext}"
 
 
+class VisualBlockOut(BaseModel):
+    id: str
+    type: str
+    title: str
+    anchor: str
+    hidden: bool
+    sources: list[int]
+
+
+class VisualsOut(BaseModel):
+    """A report's visual blocks (litstorm.visuals): whether they were drawn,
+    what they are, and what was left out and why."""
+
+    ready: bool
+    blocks: list[VisualBlockOut] = []
+    dropped: int = 0
+    model: str | None = None
+    created_at: str | None = None
+    # Drawn from the report's own sentences: no Evidence to check against.
+    from_report_text: bool = False
+
+
+class VisualsHiddenIn(BaseModel):
+    hidden: list[str] = Field(default_factory=list, max_length=20)
+
+
+def _visuals_out(visuals, report):
+    from litstorm import visuals as visuals_mod
+
+    if not visuals:
+        return VisualsOut(ready=False, from_report_text=not visuals_mod.has_evidence(report))
+    hidden = set(visuals.get("hidden") or [])
+    return VisualsOut(
+        ready=True,
+        blocks=[
+            VisualBlockOut(id=b["id"], type=b["type"], title=b.get("title") or "", anchor=b["anchor"],
+                           hidden=b["id"] in hidden, sources=b.get("sources") or [])
+            for b in visuals["blocks"]
+        ],
+        dropped=len(visuals.get("dropped") or []),
+        model=visuals.get("model"),
+        created_at=visuals.get("created_at"),
+        from_report_text=not visuals_mod.has_evidence(report),
+    )
+
+
+def _report_path(run):
+    return os.path.join(settings.get().runs_dir, str(run.id), "report.json")
+
+
+@router.get("/runs/{run_id}/visuals", response_model=VisualsOut)
+def get_visuals(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    from litstorm import visuals as visuals_mod
+
+    run, report = _report(session, run_id, user)
+    return _visuals_out(visuals_mod.load(visuals_mod.path_for(_report_path(run)), report), report)
+
+
+@router.post("/runs/{run_id}/visuals", response_model=VisualsOut)
+def make_visuals(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """Draw the report's visual blocks, once: one call to the fast model (or
+    the Run's own), kept as visuals.json. Takes no quota; counted against a
+    daily cap per User, and its cost is added to the Run's."""
+    from litstorm import cost, roles, security
+    from litstorm import visuals as visuals_mod
+    from litstorm.catalog import LLM_PROVIDERS
+    from litstorm.db.models import LlmCredential, VisualsRequest
+
+    run = deps.own(session, Run, run_id, user)
+    path = _report_path(run)
+    if not os.path.exists(path):
+        raise HTTPException(404, "no_report")
+    report = report_mod.load(path)
+    found = visuals_mod.load(visuals_mod.path_for(path), report)
+    if found:
+        return _visuals_out(found, report)
+
+    day_start = datetime.now(limits.QUOTA_ZONE).replace(hour=0, minute=0, second=0, microsecond=0)
+    asked = session.scalar(
+        select(func.count()).select_from(VisualsRequest).where(
+            VisualsRequest.user_id == user.id, VisualsRequest.created_at >= day_start
+        )
+    )
+    if asked >= limits.load(session).visuals_per_day:
+        raise HTTPException(429, "visuals_limit")
+    # The fast model draws: short structured work (docs/adr/0006). Without
+    # one, the model the Run wrote with.
+    model = roles.fast_model(session)
+    if model is None:
+        main = session.get(LlmModel, run.llm_model_id)
+        model = main if main is not None and main.enabled else None
+    if model is None:
+        raise HTTPException(409, "visuals_no_model")
+    credential = session.get(LlmCredential, model.provider)
+    key = security.decrypt(credential.api_key_ciphertext) if credential else ""
+    session.add(VisualsRequest(user_id=user.id))
+    session.commit()  # counted whether or not the model answers: it was asked
+    try:
+        drawn, tokens = visuals_mod.generate(model, key, credential.api_base if credential else None, report)
+    except visuals_mod.GenerateError:
+        raise HTTPException(502, "visuals_failed")
+
+    # Its cost is the Run's, priced as the Worker prices it.
+    prices = None
+    if model.price_in_per_mtok is not None and model.price_out_per_mtok is not None:
+        prices = {LLM_PROVIDERS[model.provider]["prefix"] + model.model: (model.price_in_per_mtok, model.price_out_per_mtok)}
+    spent = cost.estimate(tokens, prices=prices)
+    drawn["tokens"] = {name: list(t) for name, t in tokens.items()}
+    drawn["cost_usd"] = float(spent) if spent is not None else None
+    visuals_mod.write(drawn, visuals_mod.path_for(path))
+    session.refresh(run)
+    run.tokens_in = (run.tokens_in or 0) + sum(t[0] for t in tokens.values())
+    run.tokens_out = (run.tokens_out or 0) + sum(t[1] for t in tokens.values())
+    if spent is not None and run.cost_usd is not None:
+        run.cost_usd = run.cost_usd + spent
+    session.commit()
+    return _visuals_out(drawn, report)
+
+
+@router.patch("/runs/{run_id}/visuals", response_model=VisualsOut)
+def hide_visuals(
+    run_id: uuid.UUID, body: VisualsHiddenIn, user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """The owner's choice of blocks to leave out; they can be shown again."""
+    from litstorm import visuals as visuals_mod
+
+    run = deps.own(session, Run, run_id, user)
+    path = _report_path(run)
+    if not os.path.exists(path):
+        raise HTTPException(404, "no_report")
+    report = report_mod.load(path)
+    found = visuals_mod.load(visuals_mod.path_for(path), report)
+    if not found:
+        raise HTTPException(404, "no_visuals")
+    visuals_mod.write(visuals_mod.set_hidden(found, body.hidden), visuals_mod.path_for(path))
+    return _visuals_out(found, report)
+
+
 @router.get("/runs/{run_id}/export")
 def export_report(
     run_id: uuid.UUID,

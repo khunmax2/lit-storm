@@ -145,6 +145,14 @@ class DeepEngine:
                     searches += 1
                     if event.get("urls"):
                         progress.note("browsed", urls=sorted(set(event["urls"])))
+                elif kind == "node":
+                    # One node of the research tree: kept with the Run, so the
+                    # canvas can draw it while it grows and after (web: ResearchCanvas).
+                    progress.note(
+                        "tree",
+                        **{k: event[k] for k in ("id", "parent", "status", "query", "goal", "sources", "learnings", "message")
+                           if event.get(k) is not None},
+                    )
                 elif kind == "cut_short":
                     progress.note("research_cut_short", learnings=event.get("learnings"))
                 elif kind == "report":

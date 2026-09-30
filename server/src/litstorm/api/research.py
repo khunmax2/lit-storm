@@ -817,7 +817,7 @@ class RunDetail(RunOut):
 
 # Notes an owner sees while waiting. Tracebacks and the like stay in the
 # database for whoever debugs; they are not the owner's reading.
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations"}
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree"}
 
 
 @router.get("/runs/{run_id}", response_model=RunDetail)

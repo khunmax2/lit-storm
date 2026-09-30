@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
   BookOpen,
+  ChevronRight,
   FileText,
   FolderInput,
   FolderOpen,
@@ -33,6 +34,7 @@ import {
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
 import { ProjectSettingsDialog } from "@/components/project-settings";
+import { ResearchCanvas } from "@/components/research-canvas";
 import { SupportDialog } from "@/components/support-dialog";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
@@ -639,6 +641,8 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
     onError,
   });
   const [helping, setHelping] = useState(false);
+  // The research map starts open while a Deep Research Run works.
+  const [mapOpen, setMapOpen] = useState(!FINAL.has(run.status));
   const readable = run.status === "succeeded" || (run.status === "cancelled" && !!run.report_title);
   const reasonKey = `reason.${run.reason}`;
   const canRetry = ["failed", "interrupted", "cancelled"].includes(run.status);
@@ -775,6 +779,24 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />
+        {run.engine === "deep" && run.status !== "queued" && run.status !== "needs_selection" && (
+          <details
+            className="group"
+            open={mapOpen}
+            onToggle={(e) => setMapOpen((e.target as HTMLDetailsElement).open)}
+          >
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
+              <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+              {t("canvas.title")}
+            </summary>
+            {/* Drawn only when open: a canvas laid out while folded has no size to fit. */}
+            {mapOpen && (
+              <div className="mt-2">
+                <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
+              </div>
+            )}
+          </details>
+        )}
         <SupportDialog runId={run.id} open={helping} onOpenChange={setHelping} />
       </CardContent>
     </Card>

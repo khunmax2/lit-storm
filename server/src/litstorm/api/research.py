@@ -1080,24 +1080,71 @@ def hide_visuals(
     return _visuals_out(found, report)
 
 
+def _interactive(run, report, facts, full):
+    from litstorm import visuals as visuals_mod
+    from litstorm.render import interactive
+
+    path = _report_path(run)
+    found = visuals_mod.load(visuals_mod.path_for(path), report)
+    return interactive.cached(path, report, found, full=full, **facts)
+
+
+# The page runs our script, so the web app shows it sandboxed: an origin of
+# its own, no reach into the app (its cookies, its API). Links to Sources
+# still open, in a tab that is not sandboxed.
+INTERACTIVE_SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox"
+
+
+@router.get("/runs/{run_id}/interactive")
+def view_interactive(
+    run_id: uuid.UUID,
+    charts: str = Query("static", pattern="^(static|full)$"),
+    user=Depends(deps.current_user),
+    session=Depends(deps.database),
+):
+    """The interactive page, for the web app's frame."""
+    run, report = _report(session, run_id, user)
+    facts = {
+        "engine_label": ENGINES.get(report.get("engine") or run.engine, {}).get("label", ""),
+        "finished_at": run.finished_at,
+    }
+    return Response(
+        _interactive(run, report, facts, charts == "full"),
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Security-Policy": INTERACTIVE_SANDBOX,
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 @router.get("/runs/{run_id}/export")
 def export_report(
     run_id: uuid.UUID,
-    format: str = Query(pattern="^(html|md|pdf)$"),
+    format: str = Query(pattern="^(html|md|pdf|interactive)$"),
     evidence: bool = False,
+    # The interactive page's charts: drawn as pictures, or alive (+1.1 MB).
+    charts: str = Query("static", pattern="^(static|full)$"),
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
     from urllib.parse import quote
 
     run, report = _report(session, run_id, user, "export")
-    name = _filename(report, format)
+    name = _filename(report, "html" if format == "interactive" else format)
     # The facts the page shows above the title, as the web app shows them.
     facts = {
         "engine_label": ENGINES.get(report.get("engine") or run.engine, {}).get("label", ""),
         "finished_at": run.finished_at,
     }
     disposition = f"attachment; filename*=UTF-8''{quote(name)}"
+    if format == "interactive":
+        return Response(
+            _interactive(run, report, facts, charts == "full"),
+            media_type="text/html; charset=utf-8",
+            headers={"Content-Disposition": disposition},
+        )
     if format == "html":
         from litstorm.render import html
 

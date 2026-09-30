@@ -110,3 +110,24 @@ def test_a_daily_cap(finished, monkeypatch, admin):
     assert user.post(f"/api/runs/{run['id']}/visuals").status_code == 502  # counted all the same
     r = user.post(f"/api/runs/{run['id']}/visuals")
     assert r.status_code == 429 and r.json()["detail"] == "visuals_limit"
+
+
+def test_the_interactive_page_downloads_and_shows_sandboxed(finished, monkeypatch):
+    from litstorm.render import interactive
+
+    user, run = finished
+    monkeypatch.setattr(interactive, "prerender", lambda specs: ["<svg></svg>"] * len(specs))
+    _answer(monkeypatch, _figures("929,000"))
+    user.post(f"/api/runs/{run['id']}/visuals")
+
+    download = user.get(f"/api/runs/{run['id']}/export", params={"format": "interactive"})
+    assert download.status_code == 200 and "attachment" in download.headers["content-disposition"]
+    assert ".html" in download.headers["content-disposition"] and 'id="v1"' in download.text
+
+    shown = user.get(f"/api/runs/{run['id']}/interactive")
+    assert shown.headers["content-security-policy"].startswith("sandbox allow-scripts")
+    assert "allow-same-origin" not in shown.headers["content-security-policy"]
+    assert 'id="v1"' in shown.text
+
+    full = user.get(f"/api/runs/{run['id']}/interactive", params={"charts": "full"})
+    assert 'id="ls-charts"' in full.text

@@ -121,12 +121,18 @@ def test_a_glossary_term_must_be_what_its_fact_talks_about():
 
 
 def test_diagram_keeps_only_linked_known_steps():
-    facts = visuals.facts(REPORT)
-    blocks, _ = visuals.check([{"type": "diagram", "kind": "flow", "facts": [_fact(facts, "PMCS")],
+    report = copy.deepcopy(REPORT)
+    report["sources"][2]["evidence"].append("ผลผลิตจากสวนส่งเข้าโรงคัดบรรจุ แล้วขนส่งไปยังท่าเรือเพื่อส่งออก")
+    facts = visuals.facts(report)
+    made_up = {"type": "diagram", "facts": [_fact(facts, "PMCS")],
+               "nodes": [{"id": "a", "label": "ดาวอังคาร"}, {"id": "b", "label": "ดาวพุธ"}, {"id": "c", "label": "ดาวเสาร์"}],
+               "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}]}
+    assert visuals.check([made_up], report, facts)[1][0]["reason"] == "its steps are not in its facts"
+    blocks, _ = visuals.check([{"type": "diagram", "kind": "flow", "facts": [_fact(facts, "โรงคัดบรรจุ")],
         "nodes": [{"id": "farm", "label": "สวน"}, {"id": "pack", "label": "โรงคัดบรรจุ"},
                   {"id": "port", "label": "ท่าเรือ"}, {"id": "Bad Id!", "label": "x"}],
         "edges": [{"from": "farm", "to": "pack"}, {"from": "pack", "to": "port"},
-                  {"from": "pack", "to": "nowhere"}, {"from": "farm", "to": "farm"}]}], REPORT, facts)
+                  {"from": "pack", "to": "nowhere"}, {"from": "farm", "to": "farm"}]}], report, facts)
     [block] = blocks
     assert [n["id"] for n in block["nodes"]] == ["farm", "pack", "port"]
     assert len(block["edges"]) == 2

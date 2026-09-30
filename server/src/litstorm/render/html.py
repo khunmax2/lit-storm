@@ -89,6 +89,14 @@ def _font_faces():
     return "\n".join(rules)
 
 
+# The dark palette, used for the reader's system setting and for a switch.
+_DARK = (
+    "--bg: oklch(0.145 0 0); --ink: oklch(0.985 0 0); --body: oklch(0.985 0 0 / 0.86); "
+    "--card: oklch(0.185 0 0); --soft: oklch(0.269 0 0 / 0.6); --muted: oklch(0.708 0 0); "
+    "--line: oklch(1 0 0 / 0.1); --brand: oklch(0.707 0.165 254.6); --brand-soft: oklch(0.28 0.06 262); "
+    "--fav-l: 0.33; --fav-c: 0.06; --fav-ink-l: 0.88; --fav-ink-c: 0.07; color-scheme: dark;"
+)
+
 CSS = """
 :root {
   --bg: oklch(1 0 0); --ink: oklch(0.145 0 0); --body: oklch(0.145 0 0 / 0.88);
@@ -99,14 +107,8 @@ CSS = """
   --serif: "LS Serif Latin", "LS Serif Thai", "Noto Serif Thai", "Instrument Serif", Georgia, serif;
   color-scheme: light dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: oklch(0.145 0 0); --ink: oklch(0.985 0 0); --body: oklch(0.985 0 0 / 0.86);
-    --card: oklch(0.185 0 0); --soft: oklch(0.269 0 0 / 0.6); --muted: oklch(0.708 0 0);
-    --line: oklch(1 0 0 / 0.1); --brand: oklch(0.707 0.165 254.6); --brand-soft: oklch(0.28 0.06 262);
-    --fav-l: 0.33; --fav-c: 0.06; --fav-ink-l: 0.88; --fav-ink-c: 0.07;
-  }
-}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { DARK } }
+:root[data-theme="dark"] { DARK }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
@@ -255,6 +257,9 @@ nav.toc.inline .inner { position: static; max-height: none; background: var(--so
 """
 
 
+CSS = CSS.replace("DARK", _DARK)
+
+
 def _markdown(text):
     rendered = _md.render(text or "")
     return report_mod.CITATION.sub(
@@ -284,14 +289,17 @@ def _toc(sections):
     return f"<ol>{items}</ol>"
 
 
-def _sections(sections, level=2):
+def _sections(sections, level=2, after=None):
+    """The sections, and whatever `after` puts after a section's own text
+    (the interactive page's figures), by section id."""
     out = []
     tag = f"h{min(level, 6)}"
     for s in sections:
         n = s["n"].zfill(2) if level == 2 else s["n"]
         out.append(f'<{tag} id="{s["id"]}"><span class="n">{n}</span><span>{html.escape(s["heading"])}</span></{tag}>')
         out.append(_markdown(s["body"]))
-        out.append(_sections(s["children"], level + 1))
+        out.append((after or {}).get(s["id"], ""))
+        out.append(_sections(s["children"], level + 1, after))
     return "\n".join(out)
 
 
@@ -381,6 +389,26 @@ def _date(when, language):
 def render(report, with_evidence=False, expanded=False, engine_label="", finished_at: datetime | None = None):
     """The page. `expanded` opens every evidence block, for printing:
     Chromium does not print what a closed <details> holds."""
+    return page(report, with_evidence, expanded, engine_label, finished_at)
+
+
+def page(
+    report,
+    with_evidence=False,
+    expanded=False,
+    engine_label="",
+    finished_at: datetime | None = None,
+    *,
+    head="",
+    tools="",
+    after_lead="",
+    after_section=None,
+    sources_extra="",
+    body_end="",
+):
+    """The page with room for more: the interactive page puts its styles and
+    policy in `head`, its switches in `tools`, figures after the overview and
+    after sections, a table among the Sources, and its script at the end."""
     labels = LABELS[report["language"]]
     title = html.escape(report["title"])
     sections = _numbered(report["sections"])
@@ -415,27 +443,31 @@ def render(report, with_evidence=False, expanded=False, engine_label="", finishe
 <title>{title}</title>
 <style>{_font_faces()}
 {CSS}</style>
+{head}
 </head>
 <body id="top">
 <div class="page">
 <article>
 <header>
-<div class="meta">{''.join(facts)}</div>
+<div class="meta">{''.join(facts)}{tools}</div>
 <h1>{title}</h1>
 </header>
 {_strip(report['sources'], labels)}
 {inline}
 <div class="prose">
 {lead}
-{_sections(sections)}
+{after_lead}
+{_sections(sections, after=after_section)}
 </div>
 <section class="sources" id="sources">
 <h2>{labels['sources']} <span class="count">{len(report['sources'])}</span></h2>
 <ol class="sources">{sources}</ol>
+{sources_extra}
 </section>
 </article>
 {side}
 </div>
+{body_end}
 </body>
 </html>
 """

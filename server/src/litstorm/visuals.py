@@ -241,6 +241,16 @@ def _year_in(date, text):
     return any(int(n) in years for n in numbers_in(text) if n.is_integer())
 
 
+_WORD = re.compile(r"[a-z0-9\u0e01-\u0e4e]{3,}")
+
+
+def _grounded(text, fact_text):
+    """Some word of `text` (three letters or more) is in the passage: a label
+    that shares nothing with its fact was made up."""
+    passage = _normal(fact_text)
+    return any(word in passage for word in _WORD.findall(_normal(text)))
+
+
 def _when(date):
     """A date for ordering: Buddhist-era years (2567) read as CE (2024)."""
     text = _normal(date)
@@ -295,11 +305,14 @@ class _Checker:
             cite, value = _cite(raw.get("fact"), self.by_id), _number(raw.get("value"))
             if not cite or value is None or not _number_in(value, cite["text"]):
                 continue
+            as_of = _text(raw.get("as_of"), 20)
+            if as_of and re.match(r"^\s*\d{4}", _normal(as_of)) and not _year_in(as_of, cite["text"]):
+                as_of = ""
             items.append({
                 "label": _text(raw.get("label"), MAX_TEXT["label"]),
                 "value": value,
                 "unit": _text(raw.get("unit"), MAX_TEXT["unit"]),
-                "as_of": _text(raw.get("as_of"), 20),
+                "as_of": as_of,
                 "cite": cite,
             })
         items = [i for i in items if i["label"]]
@@ -384,6 +397,8 @@ class _Checker:
             label = _text(raw.get("label"), MAX_TEXT["label"])
             if not cite or not label or len(cells) != len(columns):
                 continue
+            if not any(_grounded(t, cite["text"]) for t in [label, *cells]):
+                continue
             rows.append({"label": label, "cells": cells, "cite": cite})
         if not columns or len(rows) < 2:
             return None, "fewer than two rows with facts"
@@ -412,6 +427,10 @@ class _Checker:
             return None, "fewer than three linked steps"
         if not cites:
             return None, "no fact behind it"
+        # Most steps must be named in the facts it cites.
+        passages = " ".join(c["text"] for c in cites)
+        if sum(_grounded(n["label"], passages) for n in nodes) < 0.6 * len(nodes):
+            return None, "its steps are not in its facts"
         return {"kind": kind, "nodes": nodes, "edges": edges, "cites": cites}, None
 
     def glossary(self, b):

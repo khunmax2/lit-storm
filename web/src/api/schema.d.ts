@@ -560,7 +560,12 @@ export interface paths {
         delete: operations["trash_project_api_projects__project_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Project
+         * @description Rename a Project, or set what research in it starts with. Runs
+         *     already made keep what they were started with.
+         */
+        patch: operations["update_project_api_projects__project_id__patch"];
         trace?: never;
     };
     "/api/refine": {
@@ -1449,6 +1454,26 @@ export interface components {
             /** Depth Levels */
             depth_levels: components["schemas"]["DepthChoice"][];
         };
+        /**
+         * ProjectDefaults
+         * @description What the composer starts with inside the Project. Each is a
+         *     suggestion the owner can change before starting; one that no longer
+         *     exists (a model switched off) is simply not preselected.
+         */
+        ProjectDefaults: {
+            /** Language */
+            language?: ("th" | "en") | null;
+            /** Llm Model Id */
+            llm_model_id?: string | null;
+            /** Search Provider Id */
+            search_provider_id?: string | null;
+            /** Extra Search Provider Ids */
+            extra_search_provider_ids?: string[];
+            /** Depth */
+            depth?: ("fast" | "standard" | "deep") | null;
+            /** Sections */
+            sections?: string[];
+        };
         /** ProjectDetail */
         ProjectDetail: {
             /** Id */
@@ -1460,6 +1485,23 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * @default {
+             *       "extra_search_provider_ids": [],
+             *       "sections": []
+             *     }
+             */
+            defaults: components["schemas"]["ProjectDefaults"];
+            /**
+             * Search Scope
+             * @default
+             */
+            search_scope: string;
+            /**
+             * Writing Style
+             * @default
+             */
+            writing_style: string;
             /** Sessions */
             sessions: components["schemas"]["SessionSummary"][];
         };
@@ -1479,6 +1521,33 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * @default {
+             *       "extra_search_provider_ids": [],
+             *       "sections": []
+             *     }
+             */
+            defaults: components["schemas"]["ProjectDefaults"];
+            /**
+             * Search Scope
+             * @default
+             */
+            search_scope: string;
+            /**
+             * Writing Style
+             * @default
+             */
+            writing_style: string;
+        };
+        /** ProjectPatch */
+        ProjectPatch: {
+            /** Name */
+            name?: string | null;
+            defaults?: components["schemas"]["ProjectDefaults"] | null;
+            /** Search Scope */
+            search_scope?: string | null;
+            /** Writing Style */
+            writing_style?: string | null;
         };
         /** QuestionAnswer */
         QuestionAnswer: {
@@ -1620,6 +1689,13 @@ export interface components {
              * @default []
              */
             sections: string[];
+            /**
+             * Instructions
+             * @default {}
+             */
+            instructions: {
+                [key: string]: unknown;
+            };
             /** Turn */
             turn?: {
                 [key: string]: unknown;
@@ -1726,6 +1802,13 @@ export interface components {
              * @default []
              */
             sections: string[];
+            /**
+             * Instructions
+             * @default {}
+             */
+            instructions: {
+                [key: string]: unknown;
+            };
             /** Turn */
             turn?: {
                 [key: string]: unknown;
@@ -3242,6 +3325,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_api_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectOut"];
+                };
             };
             /** @description Validation Error */
             422: {

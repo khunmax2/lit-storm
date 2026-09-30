@@ -133,10 +133,34 @@ class SessionSummary(BaseModel):
     kind: str = "research"  # "research" | "discussion"
 
 
+class ProjectDefaults(BaseModel):
+    """What the composer starts with inside the Project. Each is a
+    suggestion the owner can change before starting; one that no longer
+    exists (a model switched off) is simply not preselected."""
+
+    language: Literal["th", "en"] | None = None
+    llm_model_id: uuid.UUID | None = None
+    search_provider_id: uuid.UUID | None = None
+    extra_search_provider_ids: list[uuid.UUID] = Field(default_factory=list, max_length=3)
+    depth: Literal["fast", "standard", "deep"] | None = None
+    sections: list[str] = Field(default_factory=list, max_length=20)
+
+
 class ProjectOut(BaseModel):
     id: str
     name: str
     created_at: datetime
+    defaults: ProjectDefaults = ProjectDefaults()
+    # The Project instructions (litstorm.instructions).
+    search_scope: str = ""
+    writing_style: str = ""
+
+
+class ProjectPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    defaults: ProjectDefaults | None = None
+    search_scope: str | None = Field(default=None, max_length=2000)
+    writing_style: str | None = Field(default=None, max_length=2000)
 
 
 class ProjectDetail(ProjectOut):
@@ -144,7 +168,11 @@ class ProjectDetail(ProjectOut):
 
 
 def project_out(p):
-    return ProjectOut(id=str(p.id), name=p.name, created_at=p.created_at)
+    return ProjectOut(
+        id=str(p.id), name=p.name, created_at=p.created_at,
+        defaults=ProjectDefaults(**(p.defaults or {})),
+        search_scope=p.search_scope or "", writing_style=p.writing_style or "",
+    )
 
 
 @router.get("/projects", response_model=list[ProjectOut])
@@ -161,6 +189,26 @@ def list_projects(user=Depends(deps.current_user), session=Depends(deps.database
 def create_project(body: ProjectIn, user=Depends(deps.current_user), session=Depends(deps.database)):
     project = Project(owner_id=user.id, name=body.name.strip())
     session.add(project)
+    session.commit()
+    return project_out(project)
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
+def update_project(
+    project_id: uuid.UUID, body: ProjectPatch, user=Depends(deps.current_user), session=Depends(deps.database)
+):
+    """Rename a Project, or set what research in it starts with. Runs
+    already made keep what they were started with."""
+    project = deps.own(session, Project, project_id, user)
+    if body.name is not None:
+        project.name = body.name.strip()
+    if body.defaults is not None:
+        defaults = body.defaults.model_copy(update={"sections": sections.clean(body.defaults.sections)})
+        project.defaults = defaults.model_dump(mode="json", exclude_defaults=True)
+    if body.search_scope is not None:
+        project.search_scope = body.search_scope.strip() or None
+    if body.writing_style is not None:
+        project.writing_style = body.writing_style.strip() or None
     session.commit()
     return project_out(project)
 
@@ -290,6 +338,8 @@ class RunOut(BaseModel):
     refinement: list[QuestionAnswer] = []
     # The report's sections, as the owner set them.
     sections: list[str] = []
+    # The Project instructions it was started with.
+    instructions: dict = {}
     # A Discussion's Turn: {"action", "text", "steps"}; None for a Run.
     turn: dict | None = None
     quota_units: int = 1
@@ -324,6 +374,7 @@ def run_out(run):
         notes=run.notes or {},
         refinement=run.config.get("refinement", []),
         sections=run.config.get("sections", []),
+        instructions=run.config.get("instructions", {}),
         turn=run.turn,
         quota_units=run.quota_units if run.quota_units is not None else 1,
     )
@@ -443,6 +494,15 @@ def _extra_searches(session, body, first):
     return extra
 
 
+def _instructions(session, research_session):
+    """The Project's instructions, copied into the Run as they are now."""
+    from litstorm import instructions
+
+    project = session.get(Project, research_session.project_id) if research_session.project_id else None
+    kept = instructions.snapshot(project)
+    return {"instructions": kept} if kept else {}
+
+
 def new_run(session, owner, research_session, body, parent_run_id=None):
     """A queued Run with its config snapshot. Secrets are not in it.
 
@@ -482,6 +542,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
             "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
             **({"search_extra": extra} if extra else {}),
             **({"sections": wanted} if wanted else {}),
+            **_instructions(session, research_session),
         },
         status=QUEUED,
         quota_month=limits.quota_month(),
@@ -709,6 +770,8 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
             "refinement": old.config.get("refinement", []),
             **({"search_extra": old.config["search_extra"]} if old.config.get("search_extra") else {}),
             **({"sections": old.config["sections"]} if old.config.get("sections") else {}),
+            # The instructions it was started with, not the Project's now.
+            **({"instructions": old.config["instructions"]} if old.config.get("instructions") else {}),
         } if available else old.config,
         status=QUEUED if available else NEEDS_SELECTION,
         quota_month=limits.quota_month(),

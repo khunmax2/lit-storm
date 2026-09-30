@@ -21,7 +21,7 @@ import asyncio
 import os
 import time
 
-from litstorm import outcomes, refine, sections
+from litstorm import instructions, outcomes, sections
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
 from litstorm.engines.base import EngineFailure
 
@@ -205,7 +205,8 @@ class AgentEngine:
         mode = params.get("mode", "iterative")
         budget = (config.target_seconds or 300) * GATHER_SHARE.get(mode, 0.8) / 60
         language = LANGUAGE.get(config.language, "English")
-        focus = refine.focus(config.refinement)
+        focus = instructions.focus(config)
+        style = instructions.style(config)
 
         async def research():
             if mode == "deep":
@@ -240,6 +241,8 @@ class AgentEngine:
                 query = f"{config.topic}\n\nWrite the report in {language}."
                 if focus:
                     query += f" Focus: {focus}"
+                if style:
+                    query += f"\n\nWriting style: {style}"
                 if config.sections:
                     query += "\n\nThe report's sections, exactly these and in this order:\n" + "\n".join(
                         f"- {h}" for h in config.sections
@@ -261,7 +264,8 @@ class AgentEngine:
             progress.stage("research")
             return await researcher.run(
                 config.topic,
-                output_instructions=f"Write the whole response in {language}, with headings (##) for its parts.",
+                output_instructions=f"Write the whole response in {language}, with headings (##) for its parts."
+                + (f" Writing style: {style}" if style else ""),
                 background_context=focus,
             )
 

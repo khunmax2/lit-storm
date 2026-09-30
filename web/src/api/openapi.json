@@ -1428,6 +1428,58 @@
    }
   },
   "/api/projects/{project_id}": {
+   "patch": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Update Project",
+    "description": "Rename a Project, or set what research in it starts with. Runs\nalready made keep what they were started with.",
+    "operationId": "update_project_api_projects__project_id__patch",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
    "get": {
     "tags": [
      "research"
@@ -3854,6 +3906,85 @@
     ],
     "title": "Options"
    },
+   "ProjectDefaults": {
+    "properties": {
+     "language": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "th",
+         "en"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "llm_model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Model Id"
+     },
+     "search_provider_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Provider Id"
+     },
+     "extra_search_provider_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 3,
+      "title": "Extra Search Provider Ids"
+     },
+     "depth": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "fast",
+         "standard",
+         "deep"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Depth"
+     },
+     "sections": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "Sections"
+     }
+    },
+    "type": "object",
+    "title": "ProjectDefaults",
+    "description": "What the composer starts with inside the Project. Each is a\nsuggestion the owner can change before starting; one that no longer\nexists (a model switched off) is simply not preselected."
+   },
    "ProjectDetail": {
     "properties": {
      "id": {
@@ -3868,6 +3999,23 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "defaults": {
+      "$ref": "#/components/schemas/ProjectDefaults",
+      "default": {
+       "extra_search_provider_ids": [],
+       "sections": []
+      }
+     },
+     "search_scope": {
+      "type": "string",
+      "title": "Search Scope",
+      "default": ""
+     },
+     "writing_style": {
+      "type": "string",
+      "title": "Writing Style",
+      "default": ""
      },
      "sessions": {
       "items": {
@@ -3915,6 +4063,23 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "defaults": {
+      "$ref": "#/components/schemas/ProjectDefaults",
+      "default": {
+       "extra_search_provider_ids": [],
+       "sections": []
+      }
+     },
+     "search_scope": {
+      "type": "string",
+      "title": "Search Scope",
+      "default": ""
+     },
+     "writing_style": {
+      "type": "string",
+      "title": "Writing Style",
+      "default": ""
      }
     },
     "type": "object",
@@ -3924,6 +4089,59 @@
      "created_at"
     ],
     "title": "ProjectOut"
+   },
+   "ProjectPatch": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "defaults": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProjectDefaults"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "search_scope": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Scope"
+     },
+     "writing_style": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Writing Style"
+     }
+    },
+    "type": "object",
+    "title": "ProjectPatch"
    },
    "QuestionAnswer": {
     "properties": {
@@ -4325,6 +4543,12 @@
       "title": "Sections",
       "default": []
      },
+     "instructions": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Instructions",
+      "default": {}
+     },
      "turn": {
       "anyOf": [
        {
@@ -4640,6 +4864,12 @@
       "type": "array",
       "title": "Sections",
       "default": []
+     },
+     "instructions": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Instructions",
+      "default": {}
      },
      "turn": {
       "anyOf": [

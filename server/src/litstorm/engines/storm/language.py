@@ -122,11 +122,31 @@ _TARGETS = (
     (knowledge_curation.QuestionToQuery, _query),
 )
 
+def _style(style):
+    """The Project's writing style (litstorm.instructions), for what is written."""
+    return f"""
+
+The reader has asked for this writing style; follow it unless it conflicts
+with the format rules above:
+{style}
+"""
+
+
+# The signatures that write the report, which a writing style applies to.
+_WRITING = {
+    outline_generation.WritePageOutline,
+    outline_generation.WritePageOutlineFromConv,
+    article_generation.WriteSection,
+    article_polish.WriteLeadSection,
+    article_polish.PolishPage,
+}
+
 _ORIGINAL_DOCS = {}
 
 
-def apply(code):
-    """Point STORM's prompts at report language `code`. Safe to call repeatedly."""
+def apply(code, style=""):
+    """Point STORM's prompts at report language `code`, and its writing at
+    `style` when there is one. Safe to call repeatedly."""
     if code not in LANGUAGES:
         raise ValueError(f"{code!r} is not a report language: {sorted(LANGUAGES)}")
     language = LANGUAGES[code]
@@ -135,7 +155,10 @@ def apply(code):
         if signature not in _ORIGINAL_DOCS:
             _ORIGINAL_DOCS[signature] = signature.__doc__
         original = _ORIGINAL_DOCS[signature]
-        signature.__doc__ = original if language is None else original + directive(language)
+        doc = original if language is None else original + directive(language)
+        if style and signature in _WRITING:
+            doc += _style(style)
+        signature.__doc__ = doc
 
 
 def applied_instructions():

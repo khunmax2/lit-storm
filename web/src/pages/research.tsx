@@ -10,6 +10,7 @@ import {
   Globe,
   MoreHorizontal,
   RotateCcw,
+  Settings2,
   Sparkles,
   Square,
   Trash2,
@@ -30,6 +31,7 @@ import {
   timeAgo,
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
+import { ProjectSettingsDialog } from "@/components/project-settings";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
 import {
@@ -202,6 +204,22 @@ export function ProjectPage() {
     engine: "storm",
   });
   const [moving, setMoving] = useState<{ id: string; title: string; project_id: string } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // The composer starts from the Project's defaults, whenever they change
+  // and nothing has been typed yet.
+  const defaults = project.data?.defaults;
+  useEffect(() => {
+    if (!defaults || form.topic) return;
+    setForm((f) => ({
+      ...f,
+      language: defaults.language ?? lang,
+      llm_model_id: defaults.llm_model_id ?? "",
+      search_provider_id: defaults.search_provider_id ?? "",
+      extra_search_provider_ids: defaults.extra_search_provider_ids ?? [],
+      depth: (defaults.depth ?? "standard") as Depth,
+      sections_text: (defaults.sections ?? []).join("\n"),
+    }));
+  }, [JSON.stringify(defaults)]); // eslint-disable-line react-hooks/exhaustive-deps
   const requestKey = useRequestKey();
   const start = useMutation({
     mutationFn: () => startResearch(form, requestKey.current(), projectId),
@@ -263,6 +281,11 @@ export function ProjectPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                <Settings2 />
+                {t("projectSettings.title")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => confirm(t("delete.confirmProject"), () => remove.mutate())}
@@ -274,8 +297,21 @@ export function ProjectPage() {
           </DropdownMenu>
         }
       />
+      <ProjectSettingsDialog project={p} open={settingsOpen} onOpenChange={setSettingsOpen} />
       <Composer form={form} setForm={setForm} onSubmit={() => start.mutate()} pending={start.isPending} size="md" />
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        {p.search_scope || p.writing_style ? (
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings2 className="size-3.5" />
+            {t("projectSettings.inUse")}
+          </button>
+        ) : (
+          <span />
+        )}
         <QuotaLine />
       </div>
       {start.error && (

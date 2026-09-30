@@ -155,6 +155,14 @@ class Project(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     name: Mapped[str] = mapped_column(String(200))
+    # What the composer starts with inside the Project: language, model,
+    # search, depth, sections (docs/web-app-design.md, รุ่นสอง: โครงร่างที่
+    # ผู้ใช้กำหนดและ Project).
+    defaults: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
+    # The Project instructions (docs/CONTEXT.md): what to search for, and how
+    # to write. Each Run started in the Project keeps a copy.
+    search_scope: Mapped[str | None] = mapped_column(Text)
+    writing_style: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _now()
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

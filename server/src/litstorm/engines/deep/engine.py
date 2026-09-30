@@ -21,7 +21,7 @@ import subprocess
 import threading
 import time
 
-from litstorm import outcomes, refine
+from litstorm import instructions, outcomes
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
 from litstorm.engines.base import Cancelled, EngineFailure
 
@@ -58,9 +58,11 @@ def cli_input(config, secrets):
         raise EngineFailure(outcomes.BAD_CONFIGURATION, f"Deep Research cannot search with {config.search.get('provider')!r}")
     params = {**DEFAULTS, **(config.params or {})}
     query = config.topic
-    focus = refine.focus(config.refinement)
+    focus = instructions.focus(config)
     if focus:
         query += f"\n\nFocus: {focus}"
+    if instructions.style(config):
+        query += f"\n\nWriting style: {instructions.style(config)}"
     line = {
         "query": query,
         "language": config.language,

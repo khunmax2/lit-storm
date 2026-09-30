@@ -16,7 +16,7 @@ from knowledge_storm.storm_wiki.engine import (
 )
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 
-from litstorm import outcomes, refine, search_cache, sections
+from litstorm import instructions, outcomes, search_cache, sections
 from litstorm.engines.base import EngineFailure
 
 from . import encoders, language, normalize, providers
@@ -144,7 +144,7 @@ class StormEngine:
 
     def run(self, config, secrets, workspace, progress, cancel):
         started = time.time()
-        language.apply(config.language)
+        language.apply(config.language, style=instructions.style(config))
         output_dir = os.path.join(workspace, "storm")
         runner = build_runner(config, secrets, output_dir)
 
@@ -187,7 +187,7 @@ class StormEngine:
             # The owner's answers to the clarifying questions steer research:
             # the topic its prompts see carries them. The outline and the
             # report keep the topic as the owner wrote it.
-            focus = refine.focus(config.refinement)
+            focus = instructions.focus(config)
             runner.topic = f"{config.topic} (focus: {focus})" if focus else config.topic
             try:
                 table = stage(

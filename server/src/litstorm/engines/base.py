@@ -42,6 +42,9 @@ class RunConfig:
     search_cache_dir: str | None = None
     # The owner's answers to the clarifying questions: [{"question", "answer"}].
     refinement: list[dict[str, Any]] = field(default_factory=list)
+    # The Project instructions the Run was started with: {"search_scope",
+    # "writing_style"} (litstorm.instructions); empty outside a Project.
+    instructions: dict[str, Any] = field(default_factory=dict)
     # The report's top-level sections as the owner wants them (litstorm.sections).
     sections: list[str] = field(default_factory=list)
     # A Discussion's Turn (engines/costorm): {"action", "text", "steps",

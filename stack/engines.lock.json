@@ -1,0 +1,11 @@
+{
+  "_comment": "The Engine forks a release is built from (stack/build-images.sh, .github/workflows/images.yml). Move a pin by committing a new sha here; the build refuses a checkout that is not the pinned commit.",
+  "agents": {
+    "repo": "khunmax2/lit_agents-deep-research",
+    "commit": "66a529f051f84591768108d7a1df344cf0fe53f4"
+  },
+  "deep": {
+    "repo": "khunmax2/lit_deep-research-web",
+    "commit": "ee439d2c722acc9366d11ebc86f86d3e239e39d7"
+  }
+}

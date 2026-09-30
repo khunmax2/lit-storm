@@ -1,0 +1,46 @@
+# The stack on host 203 (docs/deploy/HOST-203.md): the images the GHCR
+# workflow published, pulled by digest, nothing built on the host. The web
+# container publishes one loopback port; the host's nginx serves it at
+# https://203.185.144.41/litstorm and terminates TLS.
+#
+#   docker compose -p litstorm -f stack/compose.yml -f stack/compose.host.yml \
+#     --env-file stack/host.env up -d
+#
+# stack/host.env (from stack/host.env.example, chmod 600) names the images
+# and the port. Compose >= 2.24, for `!reset`.
+services:
+  api:
+    build: !reset null
+    image: ${LITSTORM_SERVER_IMAGE:?set LITSTORM_SERVER_IMAGE in stack/host.env (a digest)}
+    pull_policy: missing
+    environment:
+      LITSTORM_PUBLIC_URL: ${LITSTORM_PUBLIC_URL:-https://203.185.144.41/litstorm}
+      # Behind HTTPS only: the session cookie is never sent in the clear.
+      LITSTORM_COOKIE_SECURE: "true"
+    logging: &logs
+      driver: json-file
+      options: { max-size: 10m, max-file: "5" }
+
+  worker:
+    image: ${LITSTORM_SERVER_IMAGE:?set LITSTORM_SERVER_IMAGE in stack/host.env (a digest)}
+    pull_policy: missing
+    environment:
+      LITSTORM_PUBLIC_URL: ${LITSTORM_PUBLIC_URL:-https://203.185.144.41/litstorm}
+      LITSTORM_COOKIE_SECURE: "true"
+    logging: *logs
+
+  web:
+    build: !reset null
+    image: ${LITSTORM_WEB_IMAGE:?set LITSTORM_WEB_IMAGE in stack/host.env (a digest)}
+    pull_policy: missing
+    ports: !override
+      - "127.0.0.1:${LITSTORM_HOST_PORT:-10340}:80"
+    logging: *logs
+
+  db:
+    logging: *logs
+
+  searxng:
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET in stack/host.env}
+    logging: *logs

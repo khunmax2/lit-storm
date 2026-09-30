@@ -35,6 +35,18 @@ to create the first Administrator. Then, under Settings:
 Two named volumes: `db-data` (Postgres) and `run-data` (each Run's files and
 its `report.json`). `docker compose down` keeps them; `down -v` deletes them.
 
+## On host 203
+
+`docs/deploy/HOST-203.md` is the runbook. The files it uses:
+
+- `build-images.sh` — the two images, from this checkout and the Engine
+  forks pinned in `engines.lock.json` (run by `.github/workflows/images.yml`)
+- `compose.host.yml` + `host.env` (from `host.env.example`) — the stack
+  pulling those images by digest, on one loopback port
+- `host/apply-nginx.sh` — `/litstorm` in the host's nginx: preview, install,
+  uninstall; `host/rehearse-nginx.sh` rehearses it off the host
+- `backup.sh` — back up, verify and restore a stack
+
 ## Walkthrough
 
 `server/tests/e2e_walkthrough.py` drives the whole path through a real

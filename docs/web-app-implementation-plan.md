@@ -387,6 +387,15 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 
 ### สายโครงสร้างระบบ (ไม่ผูกกับช่วงใด)
 
+✅ **เตรียมครบแล้ว 2026-09-30** (ยังไม่ได้ขึ้น host และยังไม่ได้ publish image) runbook อยู่ใน [deploy/HOST-203.md](./deploy/HOST-203.md)
+- **image:** `.github/workflows/images.yml` ทำงานเมื่อ push tag `deploy-*` หรือสั่งมือ
+  - checkout fork ตาม `stack/engines.lock.json` แล้วเรียก `stack/build-images.sh` ซึ่งไม่ยอม build ถ้า fork ไม่ตรง pin หรือมีไฟล์แก้ค้าง และตรวจว่า web image เสิร์ฟใต้ `/litstorm`
+  - push `lit-storm-server` และ `lit-storm-web` ขึ้น GHCR แล้วพิมพ์ digest ไว้ใน job summary
+  - build script ลองบนเครื่อง dev แล้ว ระหว่างนั้นจับได้ว่า Git Bash แปลง `/litstorm` เป็น path ของ Windows ซึ่งจะทำให้ web image เสิร์ฟผิด path แก้แล้ว
+  - ตัว workflow เองยังไม่ได้รันบน GitHub เพราะการรันคือการ publish image
+- **stack บน host:** `stack/compose.host.yml` pull image ตาม digest (`stack/host.env`), เปิดพอร์ตเดียวบน loopback 10340, cookie Secure, log หมุนเวียน ลองขึ้นบนเครื่อง dev จาก image ที่ build แล้ว
+- **nginx:** `stack/host/apply-nginx.sh` ตามแบบของ DeepWitya (`--preview`, `--install`, `--uninstall`, `--remove-preview`, `--check`) ซ้อมทุกโหมดด้วย `stack/host/rehearse-nginx.sh` บน layout แบบ host ผ่าน 18 ข้อ
+- **สำรองข้อมูล:** `stack/backup.sh` (สำรอง / ตรวจ / กู้คืน) ซ้อมกู้คืนแล้ว ดู web-app-design.md
 - GitHub Actions build image ขึ้น GHCR เมื่อติด tag
 - runbook การติดตั้งบน host 203 ที่ `/litstorm` ตามแบบของ DeepWitya: ตรวจพอร์ตว่างก่อน, ดูตัวอย่างผ่าน nginx บน loopback + `ssh -L` แล้วค่อยสลับ
 - ตัดสินและทำระบบสำรองข้อมูล (รวม `secret_key`) พร้อมซ้อมกู้คืน **ต้องเสร็จก่อนใช้จริง**

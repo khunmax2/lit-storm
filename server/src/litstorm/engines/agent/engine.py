@@ -21,7 +21,7 @@ import asyncio
 import os
 import time
 
-from litstorm import outcomes, refine
+from litstorm import outcomes, refine, sections
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
 from litstorm.engines.base import EngineFailure
 
@@ -96,6 +96,19 @@ class _Meter:
     def flush(self, progress, stage):
         progress.usage(stage, llm=self.tokens, search={self.search_name: self.searches})
         self.tokens, self.searches = {}, 0
+
+
+def planned_sections(planned, wanted, topic):
+    """The deep researcher's plan held to the owner's headings: theirs, in
+    their order, each keeping the key question the planner wrote for the
+    section it matches; one it did not plan asks about the heading itself."""
+    from deep_researcher.agents.planner_agent import ReportPlanSection
+
+    out = []
+    for heading, index in zip(wanted, sections.match(wanted, [s.title for s in planned])):
+        question = planned[index].key_question if index is not None else f"{heading} ({topic})"
+        out.append(ReportPlanSection(title=heading, key_question=question))
+    return out
 
 
 def _hook(meter, found, progress, cancel):
@@ -206,7 +219,10 @@ class AgentEngine:
 
                 async def staged_plan(query):
                     progress.stage("plan")
-                    return await plan(query)
+                    report_plan = await plan(query)
+                    if config.sections:
+                        report_plan.report_outline = planned_sections(report_plan.report_outline, config.sections, config.topic)
+                    return report_plan
 
                 async def staged_loops(report_plan):
                     meter.flush(progress, "plan")
@@ -224,6 +240,10 @@ class AgentEngine:
                 query = f"{config.topic}\n\nWrite the report in {language}."
                 if focus:
                     query += f" Focus: {focus}"
+                if config.sections:
+                    query += "\n\nThe report's sections, exactly these and in this order:\n" + "\n".join(
+                        f"- {h}" for h in config.sections
+                    )
                 return await researcher.run(query)
 
             researcher = IterativeResearcher(

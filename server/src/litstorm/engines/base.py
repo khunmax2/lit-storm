@@ -42,6 +42,8 @@ class RunConfig:
     search_cache_dir: str | None = None
     # The owner's answers to the clarifying questions: [{"question", "answer"}].
     refinement: list[dict[str, Any]] = field(default_factory=list)
+    # The report's top-level sections as the owner wants them (litstorm.sections).
+    sections: list[str] = field(default_factory=list)
     # A Discussion's Turn (engines/costorm): {"action", "text", "steps",
     # "state_from"}, the last being the state file the previous Turn left.
     discussion: dict[str, Any] = field(default_factory=dict)

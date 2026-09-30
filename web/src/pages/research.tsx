@@ -644,6 +644,16 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
               )}
             </div>
             <RunNotes notes={run.notes ?? {}} />
+            {!!run.sections?.length && (
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer select-none">{t("sections.set", { n: run.sections.length })}</summary>
+                <ol className="mt-1.5 list-decimal pl-7 text-foreground/80">
+                  {run.sections.map((h, i) => (
+                    <li key={i}>{h}</li>
+                  ))}
+                </ol>
+              </details>
+            )}
             {!!run.refinement?.length && (
               <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">{t("refine.answered", { n: run.refinement.length })}</summary>
@@ -751,6 +761,7 @@ export function SessionPage() {
         search_provider_id: "",
         depth: latest.depth as Depth,
         engine: latest.engine,
+        sections_text: (latest.sections ?? []).join("\n"),
       });
   }, [latest]); // eslint-disable-line react-hooks/exhaustive-deps
   const requestKey = useRequestKey();

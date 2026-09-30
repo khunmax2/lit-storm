@@ -134,6 +134,7 @@ def claim(session):
         target_seconds=60.0 * run.config["target_minutes"] if run.config.get("target_minutes") else None,
         search_cache_dir=settings.get().search_cache_dir,
         refinement=run.config.get("refinement", []),
+        sections=run.config.get("sections", []),
         discussion={**run.turn, "state_from": discussion.state_from(session, run)} if run.turn else {},
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)

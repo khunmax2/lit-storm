@@ -3075,6 +3075,14 @@
       "type": "integer",
       "title": "Max Sources",
       "default": 1
+     },
+     "sections_at": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sections At",
+      "default": []
      }
     },
     "type": "object",
@@ -3735,6 +3743,14 @@
       "maxItems": 3,
       "title": "Extra Search Provider Ids"
      },
+     "sections": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "Sections"
+     },
      "depth": {
       "type": "string",
       "enum": [
@@ -4301,6 +4317,14 @@
       "title": "Refinement",
       "default": []
      },
+     "sections": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sections",
+      "default": []
+     },
      "turn": {
       "anyOf": [
        {
@@ -4398,6 +4422,14 @@
       "type": "array",
       "maxItems": 3,
       "title": "Extra Search Provider Ids"
+     },
+     "sections": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "Sections"
      },
      "depth": {
       "type": "string",
@@ -4599,6 +4631,14 @@
       },
       "type": "array",
       "title": "Refinement",
+      "default": []
+     },
+     "sections": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sections",
       "default": []
      },
      "turn": {
@@ -4933,6 +4973,14 @@
       "type": "array",
       "maxItems": 3,
       "title": "Extra Search Provider Ids"
+     },
+     "sections": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "Sections"
      },
      "depth": {
       "type": "string",

@@ -16,7 +16,7 @@ from knowledge_storm.storm_wiki.engine import (
 )
 from knowledge_storm.storm_wiki.modules.callback import BaseCallbackHandler
 
-from litstorm import outcomes, refine, search_cache
+from litstorm import outcomes, refine, search_cache, sections
 from litstorm.engines.base import EngineFailure
 
 from . import encoders, language, normalize, providers
@@ -226,14 +226,25 @@ class StormEngine:
                         f"the search provider refused {rm.refused} searches ({rm.last_refusal})",
                     )
                 raise EngineFailure(outcomes.EMPTY_REPORT, "the research found no sources for this topic")
+            if config.sections:
+                # The owner's headings are the draft STORM improves from what
+                # research found, in place of the one it would write itself.
+                writer = runner.storm_outline_generation_module
+                write_outline = writer.write_outline
+                writer.write_outline = lambda **kw: write_outline(**{**kw, "old_outline": sections.draft(config.sections)})
             outline = stage(
                 "outline",
                 lambda: runner.run_outline_generation_module(
                     information_table=table, callback_handler=callbacks
                 ),
             )
-            # What STORM writes is decided here; see clean_outline.
-            if normalize.clean_outline(outline, config.topic):
+            # What STORM writes is decided here; see clean_outline. The
+            # owner's headings then stand as the top level, whatever the
+            # model made of them.
+            changed = normalize.clean_outline(outline, config.topic)
+            if config.sections:
+                normalize.use_sections(outline, config.sections)
+            if changed or config.sections:
                 outline.dump_outline_to_file(
                     os.path.join(runner.article_output_dir, "storm_gen_outline.txt")
                 )

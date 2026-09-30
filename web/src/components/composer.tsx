@@ -2,7 +2,7 @@
 // the model beside the send button — the layout agent apps have settled on. Used on the home page (with
 // a project picker) and at the foot of a topic (to research it again).
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Gauge, Globe, Loader2, MessageCircleQuestion, Plus, Search, SendHorizontal, Sparkles, Timer, X } from "lucide-react";
+import { Gauge, Globe, ListOrdered, Loader2, MessageCircleQuestion, Plus, Search, SendHorizontal, Sparkles, Timer, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
@@ -34,6 +34,10 @@ export type RunForm = {
   refinement?: { question: string; answer: string }[];
   // More Search Providers searched beside the first, for a mode that can.
   extra_search_provider_ids?: string[];
+  // The report's sections, one per line, and whether the mode at this depth
+  // uses them (the composer sets it): typed text is kept when it does not.
+  sections_text?: string;
+  sections_on?: boolean;
 };
 
 // One press of Start is one Run: the same key goes with every retry of the
@@ -62,6 +66,7 @@ export function runBody(form: RunForm, request_key: string) {
     engine: form.engine,
     refinement: (form.refinement ?? []).filter((qa) => qa.answer.trim()),
     extra_search_provider_ids: form.extra_search_provider_ids ?? [],
+    sections: form.sections_on ? (form.sections_text ?? "").split("\n").filter((l) => l.trim()) : [],
     request_key,
   };
 }
@@ -243,6 +248,14 @@ export function Composer({
   // The level's time target, as the Administrator set it.
   const target = o?.depth_levels.find((d) => d.id === form.depth)?.target_minutes ?? 5;
   const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
+  // The owner's headings (docs/web-app-design.md, หัวข้อที่ต้องการ): where the
+  // mode at this depth uses them.
+  const sectionsOn = !!engine?.sections_at?.includes(form.depth);
+  const [sectionsOpen, setSectionsOpen] = useState(false);
+  useEffect(() => {
+    if (!!form.sections_on !== sectionsOn) setForm({ ...form, sections_on: sectionsOn });
+  }, [sectionsOn, form.sections_on]); // eslint-disable-line react-hooks/exhaustive-deps
+  const showSections = sectionsOn && (sectionsOpen || !!form.sections_text?.trim());
 
   // Question refinement (docs/web-app-design.md, ขัดเกลาโจทย์): a few
   // questions from the chosen model, answered or skipped, before starting.
@@ -308,6 +321,19 @@ export function Composer({
           onChange={(depth) => setForm({ ...form, depth: depth as Depth })}
           items={DEPTHS.map((d) => ({ value: d, label: t(`depth.${d}`) }))}
         />
+        {sectionsOn && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn(CHIP, showSections && "bg-muted")}
+            aria-expanded={showSections}
+            onClick={() => setSectionsOpen(!showSections)}
+          >
+            <ListOrdered className="size-3.5" />
+            {t("sections.chip")}
+          </Button>
+        )}
         {extra}
       </div>
       <div
@@ -341,6 +367,21 @@ export function Composer({
             )}
           />
         </div>
+        {showSections && (
+          <label className="mx-3 mt-3 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm">
+            <span className="flex items-center gap-1.5 font-medium">
+              <ListOrdered className="size-4 text-brand" />
+              {t("sections.title")}
+            </span>
+            <span className="text-xs text-muted-foreground">{t("sections.lead")}</span>
+            <textarea
+              className="min-h-24 rounded-md border bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
+              value={form.sections_text ?? ""}
+              placeholder={t("sections.placeholder")}
+              onChange={(e) => setForm({ ...form, sections_text: e.target.value })}
+            />
+          </label>
+        )}
         {(qa.length > 0 || refine.error) && (
           <div className="mx-3 mt-3 grid gap-2.5 rounded-lg border bg-muted/40 p-3">
             <div className="flex items-center justify-between gap-2 text-sm font-medium">

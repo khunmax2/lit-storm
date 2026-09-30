@@ -1148,6 +1148,11 @@ export interface components {
              * @default 1
              */
             max_sources: number;
+            /**
+             * Sections At
+             * @default []
+             */
+            sections_at: string[];
         };
         /** EngineOut */
         EngineOut: {
@@ -1411,6 +1416,8 @@ export interface components {
             search_provider_id?: string | null;
             /** Extra Search Provider Ids */
             extra_search_provider_ids?: string[];
+            /** Sections */
+            sections?: string[];
             /**
              * Depth
              * @default standard
@@ -1608,6 +1615,11 @@ export interface components {
              * @default []
              */
             refinement: components["schemas"]["QuestionAnswer"][];
+            /**
+             * Sections
+             * @default []
+             */
+            sections: string[];
             /** Turn */
             turn?: {
                 [key: string]: unknown;
@@ -1632,6 +1644,8 @@ export interface components {
             search_provider_id?: string | null;
             /** Extra Search Provider Ids */
             extra_search_provider_ids?: string[];
+            /** Sections */
+            sections?: string[];
             /**
              * Depth
              * @default standard
@@ -1707,6 +1721,11 @@ export interface components {
              * @default []
              */
             refinement: components["schemas"]["QuestionAnswer"][];
+            /**
+             * Sections
+             * @default []
+             */
+            sections: string[];
             /** Turn */
             turn?: {
                 [key: string]: unknown;
@@ -1813,6 +1832,8 @@ export interface components {
             search_provider_id?: string | null;
             /** Extra Search Provider Ids */
             extra_search_provider_ids?: string[];
+            /** Sections */
+            sections?: string[];
             /**
              * Depth
              * @default standard

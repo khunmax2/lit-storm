@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, modes, quota, settings, trash
+from litstorm import limits, modes, quota, sections, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
@@ -70,6 +70,8 @@ class EngineChoice(BaseModel):
     stages: list[str]
     needs_tools: bool
     max_sources: int = 1
+    # The depth levels at which the owner may set the report's sections.
+    sections_at: list[str] = []
 
 
 class Options(BaseModel):
@@ -80,12 +82,21 @@ class Options(BaseModel):
     depth_levels: list[DepthChoice]
 
 
-def engine_choice(name):
+def engine_choice(name, configured):
     e = ENGINES[name]
     return EngineChoice(
         id=name, label=e["label"], search_kinds=list(e["search"]), stages=list(e["stages"]),
         needs_tools=e["needs_tools"], max_sources=e.get("max_sources", 1),
+        sections_at=[d for d in limits.DEPTHS if takes_sections(configured, name, d)],
     )
+
+
+def takes_sections(configured, engine, depth):
+    """Where the owner's headings mean something: STORM's outline, and the
+    report plan Agent Research makes at a level set to its deep mode."""
+    if engine == "storm":
+        return True
+    return engine == "agent" and configured.depth(depth).agent.get("mode") == "deep"
 
 
 @router.get("/options", response_model=Options)
@@ -94,7 +105,7 @@ def options(user=Depends(deps.current_user), session=Depends(deps.database)):
     providers = session.scalars(select(SearchProvider).where(SearchProvider.enabled).order_by(SearchProvider.label))
     configured = limits.load(session)
     return Options(
-        engines=[engine_choice(name) for name in modes.offered(session)],
+        engines=[engine_choice(name, configured) for name in modes.offered(session)],
         models=[
             ModelChoice(id=str(m.id), label=m.label, is_default=m.is_default, supports_tools=m.supports_tools)
             for m in models
@@ -235,6 +246,8 @@ class RunIn(BaseModel):
     # (catalog.ENGINES max_sources): STORM, up to two more. The first may be
     # repeated here; what counts is after that is taken out.
     extra_search_provider_ids: list[uuid.UUID] = Field(default_factory=list, max_length=3)
+    # The report's top-level sections, one per item (litstorm.sections).
+    sections: list[str] = Field(default_factory=list, max_length=20)
     depth: Literal["fast", "standard", "deep"] = "standard"
     engine: str = "storm"  # a research mode from GET /api/options
     # The clarifying questions asked before starting, with the owner's
@@ -275,6 +288,8 @@ class RunOut(BaseModel):
     notes: dict = {}
     # The clarifying questions the owner answered before it started.
     refinement: list[QuestionAnswer] = []
+    # The report's sections, as the owner set them.
+    sections: list[str] = []
     # A Discussion's Turn: {"action", "text", "steps"}; None for a Run.
     turn: dict | None = None
     quota_units: int = 1
@@ -308,6 +323,7 @@ def run_out(run):
         source_count=run.source_count,
         notes=run.notes or {},
         refinement=run.config.get("refinement", []),
+        sections=run.config.get("sections", []),
         turn=run.turn,
         quota_units=run.quota_units if run.quota_units is not None else 1,
     )
@@ -448,6 +464,9 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
     if not modes.model_fits(body.engine, model):
         raise HTTPException(422, "model_cannot_use_tools")
     extra = _extra_searches(session, body, provider)
+    wanted = sections.clean(body.sections)
+    if wanted and not takes_sections(limits.load(session), body.engine, body.depth):
+        raise HTTPException(422, "sections_not_for_mode")
     quota.check_submit(session, owner)
     run = Run(
         session_id=research_session.id,
@@ -462,6 +481,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
             **_snapshot(session, model, provider, body.depth, body.engine),
             "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
             **({"search_extra": extra} if extra else {}),
+            **({"sections": wanted} if wanted else {}),
         },
         status=QUEUED,
         quota_month=limits.quota_month(),
@@ -688,6 +708,7 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
             **_snapshot(session, model, provider, old.config.get("depth", "standard"), old.engine),
             "refinement": old.config.get("refinement", []),
             **({"search_extra": old.config["search_extra"]} if old.config.get("search_extra") else {}),
+            **({"sections": old.config["sections"]} if old.config.get("sections") else {}),
         } if available else old.config,
         status=QUEUED if available else NEEDS_SELECTION,
         quota_month=limits.quota_month(),

@@ -143,6 +143,25 @@ def clean_outline(outline, topic):
     return changes
 
 
+def use_sections(outline, wanted):
+    """Make the owner's headings the outline's top level, in their order and
+    under their names, each keeping the sub-sections STORM planned under the
+    section it matches (litstorm.sections.match). STORM writes one section
+    per top-level heading, so this is what decides the report's parts."""
+    from knowledge_storm.interface import ArticleSectionNode
+
+    from litstorm import sections
+
+    planned = list(outline.root.children)
+    top = []
+    for heading, index in zip(wanted, sections.match(wanted, [n.section_name for n in planned])):
+        node = ArticleSectionNode(heading)
+        if index is not None:
+            node.children = planned[index].children
+        top.append(node)
+    outline.root.children = top
+
+
 def parse_sections(text):
     """(lead, sections) from STORM's article text."""
     lead_lines = []

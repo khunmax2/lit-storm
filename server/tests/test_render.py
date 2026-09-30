@@ -32,7 +32,8 @@ REPORT = {
 
 def test_citations_link_to_their_source():
     page = html.render(REPORT)
-    assert '<a class="cite" href="#src-1">[1]</a>' in page
+    # A pill showing the number; its brackets stay in the text for copying.
+    assert '<a class="cite" href="#src-1"><span class="b">[</span>1<span class="b">]</span></a>' in page
     assert 'id="src-2"' in page
 
 
@@ -87,3 +88,28 @@ def test_printing_opens_the_evidence():
     # Chromium does not print what a closed <details> holds.
     assert "<details open>" in html.render(REPORT, with_evidence=True, expanded=True)
     assert "<details open>" not in html.render(REPORT, with_evidence=True)
+
+
+def test_fonts_travel_inside_the_page():
+    # The web app's faces, so a Thai report looks the same without Thai fonts
+    # installed; data: URLs, not the network.
+    page = html.render(REPORT)
+    assert page.count("@font-face") == 5
+    assert "url(data:font/woff2;base64," in page
+    assert not re.search(r"url\((?!data:)", page)
+
+
+def test_facts_above_the_title():
+    from datetime import datetime, timezone
+
+    page = html.render(REPORT, engine_label="STORM", finished_at=datetime(2026, 9, 29, 20, 0, tzinfo=timezone.utc))
+    assert '<span class="mode">STORM</span>' in page
+    # Bangkok time and the Buddhist year: 30 Sep 2026 03:00 there.
+    assert "30 ก.ย. 2569" in page
+    assert "อ่านราว 1 นาที" in page
+
+
+def test_sections_are_numbered():
+    page = html.render(REPORT)
+    assert '<h2 id="s1"><span class="n">01</span>' in page
+    assert '<h3 id="s2"><span class="n">1.1</span>' in page

@@ -952,14 +952,19 @@ def export_report(
 ):
     from urllib.parse import quote
 
-    _, report = _report(session, run_id, user, "export")
+    run, report = _report(session, run_id, user, "export")
     name = _filename(report, format)
+    # The facts the page shows above the title, as the web app shows them.
+    facts = {
+        "engine_label": ENGINES.get(report.get("engine") or run.engine, {}).get("label", ""),
+        "finished_at": run.finished_at,
+    }
     disposition = f"attachment; filename*=UTF-8''{quote(name)}"
     if format == "html":
         from litstorm.render import html
 
         return Response(
-            html.render(report, with_evidence=evidence),
+            html.render(report, with_evidence=evidence, **facts),
             media_type="text/html; charset=utf-8",
             headers={"Content-Disposition": disposition},
         )
@@ -977,7 +982,7 @@ def export_report(
 
     fd, path = tempfile.mkstemp(suffix=".pdf")
     os.close(fd)
-    pdf.render(report, path, with_evidence=evidence)
+    pdf.render(report, path, with_evidence=evidence, **facts)
     return FileResponse(
         path, media_type="application/pdf", headers={"Content-Disposition": disposition},
         background=BackgroundTask(os.remove, path),

@@ -237,3 +237,18 @@ def test_an_outline_of_only_back_matter_is_kept_rather_than_emptied():
     outline = _Outline(_Node("References"))
     assert clean_outline(outline, "x") == []
     assert _names(outline.root) == ["References"]
+
+
+@pytest.mark.slow
+def test_thai_paragraphs_are_not_cut_at_a_decimal_point():
+    """STORM drops what follows a paragraph's last sentence end, taken to be
+    cut off by the token limit. Thai ends no sentence with a full stop, so
+    the last one was a number's, and most of the paragraph went."""
+    from knowledge_storm.utils import ArticleTextProcessing as AP
+
+    thai = "ฝุ่น PM2.5 มีขนาดเล็กมาก [1] ส่งผลต่อสุขภาพของเด็กและผู้สูงอายุ [2]"
+    assert AP.remove_uncompleted_sentences_with_citations(thai) == thai
+    assert AP.clean_up_section("# หัวข้อ\n" + thai) == "# หัวข้อ\n\n" + thai
+    # English is still cut after its last full sentence, decimals aside.
+    english = "Levels rose by 2.5 times in 2020. [1] Then the model ran out of tok"
+    assert AP.remove_uncompleted_sentences_with_citations(english) == "Levels rose by 2.5 times in 2020. [1]"

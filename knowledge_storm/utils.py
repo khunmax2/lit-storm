@@ -415,12 +415,19 @@ class ArticleTextProcessing:
         # if trailing_citations:
         #     combined_sentences += ' '.join(trailing_citations)
 
-        # Regex pattern to match sentence endings, including optional citation markers.
-        eos_pattern = r"([.!?])\s*(\[\d+\])?\s*"
+        # Regex pattern to match sentence endings, including optional citation
+        # markers. A point between digits is a decimal ("PM2.5"), not an end.
+        eos_pattern = r"(?:(?<!\d)[.!?]|[.!?](?!\d))\s*(?:\[\d+\])*\s*"
         matches = list(re.finditer(eos_pattern, text))
         if matches:
             last_match = matches[-1]
-            text = text[: last_match.end()].strip()
+            tail = text[last_match.end():]
+            # Thai marks no sentence end with a full stop, so what follows the
+            # last one is not an unfinished sentence but, as often as not,
+            # most of the paragraph: cut there, "ฝุ่น PM2.5 ... [1]" kept only
+            # "ฝุ่น PM2." (found in a Thai report, 2026-09-30).
+            if not re.search(r"[฀-๿]", tail):
+                text = text[: last_match.end()].strip()
 
         return text
 

@@ -18,6 +18,7 @@ Upstream is a research codebase you drive from Python. This fork is a web app a 
 
 - **Research that runs on its own.** A topic becomes a Run on a background Worker, one process per Run. Close the page; come back to the report. Runs can be cancelled, retried, and filed in Projects — or left unfiled, as in ChatGPT or Claude.
 - **Reports you can check.** Citations are renumbered in reading order; clicking one opens the source and the excerpt the engine actually used. Export as HTML (opens offline), Markdown or PDF, with or without the evidence.
+- **Figures you can trust.** A visual view adds key figures, charts, timelines, comparisons, diagrams and a glossary, drawn from the sources' evidence in one cheap model call — every number checked against the passage it came from, and dropped if it is not there (docs/adr/0008). Also as an interactive HTML file that works offline.
 - **Thai and English**, for the interface and for the report.
 - **Accounts, quota and a fair queue.** Administrators create accounts and send one-time links. Each person has a monthly quota; the queue takes turns between people and refunds quota when a Run fails for reasons that are not theirs.
 - **Settings on a page.** Models from OpenRouter, Gemini, OpenAI, Groq or any OpenAI-compatible server; search through SearXNG (bundled), Tavily or arXiv; an embedding service of your choice. Keys are stored encrypted and never shown again. Every model, search and embedding service can be tested before it is saved.

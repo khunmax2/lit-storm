@@ -604,9 +604,9 @@ export function ReportPage() {
       <Toolbar>
         {sessionId && (
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/sessions/$sessionId" params={{ sessionId }}>
+            <Link to="/sessions/$sessionId" params={{ sessionId }} aria-label={t("report.back")}>
               <ChevronLeft />
-              {t("report.back")}
+              <span className="hidden sm:inline">{t("report.back")}</span>
             </Link>
           </Button>
         )}

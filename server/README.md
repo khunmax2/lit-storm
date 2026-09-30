@@ -30,5 +30,6 @@ uv run litstorm export runs/demo --format pdf --evidence -o demo.pdf
 | `runner/supervisor.py` | one Run in one process: cancel, deadline, heartbeat |
 | `runner/child.py` | the process a Run lives in |
 | `report.py` | the `report.json` shape and its checks |
+| `visuals.py` | a report's figures: facts from its evidence, the model's blocks, the checks |
 | `outcomes.py` | why a Run ended, and whether quota comes back |
-| `render/` | HTML, Markdown and PDF from `report.json` |
+| `render/` | HTML, Markdown and PDF from `report.json`; the interactive page with figures (`interactive.py`, ECharts vendored in `render/vendor/`) |

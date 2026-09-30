@@ -2,7 +2,22 @@
 // the model beside the send button — the layout agent apps have settled on. Used on the home page (with
 // a project picker) and at the foot of a topic (to research it again).
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Gauge, Globe, ListOrdered, Loader2, MessageCircleQuestion, Plus, Search, SendHorizontal, Sparkles, Timer, X } from "lucide-react";
+import {
+  ChevronDown,
+  Gauge,
+  Globe,
+  ListOrdered,
+  Loader2,
+  MessageCircleQuestion,
+  Search,
+  SendHorizontal,
+  Sparkles,
+  Telescope,
+  Timer,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
@@ -13,11 +28,14 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -108,9 +126,25 @@ export function QuotaLine({ className }: { className?: string }) {
   );
 }
 
-// A choice in the composer's tray: a small white button with a hairline border.
-export const CHIP =
-  "h-8 gap-1.5 rounded-lg border bg-background px-2.5 text-[13px] font-normal shadow-xs hover:bg-muted/60 dark:bg-card";
+// A choice in the composer's tray: a small white button with a hairline
+// border that lifts under the pointer, gives a little when pressed and stays
+// lit while its menu is open.
+export const CHIP = cn(
+  "h-8 gap-1.5 rounded-lg border bg-background px-2.5 text-[13px] font-normal shadow-xs dark:bg-card",
+  "transition-[background-color,box-shadow,transform,color] duration-200 ease-out",
+  "hover:-translate-y-px hover:bg-muted/60 hover:shadow-sm active:translate-y-0 active:scale-[0.96]",
+  "aria-expanded:bg-muted/70 aria-expanded:shadow-sm",
+  "motion-reduce:transform-none motion-reduce:transition-none",
+);
+// A chip whose last icon is a chevron: it turns over while the menu is open.
+const FLIP = "[&>svg:last-child]:transition-transform [&>svg:last-child]:duration-300 aria-expanded:[&>svg:last-child]:rotate-180";
+// The composer's menus open a little slower than the kit's, and ease out.
+const MENU = "duration-200 ease-out";
+// Menu rows: the highlight fades rather than jumps; a tick pops in.
+const ITEM = cn(
+  "transition-colors duration-150",
+  "[&_[data-slot$=indicator]_svg]:animate-in [&_[data-slot$=indicator]_svg]:zoom-in-50 [&_[data-slot$=indicator]_svg]:fade-in-0 [&_[data-slot$=indicator]_svg]:duration-200",
+);
 
 function Chip({
   icon,
@@ -129,17 +163,13 @@ function Chip({
     // Radix may echo a value while its items mount; passing that on would
     // write a stale copy of the form over the defaults just chosen.
     <Select value={value} onValueChange={(v) => v && v !== value && onChange(v)}>
-      <SelectTrigger
-        size="sm"
-        aria-label={label}
-        className={CHIP}
-      >
+      <SelectTrigger size="sm" aria-label={label} className={cn(CHIP, FLIP)}>
         {icon}
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className={MENU}>
         {items.map((i) => (
-          <SelectItem key={i.value} value={i.value}>
+          <SelectItem key={i.value} value={i.value} className={ITEM}>
             {i.label}
           </SelectItem>
         ))}
@@ -148,30 +178,119 @@ function Chip({
   );
 }
 
-/** Other Search Providers to search beside the first (STORM: up to two more). */
-function MoreSources({
+const DEPTH_ICON: Record<Depth, LucideIcon> = { fast: Zap, standard: Gauge, deep: Telescope };
+
+/** The depth: the menu names each level with a line on what it means and
+ *  how long it usually takes; once chosen, the chip keeps only its icon
+ *  (the name shows on hover). */
+function DepthPicker({
+  value,
+  onChange,
+  minutes,
+}: {
+  value: Depth;
+  onChange: (d: Depth) => void;
+  minutes: (d: Depth) => number;
+}) {
+  const { t } = useT();
+  const Icon = DEPTH_ICON[value];
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn(CHIP, "w-8 px-0")}
+              aria-label={`${t("depth.label")}: ${t(`depth.${value}`)}`}
+            >
+              {/* A new level's icon pops in, so the change is seen. */}
+              <Icon key={value} className="size-4 animate-in duration-300 zoom-in-50 fade-in-0 motion-reduce:animate-none" />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{t(`depth.${value}`)}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="start" className={cn(MENU, "w-80 rounded-2xl p-1.5")}>
+        <DropdownMenuRadioGroup value={value} onValueChange={(v) => v !== value && onChange(v as Depth)}>
+          {DEPTHS.map((d) => {
+            const I = DEPTH_ICON[d];
+            return (
+              <DropdownMenuRadioItem
+                key={d}
+                value={d}
+                className={cn(ITEM, "group/row items-start gap-3 rounded-xl py-2.5 pr-8 pl-3")}
+              >
+                <I className="mt-0.5 size-[18px] text-foreground transition-transform duration-200 group-focus/row:scale-110" />
+                <span className="grid gap-0.5">
+                  <span className="font-medium">{t(`depth.${d}`)}</span>
+                  <span className="text-xs leading-snug text-muted-foreground">
+                    {t(`depth.lead.${d}`)} · {t("depth.minutes", { n: minutes(d) })}
+                  </span>
+                </span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Where it searches, ticked in one menu: the first ticked is the main
+ *  Search Provider, the rest are searched beside it, up to what the mode
+ *  can use (STORM: three in all). A mode that searches one swaps instead. */
+function SearchPicker({
   providers,
-  chosen,
-  room,
+  main,
+  extra,
+  max,
   onChange,
 }: {
   providers: { id: string; label: string }[];
-  chosen: string[];
-  room: number;
-  onChange: (ids: string[]) => void;
+  main: string;
+  extra: string[];
+  max: number;
+  onChange: (main: string, extra: string[]) => void;
 }) {
   const { t } = useT();
+  const chosen = [main, ...extra].filter(Boolean);
+  const label = providers.find((p) => p.id === main)?.label ?? t("run.search");
+  const toggle = (id: string, on: boolean) => {
+    let next: string[];
+    if (on) next = max <= 1 ? [id] : chosen.length < max ? [...chosen, id] : chosen;
+    // One stays ticked: a Run searches somewhere.
+    else next = chosen.length > 1 ? chosen.filter((x) => x !== id) : chosen;
+    if (next !== chosen) onChange(next[0], next.slice(1));
+  };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className={CHIP} aria-label={t("run.moreSources")}>
-          <Plus className="size-3.5" />
-          {chosen.length ? t("run.moreSourcesN", { n: chosen.length }) : t("run.moreSources")}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn(CHIP, FLIP, "max-w-64")}
+          aria-label={`${t("run.search")}: ${label}`}
+        >
+          <Search className="size-3.5" />
+          <span className="truncate">{label}</span>
+          {extra.length > 0 && (
+            <span
+              key={extra.length}
+              className="rounded-md bg-brand-soft px-1.5 text-xs text-brand animate-in duration-200 zoom-in-75 fade-in-0 motion-reduce:animate-none"
+            >
+              +{extra.length}
+            </span>
+          )}
+          <ChevronDown className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          {t("run.moreSourcesLead", { n: room })}
+      <DropdownMenuContent align="start" className={cn(MENU, "w-72 rounded-xl p-1.5")}>
+        <DropdownMenuLabel className="text-xs leading-snug font-normal text-muted-foreground">
+          {max > 1 ? t("run.sourcesLead", { n: max }) : t("run.search")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {providers.map((p) => {
@@ -180,11 +299,16 @@ function MoreSources({
             <DropdownMenuCheckboxItem
               key={p.id}
               checked={on}
-              disabled={!on && chosen.length >= room}
-              onSelect={(e) => e.preventDefault()}
-              onCheckedChange={(checked) => onChange(checked ? [...chosen, p.id] : chosen.filter((id) => id !== p.id))}
+              disabled={max > 1 && !on && chosen.length >= max}
+              // Several can be ticked: the menu stays open between them.
+              onSelect={(e) => max > 1 && e.preventDefault()}
+              onCheckedChange={(checked) => toggle(p.id, checked)}
+              className={cn(ITEM, "rounded-lg py-1.5 pl-2.5")}
             >
-              {p.label}
+              <span className="truncate">{p.label}</span>
+              {max > 1 && chosen.length > 1 && p.id === main && (
+                <span className="ml-auto rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{t("run.sourceMain")}</span>
+              )}
             </DropdownMenuCheckboxItem>
           );
         })}
@@ -225,36 +349,42 @@ export function Composer({
   const models = o?.models.filter((m) => !engine?.needs_tools || m.supports_tools === true) ?? [];
   const providers = o?.search_providers.filter((p) => !engine || engine.search_kinds.includes(p.kind)) ?? [];
 
-  useEffect(() => {
-    // Preselect the defaults once options arrive (design: หน้าเริ่มวิจัยเลือก default ไว้ให้),
-    // and again when a new mode cannot use what was chosen.
-    if (!o) return;
-    const pick = <T extends { id: string; is_default: boolean }>(list: T[], current: string) =>
-      list.some((x) => x.id === current) ? current : (list.find((x) => x.is_default)?.id ?? list[0]?.id ?? "");
-    const model = pick(models, form.llm_model_id);
-    const search = pick(providers, form.search_provider_id);
-    const extra = (form.extra_search_provider_ids ?? [])
-      .filter((id) => id !== search && providers.some((p) => p.id === id))
-      .slice(0, (engine?.max_sources ?? 1) - 1);
-    if (
-      model !== form.llm_model_id ||
-      search !== form.search_provider_id ||
-      extra.length !== (form.extra_search_provider_ids ?? []).length
-    )
-      setForm({ ...form, llm_model_id: model, search_provider_id: search, extra_search_provider_ids: extra });
-  }, [o, form.engine]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const unavailable = o && (models.length === 0 || providers.length === 0);
-  // The level's time target, as the Administrator set it.
-  const target = o?.depth_levels.find((d) => d.id === form.depth)?.target_minutes ?? 5;
-  const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
   // The owner's headings (docs/web-app-design.md, หัวข้อที่ต้องการ): where the
   // mode at this depth uses them.
   const sectionsOn = !!engine?.sections_at?.includes(form.depth);
   const [sectionsOpen, setSectionsOpen] = useState(false);
+
   useEffect(() => {
-    if (!!form.sections_on !== sectionsOn) setForm({ ...form, sections_on: sectionsOn });
-  }, [sectionsOn, form.sections_on]); // eslint-disable-line react-hooks/exhaustive-deps
+    // One update for all of it: two effects each writing a copy of the same
+    // form in one render lost the first's changes (the defaults, when the
+    // mode takes sections at this depth — search and model showed empty).
+    const patch: Partial<RunForm> = {};
+    if (!!form.sections_on !== sectionsOn) patch.sections_on = sectionsOn;
+    // Preselect the defaults once options arrive (design: หน้าเริ่มวิจัยเลือก default ไว้ให้),
+    // and again when a new mode cannot use what was chosen. A choice still
+    // allowed is kept, so running this again changes nothing.
+    if (o) {
+      const pick = <T extends { id: string; is_default: boolean }>(list: T[], current: string) =>
+        list.some((x) => x.id === current) ? current : (list.find((x) => x.is_default)?.id ?? list[0]?.id ?? "");
+      const model = pick(models, form.llm_model_id);
+      const search = pick(providers, form.search_provider_id);
+      const extra = (form.extra_search_provider_ids ?? [])
+        .filter((id) => id !== search && providers.some((p) => p.id === id))
+        .slice(0, (engine?.max_sources ?? 1) - 1);
+      if (
+        model !== form.llm_model_id ||
+        search !== form.search_provider_id ||
+        extra.length !== (form.extra_search_provider_ids ?? []).length
+      )
+        Object.assign(patch, { llm_model_id: model, search_provider_id: search, extra_search_provider_ids: extra });
+    }
+    if (Object.keys(patch).length) setForm({ ...form, ...patch });
+  }, [o, form.engine, sectionsOn, form.sections_on]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const unavailable = o && (models.length === 0 || providers.length === 0);
+  // Each level's time target, as the Administrator set it.
+  const minutes = (d: Depth) => o?.depth_levels.find((x) => x.id === d)?.target_minutes ?? 5;
+  const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
   const showSections = sectionsOn && (sectionsOpen || !!form.sections_text?.trim());
 
   // Question refinement (docs/web-app-design.md, ขัดเกลาโจทย์): a few
@@ -292,45 +422,27 @@ export function Composer({
           ]}
         />
         {providers.length > 0 && (
-          <Chip
-            label={t("run.search")}
-            icon={<Search className="size-3.5" />}
-            value={form.search_provider_id}
-            onChange={(search_provider_id) =>
-              setForm({
-                ...form,
-                search_provider_id,
-                extra_search_provider_ids: (form.extra_search_provider_ids ?? []).filter((id) => id !== search_provider_id),
-              })
+          <SearchPicker
+            providers={providers}
+            main={form.search_provider_id}
+            extra={form.extra_search_provider_ids ?? []}
+            max={engine?.max_sources ?? 1}
+            onChange={(search_provider_id, extra_search_provider_ids) =>
+              setForm({ ...form, search_provider_id, extra_search_provider_ids })
             }
-            items={providers.map((p) => ({ value: p.id, label: p.label }))}
           />
         )}
-        {(engine?.max_sources ?? 1) > 1 && providers.length > 1 && (
-          <MoreSources
-            providers={providers.filter((p) => p.id !== form.search_provider_id)}
-            chosen={form.extra_search_provider_ids ?? []}
-            room={(engine?.max_sources ?? 1) - 1}
-            onChange={(extra_search_provider_ids) => setForm({ ...form, extra_search_provider_ids })}
-          />
-        )}
-        <Chip
-          label={t("depth.label")}
-          icon={<Gauge className="size-3.5" />}
-          value={form.depth}
-          onChange={(depth) => setForm({ ...form, depth: depth as Depth })}
-          items={DEPTHS.map((d) => ({ value: d, label: t(`depth.${d}`) }))}
-        />
+        <DepthPicker value={form.depth} onChange={(depth) => setForm({ ...form, depth })} minutes={minutes} />
         {sectionsOn && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className={cn(CHIP, showSections && "bg-muted")}
+            className={cn(CHIP, showSections && "bg-muted hover:bg-muted")}
             aria-expanded={showSections}
             onClick={() => setSectionsOpen(!showSections)}
           >
-            <ListOrdered className="size-3.5" />
+            <ListOrdered className={cn("size-3.5 transition-colors duration-200", showSections && "text-brand")} />
             {t("sections.chip")}
           </Button>
         )}
@@ -368,7 +480,7 @@ export function Composer({
           />
         </div>
         {showSections && (
-          <label className="mx-3 mt-3 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm">
+          <label className="mx-3 mt-3 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm animate-in duration-300 ease-out fade-in-0 slide-in-from-top-2 motion-reduce:animate-none">
             <span className="flex items-center gap-1.5 font-medium">
               <ListOrdered className="size-4 text-brand" />
               {t("sections.title")}
@@ -383,7 +495,7 @@ export function Composer({
           </label>
         )}
         {(qa.length > 0 || refine.error) && (
-          <div className="mx-3 mt-3 grid gap-2.5 rounded-lg border bg-muted/40 p-3">
+          <div className="mx-3 mt-3 grid gap-2.5 rounded-lg border bg-muted/40 p-3 animate-in duration-300 ease-out fade-in-0 slide-in-from-top-2 motion-reduce:animate-none">
             <div className="flex items-center justify-between gap-2 text-sm font-medium">
               <span className="flex items-center gap-1.5">
                 <MessageCircleQuestion className="size-4 text-brand" />
@@ -434,7 +546,7 @@ export function Composer({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-1.5 text-[13px] text-muted-foreground"
+                className="h-8 gap-1.5 text-[13px] text-muted-foreground transition-[background-color,color,transform] duration-200 active:scale-[0.96] motion-reduce:transform-none"
                 disabled={!ready || refine.isPending}
                 onClick={() => refine.mutate()}
               >
@@ -447,10 +559,21 @@ export function Composer({
             ) : (
               <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
                 <Timer className="size-3.5" />
-                {t("depth.estimate", { n: target })}
+                {t("depth.estimate", { n: minutes(form.depth) })}
               </span>
             )}
-            <Button type="submit" size="icon" className="size-9 rounded-lg" disabled={!ready} aria-label={t("run.start")}>
+            {/* Lights up once there is a topic; leans forward under the pointer. */}
+            <Button
+              type="submit"
+              size="icon"
+              className={cn(
+                "size-9 rounded-lg transition-[background-color,box-shadow,transform,opacity] duration-300 ease-out",
+                "hover:scale-105 hover:shadow-md active:scale-95 [&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:translate-x-0.5",
+                "motion-reduce:transform-none motion-reduce:[&_svg]:transform-none",
+              )}
+              disabled={!ready}
+              aria-label={t("run.start")}
+            >
               {pending ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
             </Button>
           </div>

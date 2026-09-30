@@ -13,24 +13,25 @@ pytestmark = pytest.mark.db
 def test_only_ready_modes_are_offered_and_the_run_says_which(admin, browser, configured):
     user = make_user(admin, browser)
     options = user.get("/api/options").json()
-    assert [e["id"] for e in options["engines"]] == ["storm", "agent"]
+    assert [e["id"] for e in options["engines"]] == ["storm", "deep", "agent"]
     storm = options["engines"][0]
     assert storm["stages"] == ["research", "outline", "article", "polish"] and "tci" in storm["search_kinds"]
     assert {p["kind"] for p in options["search_providers"]} >= {"arxiv"}
 
     run = user.post("/api/sessions", json={"topic": "Songkran", "language": "th"}).json()["runs"][0]
     assert (run["engine"], run["engine_label"]) == ("storm", "STORM")
-    r = user.post("/api/sessions", json={"topic": "Songkran", "language": "th", "engine": "deep"})
+    r = user.post("/api/sessions", json={"topic": "Songkran", "language": "th", "engine": "co-storm"})
     assert r.status_code == 422 and r.json()["detail"] == "engine_not_available"
 
 
 def test_the_administrator_switches_a_mode_off_but_not_the_last(admin, browser, configured):
     listed = {e["id"]: e for e in admin.get("/api/admin/engines").json()}
     assert listed["storm"]["ready"] and listed["storm"]["enabled"]
-    assert not listed["deep"]["ready"] and listed["agent"]["needs_tools"]
+    assert not listed["co-storm"]["ready"] and listed["agent"]["needs_tools"]
     r = admin.put("/api/admin/engines/storm", json={"enabled": False})
     assert r.status_code == 200 and not {e["id"]: e for e in r.json()}["storm"]["enabled"]
     user = make_user(admin, browser)
+    admin.put("/api/admin/engines/deep", json={"enabled": False})
     assert [e["id"] for e in user.get("/api/options").json()["engines"]] == ["agent"]
     r = admin.put("/api/admin/engines/agent", json={"enabled": False})
     assert r.status_code == 409 and r.json()["detail"] == "last_engine"

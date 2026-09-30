@@ -32,6 +32,8 @@ services:
       # khunmax2/lit_agents-deep-research.
       additional_contexts:
         agents: ../../agents-deep-research
+        # The Deep Research engine's source: khunmax2/lit_deep-research-web.
+        deep: ../../deep-research-web-ui
     image: litstorm/server:dev
     restart: unless-stopped
     environment:

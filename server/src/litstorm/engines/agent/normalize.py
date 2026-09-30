@@ -72,10 +72,17 @@ def _sections(body):
     return title, "\n".join(lead).strip(), sections
 
 
-def normalize(markdown, topic, language, found):
+def normalize(markdown, topic, language, found, refs=None, evidence=None, engine="agent"):
     """report.json from the agent's markdown. `found` maps a URL to what the
-    search returned for it: {"title", "description"}."""
-    body, refs = split_references(markdown or "")
+    search returned for it: {"title", "description"}.
+
+    An Engine that numbers its sources itself (Deep Research cites its
+    learnings by index) hands them in as `refs` {n: url}, with the passages
+    behind each URL as `evidence` {url: [text]}; a list the writer added
+    anyway is still taken off the end."""
+    body, listed = split_references(markdown or "")
+    refs = refs if refs is not None else listed
+    evidence = evidence or {}
     body = GROUPED.sub(lambda m: "".join(f"[{n.strip()}]" for n in re.split(r"[,;]", m.group(1))), body)
     title, lead, raw_sections = _sections(body)
 
@@ -94,7 +101,7 @@ def normalize(markdown, topic, language, found):
                 "url": url,
                 "title": (seen.get("title") or "").strip() or urlparse(url).netloc or url,
                 "description": (seen.get("description") or "").strip(),
-                "evidence": [],
+                "evidence": list(evidence.get(url, [])),
             })
         return f"[{renumber[url]}]"
 
@@ -117,7 +124,7 @@ def normalize(markdown, topic, language, found):
     sections = [section(s) for s in raw_sections]
     return {
         "schema": SCHEMA,
-        "engine": "agent",
+        "engine": engine,
         "title": title or topic,
         "language": language,
         "lead": lead_text,

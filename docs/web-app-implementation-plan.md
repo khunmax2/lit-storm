@@ -300,6 +300,19 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 
 ### 2.2 Deep Research
 
+✅ **เสร็จและตรวจรับผ่านเมื่อ 2026-09-30** ดู [acceptance/2026-09-30-phase-2.2.md](./acceptance/2026-09-30-phase-2.2.md) และ [benchmarks/2026-09-30-deep.md](./benchmarks/2026-09-30-deep.md)
+- **fork:** เพิ่ม `cli/litstorm.ts`
+  - รับ config บรรทัดเดียวทาง stdin รับ key ทาง env และส่ง event ทาง stdout เป็น JSONL
+  - เรียก `lib/core` ตรงแบบเดียวกับ server ของ fork
+  - จบอย่างนุ่มนวลที่ `gatherMs` แล้วเขียนรายงานจาก learning ที่มี
+  - จบตัวเองเมื่อ stdin ปิด
+- **fork (ต่อ):** `getLanguageModel` เพิ่ม middleware ที่รายงาน token จริงของทุกการเรียก และส่ง `extraBody` (ค่า reasoning ของ OpenRouter)
+- **image:** stage `deep-cli` bundle CLI ด้วย esbuild ใช้ pnpm 12.8.1 ตาม lockfile แล้ว copy แค่ `node` กับไฟล์ bundle เข้า Worker image
+- **Engine:** `engines/deep/`
+  - ส่ง env ให้ CLI เฉพาะ PATH, HOME และ key สองตัว ไม่ส่ง env ของ Worker
+  - Evidence ได้จาก excerpt ของแต่ละ learning ถ้าหลาย learning มาจาก URL เดียวกันจะรวมเป็นแหล่งเดียว
+- **ระดับ:** breadth/depth 2/1, 3/2, 4/3 ผู้ดูแลแก้ได้ในหน้าขีดจำกัด
+
 - เพิ่ม Node CLI ใน fork `lit_deep-research-web` ([ADR-0004](./adr/0004-engine-interface.md)) และเพิ่ม Node.js ใน Worker image
 - เขียน Engine ที่แปลง event เป็นความคืบหน้าและแปลงผลเป็น `report.json` พร้อม Evidence
 - บริการค้นหา: SearXNG และ Tavily

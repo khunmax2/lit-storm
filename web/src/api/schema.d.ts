@@ -967,6 +967,10 @@ export interface components {
             agent?: {
                 [key: string]: unknown;
             };
+            /** Deep */
+            deep?: {
+                [key: string]: unknown;
+            };
         };
         /** Embedding */
         Embedding: {

@@ -336,6 +336,9 @@ const en = {
   "depth.agent.rounds": "Rounds",
   "depth.agent.iterative": "Iterative",
   "depth.agent.deep": "Deep (by section)",
+  "depth.deepLead": "How Deep Research works at each level: searches it makes per step, and how many steps deep it follows leads.",
+  "depth.deep.breadth": "Searches per step",
+  "depth.deep.depth": "Steps deep",
   "embed.title": "Embedding",
   "embed.lead":
     "Turns text into vectors, so each section of a report is written from the snippets closest to it. One setting for every Run; the key is the provider's under API keys.",
@@ -748,6 +751,9 @@ const th: Record<Key, string> = {
   "depth.agent.rounds": "จำนวนรอบ",
   "depth.agent.iterative": "วนรอบ",
   "depth.agent.deep": "เจาะลึกตามหัวข้อ",
+  "depth.deepLead": "Deep Research ในแต่ละระดับ: จำนวนคำค้นต่อขั้น และจำนวนขั้นที่ตามต่อจากสิ่งที่พบ",
+  "depth.deep.breadth": "คำค้นต่อขั้น",
+  "depth.deep.depth": "จำนวนขั้น",
   "embed.title": "Embedding",
   "embed.lead":
     "แปลงข้อความเป็นเวกเตอร์ เพื่อให้แต่ละส่วนของรายงานเขียนจากข้อมูลที่ตรงกับส่วนนั้นที่สุด ตั้งครั้งเดียวใช้กับทุก Run คีย์ใช้ของผู้ให้บริการใน API key",

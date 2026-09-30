@@ -42,7 +42,7 @@ ENGINES = {
         "search": ("searxng", "tavily"),
         "stages": ("research", "report"),
         "needs_tools": False,
-        "ready": False,
+        "ready": True,
     },
     "agent": {
         "label": "Agent Research",

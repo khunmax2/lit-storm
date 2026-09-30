@@ -1,6 +1,18 @@
 # The API and the Worker: one image, two commands (docs/adr/0001).
 # Built from the repository root, because it installs knowledge_storm from there:
 #   docker build -f server/Dockerfile .
+# Two more build contexts hold the other Engines' forks (stack/compose.yml):
+# "agents" (lit_agents-deep-research) and "deep" (lit_deep-research-web).
+
+# Deep Research's CLI, bundled into one file that plain Node runs
+# (cli/litstorm.ts in the fork; docs/adr/0004).
+FROM node:24-slim AS deep-cli
+WORKDIR /fork
+COPY --from=deep package.json pnpm-lock.yaml ./
+RUN npx --yes --package=pnpm@12.8.1 -- pnpm install --frozen-lockfile --ignore-scripts
+COPY --from=deep . .
+RUN npx --yes --package=pnpm@12.8.1 -- pnpm run build:litstorm
+
 FROM python:3.12-slim
 
 # Noto Sans Thai for the PDF export: Chromium prints with the fonts the
@@ -10,6 +22,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
+# Node, only to run the Deep Research CLI: the binary and its bundle, no
+# node_modules (the same Debian release as this image).
+COPY --from=deep-cli /usr/local/bin/node /usr/local/bin/node
+COPY --from=deep-cli /fork/dist/litstorm-deep.mjs /opt/deep-research/litstorm-deep.mjs
+RUN node --version
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 

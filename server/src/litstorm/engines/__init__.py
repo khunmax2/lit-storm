@@ -8,6 +8,10 @@ def get(name):
         from .storm.engine import StormEngine
 
         return StormEngine()
+    if name == "deep":
+        from .deep.engine import DeepEngine
+
+        return DeepEngine()
     if name == "agent":
         from .agent.engine import AgentEngine
 

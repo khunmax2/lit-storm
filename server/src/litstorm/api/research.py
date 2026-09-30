@@ -323,7 +323,7 @@ def _snapshot(session, model, provider, depth="standard", engine="storm"):
     including what its depth level means today for its Engine."""
     configured = limits.load(session)
     level = configured.depth(depth)
-    params = dict(level.agent if engine == "agent" else level.storm)
+    params = dict({"agent": level.agent, "deep": level.deep}.get(engine, level.storm))
     if model.max_tokens:
         params["max_tokens"] = model.max_tokens
     return {

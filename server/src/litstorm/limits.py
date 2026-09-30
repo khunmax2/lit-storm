@@ -32,6 +32,9 @@ class DepthLevel(BaseModel):
     # Agent Research's: "iterative" with max_iterations rounds, or "deep",
     # which plans sections and researches each (engines/agent/engine.py).
     agent: dict = Field(default_factory=dict)
+    # Deep Research's: how many searches a step makes, and how many steps
+    # deep it follows leads (engines/deep/engine.py).
+    deep: dict = Field(default_factory=dict)
 
 
 def _default_depths():
@@ -44,18 +47,21 @@ def _default_depths():
             storm={"max_perspective": 2, "max_conv_turn": 2, "max_search_queries_per_turn": 2,
                    "search_top_k": 3, "retrieve_top_k": 3},
             agent={"mode": "iterative", "max_iterations": 2},
+            deep={"breadth": 2, "depth": 1},
         ),
         "standard": DepthLevel(
             target_minutes=5,
             storm={"max_perspective": 3, "max_conv_turn": 3, "max_search_queries_per_turn": 3,
                    "search_top_k": 3, "retrieve_top_k": 3},
             agent={"mode": "iterative", "max_iterations": 4},
+            deep={"breadth": 3, "depth": 2},
         ),
         "deep": DepthLevel(
             target_minutes=12,
             storm={"max_perspective": 5, "max_conv_turn": 4, "max_search_queries_per_turn": 4,
                    "search_top_k": 5, "retrieve_top_k": 8},
             agent={"mode": "deep", "max_iterations": 2},
+            deep={"breadth": 4, "depth": 3},
         ),
     }
 
@@ -78,7 +84,8 @@ class Limits(BaseModel):
         default = _default_depths()[name]
         if level is None:
             return default
-        return level if level.agent else level.model_copy(update={"agent": default.agent})
+        missing = {part: getattr(default, part) for part in ("agent", "deep") if not getattr(level, part)}
+        return level.model_copy(update=missing) if missing else level
 
 
 def load(session):

@@ -1810,6 +1810,45 @@ function Limits() {
         </CardContent>
       </Card>
 
+      {/* Deep Research's side of each level: searches per step, and steps deep. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Deep Research</CardTitle>
+          <CardDescription>{t("depth.deepLead")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("depth.label")}</TableHead>
+                <TableHead className="text-right">{t("depth.deep.breadth")}</TableHead>
+                <TableHead className="text-right">{t("depth.deep.depth")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(["fast", "standard", "deep"] as const).map((depth) => {
+                const level = levels[depth] as DepthLevelForm | undefined;
+                if (!level) return null;
+                const deep = level.deep ?? {};
+                const setDeep = (patch: Record<string, unknown>) =>
+                  setLevel(depth, (l) => ({ ...l, deep: { ...(l.deep ?? {}), ...patch } }));
+                return (
+                  <TableRow key={depth}>
+                    <TableCell className="font-medium">{t(`depth.${depth}`)}</TableCell>
+                    <TableCell className="text-right">
+                      {levelInput(depth, t("depth.deep.breadth"), deep.breadth as number | undefined, (n) => setDeep({ breadth: n }))}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {levelInput(depth, t("depth.deep.depth"), deep.depth as number | undefined, (n) => setDeep({ depth: n }))}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={save.isPending}>
           {t("save")}
@@ -1820,7 +1859,12 @@ function Limits() {
   );
 }
 
-type DepthLevelForm = { target_minutes: number; storm: Record<string, unknown>; agent?: Record<string, unknown> };
+type DepthLevelForm = {
+  target_minutes: number;
+  storm: Record<string, unknown>;
+  agent?: Record<string, unknown>;
+  deep?: Record<string, unknown>;
+};
 
 // The STORM settings behind each depth level, in the order they matter for time.
 const STORM_KNOBS = [

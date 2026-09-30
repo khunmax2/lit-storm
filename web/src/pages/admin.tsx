@@ -1713,6 +1713,7 @@ function Limits() {
           {num("monthly_run_quota", t("admin.limit.quota"))}
           {num("run_deadline_minutes", t("admin.limit.deadline"))}
           {num("refinements_per_day", t("admin.limit.refinements"))}
+          {num("visuals_per_day", t("admin.limit.visuals"))}
           {num("turns_per_quota", t("admin.limit.turns"))}
         </CardContent>
       </Card>

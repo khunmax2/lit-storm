@@ -848,6 +848,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/visuals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Visuals */
+        get: operations["get_visuals_api_runs__run_id__visuals_get"];
+        put?: never;
+        /**
+         * Make Visuals
+         * @description Draw the report's visual blocks, once: one call to the fast model (or
+         *     the Run's own), kept as visuals.json. Takes no quota; counted against a
+         *     daily cap per User, and its cost is added to the Run's.
+         */
+        post: operations["make_visuals_api_runs__run_id__visuals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Hide Visuals
+         * @description The owner's choice of blocks to leave out; they can be shown again.
+         */
+        patch: operations["hide_visuals_api_runs__run_id__visuals_patch"];
+        trace?: never;
+    };
+    "/api/runs/{run_id}/interactive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * View Interactive
+         * @description The interactive page, for the web app's frame.
+         */
+        get: operations["view_interactive_api_runs__run_id__interactive_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/export": {
         parameters: {
             query?: never;
@@ -1356,7 +1403,7 @@ export interface components {
         Limits: {
             /**
              * Max Concurrent Total
-             * @default 2
+             * @default 6
              */
             max_concurrent_total: number;
             /**
@@ -1384,6 +1431,11 @@ export interface components {
              * @default 30
              */
             refinements_per_day: number;
+            /**
+             * Visuals Per Day
+             * @default 10
+             */
+            visuals_per_day: number;
             /**
              * Turns Per Quota
              * @default 20
@@ -2312,6 +2364,54 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VisualBlockOut */
+        VisualBlockOut: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /** Anchor */
+            anchor: string;
+            /** Hidden */
+            hidden: boolean;
+            /** Sources */
+            sources: number[];
+        };
+        /** VisualsHiddenIn */
+        VisualsHiddenIn: {
+            /** Hidden */
+            hidden?: string[];
+        };
+        /**
+         * VisualsOut
+         * @description A report's visual blocks (litstorm.visuals): whether they were drawn,
+         *     what they are, and what was left out and why.
+         */
+        VisualsOut: {
+            /** Ready */
+            ready: boolean;
+            /**
+             * Blocks
+             * @default []
+             */
+            blocks: components["schemas"]["VisualBlockOut"][];
+            /**
+             * Dropped
+             * @default 0
+             */
+            dropped: number;
+            /** Model */
+            model?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * From Report Text
+             * @default false
+             */
+            from_report_text: boolean;
         };
     };
     responses: never;
@@ -4082,11 +4182,143 @@ export interface operations {
             };
         };
     };
+    get_visuals_api_runs__run_id__visuals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisualsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_visuals_api_runs__run_id__visuals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisualsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hide_visuals_api_runs__run_id__visuals_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisualsHiddenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisualsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_interactive_api_runs__run_id__interactive_get: {
+        parameters: {
+            query?: {
+                charts?: string;
+                theme?: string | null;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_report_api_runs__run_id__export_get: {
         parameters: {
             query: {
                 format: string;
                 evidence?: boolean;
+                charts?: string;
             };
             header?: never;
             path: {

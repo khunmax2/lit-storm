@@ -2,7 +2,7 @@
 // as a strip under the title, the article in a comfortable column, contents on
 // the right, and a panel that opens beside the text when a citation is clicked
 // — the page never changes (docs/web-app-design.md, ขอบเขต Source Explorer).
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import MarkdownIt from "markdown-it";
 import {
@@ -13,18 +13,24 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Eye,
+  EyeOff,
   ExternalLink,
   FileCode2,
   FileText,
   FileType2,
   Library,
+  Loader2,
+  PanelsTopLeft,
   Quote,
   Sparkles,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { api, BASE, call } from "@/api/client";
 import { ErrorText, LoadingRows, Toolbar, domainOf } from "@/components/common";
+import { Segmented } from "@/components/segmented";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -186,7 +192,9 @@ function Body({ sections, level = 2 }: { sections: Numbered[]; level?: number })
 function ExportMenu({ runId }: { runId: string }) {
   const { t } = useT();
   const [evidence, setEvidence] = useState(false);
-  const href = (format: string) => `${BASE}/api/runs/${runId}/export?format=${format}&evidence=${evidence}`;
+  const [live, setLive] = useState(false);
+  const href = (format: string) =>
+    `${BASE}/api/runs/${runId}/export?format=${format}&evidence=${evidence}&charts=${live ? "full" : "static"}`;
   const item = (format: string, label: string, Icon: typeof FileText) => (
     <DropdownMenuItem asChild>
       <a href={href(format)}>
@@ -198,9 +206,10 @@ function ExportMenu({ runId }: { runId: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" aria-label={t("report.download")}>
           <Download />
-          {t("report.download")}
+          {/* On a phone the toolbar also holds the view switch: the icon is enough. */}
+          <span className="hidden sm:inline">{t("report.download")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -208,6 +217,7 @@ function ExportMenu({ runId }: { runId: string }) {
         {item("pdf", "PDF", FileText)}
         {item("html", "HTML", FileCode2)}
         {item("md", "Markdown", FileType2)}
+        {item("interactive", t("report.exportInteractive"), PanelsTopLeft)}
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={evidence}
@@ -216,8 +226,143 @@ function ExportMenu({ runId }: { runId: string }) {
         >
           {t("report.withEvidence")}
         </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem checked={live} onCheckedChange={(v) => setLive(!!v)} onSelect={(e) => e.preventDefault()}>
+          {t("report.fullCharts")}
+        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+type VisualBlock = { id: string; type: string; title: string; anchor: string; hidden: boolean; sources: number[] };
+type Visuals = {
+  ready: boolean;
+  blocks: VisualBlock[];
+  dropped: number;
+  model: string | null;
+  created_at: string | null;
+  from_report_text: boolean;
+};
+
+/** The report with its figures (litstorm.render.interactive), shown as the
+ *  server draws it, in a frame of its own: the page runs a script, so it is
+ *  sandboxed — no reach into this app, its cookies or its API. It scrolls
+ *  inside the frame, keeping its own contents and progress. */
+function VisualView({ runId }: { runId: string }) {
+  const { t } = useT();
+  const { resolvedTheme } = useTheme();
+  const client = useQueryClient();
+  const key = ["visuals", runId];
+  const visuals = useQuery({
+    queryKey: key,
+    queryFn: () => call(api.GET("/api/runs/{run_id}/visuals", { params: { path: { run_id: runId } } })) as Promise<Visuals>,
+  });
+  const make = useMutation({
+    mutationFn: () => call(api.POST("/api/runs/{run_id}/visuals", { params: { path: { run_id: runId } } })) as Promise<Visuals>,
+    onSuccess: (v) => client.setQueryData(key, v),
+  });
+  const hide = useMutation({
+    mutationFn: (hidden: string[]) =>
+      call(
+        api.PATCH("/api/runs/{run_id}/visuals", { params: { path: { run_id: runId } }, body: { hidden } }),
+      ) as Promise<Visuals>,
+    onSuccess: (v) => client.setQueryData(key, v),
+  });
+  const v = visuals.data;
+  const hidden = (v?.blocks ?? []).filter((b) => b.hidden).map((b) => b.id);
+  // The frame reloads when what it shows changes.
+  const version = `${v?.ready ? v.created_at : "none"}-${hidden.join(",")}`;
+  const theme = resolvedTheme === "dark" ? "dark" : "light";
+  const src = `${BASE}/api/runs/${runId}/interactive?theme=${theme}&v=${encodeURIComponent(version)}`;
+  const [loading, setLoading] = useState(true);
+  useEffect(() => setLoading(true), [src]);
+
+  return (
+    <div className="animate-in duration-300 fade-in-0 motion-reduce:animate-none">
+      <div className="mb-4 rounded-2xl border bg-card p-4 md:p-5">
+        {!v ? (
+          <LoadingRows rows={2} />
+        ) : !v.ready ? (
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 font-medium">
+                <Sparkles className="size-4 text-brand" />
+                {t("visuals.title")}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t("visuals.lead")}</p>
+              {v.from_report_text && <p className="mt-1 text-xs text-muted-foreground">{t("visuals.leadReport")}</p>}
+            </div>
+            <Button onClick={() => make.mutate()} disabled={make.isPending} className="shrink-0">
+              {make.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              {make.isPending ? t("visuals.making") : t("visuals.make")}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span className="flex items-center gap-2 font-medium">
+                <Sparkles className="size-4 text-brand" />
+                {t("visuals.made", { model: v.model ?? "AI", n: v.blocks.length })}
+              </span>
+              {v.dropped > 0 && <span className="text-xs text-muted-foreground">{t("visuals.dropped", { n: v.dropped })}</span>}
+            </p>
+            {v.blocks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("visuals.none")}</p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {v.blocks.map((b) => {
+                    const Icon = b.hidden ? EyeOff : Eye;
+                    const next = b.hidden ? hidden.filter((h) => h !== b.id) : [...hidden, b.id];
+                    return (
+                      <button
+                        key={b.id}
+                        type="button"
+                        disabled={hide.isPending}
+                        onClick={() => hide.mutate(next)}
+                        aria-pressed={!b.hidden}
+                        title={b.hidden ? t("visuals.show") : t("visuals.hide")}
+                        className={cn(
+                          "inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-[background-color,color,opacity,transform] duration-200 hover:-translate-y-px active:scale-[0.97] motion-reduce:transform-none",
+                          b.hidden ? "text-muted-foreground line-through opacity-60" : "bg-brand-soft/60 text-foreground",
+                        )}
+                      >
+                        <Icon className="size-3.5 shrink-0" />
+                        <span className="shrink-0 text-muted-foreground">{t(`visuals.type.${b.type}` as never)}</span>
+                        <span className="truncate">{b.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("visuals.hiddenNote")}</p>
+              </>
+            )}
+          </div>
+        )}
+        {(make.error || hide.error) && (
+          <div className="mt-3">
+            <ErrorText error={make.error || hide.error} />
+          </div>
+        )}
+      </div>
+      <div className="relative overflow-hidden rounded-2xl border bg-background">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/70">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        <iframe
+          key={src}
+          title={t("report.view.visual")}
+          src={src}
+          // Its own origin: scripts run, links to Sources open, nothing else.
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoading(false)}
+          className="block h-[calc(100svh-9rem)] min-h-[32rem] w-full"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -362,6 +507,7 @@ export function ReportPage() {
     queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: runId } } })),
   });
   const [open, setOpen] = useState<number | null>(null);
+  const [view, setView] = useState<"read" | "visual">("read");
   const [hover, setHover] = useState<{ id: number; at: DOMRect } | null>(null);
   const byId = useMemo(() => new Map((report.data?.sources ?? []).map((s) => [s.id, s])), [report.data]);
   const sections = useMemo(() => numbered(report.data?.sections ?? []), [report.data]);
@@ -464,11 +610,25 @@ export function ReportPage() {
             </Link>
           </Button>
         )}
-        <span className="min-w-0 truncate text-sm font-medium">{r.title}</span>
-        <div className="ml-auto">
+        <span className="hidden min-w-0 truncate text-sm font-medium md:inline">{r.title}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <Segmented
+            label={t("report.view.visual")}
+            value={view}
+            onChange={setView}
+            className="p-0.5 [&_button]:h-7 [&_button]:px-3 [&_button]:text-xs"
+            options={[
+              { value: "read", label: t("report.view.read") },
+              { value: "visual", label: t("report.view.visual") },
+            ]}
+          />
           <ExportMenu runId={runId} />
         </div>
       </Toolbar>
+
+      {view === "visual" ? (
+        <VisualView runId={runId} />
+      ) : (
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
         <article
@@ -615,6 +775,7 @@ export function ReportPage() {
           </nav>
         </aside>
       </div>
+      )}
 
       {hovered && hover && <CitePreview source={hovered} at={hover.at} />}
       <SourceSheet

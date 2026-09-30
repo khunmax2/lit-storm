@@ -1099,6 +1099,8 @@ INTERACTIVE_SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape
 def view_interactive(
     run_id: uuid.UUID,
     charts: str = Query("static", pattern="^(static|full)$"),
+    # The web app's theme, which may differ from the system's.
+    theme: str | None = Query(None, pattern="^(light|dark)$"),
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
@@ -1108,8 +1110,11 @@ def view_interactive(
         "engine_label": ENGINES.get(report.get("engine") or run.engine, {}).get("label", ""),
         "finished_at": run.finished_at,
     }
+    page = _interactive(run, report, facts, charts == "full")
+    if theme:
+        page = page.replace("<html ", f'<html data-theme="{theme}" ', 1)
     return Response(
-        _interactive(run, report, facts, charts == "full"),
+        page,
         media_type="text/html; charset=utf-8",
         headers={
             "Content-Security-Policy": INTERACTIVE_SANDBOX,

@@ -188,7 +188,7 @@
      "auth"
     ],
     "summary": "Check Link",
-    "description": "Whether a link still works — POST, so the token stays out of logs.",
+    "description": "Whether a link still works \u2014 POST, so the token stays out of logs.",
     "operationId": "check_link_api_auth_password_link_post",
     "requestBody": {
      "content": {
@@ -2033,7 +2033,7 @@
      "research"
     ],
     "summary": "Retry",
-    "description": "Try a Run again: a new Run in the same Session, with the same topic\nand settings, linked back to this one, whose history is kept. It starts\nfrom the beginning (docs/web-app-design.md, ผู้ใช้สั่งลองใหม่).\n\nIf the model or provider it used has since been turned off, the new Run\nwaits for the owner to choose again instead of failing.",
+    "description": "Try a Run again: a new Run in the same Session, with the same topic\nand settings, linked back to this one, whose history is kept. It starts\nfrom the beginning (docs/web-app-design.md, \u0e1c\u0e39\u0e49\u0e43\u0e0a\u0e49\u0e2a\u0e31\u0e48\u0e07\u0e25\u0e2d\u0e07\u0e43\u0e2b\u0e21\u0e48).\n\nIf the model or provider it used has since been turned off, the new Run\nwaits for the owner to choose again instead of failing.",
     "operationId": "retry_api_runs__run_id__retry_post",
     "parameters": [
      {
@@ -2186,7 +2186,7 @@
      "research"
     ],
     "summary": "Cancel Run",
-    "description": "Stop a Run. One still waiting stops now; one running is asked to stop\nand becomes \"cancelling\" until the Worker confirms (design: การยกเลิก Run).\n\nBoth are conditional updates, so a cancel racing the Worker's claim or\nfinish changes nothing it should not.",
+    "description": "Stop a Run. One still waiting stops now; one running is asked to stop\nand becomes \"cancelling\" until the Worker confirms (design: \u0e01\u0e32\u0e23\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01 Run).\n\nBoth are conditional updates, so a cancel racing the Worker's claim or\nfinish changes nothing it should not.",
     "operationId": "cancel_run_api_runs__run_id__cancel_post",
     "parameters": [
      {
@@ -2335,6 +2335,213 @@
     }
    }
   },
+  "/api/runs/{run_id}/visuals": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Get Visuals",
+    "operationId": "get_visuals_api_runs__run_id__visuals_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VisualsOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Make Visuals",
+    "description": "Draw the report's visual blocks, once: one call to the fast model (or\nthe Run's own), kept as visuals.json. Takes no quota; counted against a\ndaily cap per User, and its cost is added to the Run's.",
+    "operationId": "make_visuals_api_runs__run_id__visuals_post",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VisualsOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Hide Visuals",
+    "description": "The owner's choice of blocks to leave out; they can be shown again.",
+    "operationId": "hide_visuals_api_runs__run_id__visuals_patch",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VisualsHiddenIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VisualsOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/runs/{run_id}/interactive": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "View Interactive",
+    "description": "The interactive page, for the web app's frame.",
+    "operationId": "view_interactive_api_runs__run_id__interactive_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "charts",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(static|full)$",
+       "default": "static",
+       "title": "Charts"
+      }
+     },
+     {
+      "name": "theme",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^(light|dark)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Theme"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}/export": {
    "get": {
     "tags": [
@@ -2359,7 +2566,7 @@
       "required": true,
       "schema": {
        "type": "string",
-       "pattern": "^(html|md|pdf)$",
+       "pattern": "^(html|md|pdf|interactive)$",
        "title": "Format"
       }
      },
@@ -2371,6 +2578,17 @@
        "type": "boolean",
        "default": false,
        "title": "Evidence"
+      }
+     },
+     {
+      "name": "charts",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(static|full)$",
+       "default": "static",
+       "title": "Charts"
       }
      }
     ],
@@ -3092,7 +3310,7 @@
      "storm"
     ],
     "title": "DepthLevel",
-    "description": "What one depth level means (docs/web-app-design.md, รุ่นสอง: ระดับ\nความลึก). Owners choose the level; the numbers behind it are the\nAdministrator's, so a Run's cost still has a ceiling."
+    "description": "What one depth level means (docs/web-app-design.md, \u0e23\u0e38\u0e48\u0e19\u0e2a\u0e2d\u0e07: \u0e23\u0e30\u0e14\u0e31\u0e1a\n\u0e04\u0e27\u0e32\u0e21\u0e25\u0e36\u0e01). Owners choose the level; the numbers behind it are the\nAdministrator's, so a Run's cost still has a ceiling."
    },
    "DiscussionIn": {
     "properties": {
@@ -3650,7 +3868,7 @@
       "type": "integer",
       "minimum": 1.0,
       "title": "Max Concurrent Total",
-      "default": 2
+      "default": 6
      },
      "max_concurrent_per_user": {
       "type": "integer",
@@ -3681,6 +3899,12 @@
       "minimum": 0.0,
       "title": "Refinements Per Day",
       "default": 30
+     },
+     "visuals_per_day": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Visuals Per Day",
+      "default": 10
      },
      "turns_per_quota": {
       "type": "integer",
@@ -6267,6 +6491,115 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "VisualBlockOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "type": {
+      "type": "string",
+      "title": "Type"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "anchor": {
+      "type": "string",
+      "title": "Anchor"
+     },
+     "hidden": {
+      "type": "boolean",
+      "title": "Hidden"
+     },
+     "sources": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Sources"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "type",
+     "title",
+     "anchor",
+     "hidden",
+     "sources"
+    ],
+    "title": "VisualBlockOut"
+   },
+   "VisualsHiddenIn": {
+    "properties": {
+     "hidden": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "Hidden"
+     }
+    },
+    "type": "object",
+    "title": "VisualsHiddenIn"
+   },
+   "VisualsOut": {
+    "properties": {
+     "ready": {
+      "type": "boolean",
+      "title": "Ready"
+     },
+     "blocks": {
+      "items": {
+       "$ref": "#/components/schemas/VisualBlockOut"
+      },
+      "type": "array",
+      "title": "Blocks",
+      "default": []
+     },
+     "dropped": {
+      "type": "integer",
+      "title": "Dropped",
+      "default": 0
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "created_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created At"
+     },
+     "from_report_text": {
+      "type": "boolean",
+      "title": "From Report Text",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "ready"
+    ],
+    "title": "VisualsOut",
+    "description": "A report's visual blocks (litstorm.visuals): whether they were drawn,\nwhat they are, and what was left out and why."
    }
   }
  }

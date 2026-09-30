@@ -511,6 +511,10 @@ Rules:
 separators). Never compute, convert, sum or estimate. A date's year must be in its fact.
 - A glossary term must appear word for word in its fact.
 - Do not put numbers from different units, years or definitions in one chart.
+- Titles and labels say exactly what the facts measure: which crop, place, group or study, \
+and when. Do not widen a finding about one case into a general claim.
+- A diagram is only for steps or parts the facts describe as a process or a structure. \
+Values measured under different conditions belong in a comparison, not a diagram.
 - Plain text only: no markdown, no HTML, no links.
 
 FACTS:

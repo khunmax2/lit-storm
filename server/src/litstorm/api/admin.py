@@ -608,7 +608,8 @@ def usage(month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"), ses
             func.count(Run.id).filter(started),
             func.count(Run.id).filter(Run.status == "succeeded"),
             func.count(Run.id).filter(Run.status.in_(("failed", "interrupted"))),
-            func.count(Run.id).filter(Run.quota_refunded.is_(True)),
+            # Quota units given back: a Discussion's Turns mostly take none.
+            func.coalesce(func.sum(Run.quota_units).filter(Run.quota_refunded.is_(True)), 0),
             func.coalesce(func.sum(Run.tokens_in), 0),
             func.coalesce(func.sum(Run.tokens_out), 0),
             func.coalesce(func.sum(Run.search_calls), 0),

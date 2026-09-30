@@ -1712,6 +1712,7 @@ function Limits() {
           {num("monthly_run_quota", t("admin.limit.quota"))}
           {num("run_deadline_minutes", t("admin.limit.deadline"))}
           {num("refinements_per_day", t("admin.limit.refinements"))}
+          {num("turns_per_quota", t("admin.limit.turns"))}
         </CardContent>
       </Card>
 
@@ -1810,6 +1811,41 @@ function Limits() {
         </CardContent>
       </Card>
 
+      {/* Co-STORM's side of each level: how many experts research before the Discussion opens. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Co-STORM</CardTitle>
+          <CardDescription>{t("depth.costormLead")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("depth.label")}</TableHead>
+                <TableHead className="text-right">{t("depth.costorm.experts")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(["fast", "standard", "deep"] as const).map((depth) => {
+                const level = levels[depth] as DepthLevelForm | undefined;
+                if (!level) return null;
+                const costorm = level.costorm ?? {};
+                return (
+                  <TableRow key={depth}>
+                    <TableCell className="font-medium">{t(`depth.${depth}`)}</TableCell>
+                    <TableCell className="text-right">
+                      {levelInput(depth, t("depth.costorm.experts"), costorm.warmstart_max_num_experts as number | undefined, (n) =>
+                        setLevel(depth, (l) => ({ ...l, costorm: { ...(l.costorm ?? {}), warmstart_max_num_experts: n } })),
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       {/* Deep Research's side of each level: searches per step, and steps deep. */}
       <Card>
         <CardHeader>
@@ -1864,6 +1900,7 @@ type DepthLevelForm = {
   storm: Record<string, unknown>;
   agent?: Record<string, unknown>;
   deep?: Record<string, unknown>;
+  costorm?: Record<string, unknown>;
 };
 
 // The STORM settings behind each depth level, in the order they matter for time.

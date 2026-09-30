@@ -860,6 +860,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/discussions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start */
+        post: operations["start_api_discussions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discussions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get */
+        get: operations["get_api_discussions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discussions/{session_id}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask */
+        post: operations["ask_api_discussions__session_id__turns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -912,6 +963,17 @@ export interface components {
             cost_usd: string | null;
             /** Quota Refunded */
             quota_refunded: boolean;
+        };
+        /** AllowanceOut */
+        AllowanceOut: {
+            /** Per Block */
+            per_block: number;
+            /** Blocks */
+            blocks: number;
+            /** Used */
+            used: number;
+            /** Remaining */
+            remaining: number;
         };
         /** CheckOut */
         CheckOut: {
@@ -971,6 +1033,60 @@ export interface components {
             deep?: {
                 [key: string]: unknown;
             };
+            /** Costorm */
+            costorm?: {
+                [key: string]: unknown;
+            };
+        };
+        /** DiscussionIn */
+        DiscussionIn: {
+            /** Topic */
+            topic: string;
+            /** Language */
+            language: string;
+            /** Llm Model Id */
+            llm_model_id?: string | null;
+            /** Search Provider Id */
+            search_provider_id?: string | null;
+            /**
+             * Depth
+             * @default standard
+             * @enum {string}
+             */
+            depth: "fast" | "standard" | "deep";
+            /** Project Id */
+            project_id?: string | null;
+            /** Request Key */
+            request_key?: string | null;
+        };
+        /** DiscussionOut */
+        DiscussionOut: {
+            /** Id */
+            id: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Project Name */
+            project_name: string | null;
+            /** Title */
+            title: string;
+            /** Language */
+            language: string;
+            /** Depth */
+            depth: string;
+            /** Model Label */
+            model_label: string;
+            /** Search Label */
+            search_label: string;
+            /** Turns */
+            turns: components["schemas"]["RunOut"][];
+            allowance: components["schemas"]["AllowanceOut"];
+            current: components["schemas"]["RunOut"] | null;
+            /** View */
+            view: {
+                [key: string]: unknown;
+            } | null;
+            /** Reports */
+            reports: components["schemas"]["ReportRef"][];
         };
         /** Embedding */
         Embedding: {
@@ -1106,6 +1222,11 @@ export interface components {
              * @default 30
              */
             refinements_per_day: number;
+            /**
+             * Turns Per Quota
+             * @default 20
+             */
+            turns_per_quota: number;
             /** Depth Levels */
             depth_levels?: {
                 [key: string]: components["schemas"]["DepthLevel"];
@@ -1385,6 +1506,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Kind
+             * @default research
+             */
+            kind: string;
         };
         /** RefineIn */
         RefineIn: {
@@ -1399,6 +1525,17 @@ export interface components {
         RefineOut: {
             /** Questions */
             questions: string[];
+        };
+        /** ReportRef */
+        ReportRef: {
+            /** Run Id */
+            run_id: string;
+            /** Title */
+            title: string | null;
+            /** Source Count */
+            source_count: number | null;
+            /** Finished At */
+            finished_at: string | null;
         };
         /** RolesIO */
         RolesIO: {
@@ -1464,6 +1601,15 @@ export interface components {
              * @default []
              */
             refinement: components["schemas"]["QuestionAnswer"][];
+            /** Turn */
+            turn?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Quota Units
+             * @default 1
+             */
+            quota_units: number;
             /** Events */
             events: components["schemas"]["EventOut"][];
         };
@@ -1552,6 +1698,15 @@ export interface components {
              * @default []
              */
             refinement: components["schemas"]["QuestionAnswer"][];
+            /** Turn */
+            turn?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Quota Units
+             * @default 1
+             */
+            quota_units: number;
         };
         /** SearchChoice */
         SearchChoice: {
@@ -1680,6 +1835,11 @@ export interface components {
             created_at: string;
             /** Runs */
             runs: components["schemas"]["RunOut"][];
+            /**
+             * Kind
+             * @default research
+             */
+            kind: string;
         };
         /** SessionSummary */
         SessionSummary: {
@@ -1694,6 +1854,11 @@ export interface components {
             created_at: string;
             /** Last Status */
             last_status: string | null;
+            /**
+             * Kind
+             * @default research
+             */
+            kind: string;
         };
         /** SetPasswordIn */
         SetPasswordIn: {
@@ -1741,6 +1906,31 @@ export interface components {
              * Format: date-time
              */
             purge_at: string;
+        };
+        /** TurnIn */
+        TurnIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "say" | "step" | "auto" | "report" | "start";
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * Steps
+             * @default 3
+             */
+            steps: number;
+            /**
+             * Extend
+             * @default false
+             */
+            extend: boolean;
+            /** Request Key */
+            request_key?: string | null;
         };
         /** UsageOut */
         UsageOut: {
@@ -3606,6 +3796,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_discussions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscussionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_api_discussions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_api_discussions__session_id__turns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TurnIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */

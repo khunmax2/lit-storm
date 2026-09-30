@@ -39,6 +39,9 @@ class RunConfig:
     search_cache_dir: str | None = None
     # The owner's answers to the clarifying questions: [{"question", "answer"}].
     refinement: list[dict[str, Any]] = field(default_factory=list)
+    # A Discussion's Turn (engines/costorm): {"action", "text", "steps",
+    # "state_from"}, the last being the state file the previous Turn left.
+    discussion: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data):

@@ -35,7 +35,8 @@ ENGINES = {
         "search": SEARCH_PROVIDERS,
         "stages": ("warmup", "discussion", "report"),
         "needs_tools": False,
-        "ready": False,
+        # A Discussion, not a Run: started from POST /api/discussions.
+        "ready": True,
     },
     "deep": {
         "label": "Deep Research",

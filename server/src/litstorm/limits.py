@@ -35,6 +35,9 @@ class DepthLevel(BaseModel):
     # Deep Research's: how many searches a step makes, and how many steps
     # deep it follows leads (engines/deep/engine.py).
     deep: dict = Field(default_factory=dict)
+    # Co-STORM's warm start: how many experts research the topic before the
+    # Discussion opens (engines/costorm/engine.py).
+    costorm: dict = Field(default_factory=dict)
 
 
 def _default_depths():
@@ -48,6 +51,7 @@ def _default_depths():
                    "search_top_k": 3, "retrieve_top_k": 3},
             agent={"mode": "iterative", "max_iterations": 2},
             deep={"breadth": 2, "depth": 1},
+            costorm={"warmstart_max_num_experts": 2},
         ),
         "standard": DepthLevel(
             target_minutes=5,
@@ -55,6 +59,7 @@ def _default_depths():
                    "search_top_k": 3, "retrieve_top_k": 3},
             agent={"mode": "iterative", "max_iterations": 4},
             deep={"breadth": 3, "depth": 2},
+            costorm={"warmstart_max_num_experts": 3},
         ),
         "deep": DepthLevel(
             target_minutes=12,
@@ -62,6 +67,7 @@ def _default_depths():
                    "search_top_k": 5, "retrieve_top_k": 8},
             agent={"mode": "deep", "max_iterations": 2},
             deep={"breadth": 4, "depth": 3},
+            costorm={"warmstart_max_num_experts": 4},
         ),
     }
 
@@ -75,6 +81,9 @@ class Limits(BaseModel):
     # Question refinement takes no quota, so it has a cap of its own:
     # requests per User per Bangkok day (docs/web-app-design.md, ขัดเกลาโจทย์).
     refinements_per_day: int = Field(default=30, ge=0)
+    # A Discussion's Turns per quota unit, the report included
+    # (docs/web-app-design.md, รุ่นสอง: Discussion).
+    turns_per_quota: int = Field(default=20, ge=1)
     depth_levels: dict[str, DepthLevel] = Field(default_factory=_default_depths)
 
     def depth(self, name):
@@ -84,7 +93,7 @@ class Limits(BaseModel):
         default = _default_depths()[name]
         if level is None:
             return default
-        missing = {part: getattr(default, part) for part in ("agent", "deep") if not getattr(level, part)}
+        missing = {part: getattr(default, part) for part in ("agent", "deep", "costorm") if not getattr(level, part)}
         return level.model_copy(update=missing) if missing else level
 
 

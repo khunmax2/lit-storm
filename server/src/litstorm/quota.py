@@ -12,6 +12,10 @@ the month it was booked in:
 
 The quota resets because the month key changes (Asia/Bangkok, limits.py);
 nothing has to run at midnight.
+
+What is counted is each Run's `quota_units`: 1 for a Run, and for the Turn
+that opens a block of a Discussion's Turns; 0 for the other Turns of the
+block (litstorm.discussion).
 """
 
 from dataclasses import dataclass
@@ -59,20 +63,24 @@ class Usage:
 def usage(session, user, month=None, configured=None):
     month = month or limits.quota_month()
     configured = configured or limits.load(session)
+    def units(where):
+        return func.coalesce(func.sum(Run.quota_units).filter(where), 0)
+
     row = session.execute(
         select(
-            func.count().filter(Run.status.in_(WAITING)),
-            func.count().filter(and_(Run.started_at.is_not(None), Run.quota_refunded.is_(False))),
-            func.count().filter(Run.quota_refunded.is_(True)),
+            units(Run.status.in_(WAITING)),
+            units(and_(Run.started_at.is_not(None), Run.quota_refunded.is_(False))),
+            units(Run.quota_refunded.is_(True)),
         ).where(Run.owner_id == user.id, Run.quota_month == month)
     ).one()
-    reserved, used, refunded = row
+    reserved, used, refunded = (int(n) for n in row)
     return Usage(month, effective(user, configured).monthly_quota, used, reserved, refunded)
 
 
-def check_submit(session, user):
+def check_submit(session, user, units=1):
     """Refuse a new Run the User has no room for. Locks the User's row, so
-    two submissions at once cannot both take the last slot."""
+    two submissions at once cannot both take the last slot. A Turn that
+    takes no unit still has to fit in the queue."""
     session.execute(select(User.id).where(User.id == user.id).with_for_update())
     configured = limits.load(session)
     mine = effective(user, configured)
@@ -81,7 +89,7 @@ def check_submit(session, user):
     )
     if waiting >= mine.max_queued:
         raise HTTPException(429, "queue_full")
-    if usage(session, user, configured=configured).remaining <= 0:
+    if units and usage(session, user, configured=configured).remaining < units:
         raise HTTPException(429, "quota_exhausted")
 
 

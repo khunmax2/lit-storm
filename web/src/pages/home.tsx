@@ -8,7 +8,7 @@ import { useState, type ReactNode } from "react";
 import { api, call } from "@/api/client";
 import { DOT } from "@/components/app-sidebar";
 import { ErrorText, timeAgo } from "@/components/common";
-import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
+import { Composer, QuotaLine, startResearch, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Segmented } from "@/components/segmented";
 import { has, useT, type Key } from "@/i18n";
@@ -86,7 +86,7 @@ export function HomePage() {
   // Research from here is filed in no Project; the owner can file it later
   // (as ChatGPT, Claude and Gemini do), or start it from inside a Project.
   const start = useMutation({
-    mutationFn: () => call(api.POST("/api/sessions", { body: runBody({ ...form, engine: mode }, requestKey.current()) })),
+    mutationFn: () => startResearch({ ...form, engine: mode }, requestKey.current()),
     onSuccess: (s) => {
       requestKey.next();
       queryClient.invalidateQueries();

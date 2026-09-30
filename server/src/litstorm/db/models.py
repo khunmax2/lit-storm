@@ -167,8 +167,15 @@ class ResearchSession(Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("projects.id"), index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(300))
+    # RESEARCH: Runs, each making a Report; DISCUSSION: a Co-STORM
+    # conversation, whose Runs are its Turns (docs/CONTEXT.md).
+    kind: Mapped[str] = mapped_column(String(20), default="research", server_default="research")
     created_at: Mapped[datetime] = _now()
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+RESEARCH = "research"
+DISCUSSION = "discussion"
 
 
 # Run statuses (docs/web-app-design.md, วงจรชีวิตของ Run).
@@ -224,6 +231,11 @@ class Run(Base):
     # The Bangkok calendar month the Run's quota is charged to, "2026-09".
     quota_month: Mapped[str] = mapped_column(String(7))
     quota_refunded: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Quota units this Run takes: 1 for a Run, and for the Turn that opens a
+    # block of a Discussion's Turns; 0 for the rest of the block.
+    quota_units: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # Set on a Discussion's Turn: {"action", "text", "steps"} (litstorm.discussion).
+    turn: Mapped[dict | None] = mapped_column(JSONB)
 
     queued_at: Mapped[datetime] = _now()
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

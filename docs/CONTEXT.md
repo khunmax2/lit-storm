@@ -38,7 +38,7 @@ _Avoid_: Article
 _Avoid_: Round table, Run
 
 **Turn** (รุ่นสอง):
-การสนทนาหนึ่งรอบใน Discussion ผู้ใช้พิมพ์แทรกหรือให้ผู้เชี่ยวชาญคุยต่อก็ได้ หนึ่ง Discussion มีจำนวน Turn จำกัดต่อหนึ่งหน่วย Quota
+การสนทนาหนึ่งรอบใน Discussion ผู้ใช้พิมพ์แทรก ให้ผู้เชี่ยวชาญคุยต่อ หรือขอรายงานก็ได้ การเตรียมพื้นหลังตอนเริ่ม Discussion ก็นับเป็น Turn หนึ่ง Discussion มีจำนวน Turn จำกัดต่อหนึ่งหน่วย Quota และทำได้ทีละ Turn
 _Avoid_: Step, Round
 
 **Depth level** (ระดับความลึก, รุ่นสอง):

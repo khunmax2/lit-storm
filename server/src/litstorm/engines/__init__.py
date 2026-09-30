@@ -12,6 +12,10 @@ def get(name):
         from .deep.engine import DeepEngine
 
         return DeepEngine()
+    if name == "co-storm":
+        from .costorm.engine import CoStormEngine
+
+        return CoStormEngine()
     if name == "agent":
         from .agent.engine import AgentEngine
 

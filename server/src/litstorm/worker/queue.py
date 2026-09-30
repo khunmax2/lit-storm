@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text, update
 
-from litstorm import cost, embedding, limits, quota, security, settings
+from litstorm import cost, discussion, embedding, limits, quota, security, settings
 from litstorm.db.models import (
     ACTIVE,
     CANCELLING,
@@ -84,7 +84,9 @@ def _next_run(session, configured):
             User.is_active.is_(True),
             func.coalesce(active.c.active, 0) < ceiling,
         )
-        .order_by(User.last_run_started_at.asc().nulls_first(), Run.queued_at)
+        # A Discussion's Turn first: its owner is waiting on the page for
+        # it (docs/web-app-design.md, รุ่นสอง: Discussion). False sorts first.
+        .order_by(Run.turn.is_(None), User.last_run_started_at.asc().nulls_first(), Run.queued_at)
         .limit(1)
         .with_for_update(of=Run, skip_locked=True)
     )
@@ -129,6 +131,7 @@ def claim(session):
         target_seconds=60.0 * run.config["target_minutes"] if run.config.get("target_minutes") else None,
         search_cache_dir=settings.get().search_cache_dir,
         refinement=run.config.get("refinement", []),
+        discussion={**run.turn, "state_from": discussion.state_from(session, run)} if run.turn else {},
     )
     deadline = 60.0 * run.config.get("deadline_minutes", configured.run_deadline_minutes)
     return Claim(run.id, token, config, secrets, deadline, prices=_prices(session, run, fast))

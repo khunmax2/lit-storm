@@ -2,22 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
   BookOpen,
-  Check,
-  Circle,
   FileText,
   FolderInput,
   FolderOpen,
   FolderPlus,
   Gauge,
   Globe,
-  History,
-  Info,
-  Loader2,
   MoreHorizontal,
   RotateCcw,
   Sparkles,
   Square,
-  Timer,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -36,18 +30,19 @@ import {
   timeAgo,
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
+import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
-import { Composer, QuotaLine, runBody, useRequestKey, useRunOptions, type Depth, type RunForm } from "@/components/composer";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Composer,
+  QuotaLine,
+  runBody,
+  startResearch,
+  useRequestKey,
+  useRunOptions,
+  type Depth,
+  type RunForm,
+} from "@/components/composer";
+import { DiscussionPage } from "@/pages/discussion";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -78,42 +73,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { has, useT, type Key } from "@/i18n";
-import { cn } from "@/lib/utils";
+import { has, useT } from "@/i18n";
 
 type Run = Schemas["RunOut"];
-const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
-// STORM's stages; every Engine's own list comes with the options.
-const DEFAULT_STAGES = ["research", "outline", "article", "polish"];
-
-/** Ask before doing something that cannot be undone from this page. */
-function useConfirm() {
-  const { t } = useT();
-  const [state, setState] = useState<{ text: string; action: () => void } | null>(null);
-  const dialog = (
-    <AlertDialog open={!!state} onOpenChange={(open) => !open && setState(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("common.confirm")}</AlertDialogTitle>
-          <AlertDialogDescription>{state?.text}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={() => {
-              state?.action();
-              setState(null);
-            }}
-          >
-            {t("yes")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-  return { confirm: (text: string, action: () => void) => setState({ text, action }), dialog };
-}
 
 // --- Projects ------------------------------------------------------------------
 
@@ -242,13 +204,7 @@ export function ProjectPage() {
   const [moving, setMoving] = useState<{ id: string; title: string; project_id: string } | null>(null);
   const requestKey = useRequestKey();
   const start = useMutation({
-    mutationFn: () =>
-      call(
-        api.POST("/api/projects/{project_id}/sessions", {
-          params: { path: { project_id: projectId } },
-          body: runBody(form, requestKey.current()),
-        }),
-      ),
+    mutationFn: () => startResearch(form, requestKey.current(), projectId),
     onSuccess: (s) => {
       requestKey.next();
       queryClient.invalidateQueries();
@@ -509,42 +465,6 @@ export function AllResearchPage() {
 
 // --- a Run --------------------------------------------------------------------------
 
-function Stepper({ stage, status, engine }: { stage: string | null; status: string; engine: string }) {
-  const { t } = useT();
-  const STAGES = useRunOptions().data?.engines.find((e) => e.id === engine)?.stages ?? DEFAULT_STAGES;
-  const current = STAGES.indexOf(stage ?? "");
-  const done = status === "succeeded";
-  return (
-    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
-      {STAGES.map((s, i) => {
-        const state = done || i < current ? "done" : i === current ? "now" : "todo";
-        return (
-          <li key={s} className="flex items-center gap-2">
-            <span
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-2.5 py-1",
-                state === "done" && "bg-success-soft text-success",
-                state === "now" && "bg-brand-soft font-medium text-brand",
-                state === "todo" && "bg-muted text-muted-foreground",
-              )}
-            >
-              {state === "done" ? (
-                <Check className="size-3" />
-              ) : state === "now" ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Circle className="size-3" />
-              )}
-              {t(`stage.${s}` as Key)}
-            </span>
-            {i < STAGES.length - 1 && <span className="h-px w-3 bg-border" />}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 function LiveProgress({ run }: { run: Run }) {
   const { t } = useT();
   const queryClient = useQueryClient();
@@ -649,39 +569,6 @@ function ChooseAgain({ run }: { run: Run }) {
         </Button>
       </div>
       {save.error && <ErrorText error={save.error} />}
-    </div>
-  );
-}
-
-// How a Run went, where the owner should know: it wrote from what it had
-// when its time ran short, or matched sources with the fallback model.
-// Cached searches are good news, said quietly.
-function RunNotes({ notes }: { notes: Record<string, unknown> }) {
-  const { t } = useT();
-  const cut = notes.research_cut_short as { seconds?: number } | undefined;
-  const fallback = notes.embedding as { fallback?: boolean } | undefined;
-  const cache = notes.search_cache as { hits?: number } | undefined;
-  if (!cut && !fallback?.fallback && !cache?.hits) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-      {cut && (
-        <span className="flex items-center gap-1 text-warning">
-          <Timer className="size-3" />
-          {t("run.note.cutShort", { n: Math.round((cut.seconds ?? 0) / 60) || 1 })}
-        </span>
-      )}
-      {fallback?.fallback && (
-        <span className="flex items-center gap-1 text-warning">
-          <Info className="size-3" />
-          {t("run.note.embeddingFallback")}
-        </span>
-      )}
-      {!!cache?.hits && (
-        <span className="flex items-center gap-1 text-muted-foreground">
-          <History className="size-3" />
-          {t("run.note.cached", { n: cache.hits })}
-        </span>
-      )}
     </div>
   );
 }
@@ -906,6 +793,8 @@ export function SessionPage() {
       </div>
     );
   const s = session.data;
+  // A Discussion lives at the same address and has a page of its own.
+  if (s.kind === "discussion") return <DiscussionPage sessionId={s.id} />;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-8">

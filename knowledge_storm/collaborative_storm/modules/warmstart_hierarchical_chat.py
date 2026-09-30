@@ -10,6 +10,7 @@ The synthesized conversation is presented to the user to help them quickly catch
 
 import dspy
 import concurrent.futures
+import re
 from threading import Lock
 from typing import List, Optional, Union, TYPE_CHECKING
 
@@ -66,6 +67,16 @@ class SectionToConvTranscript(dspy.Signature):
     )
 
 
+# Where a model that wrote the answer into the question field starts it:
+# "Answer:", "**Answer:**", after a "---" rule. Seen with Gemini 3.1 Flash
+# Lite on Thai topics; the moderator then said the expert's answer as well.
+_ANSWER_IN_QUESTION = re.compile(r"\n\s*(?:-{3,}\s*\n\s*)?\**\s*Answer\s*:", re.IGNORECASE)
+
+
+def question_only(text):
+    return _ANSWER_IN_QUESTION.split(text or "", maxsplit=1)[0].strip()
+
+
 class ReportToConversation(dspy.Module):
     def __init__(self, engine: Union[dspy.dsp.LM, dspy.dsp.HFModel]):
         self.engine = engine
@@ -79,8 +90,8 @@ class ReportToConversation(dspy.Module):
                     section_name=node.get_path_from_root(),
                     section_content=node.synthesize_output,
                 )
-                question = output.question.replace("Question:", "").strip()
-                answer = output.answer.replace("Answer:", "").strip()
+                question = question_only(output.question.replace("Question:", ""))
+                answer = output.answer.replace("Answer:", "").strip().lstrip("*").strip()
                 return question, answer
 
         conversations = []

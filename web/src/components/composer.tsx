@@ -29,8 +29,17 @@ export type RunForm = {
 // One press of Start is one Run: the same key goes with every retry of the
 // request, and a new key is made only after the Run was created.
 export function useRequestKey() {
-  const key = useRef(crypto.randomUUID());
-  return { current: () => key.current, next: () => (key.current = crypto.randomUUID()) };
+  const key = useRef("");
+  if (!key.current) key.current = newKey();
+  return { current: () => key.current, next: () => (key.current = newKey()) };
+}
+
+// crypto.randomUUID exists only on HTTPS and localhost. Opened over plain
+// HTTP by address, every page with a composer failed to render without it.
+function newKey() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function runBody(form: RunForm, request_key: string) {
@@ -44,6 +53,25 @@ export function runBody(form: RunForm, request_key: string) {
     refinement: (form.refinement ?? []).filter((qa) => qa.answer.trim()),
     request_key,
   };
+}
+
+/** Start research: a Discussion for Co-STORM, which talks in Turns;
+ *  otherwise a Research Session with its first Run. Both answer with the
+ *  Session's id, which is where the page goes next. */
+export function startResearch(form: RunForm, request_key: string, project_id?: string): Promise<{ id: string }> {
+  if (form.engine === "co-storm") {
+    const { topic, language, llm_model_id, search_provider_id, depth } = runBody(form, request_key);
+    return call(
+      api.POST("/api/discussions", {
+        body: { topic, language, llm_model_id, search_provider_id, depth, project_id: project_id ?? null, request_key },
+      }),
+    );
+  }
+  if (project_id)
+    return call(
+      api.POST("/api/projects/{project_id}/sessions", { params: { path: { project_id } }, body: runBody(form, request_key) }),
+    );
+  return call(api.POST("/api/sessions", { body: runBody(form, request_key) }));
 }
 
 export function useRunOptions() {
@@ -282,7 +310,8 @@ export function Composer({
             />
           )}
           <div className="ml-auto flex items-center gap-3">
-            {!locked && qa.length === 0 && (
+            {/* A Discussion is steered as it goes; it has no questions up front. */}
+            {!locked && qa.length === 0 && form.engine !== "co-storm" && (
               <Button
                 type="button"
                 variant="ghost"

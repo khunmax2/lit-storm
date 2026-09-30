@@ -83,6 +83,11 @@ def run(run_dir, secrets):
         _write_outcome(run_dir, "failed", outcomes.classify(error), f"{type(error).__name__}: {error}")
         return
 
+    if report is None and config.discussion:
+        # A Discussion's Turn that is not a report: what it made is the
+        # state and the view it left in its workspace (engines/costorm).
+        _write_outcome(run_dir, "succeeded", outcomes.SUCCEEDED)
+        return
     if report_mod.is_empty(report):
         _write_outcome(run_dir, "failed", outcomes.EMPTY_REPORT, "the engine produced nothing to read")
         return

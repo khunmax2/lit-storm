@@ -2344,6 +2344,143 @@
     }
    }
   },
+  "/api/discussions": {
+   "post": {
+    "tags": [
+     "discussions"
+    ],
+    "summary": "Start",
+    "operationId": "start_api_discussions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DiscussionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DiscussionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/discussions/{session_id}": {
+   "get": {
+    "tags": [
+     "discussions"
+    ],
+    "summary": "Get",
+    "operationId": "get_api_discussions__session_id__get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DiscussionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/discussions/{session_id}/turns": {
+   "post": {
+    "tags": [
+     "discussions"
+    ],
+    "summary": "Ask",
+    "operationId": "ask_api_discussions__session_id__turns_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TurnIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RunOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/health": {
    "get": {
     "summary": "Health",
@@ -2489,6 +2626,34 @@
     ],
     "title": "AdminRunOut"
    },
+   "AllowanceOut": {
+    "properties": {
+     "per_block": {
+      "type": "integer",
+      "title": "Per Block"
+     },
+     "blocks": {
+      "type": "integer",
+      "title": "Blocks"
+     },
+     "used": {
+      "type": "integer",
+      "title": "Used"
+     },
+     "remaining": {
+      "type": "integer",
+      "title": "Remaining"
+     }
+    },
+    "type": "object",
+    "required": [
+     "per_block",
+     "blocks",
+     "used",
+     "remaining"
+    ],
+    "title": "AllowanceOut"
+   },
    "CheckOut": {
     "properties": {
      "ok": {
@@ -2614,6 +2779,11 @@
       "additionalProperties": true,
       "type": "object",
       "title": "Deep"
+     },
+     "costorm": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Costorm"
      }
     },
     "type": "object",
@@ -2623,6 +2793,191 @@
     ],
     "title": "DepthLevel",
     "description": "What one depth level means (docs/web-app-design.md, รุ่นสอง: ระดับ\nความลึก). Owners choose the level; the numbers behind it are the\nAdministrator's, so a Run's cost still has a ceiling."
+   },
+   "DiscussionIn": {
+    "properties": {
+     "topic": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Topic"
+     },
+     "language": {
+      "type": "string",
+      "pattern": "^(th|en)$",
+      "title": "Language"
+     },
+     "llm_model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Llm Model Id"
+     },
+     "search_provider_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Search Provider Id"
+     },
+     "depth": {
+      "type": "string",
+      "enum": [
+       "fast",
+       "standard",
+       "deep"
+      ],
+      "title": "Depth",
+      "default": "standard"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "request_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Key"
+     }
+    },
+    "type": "object",
+    "required": [
+     "topic",
+     "language"
+    ],
+    "title": "DiscussionIn"
+   },
+   "DiscussionOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "project_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Id"
+     },
+     "project_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Name"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "language": {
+      "type": "string",
+      "title": "Language"
+     },
+     "depth": {
+      "type": "string",
+      "title": "Depth"
+     },
+     "model_label": {
+      "type": "string",
+      "title": "Model Label"
+     },
+     "search_label": {
+      "type": "string",
+      "title": "Search Label"
+     },
+     "turns": {
+      "items": {
+       "$ref": "#/components/schemas/RunOut"
+      },
+      "type": "array",
+      "title": "Turns"
+     },
+     "allowance": {
+      "$ref": "#/components/schemas/AllowanceOut"
+     },
+     "current": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "view": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "View"
+     },
+     "reports": {
+      "items": {
+       "$ref": "#/components/schemas/ReportRef"
+      },
+      "type": "array",
+      "title": "Reports"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "project_id",
+     "project_name",
+     "title",
+     "language",
+     "depth",
+     "model_label",
+     "search_label",
+     "turns",
+     "allowance",
+     "current",
+     "view",
+     "reports"
+    ],
+    "title": "DiscussionOut"
    },
    "Embedding": {
     "properties": {
@@ -2876,6 +3231,12 @@
       "minimum": 0.0,
       "title": "Refinements Per Day",
       "default": 30
+     },
+     "turns_per_quota": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Turns Per Quota",
+      "default": 20
      },
      "depth_levels": {
       "additionalProperties": {
@@ -3634,6 +3995,11 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "default": "research"
      }
     },
     "type": "object",
@@ -3695,6 +4061,55 @@
      "questions"
     ],
     "title": "RefineOut"
+   },
+   "ReportRef": {
+    "properties": {
+     "run_id": {
+      "type": "string",
+      "title": "Run Id"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "source_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Count"
+     },
+     "finished_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "run_id",
+     "title",
+     "source_count",
+     "finished_at"
+    ],
+    "title": "ReportRef"
    },
    "RolesIO": {
     "properties": {
@@ -3871,6 +4286,23 @@
       "type": "array",
       "title": "Refinement",
       "default": []
+     },
+     "turn": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Turn"
+     },
+     "quota_units": {
+      "type": "integer",
+      "title": "Quota Units",
+      "default": 1
      },
      "events": {
       "items": {
@@ -4145,6 +4577,23 @@
       "type": "array",
       "title": "Refinement",
       "default": []
+     },
+     "turn": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Turn"
+     },
+     "quota_units": {
+      "type": "integer",
+      "title": "Quota Units",
+      "default": 1
      }
     },
     "type": "object",
@@ -4540,6 +4989,11 @@
       },
       "type": "array",
       "title": "Runs"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "default": "research"
      }
     },
     "type": "object",
@@ -4578,6 +5032,11 @@
        }
       ],
       "title": "Last Status"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "default": "research"
      }
     },
     "type": "object",
@@ -4690,6 +5149,56 @@
      "purge_at"
     ],
     "title": "TrashItem"
+   },
+   "TurnIn": {
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "say",
+       "step",
+       "auto",
+       "report",
+       "start"
+      ],
+      "title": "Action"
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 2000,
+      "title": "Text",
+      "default": ""
+     },
+     "steps": {
+      "type": "integer",
+      "maximum": 10.0,
+      "minimum": 1.0,
+      "title": "Steps",
+      "default": 3
+     },
+     "extend": {
+      "type": "boolean",
+      "title": "Extend",
+      "default": false
+     },
+     "request_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Key"
+     }
+    },
+    "type": "object",
+    "required": [
+     "action"
+    ],
+    "title": "TurnIn"
    },
    "UsageOut": {
     "properties": {

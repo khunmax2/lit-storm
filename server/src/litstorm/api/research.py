@@ -22,6 +22,7 @@ from litstorm.catalog import ENGINES
 from litstorm.db.models import (
     CANCELLED,
     CANCELLING,
+    DISCUSSION,
     FAILED,
     INTERRUPTED,
     NEEDS_SELECTION,
@@ -117,6 +118,7 @@ class SessionSummary(BaseModel):
     title: str
     created_at: datetime
     last_status: str | None
+    kind: str = "research"  # "research" | "discussion"
 
 
 class ProjectOut(BaseModel):
@@ -170,7 +172,9 @@ def get_project(project_id: uuid.UUID, user=Depends(deps.current_user), session=
     return ProjectDetail(
         **project_out(project).model_dump(),
         sessions=[
-            SessionSummary(id=str(s.id), title=s.title, created_at=s.created_at, last_status=last.get(s.id))
+            SessionSummary(
+                id=str(s.id), title=s.title, created_at=s.created_at, last_status=last.get(s.id), kind=s.kind
+            )
             for s in sessions
         ],
     )
@@ -266,6 +270,9 @@ class RunOut(BaseModel):
     notes: dict = {}
     # The clarifying questions the owner answered before it started.
     refinement: list[QuestionAnswer] = []
+    # A Discussion's Turn: {"action", "text", "steps"}; None for a Run.
+    turn: dict | None = None
+    quota_units: int = 1
 
 
 def run_out(run):
@@ -293,6 +300,8 @@ def run_out(run):
         source_count=run.source_count,
         notes=run.notes or {},
         refinement=run.config.get("refinement", []),
+        turn=run.turn,
+        quota_units=run.quota_units if run.quota_units is not None else 1,
     )
 
 
@@ -303,6 +312,7 @@ class SessionOut(BaseModel):
     title: str
     created_at: datetime
     runs: list[RunOut]
+    kind: str = "research"  # "discussion": GET /api/discussions/{id} shows it
 
 
 def _pick(session, table, wanted_id):
@@ -323,7 +333,7 @@ def _snapshot(session, model, provider, depth="standard", engine="storm"):
     including what its depth level means today for its Engine."""
     configured = limits.load(session)
     level = configured.depth(depth)
-    params = dict({"agent": level.agent, "deep": level.deep}.get(engine, level.storm))
+    params = dict({"agent": level.agent, "deep": level.deep, "co-storm": level.costorm}.get(engine, level.storm))
     if model.max_tokens:
         params["max_tokens"] = model.max_tokens
     return {
@@ -395,6 +405,9 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
     """
     if body.engine not in modes.offered(session):
         raise HTTPException(422, "engine_not_available")
+    # Co-STORM talks in Turns, in a Discussion of its own (api/discussions.py).
+    if body.engine == "co-storm" or research_session.kind == DISCUSSION:
+        raise HTTPException(422, "use_discussion")
     model = _pick(session, LlmModel, body.llm_model_id)
     provider = _pick(session, SearchProvider, body.search_provider_id)
     # What the page offers for the mode, checked again here: a Run that
@@ -437,6 +450,7 @@ def session_out(session, rs):
         title=rs.title,
         created_at=rs.created_at,
         runs=[run_out(r) for r in runs],
+        kind=rs.kind,
     )
 
 
@@ -480,6 +494,7 @@ class RecentSession(BaseModel):
     project_name: str | None
     last_status: str | None
     updated_at: datetime
+    kind: str = "research"
 
 
 def _sessions(session, user, limit):
@@ -515,7 +530,7 @@ def _sessions(session, user, limit):
         out.append(
             RecentSession(
                 id=str(rs.id), title=rs.title, project_id=str(rs.project_id) if rs.project_id else None,
-                project_name=project_name, last_status=status, updated_at=updated,
+                project_name=project_name, last_status=status, updated_at=updated, kind=rs.kind,
             )
         )
     return out
@@ -617,6 +632,12 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
     old = deps.own(session, Run, run_id, user)
     if old.status not in (FAILED, INTERRUPTED, CANCELLED):
         raise HTTPException(409, "cannot_retry")
+    if old.turn is not None:
+        # A Turn is asked again as a new Turn, under the Discussion's rules.
+        from litstorm.api import discussions
+
+        rs = deps.own(session, ResearchSession, old.session_id, user)
+        return run_out(discussions.new_turn(session, user, rs, old.turn))
     model = session.get(LlmModel, old.llm_model_id)
     provider = session.get(SearchProvider, old.search_provider_id)
     available = model is not None and model.enabled and provider is not None and provider.enabled
@@ -738,7 +759,12 @@ def trash_session(session_id: uuid.UUID, user=Depends(deps.current_user), sessio
 
 @router.delete("/runs/{run_id}", status_code=204)
 def trash_run(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
-    trash.trash_run(session, deps.own(session, Run, run_id, user))
+    run = deps.own(session, Run, run_id, user)
+    if run.turn is not None:
+        # A Turn is part of its Discussion's conversation; the Discussion
+        # goes to the Trash as a whole.
+        raise HTTPException(409, "part_of_discussion")
+    trash.trash_run(session, run)
     session.commit()
 
 

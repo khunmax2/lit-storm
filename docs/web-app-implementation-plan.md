@@ -320,6 +320,30 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 
 ### 2.3 Co-STORM (Discussion)
 
+✅ **ทำแล้วและตรวจรับผ่าน (2026-09-30)** ข้อสรุปตอนลงมืออยู่ใน [web-app-design.md](./web-app-design.md) หัวข้อ "รุ่นสอง: Discussion"
+- **พิสูจน์ engine ก่อน:** Discussion ภาษาไทยจริงหนึ่งชุด ผ่าน supervisor จริงใน Worker ใช้ Ollama bge-m3 เป็น embedding
+  - ช่วงเตรียม (3 ผู้เชี่ยวชาญ) 80 วินาที ได้ 44 แหล่งและแผนผังความคิด 5 หัวข้อ
+  - พิมพ์แทรก 35 วินาที, คุยต่อ 20 วินาที, รายงาน 14 วินาที (ภาษาไทย 5 หัวข้อ 29 แหล่ง)
+  - เวลาต่อ Turn รวมการเริ่ม process ราว 9 วินาที ซึ่ง process ที่ Worker เตรียมไว้ล่วงหน้าตัดออกไป
+- **Engine:** `engines/costorm/`
+  - Turn ละ process: `start` / `say` / `step` / `auto` / `report`
+  - โหลดสถานะเอง สลับภาษาส่วนของ Co-STORM (ยกมาจากแอป Streamlit ใน git history) และใช้ encoder จากบริการ embedding ของระบบ
+- **ข้อมูล:** migration 0008 เพิ่ม `research_sessions.kind`, `runs.turn` และ `runs.quota_units` โควตานับเป็นหน่วยแทนจำนวน Run
+- **API:** `POST /api/discussions`, `GET /api/discussions/{id}`, `POST /api/discussions/{id}/turns`
+  - ลองใหม่ของ Turn คือ Turn ใหม่ตามกติกาของ Discussion
+  - Turn ลบทีละ Turn ไม่ได้
+- **คิว:** Turn ได้ก่อน Run ใหม่ และบอก Turn ว่าต้องทำต่อจากสถานะไหน
+- **หน้าจอ:** แท็บ Co-STORM บนหน้าแรกเริ่ม Discussion หน้าหัวข้อแสดง Discussion เมื่อหัวข้อเป็น Discussion
+  - แชตพร้อมเลขอ้างอิงที่กดได้
+  - การเตรียมพื้นหลังพับเก็บได้
+  - แผงขวาแสดงรายงาน แผนผังความคิด และผู้ร่วมวง
+  - ปุ่ม 4 แบบ และถามก่อนใช้หน่วยใหม่
+- **เทสต์:** `test_discussions.py` (กติกา 9 ข้อ) และ `test_costorm_engine.py` (รายงาน การนับ token และข้อมูลที่หน้าเว็บเห็น)
+- **ตรวจรับผ่านเมื่อ 2026-09-30**
+  - Discussion ไทยและอังกฤษ, กลับมาคุยต่อ, Worker ล่มกลาง Turn, Project และถังขยะ ผ่านครบ 28 ข้อ ดู [acceptance/2026-09-30-phase-2.3-discussion.md](./acceptance/2026-09-30-phase-2.3-discussion.md)
+  - เกณฑ์รุ่นแรก 12 ข้อยังผ่านบน stack จำลอง host ดู [acceptance/2026-09-30-phase-2.3.md](./acceptance/2026-09-30-phase-2.3.md)
+  - ระหว่างตรวจรับแก้ 3 เรื่อง: รายงานที่ไม่มีบทนำไม่มีส่วนนำ (ให้เขียนส่วนนำด้วยพรอมต์ของ STORM), คำถามช่วงเตรียมที่มีคำตอบติดมา, และหน้าเว็บที่เปิดผ่าน HTTP ธรรมดาแล้วแสดงไม่ขึ้น (`crypto.randomUUID`)
+
 - Research Session ชนิด Discussion
 - Turn เป็นงานในคิวที่ได้คิวก่อน Run ใหม่ เก็บ/โหลดสถานะของ runner
 - โควตา 1 หน่วยต่อ 20 Turn และปุ่ม "ต่อเวลา"

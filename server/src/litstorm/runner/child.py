@@ -137,7 +137,17 @@ def _spare(parent_pid, preload):
     return run_dir, raw
 
 
+# Below the API and the database: a Run waits on models and searches for
+# minutes and can spare a second, while a page waiting on the API cannot. Many
+# Runs loading their libraries at once took every core and slowed the API's
+# answers to seconds (docs/benchmarks/2026-09-30-concurrency.md). An Engine's
+# own processes (Deep Research's node) inherit it.
+NICENESS = 10
+
+
 def main():
+    if hasattr(os, "nice"):
+        os.nice(NICENESS)
     if sys.argv[1] == "--spare":
         run_dir, raw = _spare(int(sys.argv[2]), sys.argv[3:])
     else:

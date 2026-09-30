@@ -111,3 +111,40 @@ def test_only_one_default_model(admin):
     b = admin.post("/api/admin/llm-models", json={"label": "B", "provider": "openrouter", "model": "b/b", "is_default": True}).json()
     defaults = [m["id"] for m in admin.get("/api/admin/llm-models").json() if m["is_default"]]
     assert defaults == [b["id"]] and a["id"] != b["id"]
+
+
+
+def test_more_requests_than_connections_wait_their_turn(admin, monkeypatch):
+    """Twenty requests at once on a pool of two and four threads: each waits for a slot
+    (api/deps.py) instead of every thread waiting on the pool for a
+    connection held by a request waiting for a thread."""
+    import asyncio
+
+    import anyio
+    import httpx
+
+    from litstorm import db
+    from litstorm.api import create_app
+
+    monkeypatch.setattr(db, "POOL_SIZE", 1)
+    monkeypatch.setattr(db, "MAX_OVERFLOW", 1)
+    monkeypatch.setattr(db, "POOL_TIMEOUT", 3)
+    db.engine.cache_clear()
+    db.sessions.cache_clear()
+    cookies = dict(admin.client.cookies)
+
+    async def burst():
+        # Fewer threads than requests, as with 40 threads and 100 requests.
+        anyio.to_thread.current_default_thread_limiter().total_tokens = 4
+        transport = httpx.ASGITransport(app=create_app(), raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t", cookies=cookies) as client:
+            return await asyncio.gather(*(client.get("/api/projects") for _ in range(20)))
+
+    try:
+        statuses = [r.status_code for r in asyncio.run(burst())]
+    finally:
+        db.engine().dispose()
+        monkeypatch.undo()
+        db.engine.cache_clear()
+        db.sessions.cache_clear()
+    assert statuses == [200] * 20

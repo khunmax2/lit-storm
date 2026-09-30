@@ -15,7 +15,6 @@ from dsp import ERRORS, backoff_hdlr, giveup_hdlr
 from dsp.modules.hf import openai_to_hf
 from dsp.modules.hf_client import send_hftgi_request_v01_wrapped
 from openai import OpenAI, AzureOpenAI
-from transformers import AutoTokenizer
 
 try:
     from anthropic import RateLimitError
@@ -1071,6 +1070,9 @@ class TogetherClient(dspy.HFModel):
             logging.info("Loading huggingface tokenizer.")
             if hf_tokenizer_name is None:
                 hf_tokenizer_name = self.model
+            # Imported here: transformers brings torch with it.
+            from transformers import AutoTokenizer
+
             self.tokenizer = AutoTokenizer.from_pretrained(
                 hf_tokenizer_name, cache_dir=kwargs.get("cache_dir", None)
             )

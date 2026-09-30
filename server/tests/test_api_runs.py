@@ -93,7 +93,7 @@ def test_claims_respect_the_system_ceiling(admin, browser, configured, db):
 
     # One User here, so lift their own ceiling to see the system's.
     current = admin.get("/api/admin/limits").json()
-    admin.put("/api/admin/limits", json={**current, "max_concurrent_per_user": 5})
+    admin.put("/api/admin/limits", json={**current, "max_concurrent_per_user": 5, "max_concurrent_total": 2})
     user = make_user(admin, browser)
     for _ in range(3):
         _session(user)
@@ -102,7 +102,7 @@ def test_claims_respect_the_system_ceiling(admin, browser, configured, db):
     for _ in range(3):
         with Session() as s:
             claims.append(queue.claim(s))
-    assert [c is not None for c in claims] == [True, True, False]  # default ceiling: 2
+    assert [c is not None for c in claims] == [True, True, False]
     assert claims[0].secrets.llm_api_key == "sk-test-0000"
 
 

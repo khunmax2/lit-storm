@@ -11,10 +11,14 @@
     {"pid": true}                      note its own process id
     {"write_thai": true}               write Thai the way knowledge_storm does
     {"language_probe": true}           note the article prompt it would use
+    {"import": "module"}               load a module, as a real Engine would
+                                       (weight without the calls: tests/load_test.py)
+    {"embed": true}                    load the built-in embedding model and use it
 
 and then it returns a one-section report citing one source.
 """
 
+import importlib
 import os
 import time
 
@@ -73,6 +77,14 @@ class FakeEngine:
                     f.write("สงกรานต์")
             elif step.get("crash"):
                 os._exit(3)
+            elif "import" in step:
+                importlib.import_module(step["import"])
+            elif step.get("embed"):
+                from sentence_transformers import SentenceTransformer
+
+                from litstorm import embedding
+
+                SentenceTransformer(embedding.BUILTIN_MODEL).encode(["snippet"] * 64)
             elif step.get("language_probe"):
                 from litstorm.engines.storm import language
 

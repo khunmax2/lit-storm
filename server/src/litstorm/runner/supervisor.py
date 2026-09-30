@@ -130,9 +130,14 @@ class Spare:
     (docs/benchmarks/2026-09-30-baseline.md). A spare pays that while nothing
     is waiting; the next Run takes it and a new spare starts behind it. The
     spare exits if the Worker does, like any Run's process.
+
+    It does not load torch: a Run embedding through a service never needs it,
+    and one using the built-in model loads it for its last stage only
+    (about 5 seconds), so Runs side by side mostly go without its 300 MB
+    (docs/benchmarks/2026-09-30-concurrency.md).
     """
 
-    def __init__(self, preload=("litstorm.engines.storm.engine", "sentence_transformers")):
+    def __init__(self, preload=("litstorm.engines.storm.engine",)):
         self.preload = tuple(preload)
         self._lock = threading.Lock()
         self._proc = None

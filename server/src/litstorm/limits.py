@@ -73,7 +73,9 @@ def _default_depths():
 
 
 class Limits(BaseModel):
-    max_concurrent_total: int = Field(default=2, ge=1)
+    # A fresh install's ceiling; an Administrator's saved value wins
+    # (docs/web-app-design.md, เพดาน Run พร้อมกันทั้งระบบ).
+    max_concurrent_total: int = Field(default=6, ge=1)
     max_concurrent_per_user: int = Field(default=1, ge=1)
     max_queued_per_user: int = Field(default=5, ge=1)
     monthly_run_quota: int = Field(default=10, ge=0)

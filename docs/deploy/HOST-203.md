@@ -47,6 +47,24 @@ docker ps --format '{{.Names}}\t{{.Ports}}' | grep -i litstorm   # ต้อง�
 - [ ] ไฟล์ :443 คือ `/etc/nginx/sites-available/sansarnnews-ssl` และ :80 คือ `/etc/nginx/sites-available/ade` ถ้าไม่ใช่ ให้ส่งค่าจริงผ่าน env `SSL=` / `HTTP=` ของ `stack/host/apply-nginx.sh` และแก้ตารางนี้
 - [ ] ถ้าพอร์ตไม่ว่าง เลือกเลขใหม่ แล้วใช้เลขนั้นทุกที่ที่เขียน 10340 / 9443
 - [ ] ออกอินเทอร์เน็ตได้: `curl -sI https://ghcr.io | head -1` และ `curl -sI https://openrouter.ai | head -1`
+- [ ] RAM ว่างและจำนวน core: `free -m && nproc` แล้วเลือกเพดานจากตารางด้านล่าง
+
+**Run พร้อมกันกี่งาน** ตั้งหลังติดตั้งที่ ตั้งค่า › ขีดจำกัด › "Run พร้อมกันทั้งระบบ" ค่าตั้งต้นคือ 6 ตัวเลขในตารางมาจาก load test (`docs/benchmarks/2026-09-30-concurrency.md`)
+
+- stack ขณะว่างใช้ RAM ราว 1 GB: api 2 process, db, web, edge, searxng และ Worker
+- ถ้าผู้ใช้เกินราว 100 คนเปิดดูงานสดพร้อมกัน ให้ตั้ง `LITSTORM_API_WORKERS=3` หรือ `4` ใน `host.env` process หนึ่งรับได้ราว 60 คำขอต่อวินาที และ Postgres รับ connection ได้พอสำหรับไม่เกิน 4 process
+- Run หนึ่งใช้เพิ่มราว 0.3 GB ถ้า embed ผ่านบริการ (ตั้งค่า › Embedding) หรือราว 0.55 GB ถ้าใช้โมเดลในตัว
+
+| RAM ที่เหลือให้ lit-storm | embed ผ่านบริการ | โมเดลในตัว |
+|---|---|---|
+| 4 GB | 8 | 4 |
+| 8 GB | 18 | 10 |
+| 16 GB | 40 | 22 |
+
+- ตัวเลขในตารางเผื่อไว้ราว 20% แล้ว
+- เกิน 6–8 Run ต้องใช้ Search Provider แบบ API เช่น Tavily, Serper, Brave หรือ Exa เป็นหลัก เพราะ SearXNG จะติด CAPTCHA ก่อน RAM หมด
+- ดู rate limit ของ OpenRouter ของบัญชีด้วย
+- CPU ไม่ใช่คอขวด process ของ Run มีลำดับความสำคัญต่ำกว่า API (nice 10) จึงไม่แย่ง CPU จนหน้าเว็บช้า
 
 ---
 

@@ -6,8 +6,11 @@ header; the token is readable by the page (a second, non-httpOnly cookie) but
 not by another site.
 """
 
+import asyncio
+import weakref
 from datetime import datetime, timezone
 
+import anyio
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 
@@ -20,9 +23,36 @@ CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def database():
-    with db.sessions()() as session:
-        yield session
+_slots = weakref.WeakKeyDictionary()  # event loop -> its Semaphore
+
+
+def _request_slots():
+    loop = asyncio.get_running_loop()
+    slots = _slots.get(loop)
+    if slots is None:
+        slots = _slots[loop] = asyncio.Semaphore(db.capacity())
+    return slots
+
+
+async def database():
+    """A database session, for no more requests at once than the pool has
+    connections.
+
+    FastAPI runs a request's sync dependencies, its handler and the check of
+    its response as separate jobs on one pool of threads, and a request keeps
+    its connection between them. With more requests than connections, every
+    thread could end up waiting for a connection held by a request waiting for
+    a thread: 100 Users submitting at once got 500s after the pool's timeout
+    (docs/benchmarks/2026-09-30-concurrency.md). Requests beyond the pool wait
+    here instead, on the event loop, holding neither.
+    """
+    async with _request_slots():
+        session = db.sessions()()
+        try:
+            yield session
+        finally:
+            # Closing may roll back, a round trip: off the event loop.
+            await anyio.to_thread.run_sync(session.close, limiter=anyio.CapacityLimiter(1))
 
 
 def _signed_in(request, session):

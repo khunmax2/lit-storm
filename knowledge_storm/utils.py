@@ -12,10 +12,29 @@ import toml
 from typing import List, Dict
 from tqdm import tqdm
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from trafilatura import extract
 
 from .lm import LitellmModel
+
+
+def _import_splitter():
+    """langchain_text_splitters imports transformers and sentence_transformers,
+    and with them torch (about 300 MB per Run), only to offer token-based
+    splitters STORM never uses. Hide them while it loads, so they fail at once
+    instead of loading or half-loading; a Run that needs them imports them
+    later, whole."""
+    hidden = [name for name in ("transformers", "sentence_transformers") if name not in sys.modules]
+    for name in hidden:
+        sys.modules[name] = None
+    try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+    finally:
+        for name in hidden:
+            del sys.modules[name]
+    return RecursiveCharacterTextSplitter
+
+
+RecursiveCharacterTextSplitter = _import_splitter()
 
 logging.getLogger("httpx").setLevel(logging.WARNING)  # Disable INFO logging for httpx.
 

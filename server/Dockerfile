@@ -67,4 +67,8 @@ ENV LITSTORM_DATA_DIR=/data
 
 EXPOSE 8000
 # The api service migrates, then serves. The worker service overrides this.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn litstorm.api:app --host 0.0.0.0 --port 8000 --proxy-headers"]
+# Two processes by default: one tops out a core at about 60 requests a second
+# (100 Users watching live Runs; docs/benchmarks/2026-09-30-concurrency.md).
+# Each holds up to 30 database connections (litstorm/db).
+ENV LITSTORM_API_WORKERS=2
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn litstorm.api:app --host 0.0.0.0 --port 8000 --proxy-headers --workers ${LITSTORM_API_WORKERS}"]

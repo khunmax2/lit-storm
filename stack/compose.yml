@@ -13,6 +13,9 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    # Up to 30 connections for each API process and 30 for the Worker
+    # (server/src/litstorm/db): room for 4 API processes.
+    command: ["postgres", "-c", "max_connections=200"]
     environment:
       POSTGRES_USER: litstorm
       POSTGRES_PASSWORD: litstorm  # reachable only inside this network
@@ -44,6 +47,8 @@ services:
         LITSTORM_SEARXNG_URL: http://searxng:8080/search
       # Only the api service sees the setup code.
       LITSTORM_BOOTSTRAP_CODE_FILE: /run/secrets/bootstrap_code
+      # uvicorn processes; each holds up to 30 database connections.
+      LITSTORM_API_WORKERS: ${LITSTORM_API_WORKERS:-2}
     secrets: [secret_key, bootstrap_code]
     # Services on the machine itself (Ollama for embeddings) are reached as
     # host.docker.internal, on Docker Desktop and on Linux alike.

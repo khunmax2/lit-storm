@@ -5,14 +5,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import MarkdownIt from "markdown-it";
-import { ChevronLeft, Download, ExternalLink, FileCode2, FileText, FileType2, Quote } from "lucide-react";
-import { useMemo, useState, type MouseEvent } from "react";
+import {
+  ArrowUp,
+  BookOpen,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  ExternalLink,
+  FileCode2,
+  FileText,
+  FileType2,
+  Library,
+  Quote,
+  Sparkles,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { api, BASE, call } from "@/api/client";
 import { ErrorText, LoadingRows, Toolbar, domainOf } from "@/components/common";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -23,9 +36,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useT } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 type Source = { id: number; url: string; title: string; description?: string; evidence: string[] };
 type Section = { id: string; heading: string; body: string; children: Section[] };
@@ -50,44 +63,117 @@ function readable(url: string) {
   }
 }
 
+/** Minutes to read: Thai has no spaces between words, so it is counted in
+ *  letters (about 900 a minute); other languages in words (about 230). */
+function readingMinutes(r: Report) {
+  const all = (s: Section[]): string => s.map((x) => `${x.heading} ${x.body} ${all(x.children)}`).join(" ");
+  const text = `${r.lead} ${all(r.sections)}`.replace(/\[\d+\]/g, "");
+  const n = r.language === "th" ? text.replace(/\s/g, "").length / 900 : text.split(/\s+/).length / 230;
+  return Math.max(1, Math.round(n));
+}
+
 function Favicon({ url, className = "size-4" }: { url: string; className?: string }) {
   // A letter, not a fetched icon: the page stays free of third-party requests.
+  // Each site keeps its own hue, so sources from one place are seen together.
   const d = domainOf(url);
+  let hue = 0;
+  for (const ch of d) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
   return (
     <span
-      className={`${className} inline-flex shrink-0 items-center justify-center rounded-sm bg-muted text-[0.6rem] font-semibold uppercase text-muted-foreground`}
+      style={{ ["--h" as string]: hue }}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-[5px] text-[0.6rem] font-semibold uppercase",
+        "bg-[oklch(0.93_0.045_var(--h))] text-[oklch(0.42_0.12_var(--h))] dark:bg-[oklch(0.33_0.06_var(--h))] dark:text-[oklch(0.88_0.07_var(--h))]",
+        className,
+      )}
     >
       {d.charAt(0)}
     </span>
   );
 }
 
-function Contents({ sections, depth = 0 }: { sections: Section[]; depth?: number }) {
+function Num({ id, className }: { id: number; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-soft px-1.5 text-[0.7rem] font-medium tabular-nums text-brand",
+        className,
+      )}
+    >
+      {id}
+    </span>
+  );
+}
+
+/** "1", "1.2": where a section sits, shown beside its heading and in the contents. */
+function numbered(sections: Section[], prefix = ""): (Section & { n: string; children: ReturnType<typeof numbered> })[] {
+  return sections.map((s, i) => {
+    const n = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
+    return { ...s, n, children: numbered(s.children, n) };
+  });
+}
+type Numbered = ReturnType<typeof numbered>[number];
+
+function Contents({ sections, active, depth = 0 }: { sections: Numbered[]; active: string; depth?: number }) {
   if (!sections.length) return null;
   return (
-    <ul className={depth ? "mt-1 ml-3 space-y-1 border-l pl-3" : "space-y-1"}>
-      {sections.map((s) => (
-        <li key={s.id}>
-          <a href={`#${s.id}`} className="line-clamp-2 text-muted-foreground transition-colors hover:text-foreground">
-            {s.heading}
-          </a>
-          <Contents sections={s.children} depth={depth + 1} />
-        </li>
-      ))}
+    <ul className={depth ? "mt-1 ml-3 space-y-0.5" : "space-y-0.5"}>
+      {sections.map((s) => {
+        const on = s.id === active;
+        return (
+          <li key={s.id}>
+            <a
+              href={`#${s.id}`}
+              aria-current={on ? "location" : undefined}
+              className={cn(
+                "relative flex gap-2 rounded-md py-1 pr-2 pl-3 leading-snug transition-colors duration-200",
+                "before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:transition-colors before:duration-200",
+                on
+                  ? "font-medium text-foreground before:bg-brand"
+                  : "text-muted-foreground before:bg-transparent hover:text-foreground",
+              )}
+            >
+              <span className={cn("shrink-0 tabular-nums", on ? "text-brand" : "text-muted-foreground/70")}>{s.n}</span>
+              <span className="line-clamp-2">{s.heading}</span>
+            </a>
+            <Contents sections={s.children} active={active} depth={depth + 1} />
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-function Body({ sections, level = 2 }: { sections: Section[]; level?: number }) {
+function Body({ sections, level = 2 }: { sections: Numbered[]; level?: number }) {
   return (
     <>
       {sections.map((s) => {
-        const size = level === 2 ? "text-xl mt-12" : level === 3 ? "text-lg mt-8" : "text-base mt-6";
+        const top = level === 2;
+        const Tag = top ? "h2" : level === 3 ? "h3" : "h4";
         return (
           <section key={s.id}>
-            <h2 id={s.id} className={`${size} mb-3 scroll-mt-20 font-semibold tracking-tight`}>
-              {s.heading}
-            </h2>
+            <Tag
+              id={s.id}
+              data-heading
+              className={cn(
+                "flex scroll-mt-24 items-baseline gap-3 tracking-tight text-balance",
+                top
+                  ? "mt-14 mb-4 border-t pt-8 font-display text-[1.75rem] leading-snug md:text-3xl"
+                  : level === 3
+                    ? "mt-9 mb-3 text-lg font-semibold"
+                    : "mt-7 mb-2 text-base font-semibold",
+              )}
+            >
+              <span
+                className={cn(
+                  "shrink-0 font-sans tabular-nums",
+                  top ? "text-sm font-medium text-brand" : "text-sm font-normal text-muted-foreground",
+                )}
+              >
+                {top ? s.n.padStart(2, "0") : s.n}
+              </span>
+              <span>{s.heading}</span>
+            </Tag>
             <div dangerouslySetInnerHTML={{ __html: render(s.body) }} />
             <Body sections={s.children} level={level + 1} />
           </section>
@@ -135,7 +221,20 @@ function ExportMenu({ runId }: { runId: string }) {
   );
 }
 
-function SourceSheet({ source, onClose }: { source?: Source; onClose: () => void }) {
+function SourceSheet({
+  source,
+  place,
+  total,
+  onClose,
+  onStep,
+}: {
+  source?: Source;
+  /** Its place in the list, from 1: numbers need not run without gaps. */
+  place: number;
+  total: number;
+  onClose: () => void;
+  onStep: (by: number) => void;
+}) {
   const { t } = useT();
   const safe = source && /^https?:\/\//.test(source.url);
   return (
@@ -143,30 +242,59 @@ function SourceSheet({ source, onClose }: { source?: Source; onClose: () => void
       <SheetContent className="w-full gap-0 sm:max-w-md">
         {source && (
           <>
-            <SheetHeader className="border-b">
+            <SheetHeader className="border-b pr-12">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="secondary" className="bg-brand-soft text-brand">
-                  {source.id}
-                </Badge>
+                <Num id={source.id} />
                 <Favicon url={source.url} />
                 <span className="truncate">{domainOf(source.url)}</span>
               </div>
-              <SheetTitle className="text-base leading-snug">{source.title}</SheetTitle>
-              <SheetDescription className="break-all text-xs">{readable(source.url)}</SheetDescription>
-              {safe && (
-                <Button variant="outline" size="sm" className="mt-2 w-fit" asChild>
-                  <a href={source.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink />
-                    {t("report.openSource")}
-                  </a>
-                </Button>
-              )}
+              {/* A new source slides in, so stepping through them is seen. */}
+              <div key={source.id} className="animate-in duration-300 fade-in-0 slide-in-from-right-2 motion-reduce:animate-none">
+                <SheetTitle className="text-base leading-snug">{source.title}</SheetTitle>
+                <SheetDescription className="mt-1 break-all text-xs">{readable(source.url)}</SheetDescription>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                {safe && (
+                  <Button variant="outline" size="sm" className="w-fit" asChild>
+                    <a href={source.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink />
+                      {t("report.openSource")}
+                    </a>
+                  </Button>
+                )}
+                <span className="ml-auto flex items-center gap-1">
+                  <span className="mr-1 text-xs text-muted-foreground tabular-nums">
+                    {t("report.sourceOf", { n: place, total })}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("report.prevSource")}
+                    disabled={place <= 1}
+                    onClick={() => onStep(-1)}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("report.nextSource")}
+                    disabled={place >= total}
+                    onClick={() => onStep(1)}
+                  >
+                    <ChevronRight />
+                  </Button>
+                </span>
+              </div>
             </SheetHeader>
             <ScrollArea className="min-h-0 flex-1">
-              <div className="space-y-3 p-4">
+              <div key={source.id} className="space-y-3 p-4 animate-in duration-300 fade-in-0 motion-reduce:animate-none">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Quote className="size-4 text-muted-foreground" />
                   {t("report.evidence")}
+                  {source.evidence.length > 0 && (
+                    <span className="text-xs font-normal text-muted-foreground">· {source.evidence.length}</span>
+                  )}
                 </div>
                 {source.evidence.length ? (
                   <>
@@ -192,8 +320,38 @@ function SourceSheet({ source, onClose }: { source?: Source; onClose: () => void
   );
 }
 
-export function ReportPage() {
+/** A citation's source, shown beside it while the pointer rests on it. */
+function CitePreview({ source, at }: { source: Source; at: DOMRect }) {
   const { t } = useT();
+  const width = 300;
+  const left = Math.max(12, Math.min(at.left + at.width / 2 - width / 2, window.innerWidth - width - 12));
+  const below = at.bottom + 220 < window.innerHeight;
+  return (
+    <div
+      role="tooltip"
+      style={{ left, width, ...(below ? { top: at.bottom + 8 } : { bottom: window.innerHeight - at.top + 8 }) }}
+      className={cn(
+        "pointer-events-none fixed z-50 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg",
+        "animate-in duration-150 fade-in-0 zoom-in-95 motion-reduce:animate-none",
+        below ? "slide-in-from-top-1" : "slide-in-from-bottom-1",
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Num id={source.id} className="h-4 min-w-4 px-1 text-[0.65rem]" />
+        <Favicon url={source.url} className="size-3.5" />
+        <span className="truncate">{domainOf(source.url)}</span>
+      </div>
+      <p className="mt-1.5 line-clamp-2 text-sm leading-snug font-medium">{source.title}</p>
+      {source.evidence[0] && (
+        <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">“{source.evidence[0]}”</p>
+      )}
+      <p className="mt-2 text-[0.7rem] text-brand">{t("report.citeHint")}</p>
+    </div>
+  );
+}
+
+export function ReportPage() {
+  const { t, lang } = useT();
   const { runId } = useParams({ from: "/app/runs/$runId" });
   const report = useQuery({
     queryKey: ["report", runId],
@@ -204,11 +362,65 @@ export function ReportPage() {
     queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: runId } } })),
   });
   const [open, setOpen] = useState<number | null>(null);
+  const [hover, setHover] = useState<{ id: number; at: DOMRect } | null>(null);
   const byId = useMemo(() => new Map((report.data?.sources ?? []).map((s) => [s.id, s])), [report.data]);
+  const sections = useMemo(() => numbered(report.data?.sections ?? []), [report.data]);
+  const article = useRef<HTMLElement>(null);
+  const [active, setActive] = useState("");
+  const [progress, setProgress] = useState(0);
 
+  // Where the reader is: the last heading above the top of the view lights up
+  // in the contents, and a line along the top shows how far through they are.
+  useEffect(() => {
+    const el = article.current;
+    if (!el) return;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      let current = "";
+      for (const h of el.querySelectorAll<HTMLElement>("[data-heading]")) {
+        if (h.getBoundingClientRect().top < 140) current = h.id;
+        else break;
+      }
+      setActive(current);
+      const box = el.getBoundingClientRect();
+      const span = box.height - window.innerHeight;
+      setProgress(span > 0 ? Math.min(1, Math.max(0, -box.top / span)) : 1);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [report.data]);
+
+  // The citation whose source is open stays lit.
+  useEffect(() => {
+    article.current?.querySelectorAll<HTMLElement>("[data-cite]").forEach((b) => {
+      b.dataset.active = String(Number(b.dataset.cite) === open);
+    });
+  }, [open]);
+
+  const citeOf = (e: MouseEvent) => (e.target as HTMLElement).closest("[data-cite]") as HTMLElement | null;
   const onClick = (e: MouseEvent) => {
-    const cite = (e.target as HTMLElement).closest("[data-cite]") as HTMLElement | null;
-    if (cite) setOpen(Number(cite.dataset.cite));
+    const cite = citeOf(e);
+    if (cite) {
+      setHover(null);
+      setOpen(Number(cite.dataset.cite));
+    }
+  };
+  const onOver = (e: MouseEvent) => {
+    const cite = citeOf(e);
+    const id = cite ? Number(cite.dataset.cite) : null;
+    if (cite && id != null && byId.has(id)) {
+      if (hover?.id !== id) setHover({ id, at: cite.getBoundingClientRect() });
+    } else if (hover) setHover(null);
   };
 
   if (report.isLoading)
@@ -224,10 +436,25 @@ export function ReportPage() {
       </div>
     );
   const r = report.data;
-  const sessionId = run.data?.session_id;
+  const summary = run.data;
+  const sessionId = summary?.session_id;
+  const finished = summary?.finished_at
+    ? new Date(summary.finished_at).toLocaleDateString(lang === "th" ? "th-TH" : "en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+  const hovered = hover && byId.get(hover.id);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
+      {/* How far through the report the reader is. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 z-40 h-0.5 origin-left bg-brand transition-transform duration-150 ease-out motion-reduce:transition-none"
+        style={{ transform: `scaleX(${progress})` }}
+      />
       <Toolbar>
         {sessionId && (
           <Button variant="ghost" size="sm" asChild>
@@ -244,32 +471,65 @@ export function ReportPage() {
       </Toolbar>
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
-        <article lang={r.language} className="min-w-0 max-w-3xl" onClick={onClick}>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-balance md:text-4xl">{r.title}</h1>
+        <article
+          ref={article}
+          lang={r.language}
+          className="min-w-0 max-w-3xl animate-in duration-500 ease-out fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
+          onClick={onClick}
+          onMouseOver={onOver}
+          onMouseLeave={() => setHover(null)}
+        >
+          <header>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+              {summary?.engine_label && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-0.5 font-medium text-brand">
+                  <Sparkles className="size-3" />
+                  {summary.engine_label}
+                </span>
+              )}
+              {finished && (
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="size-3.5" />
+                  {finished}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="size-3.5" />
+                {t("report.readMinutes", { n: readingMinutes(r) })}
+              </span>
+              <a href="#sources" className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground">
+                <Library className="size-3.5" />
+                {t("report.sourcesCount", { n: r.sources.length })}
+              </a>
+            </div>
+            <h1 className="mt-4 font-display text-4xl leading-[1.15] tracking-tight text-balance md:text-5xl">
+              {r.title}
+            </h1>
+          </header>
 
           {/* The sources up front, as Perplexity shows them. */}
-          <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {r.sources.slice(0, 3).map((s) => (
               <button
                 key={s.id}
                 onClick={() => setOpen(s.id)}
-                className="flex flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-colors hover:bg-muted/50"
+                className="group flex flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-muted/40 hover:shadow-md active:translate-y-0 active:scale-[0.98] motion-reduce:transform-none"
               >
-                <span className="line-clamp-2 text-xs font-medium leading-snug">{s.title}</span>
+                <span className="line-clamp-2 text-xs leading-snug font-medium">{s.title}</span>
                 <span className="mt-auto flex items-center gap-1.5 text-[0.7rem] text-muted-foreground">
                   <Favicon url={s.url} className="size-3.5" />
                   <span className="truncate">{domainOf(s.url)}</span>
-                  <span className="ml-auto">{s.id}</span>
+                  <Num id={s.id} className="ml-auto h-4 min-w-4 px-1 text-[0.6rem]" />
                 </span>
               </button>
             ))}
             {r.sources.length > 3 && (
               <a
                 href="#sources"
-                className="flex flex-col justify-between gap-2 rounded-xl border bg-card p-3 text-xs transition-colors hover:bg-muted/50"
+                className="flex flex-col justify-between gap-2 rounded-xl border bg-card p-3 text-xs transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-muted/40 hover:shadow-md motion-reduce:transform-none"
               >
                 <span className="flex -space-x-1">
-                  {r.sources.slice(3, 7).map((s) => (
+                  {r.sources.slice(3, 8).map((s) => (
                     <Favicon key={s.id} url={s.url} className="size-4 ring-2 ring-card" />
                   ))}
                 </span>
@@ -278,51 +538,95 @@ export function ReportPage() {
             )}
           </div>
 
-          <div className="prose-report mt-8">
-            <div dangerouslySetInnerHTML={{ __html: render(r.lead) }} />
-            <Body sections={r.sections} />
+          <div className="prose-report mt-10">
+            {r.lead.trim() && (
+              // A line down its side, not a box: an overview can run to
+              // several paragraphs, and a filled card that long weighs on the page.
+              <div className="border-l-2 border-brand/60 pl-5 md:pl-6">
+                <p className="!mb-2 flex items-center gap-1.5 text-xs font-medium tracking-wide text-brand">
+                  <BookOpen className="size-3.5" />
+                  {t("report.summary")}
+                </p>
+                <div className="lead" dangerouslySetInnerHTML={{ __html: render(r.lead) }} />
+              </div>
+            )}
+            <Body sections={sections} />
           </div>
 
-          <Separator className="my-12" />
-          <section id="sources" className="scroll-mt-20">
-            <h2 className="mb-4 text-lg font-semibold">{t("report.allSources")}</h2>
-            <div className="grid gap-2">
+          <section id="sources" className="mt-16 scroll-mt-24 border-t pt-8">
+            <h2 className="mb-5 flex items-baseline gap-3 font-display text-2xl tracking-tight">
+              {t("report.allSources")}
+              <span className="font-sans text-sm text-muted-foreground tabular-nums">{r.sources.length}</span>
+            </h2>
+            <div className="grid gap-2.5 sm:grid-cols-2">
               {r.sources.map((s) => (
-                <Card key={s.id} className="py-0">
-                  <CardContent className="p-0">
-                    <button
-                      onClick={() => setOpen(s.id)}
-                      className="flex w-full items-start gap-3 p-3 text-left hover:bg-muted/40"
-                    >
-                      <Badge variant="secondary" className="mt-0.5 shrink-0 bg-brand-soft text-brand">
-                        {s.id}
-                      </Badge>
-                      <span className="min-w-0">
-                        <span className="line-clamp-1 text-sm font-medium">{s.title}</span>
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Favicon url={s.url} className="size-3.5" />
-                          <span className="truncate">{domainOf(s.url)}</span>
-                        </span>
-                      </span>
-                    </button>
-                  </CardContent>
-                </Card>
+                <button
+                  key={s.id}
+                  onClick={() => setOpen(s.id)}
+                  className="group flex flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-left transition-[transform,box-shadow,background-color,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:transform-none"
+                >
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Num id={s.id} />
+                    <Favicon url={s.url} className="size-3.5" />
+                    <span className="truncate">{domainOf(s.url)}</span>
+                  </span>
+                  <span className="line-clamp-2 text-sm leading-snug font-medium transition-colors group-hover:text-brand">
+                    {s.title}
+                  </span>
+                  {s.evidence[0] && (
+                    <span className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{s.evidence[0]}</span>
+                  )}
+                </button>
               ))}
             </div>
           </section>
         </article>
 
         <aside className="hidden lg:block">
-          <nav className="sticky top-20 text-sm">
+          <nav className="sticky top-20 max-h-[calc(100svh-6rem)] overflow-y-auto pb-6 text-sm">
             <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               {t("report.onThisPage")}
             </p>
-            <Contents sections={r.sections} />
+            <Contents sections={sections} active={active} />
+            <div className="mt-5 space-y-1 border-t pt-4 text-muted-foreground">
+              <a href="#sources" className="flex items-center gap-2 py-1 pl-3 transition-colors hover:text-foreground">
+                <Library className="size-3.5" />
+                {t("report.allSources")}
+                <span className="ml-auto tabular-nums">{r.sources.length}</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="flex items-center gap-2 py-1 pl-3 transition-colors hover:text-foreground"
+              >
+                <ArrowUp className="size-3.5" />
+                {t("report.backToTop")}
+              </button>
+              <div className="mt-3 flex items-center gap-2 pl-3 text-xs">
+                <span className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                  <span
+                    className="block h-full rounded-full bg-brand transition-[width] duration-150"
+                    style={{ width: `${Math.round(progress * 100)}%` }}
+                  />
+                </span>
+                <span className="w-8 text-right tabular-nums">{Math.round(progress * 100)}%</span>
+              </div>
+            </div>
           </nav>
         </aside>
       </div>
 
-      <SourceSheet source={open != null ? byId.get(open) : undefined} onClose={() => setOpen(null)} />
+      {hovered && hover && <CitePreview source={hovered} at={hover.at} />}
+      <SourceSheet
+        source={open != null ? byId.get(open) : undefined}
+        place={r.sources.findIndex((s) => s.id === open) + 1}
+        total={r.sources.length}
+        onClose={() => setOpen(null)}
+        onStep={(by) => {
+          const next = r.sources[r.sources.findIndex((s) => s.id === open) + by];
+          if (next) setOpen(next.id);
+        }}
+      />
     </div>
   );
 }

@@ -172,6 +172,49 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.prose-report p,
+.prose-report li {
+  color: color-mix(in oklch, var(--foreground) 88%, transparent);
+}
+/* The overview above the sections reads a size up. */
+.prose-report .lead p {
+  font-size: 1.075rem;
+  color: var(--foreground);
+}
+.prose-report blockquote {
+  margin: 0 0 1.1rem;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.prose-report hr {
+  margin: 2rem 0;
+  border-color: var(--border);
+}
+.prose-report code {
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9em;
+  background: var(--muted);
+  border-radius: 0.3rem;
+}
+.prose-report table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 1.2rem;
+  font-size: 0.95rem;
+  border-collapse: collapse;
+}
+.prose-report th,
+.prose-report td {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.prose-report th {
+  font-weight: 600;
+  background: var(--muted);
+}
 .prose-report button.cite {
   display: inline-flex;
   align-items: center;
@@ -188,10 +231,22 @@
   background: var(--brand-soft);
   border-radius: 9999px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.15s;
 }
 .prose-report button.cite:hover,
 .prose-report button.cite[data-active="true"] {
   background: var(--brand);
   color: white;
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .prose-report button.cite {
+    transition: none;
+  }
+  .prose-report button.cite:hover {
+    transform: none;
+  }
 }

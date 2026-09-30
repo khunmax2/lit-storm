@@ -1143,6 +1143,11 @@ export interface components {
             stages: string[];
             /** Needs Tools */
             needs_tools: boolean;
+            /**
+             * Max Sources
+             * @default 1
+             */
+            max_sources: number;
         };
         /** EngineOut */
         EngineOut: {
@@ -1404,6 +1409,8 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /** Extra Search Provider Ids */
+            extra_search_provider_ids?: string[];
             /**
              * Depth
              * @default standard
@@ -1623,6 +1630,8 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /** Extra Search Provider Ids */
+            extra_search_provider_ids?: string[];
             /**
              * Depth
              * @default standard
@@ -1802,6 +1811,8 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /** Extra Search Provider Ids */
+            extra_search_provider_ids?: string[];
             /**
              * Depth
              * @default standard

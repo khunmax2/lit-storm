@@ -69,6 +69,7 @@ class EngineChoice(BaseModel):
     search_kinds: list[str]
     stages: list[str]
     needs_tools: bool
+    max_sources: int = 1
 
 
 class Options(BaseModel):
@@ -83,7 +84,7 @@ def engine_choice(name):
     e = ENGINES[name]
     return EngineChoice(
         id=name, label=e["label"], search_kinds=list(e["search"]), stages=list(e["stages"]),
-        needs_tools=e["needs_tools"],
+        needs_tools=e["needs_tools"], max_sources=e.get("max_sources", 1),
     )
 
 
@@ -230,6 +231,10 @@ class RunIn(BaseModel):
     language: str = Field(pattern="^(th|en)$")
     llm_model_id: uuid.UUID | None = None  # default model when absent
     search_provider_id: uuid.UUID | None = None  # default provider when absent
+    # More Search Providers to search beside it, for an Engine that can
+    # (catalog.ENGINES max_sources): STORM, up to two more. The first may be
+    # repeated here; what counts is after that is taken out.
+    extra_search_provider_ids: list[uuid.UUID] = Field(default_factory=list, max_length=3)
     depth: Literal["fast", "standard", "deep"] = "standard"
     engine: str = "storm"  # a research mode from GET /api/options
     # The clarifying questions asked before starting, with the owner's
@@ -285,7 +290,10 @@ def run_out(run):
         engine=run.engine,
         engine_label=ENGINES.get(run.engine, {}).get("label", run.engine),
         model_label=run.config.get("llm", {}).get("label", ""),
-        search_label=run.config.get("search", {}).get("label", ""),
+        search_label=" + ".join(
+            [run.config.get("search", {}).get("label", "")]
+            + [x.get("label", "") for x in run.config.get("search_extra") or []]
+        ),
         depth=run.config.get("depth", "standard"),
         status=run.status,
         quota_month=run.quota_month,
@@ -396,6 +404,29 @@ def _commit_once(session, owner, request_key):
     return None
 
 
+def _search_snapshot(provider):
+    return {
+        "id": str(provider.id), "label": provider.label, "provider": provider.kind,
+        "endpoint": provider.endpoint, "engines": provider.engines,
+    }
+
+
+def _extra_searches(session, body, first):
+    """The other Search Providers the owner ticked, checked as the first is."""
+    wanted = list(dict.fromkeys(i for i in body.extra_search_provider_ids if i != first.id))
+    if not wanted:
+        return []
+    if len(wanted) + 1 > ENGINES[body.engine].get("max_sources", 1):
+        raise HTTPException(422, "too_many_sources")
+    extra = []
+    for provider_id in wanted:
+        provider = _pick(session, SearchProvider, provider_id)
+        if not modes.search_fits(body.engine, provider):
+            raise HTTPException(422, "search_not_for_engine")
+        extra.append(_search_snapshot(provider))
+    return extra
+
+
 def new_run(session, owner, research_session, body, parent_run_id=None):
     """A queued Run with its config snapshot. Secrets are not in it.
 
@@ -416,6 +447,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         raise HTTPException(422, "search_not_for_engine")
     if not modes.model_fits(body.engine, model):
         raise HTTPException(422, "model_cannot_use_tools")
+    extra = _extra_searches(session, body, provider)
     quota.check_submit(session, owner)
     run = Run(
         session_id=research_session.id,
@@ -429,6 +461,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         config={
             **_snapshot(session, model, provider, body.depth, body.engine),
             "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
+            **({"search_extra": extra} if extra else {}),
         },
         status=QUEUED,
         quota_month=limits.quota_month(),
@@ -654,6 +687,7 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
         config={
             **_snapshot(session, model, provider, old.config.get("depth", "standard"), old.engine),
             "refinement": old.config.get("refinement", []),
+            **({"search_extra": old.config["search_extra"]} if old.config.get("search_extra") else {}),
         } if available else old.config,
         status=QUEUED if available else NEEDS_SELECTION,
         quota_month=limits.quota_month(),

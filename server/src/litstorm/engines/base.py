@@ -24,6 +24,9 @@ class RunConfig:
     language: str  # report language: "th" | "en"
     llm: dict[str, Any]  # {"provider", "model", optional "api_base", "reasoning"}
     search: dict[str, Any]  # {"provider", optional "endpoint", "engines"}
+    # More Search Providers searched beside `search`, like it (STORM only,
+    # docs/web-app-design.md, รุ่นสอง: ค้นหลายแหล่งต่อ Run).
+    search_extra: list[dict[str, Any]] = field(default_factory=list)
     params: dict[str, Any] = field(default_factory=dict)  # engine knobs, set by admins
     # The model for research's short calls, like `llm` plus "max_tokens";
     # empty: `llm` does everything (docs/adr/0006).
@@ -54,6 +57,8 @@ class Secrets:
 
     llm_api_key: str = ""
     search_api_key: str = ""
+    # One per RunConfig.search_extra, in its order.
+    search_extra_api_keys: tuple = ()
     embedding_api_key: str = ""
     fast_llm_api_key: str = ""
 

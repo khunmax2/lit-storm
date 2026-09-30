@@ -94,13 +94,20 @@ export function RunNotes({ notes }: { notes: Record<string, unknown> }) {
   const cut = notes.research_cut_short as { seconds?: number } | undefined;
   const fallback = notes.embedding as { fallback?: boolean } | undefined;
   const cache = notes.search_cache as { hits?: number } | undefined;
-  if (!cut && !fallback?.fallback && !cache?.hits) return null;
+  const skipped = Object.keys((notes.sources_skipped as { sources?: Record<string, string> } | undefined)?.sources ?? {});
+  if (!cut && !fallback?.fallback && !cache?.hits && !skipped.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       {cut && (
         <span className="flex items-center gap-1 text-warning">
           <Timer className="size-3" />
           {t("run.note.cutShort", { n: Math.round((cut.seconds ?? 0) / 60) || 1 })}
+        </span>
+      )}
+      {skipped.length > 0 && (
+        <span className="flex items-center gap-1 text-warning">
+          <Info className="size-3" />
+          {t("run.note.sourcesSkipped", { names: skipped.join(", ") })}
         </span>
       )}
       {fallback?.fallback && (

@@ -3070,6 +3070,11 @@
      "needs_tools": {
       "type": "boolean",
       "title": "Needs Tools"
+     },
+     "max_sources": {
+      "type": "integer",
+      "title": "Max Sources",
+      "default": 1
      }
     },
     "type": "object",
@@ -3720,6 +3725,15 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "extra_search_provider_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 3,
+      "title": "Extra Search Provider Ids"
      },
      "depth": {
       "type": "string",
@@ -4376,6 +4390,15 @@
       ],
       "title": "Search Provider Id"
      },
+     "extra_search_provider_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 3,
+      "title": "Extra Search Provider Ids"
+     },
      "depth": {
       "type": "string",
       "enum": [
@@ -4901,6 +4924,15 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "extra_search_provider_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 3,
+      "title": "Extra Search Provider Ids"
      },
      "depth": {
       "type": "string",

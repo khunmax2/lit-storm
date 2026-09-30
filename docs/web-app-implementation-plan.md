@@ -357,6 +357,12 @@ deploy/     compose ชุดใหม่: edge (nginx), api, worker, postgres, 
 
 ### 2.4 ฟีเจอร์เสริม
 
+- ✅ **ค้นหลายแหล่งต่อ Run (2026-09-30)**
+  - `MultiRM` ของ fork สลับผลจากแต่ละแหล่ง ตัดซ้ำด้วย URL รวมจำนวนการค้นหา และจำแหล่งที่ล้มกับคำที่ถูกปฏิเสธ
+  - `engines/storm/engine.py`, `build_search` แบ่งงบต่อคำถามให้ทุกแหล่ง
+  - Run เก็บ `search_extra` ใน config ส่วน Worker ถอด key ของแต่ละแหล่งตอนเริ่ม
+  - ลองจริง: STORM ภาษาไทยระดับเร็ว ค้น SearXNG + arXiv + TCI-ThaiJO ได้แหล่งอ้างอิงจากทั้งสามแหล่ง
+  - เทสต์: `test_multi_source.py` (6 ข้อ)
 - ค้นหลายแหล่งต่อ Run (STORM, สูงสุด 3 แหล่ง)
 - ช่อง "หัวข้อที่ต้องการ"
 - ค่าเริ่มต้นและคำสั่งของ Project

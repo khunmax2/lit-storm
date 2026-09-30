@@ -2,12 +2,20 @@
 // the model beside the send button — the layout agent apps have settled on. Used on the home page (with
 // a project picker) and at the foot of a topic (to research it again).
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Gauge, Globe, Loader2, MessageCircleQuestion, Search, SendHorizontal, Sparkles, Timer, X } from "lucide-react";
+import { Gauge, Globe, Loader2, MessageCircleQuestion, Plus, Search, SendHorizontal, Sparkles, Timer, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
 import { ErrorText } from "@/components/common";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useT } from "@/i18n";
@@ -24,6 +32,8 @@ export type RunForm = {
   engine: string;
   // Clarifying questions and the owner's answers, when they asked for them.
   refinement?: { question: string; answer: string }[];
+  // More Search Providers searched beside the first, for a mode that can.
+  extra_search_provider_ids?: string[];
 };
 
 // One press of Start is one Run: the same key goes with every retry of the
@@ -51,6 +61,7 @@ export function runBody(form: RunForm, request_key: string) {
     depth: form.depth,
     engine: form.engine,
     refinement: (form.refinement ?? []).filter((qa) => qa.answer.trim()),
+    extra_search_provider_ids: form.extra_search_provider_ids ?? [],
     request_key,
   };
 }
@@ -132,6 +143,51 @@ function Chip({
   );
 }
 
+/** Other Search Providers to search beside the first (STORM: up to two more). */
+function MoreSources({
+  providers,
+  chosen,
+  room,
+  onChange,
+}: {
+  providers: { id: string; label: string }[];
+  chosen: string[];
+  room: number;
+  onChange: (ids: string[]) => void;
+}) {
+  const { t } = useT();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className={CHIP} aria-label={t("run.moreSources")}>
+          <Plus className="size-3.5" />
+          {chosen.length ? t("run.moreSourcesN", { n: chosen.length }) : t("run.moreSources")}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          {t("run.moreSourcesLead", { n: room })}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {providers.map((p) => {
+          const on = chosen.includes(p.id);
+          return (
+            <DropdownMenuCheckboxItem
+              key={p.id}
+              checked={on}
+              disabled={!on && chosen.length >= room}
+              onSelect={(e) => e.preventDefault()}
+              onCheckedChange={(checked) => onChange(checked ? [...chosen, p.id] : chosen.filter((id) => id !== p.id))}
+            >
+              {p.label}
+            </DropdownMenuCheckboxItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function Composer({
   form,
   setForm,
@@ -172,8 +228,15 @@ export function Composer({
       list.some((x) => x.id === current) ? current : (list.find((x) => x.is_default)?.id ?? list[0]?.id ?? "");
     const model = pick(models, form.llm_model_id);
     const search = pick(providers, form.search_provider_id);
-    if (model !== form.llm_model_id || search !== form.search_provider_id)
-      setForm({ ...form, llm_model_id: model, search_provider_id: search });
+    const extra = (form.extra_search_provider_ids ?? [])
+      .filter((id) => id !== search && providers.some((p) => p.id === id))
+      .slice(0, (engine?.max_sources ?? 1) - 1);
+    if (
+      model !== form.llm_model_id ||
+      search !== form.search_provider_id ||
+      extra.length !== (form.extra_search_provider_ids ?? []).length
+    )
+      setForm({ ...form, llm_model_id: model, search_provider_id: search, extra_search_provider_ids: extra });
   }, [o, form.engine]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unavailable = o && (models.length === 0 || providers.length === 0);
@@ -220,8 +283,22 @@ export function Composer({
             label={t("run.search")}
             icon={<Search className="size-3.5" />}
             value={form.search_provider_id}
-            onChange={(search_provider_id) => setForm({ ...form, search_provider_id })}
+            onChange={(search_provider_id) =>
+              setForm({
+                ...form,
+                search_provider_id,
+                extra_search_provider_ids: (form.extra_search_provider_ids ?? []).filter((id) => id !== search_provider_id),
+              })
+            }
             items={providers.map((p) => ({ value: p.id, label: p.label }))}
+          />
+        )}
+        {(engine?.max_sources ?? 1) > 1 && providers.length > 1 && (
+          <MoreSources
+            providers={providers.filter((p) => p.id !== form.search_provider_id)}
+            chosen={form.extra_search_provider_ids ?? []}
+            room={(engine?.max_sources ?? 1) - 1}
+            onChange={(extra_search_provider_ids) => setForm({ ...form, extra_search_provider_ids })}
           />
         )}
         <Chip

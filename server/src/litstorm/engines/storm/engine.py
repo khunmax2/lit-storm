@@ -69,6 +69,29 @@ def _params(config):
     return params
 
 
+def build_search(config, secrets, k):
+    """The Run's retriever: its Search Provider, or several searched as one
+    (docs/web-app-design.md, รุ่นสอง: ค้นหลายแหล่งต่อ Run). With several,
+    each query's budget of `k` results is shared out evenly, and each source
+    keeps a cache of its own."""
+    from knowledge_storm.rm import MultiRM
+
+    searches = [(config.search, secrets.search_api_key)]
+    keys = list(secrets.search_extra_api_keys) + [""] * len(config.search_extra)
+    searches += list(zip(config.search_extra, keys))
+    each = -(-k // len(searches))  # k shared out, rounded up
+    built = []
+    for search, key in searches:
+        rm = providers.build_rm(search, key, each, config.request_timeout)
+        if config.search_cache_dir:
+            rm = search_cache.CachedRM(rm, config.search_cache_dir, search_cache.identity(search, each))
+        built.append(rm)
+    if len(built) == 1:
+        return built[0]
+    names = [s.get("label") or s.get("provider") for s, _ in searches]
+    return MultiRM(built, k=k, names=names)
+
+
 def build_runner(config, secrets, output_dir):
     params = _params(config)
     try:
@@ -91,18 +114,9 @@ def build_runner(config, secrets, output_dir):
             params["max_tokens"]["writing"],
             config.request_timeout,
         )
-        rm = providers.build_rm(
-            config.search,
-            secrets.search_api_key,
-            params["search_top_k"],
-            config.request_timeout,
-        )
+        rm = build_search(config, secrets, params["search_top_k"])
     except providers.ProviderConfigError as error:
         raise EngineFailure(outcomes.BAD_CONFIGURATION, str(error)) from error
-    if config.search_cache_dir:
-        rm = search_cache.CachedRM(
-            rm, config.search_cache_dir, search_cache.identity(config.search, params["search_top_k"])
-        )
 
     # The owner's model writes; research talks with the fast model if the
     # Run has one, else the owner's model with a smaller reply budget.
@@ -182,9 +196,17 @@ class StormEngine:
                 )
             finally:
                 runner.topic = config.topic
-            cache = runner.retriever.rm
-            if isinstance(cache, search_cache.CachedRM) and cache.hits:
-                progress.note("search_cache", hits=cache.hits, misses=cache.misses)
+            rm = runner.retriever.rm
+            caches = [c for c in getattr(rm, "retrievers", [rm]) if isinstance(c, search_cache.CachedRM)]
+            hits = sum(c.hits for c in caches)
+            if hits:
+                progress.note("search_cache", hits=hits, misses=sum(c.misses for c in caches))
+            if getattr(rm, "failures", None):
+                # A source that failed was skipped; the others carried the Run.
+                progress.note(
+                    "sources_skipped",
+                    sources={name: message for name, (_, message) in rm.failures.items()},
+                )
             if conversations.cut_short:
                 progress.note(
                     "research_cut_short",

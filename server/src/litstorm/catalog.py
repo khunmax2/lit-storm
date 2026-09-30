@@ -19,9 +19,10 @@ SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv", "tci")
 
 # What each Engine declares (docs/web-app-design.md, รุ่นสอง: กติกาที่ทุก
 # Engine ใช้ร่วมกัน): the Search Provider kinds it can use, its stages for
-# the progress bar, and whether it needs a model that can call tools. An
-# Engine is offered only once `ready`; an Administrator can still switch a
-# ready one off (litstorm.engine_settings). Order is the tabs' order.
+# the progress bar, whether it needs a model that can call tools, and how
+# many Search Providers one Run may search together (`max_sources`, 1 when
+# absent). An Engine is offered only once `ready`; an Administrator can still
+# switch a ready one off (litstorm.engine_settings). Order is the tabs' order.
 ENGINES = {
     "storm": {
         "label": "STORM",
@@ -29,6 +30,8 @@ ENGINES = {
         "stages": ("research", "outline", "article", "polish"),
         "needs_tools": False,
         "ready": True,
+        # Search Providers one Run may search at once (MultiRM).
+        "max_sources": 3,
     },
     "co-storm": {
         "label": "Co-STORM",

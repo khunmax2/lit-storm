@@ -14,7 +14,7 @@ Runs does not make everyone else wait for all ten.
 """
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text, update
@@ -116,6 +116,8 @@ def claim(session):
     run.stage = None
     session.execute(update(User).where(User.id == run.owner_id).values(last_run_started_at=now))
     secrets, llm, fast = _secrets(session, run)
+    extra, extra_keys = _extra_searches(session, run)
+    secrets = replace(secrets, search_extra_api_keys=tuple(extra_keys))
     session.commit()
 
     config = RunConfig(
@@ -125,6 +127,7 @@ def claim(session):
         language=run.language,
         llm=llm,
         search={k: v for k, v in run.config["search"].items() if k != "label" and v},
+        search_extra=extra,
         params=run.config.get("params", {}),
         fast_llm=fast,
         embedding=run.config.get("embedding", {}),
@@ -170,6 +173,20 @@ def _secrets(session, run):
         embedding_api_key=_embedding_key(session, run),
         fast_llm_api_key=fast_key,
     ), llm, fast
+
+
+def _extra_searches(session, run):
+    """The Run's other Search Providers that are still on, and their keys.
+    One switched off since the Run was queued is left out rather than parking
+    the Run: its first provider decides that, and the rest are extra."""
+    kept, keys = [], []
+    for search in run.config.get("search_extra") or []:
+        provider = session.get(SearchProvider, uuid.UUID(search["id"])) if search.get("id") else None
+        if provider is None or not provider.enabled:
+            continue
+        kept.append({k: v for k, v in search.items() if k != "id" and v})
+        keys.append(security.decrypt(provider.api_key_ciphertext) if provider.api_key_ciphertext else "")
+    return kept, keys
 
 
 def _fast(session, run):
@@ -221,7 +238,7 @@ def set_stage(session, claim, stage):
 
 
 # The engine's notes an owner is shown on the Run, not only in its log.
-NOTE_KINDS = ("research_cut_short", "embedding", "search_cache")
+NOTE_KINDS = ("research_cut_short", "embedding", "search_cache", "sources_skipped")
 
 
 def add_note(session, claim, kind, data):

@@ -836,43 +836,68 @@ class MultiRM(dspy.Retrieve):
     question, asked with its Test button before a run ever starts.
     """
 
-    def __init__(self, retrievers, k=3):
+    def __init__(self, retrievers, k=3, names=None):
         super().__init__(k=k)
         retrievers = [rm for rm in retrievers if rm is not None]
         if not retrievers:
             raise RuntimeError("MultiRM needs at least one retriever")
         self.retrievers = retrievers
+        # What to call each source when saying which one failed.
+        self.names = list(names) if names else [type(rm).__name__ for rm in retrievers]
+        # Per source: the queries that raised, and the last error.
+        self.failures = {}
 
     def get_usage_and_reset(self):
+        # Summed, not merged: two sources of one kind (two SearXNG
+        # providers) report under the same name.
         usage = {}
         for rm in self.retrievers:
             if hasattr(rm, "get_usage_and_reset"):
-                usage.update(rm.get_usage_and_reset())
+                for name, n in rm.get_usage_and_reset().items():
+                    usage[name] = usage.get(name, 0) + n
         return usage
+
+    @property
+    def refused(self):
+        """Queries refused by any source; the run says so if it found nothing."""
+        return sum(getattr(rm, "refused", 0) for rm in self.retrievers) + sum(
+            n for n, _ in self.failures.values()
+        )
+
+    @property
+    def last_refusal(self):
+        reasons = [getattr(rm, "last_refusal", "") for rm in self.retrievers]
+        reasons += [f"{name}: {message}" for name, (_, message) in self.failures.items()]
+        return "; ".join(r for r in reasons if r)[:300]
 
     def forward(
         self, query_or_queries: Union[str, List[str]], exclude_urls: List[str] = []
     ):
+        """Each query to every source, the results taken from each in turn —
+        first from each, then second from each — so no source crowds out
+        the others. A URL already taken is not taken again."""
         queries = (
             [query_or_queries]
             if isinstance(query_or_queries, str)
             else query_or_queries
         )
+        per_source = []
+        for name, rm in zip(self.names, self.retrievers):
+            try:
+                per_source.append(list(rm.forward(queries, exclude_urls=exclude_urls) or []))
+            except Exception as e:  # noqa: BLE001 - one source down is not a run lost
+                n, _ = self.failures.get(name, (0, ""))
+                self.failures[name] = (n + len(queries), f"{type(e).__name__}: {e}"[:200])
+                logging.error(f"{name} failed and was skipped for this query: {e}")
         seen = set(exclude_urls)
         collected = []
-        for rm in self.retrievers:
-            try:
-                results = rm.forward(queries, exclude_urls=list(seen))
-            except Exception as e:  # noqa: BLE001 - one source down is not a run lost
-                logging.error(
-                    f"{type(rm).__name__} failed and was skipped for this query: {e}"
-                )
-                continue
-            for r in results or []:
-                url = r.get("url")
-                if url and url not in seen:
-                    seen.add(url)
-                    collected.append(r)
+        for i in range(max((len(r) for r in per_source), default=0)):
+            for results in per_source:
+                if i < len(results):
+                    url = results[i].get("url")
+                    if url and url not in seen:
+                        seen.add(url)
+                        collected.append(results[i])
         return collected
 
 

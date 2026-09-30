@@ -6,6 +6,7 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  LifeBuoy,
   Gauge,
   Globe,
   MoreHorizontal,
@@ -32,6 +33,7 @@ import {
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
 import { ProjectSettingsDialog } from "@/components/project-settings";
+import { SupportDialog } from "@/components/support-dialog";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
 import {
@@ -636,6 +638,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
     },
     onError,
   });
+  const [helping, setHelping] = useState(false);
   const readable = run.status === "succeeded" || (run.status === "cancelled" && !!run.report_title);
   const reasonKey = `reason.${run.reason}`;
   const canRetry = ["failed", "interrupted", "cancelled"].includes(run.status);
@@ -746,6 +749,11 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                       <DropdownMenuSeparator />
                     </>
                   )}
+                  <DropdownMenuItem onClick={() => setHelping(true)}>
+                    <LifeBuoy />
+                    {t("support.title")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={() => confirm(t("delete.confirmRun"), () => remove.mutate())}
@@ -767,6 +775,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />
+        <SupportDialog runId={run.id} open={helping} onOpenChange={setHelping} />
       </CardContent>
     </Card>
   );

@@ -11,6 +11,7 @@ import {
   FileText,
   FolderInput,
   FolderOpen,
+  LifeBuoy,
   Gauge,
   Globe,
   Loader2,
@@ -41,6 +42,7 @@ import {
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
 import { MoveSessionDialog } from "@/components/move-session";
+import { SupportDialog } from "@/components/support-dialog";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
   AlertDialog,
@@ -339,6 +341,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
+  const [helping, setHelping] = useState(false);
   const [text, setText] = useState("");
   // A Turn waiting for the owner to agree to another quota unit.
   const [extending, setExtending] = useState<Asked | null>(null);
@@ -428,6 +431,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
         session={moving ? { id: d.id, title: d.title, project_id: d.project_id } : null}
         onOpenChange={setMoving}
       />
+      {!d.read_only && <SupportDialog sessionId={d.id} open={helping} onOpenChange={setHelping} />}
       <AlertDialog open={!!extending} onOpenChange={(open) => !open && setExtending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -484,6 +488,9 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
               </button>
             }
             actions={
+              d.read_only ? (
+                <span className="rounded-md bg-warning-soft px-2 py-1 text-xs text-warning">{t("support.readOnly")}</span>
+              ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" aria-label={t("run.more")}>
@@ -495,6 +502,10 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                     <FolderInput />
                     {t("move.title")}
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setHelping(true)}>
+                    <LifeBuoy />
+                    {t("support.title")}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
@@ -505,6 +516,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )
             }
           />
           <div className="-mt-5 mb-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -598,7 +610,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
         </div>
 
         {/* The owner's turn, at the foot of the page. */}
-        {started && (
+        {started && !d.read_only && (
           <div className="sticky bottom-0 border-t bg-background/90 backdrop-blur">
             <form
               className="mx-auto w-full max-w-3xl space-y-2 px-6 py-3"

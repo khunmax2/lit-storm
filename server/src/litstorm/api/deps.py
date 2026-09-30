@@ -75,5 +75,32 @@ def own(session, model, row_id, user):
     return row
 
 
+def readable(session, model, row_id, user, what):
+    """Like `own`, for reading only: the owner, or an Administrator the owner
+    granted access to this Run or Discussion (litstorm.support), whose read
+    is then recorded for the owner to see. Anyone else gets the same 404."""
+    from litstorm import support, trash
+    from litstorm.db.models import ResearchSession, Run
+
+    try:
+        return own(session, model, row_id, user)
+    except HTTPException:
+        if user.role != "admin":
+            raise
+    row = session.get(model, row_id)
+    alive = row is not None and (
+        trash.run_alive(session, row) if model is Run else trash.session_alive(session, row)
+    )
+    grant = None
+    if alive and model is Run:
+        grant = support.covering(session, user, run=row)
+    elif alive and model is ResearchSession:
+        grant = support.covering(session, user, research_session=row)
+    if grant is None:
+        raise HTTPException(404, "not_found")
+    support.record(session, grant, what)
+    return row
+
+
 def by_email(session, email):
     return session.scalar(select(User).where(User.email == email.strip().lower()))

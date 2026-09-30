@@ -388,6 +388,9 @@ class SessionOut(BaseModel):
     created_at: datetime
     runs: list[RunOut]
     kind: str = "research"  # "discussion": GET /api/discussions/{id} shows it
+    # Shown to an Administrator under a Support Access Grant: nothing can be
+    # changed from it.
+    read_only: bool = False
 
 
 def _pick(session, table, wanted_id):
@@ -685,7 +688,12 @@ def move_session(
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)
 def get_session(session_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
-    return session_out(session, deps.own(session, ResearchSession, session_id, user))
+    # Readable under a grant only for a Discussion's grant, which names the
+    # topic; a Run's grant names that Run alone (litstorm.support).
+    rs = deps.readable(session, ResearchSession, session_id, user, "discussion")
+    out = session_out(session, rs)
+    out.read_only = rs.owner_id != user.id
+    return out
 
 
 @router.post("/sessions/{session_id}/runs", response_model=RunOut, status_code=201)
@@ -804,6 +812,7 @@ class EventOut(BaseModel):
 
 class RunDetail(RunOut):
     events: list[EventOut]
+    read_only: bool = False
 
 
 # Notes an owner sees while waiting. Tracebacks and the like stay in the
@@ -818,16 +827,19 @@ def get_run(
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
-    run = deps.own(session, Run, run_id, user)
+    run = deps.readable(session, Run, run_id, user, "run")
+    helping = run.owner_id != user.id
     events = session.scalars(
         select(RunEvent).where(RunEvent.run_id == run.id, RunEvent.id > after).order_by(RunEvent.id).limit(500)
     )
+    # An Administrator the owner asked for help sees every note, tracebacks
+    # included: that is what the help is for.
     shown = [
         EventOut(id=e.id, at=e.at, type=e.type, data=e.data)
         for e in events
-        if e.type in ("stage", "usage") or (e.type == "note" and e.data.get("kind") in _SHOWN_NOTES)
+        if e.type in ("stage", "usage") or (e.type == "note" and (helping or e.data.get("kind") in _SHOWN_NOTES))
     ]
-    return RunDetail(**run_out(run).model_dump(), events=shown)
+    return RunDetail(**run_out(run).model_dump(), events=shown, read_only=helping)
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunOut)
@@ -911,8 +923,8 @@ def restore(kind: str, item_id: uuid.UUID, user=Depends(deps.current_user), sess
 # --- Reports -------------------------------------------------------------------
 
 
-def _report(session, run_id, user):
-    run = deps.own(session, Run, run_id, user)
+def _report(session, run_id, user, what="report"):
+    run = deps.readable(session, Run, run_id, user, what)
     path = os.path.join(settings.get().runs_dir, str(run.id), "report.json")
     if not os.path.exists(path):
         raise HTTPException(404, "no_report")
@@ -940,7 +952,7 @@ def export_report(
 ):
     from urllib.parse import quote
 
-    _, report = _report(session, run_id, user)
+    _, report = _report(session, run_id, user, "export")
     name = _filename(report, format)
     disposition = f"attachment; filename*=UTF-8''{quote(name)}"
     if format == "html":

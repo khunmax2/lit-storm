@@ -280,6 +280,37 @@ class Run(Base):
     )
 
 
+class SupportGrant(Base):
+    """An owner's permission for one Administrator to read one Run, or one
+    Discussion with its Turns, for 24 hours (docs/CONTEXT.md, Support Access
+    Grant). Revoked by setting `revoked_at`; never widened."""
+
+    __tablename__ = "support_grants"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    admin_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Exactly one of the two: a Run, or a Discussion (its Research Session).
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("research_sessions.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = _now()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SupportAccess(Base):
+    """One read under a grant: who, when, what. The owner sees these."""
+
+    __tablename__ = "support_access"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    grant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("support_grants.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = _now()
+    what: Mapped[str] = mapped_column(String(40))  # "run", "report", "export", "discussion"
+
+
 class RunEvent(Base):
     """What the Run's process reported: stages, notes, usage."""
 

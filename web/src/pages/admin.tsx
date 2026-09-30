@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Info,
   KeyRound,
+  LifeBuoy,
   Layers,
   Link2,
   Loader2,
@@ -2053,6 +2054,96 @@ function Usage() {
   );
 }
 
+// --- support: what owners have granted this Administrator ------------------------------
+
+function GrantedRun({ runId }: { runId: string }) {
+  const { t } = useT();
+  const run = useQuery({
+    queryKey: ["support-run", runId],
+    queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: runId } } })),
+  });
+  if (!run.data) return run.error ? <ErrorText error={run.error} /> : <LoadingRows rows={1} />;
+  const r = run.data;
+  const notes = r.events.filter((e) => e.type === "note");
+  return (
+    <div className="grid gap-2 rounded-lg bg-muted/40 p-3 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge status={r.status} />
+        <span className="text-muted-foreground">
+          {r.engine_label} · {r.model_label} · {r.search_label} · {t(`depth.${r.depth}` as Key)}
+        </span>
+      </div>
+      {r.reason && r.reason !== "succeeded" && (
+        <p className="font-mono break-words text-destructive">
+          {r.reason}
+          {r.message ? `: ${r.message}` : ""}
+        </p>
+      )}
+      {notes.map((e) => (
+        <details key={e.id}>
+          <summary className="cursor-pointer">{String(e.data.kind)}</summary>
+          <pre className="mt-1 max-h-60 overflow-auto rounded bg-background p-2 whitespace-pre-wrap">
+            {String(e.data.text ?? JSON.stringify(e.data, null, 1))}
+          </pre>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function Support() {
+  const { t, lang } = useT();
+  const grants = useQuery({ queryKey: ["admin-support"], queryFn: () => call(api.GET("/api/admin/support")) });
+  const [open, setOpen] = useState<string | null>(null);
+  if (grants.isLoading) return <LoadingRows />;
+  if (!grants.data?.length)
+    return (
+      <Card>
+        <CardContent className="text-sm text-muted-foreground">{t("support.none")}</CardContent>
+      </Card>
+    );
+  return (
+    <div className="grid gap-3">
+      {grants.data.map((g) => (
+        <Card key={g.id} className="gap-3 py-4">
+          <CardContent className="grid gap-3 px-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate font-medium">{g.title}</div>
+                <div className="text-xs text-muted-foreground">
+                  {g.owner_email} · {g.kind === "discussion" ? "Co-STORM" : t("support.kindRun")} ·{" "}
+                  {g.live ? t("support.until", { at: formatDate(g.expires_at, lang) }) : t("support.ended")}
+                </div>
+              </div>
+              {g.live && (
+                <div className="flex gap-2">
+                  {g.kind === "run" && (
+                    <Button variant="outline" size="sm" onClick={() => setOpen(open === g.id ? null : g.id)}>
+                      {t("support.details")}
+                    </Button>
+                  )}
+                  <Button size="sm" asChild>
+                    {g.kind === "run" ? (
+                      <Link to="/runs/$runId" params={{ runId: g.run_id! }}>
+                        {t("run.open")}
+                      </Link>
+                    ) : (
+                      <Link to="/sessions/$sessionId" params={{ sessionId: g.session_id! }}>
+                        {t("support.openDiscussion")}
+                      </Link>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {open === g.id && g.run_id && <GrantedRun runId={g.run_id} />}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 // The settings sections, each its own address, listed in the settings page's
 // own side column.
 export const SETTINGS = [
@@ -2062,6 +2153,7 @@ export const SETTINGS = [
   { id: "modes", label: "modes.title", lead: "modes.lead", icon: Layers, page: Modes },
   { id: "limits", label: "admin.limits", lead: "settings.limitsLead", icon: Gauge, page: Limits },
   { id: "usage", label: "admin.usage", lead: "settings.usageLead", icon: ChartColumn, page: Usage },
+  { id: "support", label: "admin.support", lead: "settings.supportLead", icon: LifeBuoy, page: Support },
 ] as const;
 
 // A section's main action sits beside its title at the top of the page.

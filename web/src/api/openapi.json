@@ -2533,6 +2533,212 @@
     }
    }
   },
+  "/api/support/admins": {
+   "get": {
+    "tags": [
+     "support"
+    ],
+    "summary": "Administrators",
+    "description": "Whom the owner can ask for help.",
+    "operationId": "administrators_api_support_admins_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AdminChoice"
+         },
+         "type": "array",
+         "title": "Response Administrators Api Support Admins Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/grants": {
+   "post": {
+    "tags": [
+     "support"
+    ],
+    "summary": "Create Grant",
+    "operationId": "create_grant_api_grants_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GrantIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GrantOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "support"
+    ],
+    "summary": "My Grants",
+    "description": "The owner's grants, newest first; for one Run or Discussion if asked.",
+    "operationId": "my_grants_api_grants_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "session_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/GrantOut"
+         },
+         "title": "Response My Grants Api Grants Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/grants/{grant_id}": {
+   "delete": {
+    "tags": [
+     "support"
+    ],
+    "summary": "Revoke",
+    "operationId": "revoke_api_grants__grant_id__delete",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GrantOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/support": {
+   "get": {
+    "tags": [
+     "support"
+    ],
+    "summary": "Granted To Me",
+    "description": "What owners have granted this Administrator: live ones, and those that\nended in the last week.",
+    "operationId": "granted_to_me_api_admin_support_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/GrantOut"
+         },
+         "type": "array",
+         "title": "Response Granted To Me Api Admin Support Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/health": {
    "get": {
     "summary": "Health",
@@ -2552,6 +2758,48 @@
  },
  "components": {
   "schemas": {
+   "AccessOut": {
+    "properties": {
+     "at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "At"
+     },
+     "what": {
+      "type": "string",
+      "title": "What"
+     }
+    },
+    "type": "object",
+    "required": [
+     "at",
+     "what"
+    ],
+    "title": "AccessOut"
+   },
+   "AdminChoice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "email"
+    ],
+    "title": "AdminChoice"
+   },
    "AdminRunOut": {
     "properties": {
      "id": {
@@ -3011,6 +3259,11 @@
       },
       "type": "array",
       "title": "Reports"
+     },
+     "read_only": {
+      "type": "boolean",
+      "title": "Read Only",
+      "default": false
      }
     },
     "type": "object",
@@ -3231,6 +3484,138 @@
      "data"
     ],
     "title": "EventOut"
+   },
+   "GrantIn": {
+    "properties": {
+     "admin_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Admin Id"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "admin_id"
+    ],
+    "title": "GrantIn"
+   },
+   "GrantOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "admin": {
+      "$ref": "#/components/schemas/AdminChoice"
+     },
+     "owner_email": {
+      "type": "string",
+      "title": "Owner Email"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     },
+     "revoked_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revoked At"
+     },
+     "live": {
+      "type": "boolean",
+      "title": "Live"
+     },
+     "accesses": {
+      "items": {
+       "$ref": "#/components/schemas/AccessOut"
+      },
+      "type": "array",
+      "title": "Accesses"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "admin",
+     "owner_email",
+     "kind",
+     "run_id",
+     "session_id",
+     "title",
+     "created_at",
+     "expires_at",
+     "revoked_at",
+     "live",
+     "accesses"
+    ],
+    "title": "GrantOut"
    },
    "HTTPValidationError": {
     "properties": {
@@ -4572,6 +4957,11 @@
       },
       "type": "array",
       "title": "Events"
+     },
+     "read_only": {
+      "type": "boolean",
+      "title": "Read Only",
+      "default": false
      }
     },
     "type": "object",
@@ -5304,6 +5694,11 @@
       "type": "string",
       "title": "Kind",
       "default": "research"
+     },
+     "read_only": {
+      "type": "boolean",
+      "title": "Read Only",
+      "default": false
      }
     },
     "type": "object",

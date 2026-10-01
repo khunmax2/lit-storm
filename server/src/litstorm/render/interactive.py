@@ -36,7 +36,7 @@ from litstorm import visuals as visuals_mod
 from litstorm.render import html as page_mod
 
 # Bump when the page changes, so pages kept on disk are drawn again.
-RENDER_VERSION = 1
+RENDER_VERSION = 2
 
 _VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
 ECHARTS = os.path.join(_VENDOR, "echarts-6.1.0.min.js")
@@ -213,11 +213,88 @@ def _timeline(b, labels, language):
                    foot=_from(b["sources"], labels, b.get("note")))
 
 
-def _comparison(b, labels, language):
-    rows = [[f"<strong>{_e(r['label'])}</strong>", *(_e(c) for c in r["cells"]), _pill(r["cite"], labels)] for r in b["rows"]]
-    view = _table(["", *b["columns"], labels["from"]], rows)
-    return _figure(b["id"], "comparison", b["title"] or labels["comparison"], labels, view,
+_NUMBER = r"\d[\d,]*(?:\.\d+)?"
+_RATIO = re.compile(rf"^\s*({_NUMBER})\s*[:：]\s*({_NUMBER})\s*$")
+_AMOUNT = re.compile(rf"^\s*([^\d\s]{{0,3}})\s*({_NUMBER})\s*([^\d]{{0,12}}?)\s*$")
+
+
+def _measure(cell):
+    """A cell as (value, unit), or None when it is not one number: "23.9%",
+    "1,600 บาท", and "1 : 3" (as 3 to every 1)."""
+    m = _RATIO.match(cell or "")
+    if m:
+        a, b = (float(x.replace(",", "")) for x in m.groups())
+        return (b / a, ":") if a else None
+    m = _AMOUNT.match(cell or "")
+    if not m:
+        return None
+    return float(m.group(2).replace(",", "")), (m.group(1) + "|" + m.group(3).strip())
+
+
+def _comparison_columns(b):
+    """The columns worth showing: not those that only say again what their
+    row's label says ("2569" beside "ปี 2569")."""
+    keep = []
+    for i, _ in enumerate(b["columns"]):
+        cells = [(r["cells"][i] if i < len(r["cells"]) else "").strip() for r in b["rows"]]
+        if all(c and c in r["label"] for c, r in zip(cells, b["rows"])):
+            continue
+        keep.append(i)
+    return keep
+
+
+def comparison_spec(b, language):
+    """A comparison whose columns are numbers in one unit, as a bar chart
+    (None when it is not one: text stays a table). The bars carry the cells
+    as written; the table stays a tab away."""
+    if len(b["rows"]) < 2:
+        return None
+    series, unit = [], None
+    for i in _comparison_columns(b):
+        cells = [r["cells"][i] if i < len(r["cells"]) else "" for r in b["rows"]]
+        measured = [_measure(c) for c in cells]
+        if any(m is None for m in measured):
+            continue
+        units = {m[1] for m in measured}
+        values = [m[0] for m in measured]
+        # Years down a column are when, not how much.
+        if units == {"|"} and all(v.is_integer() and 1800 <= v <= 2700 for v in values):
+            continue
+        if len(units) != 1 or (unit is not None and units != {unit}):
+            continue
+        unit = units.pop()
+        series.append({"name": b["columns"][i], "values": values, "labels": [c.strip() for c in cells]})
+    if not series:
+        return None
+    return {"kind": "bar", "categories": [r["label"] for r in b["rows"]], "series": series[:3],
+            "unit": "", "x_label": "", "y_label": "", "locale": language, "as_written": True}
+
+
+def _comparison(b, labels, language, svg=""):
+    columns = _comparison_columns(b)
+    rows = [[f"<strong>{_e(r['label'])}</strong>", *(_e(r["cells"][i] if i < len(r["cells"]) else "") for i in columns),
+             _pill(r["cite"], labels)] for r in b["rows"]]
+    table = _table(["", *(b["columns"][i] for i in columns), labels["from"]], rows)
+    if svg:
+        view, data = f'<div class="chart" data-chart="{b["id"]}">{svg}</div>', table
+    else:
+        view, data = table, ""
+    return _figure(b["id"], "comparison", b["title"] or labels["comparison"], labels, view, data,
                    foot=_from(b["sources"], labels, b.get("note")))
+
+
+def chart_specs(blocks, language):
+    """Every block drawn as a chart, by id: the charts, and the comparisons
+    that are numbers."""
+    specs = {}
+    for b in blocks:
+        if b["type"] == "chart":
+            specs[b["id"]] = chart_spec(b, language)
+        elif b["type"] == "comparison":
+            spec = comparison_spec(b, language)
+            if spec:
+                specs[b["id"]] = spec
+    return specs
 
 
 def _layers(nodes, edges):
@@ -423,16 +500,24 @@ CHART_JS = r"""
       return base;
     }
     var cats = spec.categories.map(function (c) { return wrap(c, spec.kind === "bar" ? 24 : 10, loc); });
-    var valueAxis = { type: "value", axisLabel: Object.assign({ formatter: compact(loc) }, text), splitLine: { lineStyle: { color: RULE } },
+    var valueAxis = { type: "value", axisLabel: Object.assign({ formatter: compact(loc), show: !spec.as_written }, text), splitLine: { lineStyle: { color: RULE } },
                       name: spec.unit || "", nameTextStyle: text };
     var catAxis = { type: "category", data: cats, axisLabel: Object.assign({ interval: 0 }, text), axisLine: { lineStyle: { color: RULE } }, axisTick: { show: false } };
     base.grid = { left: 8, right: 56, top: many ? 34 : 16, bottom: 8, containLabel: true };
+    // What the categories are ("Temperature (°C)"): over the bars' labels, or under a line's years.
+    if (spec.x_label) {
+      catAxis.name = spec.x_label;
+      catAxis.nameTextStyle = Object.assign({}, text, { fontSize: 11, align: spec.kind === "bar" ? "left" : "center" });
+      if (spec.kind === "bar") { catAxis.nameLocation = "start"; catAxis.nameGap = 10; base.grid.top += 20; }
+      else { catAxis.nameLocation = "middle"; catAxis.nameGap = 30; base.grid.bottom += 24; }
+    }
     if (spec.kind === "bar") {
       catAxis.inverse = true;
       base.yAxis = catAxis; base.xAxis = valueAxis;
       base.series = spec.series.map(function (s) {
         return { type: "bar", name: s.name, data: s.values, barMaxWidth: 22, itemStyle: { borderRadius: [0, 4, 4, 0] },
-                 label: { show: true, position: "right", color: INK, fontFamily: FONT, formatter: function (p) { return n(p.value); } } };
+                 label: { show: true, position: "right", color: INK, fontFamily: FONT,
+                          formatter: function (p) { return s.labels ? s.labels[p.dataIndex] : n(p.value); } } };
       });
     } else {
       base.xAxis = catAxis; base.yAxis = valueAxis;
@@ -444,8 +529,13 @@ CHART_JS = r"""
     return base;
   };
   window.lsHeight = function (spec) {
-    if (spec.kind === "bar") return Math.max(140, 40 + spec.categories.length * (spec.series.length > 1 ? 44 : 34) + (spec.series.length > 1 ? 30 : 0));
-    return 300;
+    if (spec.kind === "bar") {
+      // Room for the longest label's lines (wrap() breaks them at 24, up to 3).
+      var lines = Math.min(3, Math.max.apply(null, spec.categories.map(function (c) { return Math.ceil(String(c).length / 24) || 1; })));
+      var row = (spec.series.length > 1 ? 44 : 34) + (lines - 1) * 15;
+      return Math.max(140, 40 + spec.categories.length * row + (spec.series.length > 1 ? 30 : 0) + (spec.x_label ? 20 : 0));
+    }
+    return spec.x_label ? 324 : 300;
   };
 })();
 """.replace("%PALETTE%", json.dumps(PALETTE))
@@ -749,7 +839,7 @@ def render(report, visuals=None, engine_label="", finished_at=None, full=False, 
     hidden = set((visuals or {}).get("hidden") or [])
     blocks = [b for b in (visuals or {}).get("blocks") or [] if b["id"] not in hidden]
 
-    specs = {b["id"]: chart_spec(b, language) for b in blocks if b["type"] == "chart"}
+    specs = chart_specs(blocks, language)
     if report["sources"]:
         specs["most-cited"] = most_cited_spec(report)[0]
     if svgs is None:
@@ -766,6 +856,8 @@ def render(report, visuals=None, engine_label="", finished_at=None, full=False, 
     for b in blocks:
         if b["type"] == "chart":
             figure = _chart(b, labels, language, svgs.get(b["id"], ""))
+        elif b["type"] == "comparison":
+            figure = _comparison(b, labels, language, svgs.get(b["id"], ""))
         else:
             figure = _BLOCKS[b["type"]](b, labels, language)
         if b["anchor"] == "lead":
@@ -819,7 +911,10 @@ def cached(report_path, report, visuals=None, engine_label="", finished_at=None,
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return f.read()
-    page = render(report, visuals, engine_label, finished_at, full)
+    # The page people get is the brief and its reading canvas (render/brief.py).
+    from litstorm.render import brief
+
+    page = brief.render(report, visuals, engine_label, finished_at, full=full)
     for old in glob.glob(os.path.join(directory, f"interactive-{variant}-*.html")):
         try:
             os.remove(old)

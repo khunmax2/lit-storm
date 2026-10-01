@@ -27,12 +27,12 @@ def _page(v=None, **kw):
 
 def _figures():
     facts = visuals.facts(REPORT)
-    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
     return [
         {"type": "chart", "chart": "bar", "anchor": "s2", "title": "ส่งออก", "unit": "ตัน",
          "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]},
         {"type": "stat_cards", "anchor": "lead", "title": "<script>alert(1)</script>",
-         "items": [{"label": "<img src=x onerror=alert(1)>", "value": 929000, "unit": "ตัน", "fact": f1}]},
+         "items": [{"label": "<img src=x onerror=alert(1)>", "value": 42.5, "unit": "%", "fact": f3}]},
     ]
 
 
@@ -107,3 +107,29 @@ def test_charts_are_drawn_as_svg():
     svgs = interactive.prerender(specs)
     assert len(svgs) == 2 and all(s.startswith("<svg") and "viewBox" in s for s in svgs)
     assert "929" in svgs[0]
+
+
+def _comparison(columns, rows):
+    return {"id": "v9", "type": "comparison", "title": "", "note": "", "sources": [1], "columns": columns,
+            "rows": [{"label": label, "cells": cells, "cite": {"source": 1, "text": "", "origin": "evidence"}} for label, cells in rows]}
+
+
+def test_a_comparison_of_numbers_is_drawn_as_bars():
+    b = _comparison(["ปี พ.ศ.", "สัดส่วนการผลิตชดเชย"], [("ปี 2569", ["2569", "1 : 2"]), ("ปี 2570", ["2570", "1 : 3"])])
+    spec = interactive.comparison_spec(b, "th")
+    assert spec["categories"] == ["ปี 2569", "ปี 2570"]
+    # The year column only says what the label says; the bars keep the cells as written.
+    assert spec["series"] == [{"name": "สัดส่วนการผลิตชดเชย", "values": [2.0, 3.0], "labels": ["1 : 2", "1 : 3"]}]
+    page = interactive._comparison(b, interactive.LABELS["th"], "th", "<svg id='fake-v9'></svg>")
+    assert "fake-v9" in page and 'data-tab="data"' in page and "ปี พ.ศ." not in page
+
+
+def test_a_comparison_of_words_or_mixed_units_stays_a_table():
+    words = _comparison(["จุดเด่น"], [("ก", ["ถูก"]), ("ข", ["เร็ว"])])
+    mixed = _comparison(["ราคา"], [("ก", ["1,600 บาท"]), ("ข", ["23.9%"])])
+    years = _comparison(["เริ่ม"], [("ก", ["2566"]), ("ข", ["2568"])])
+    for b in (words, mixed, years):
+        assert interactive.comparison_spec(b, "th") is None
+    assert "data-tab" not in interactive._comparison(words, interactive.LABELS["th"], "th")
+    money = _comparison(["ภาษีต่อปี"], [("ก่อน", ["1,600 บาท"]), ("หลัง", ["320 บาท"])])
+    assert interactive.comparison_spec(money, "th")["series"][0]["values"] == [1600.0, 320.0]

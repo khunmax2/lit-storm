@@ -1,0 +1,92 @@
+// Four light directions from ui-ux-pro-max (styles.csv + colors.csv), with
+// what makes each one more than a colour change.
+export const PALETTES: Record<string, string> = {
+  now: "",
+
+  // Academic Journal palette (navy #1E3A5F + brass #B45309) on E-Ink/Paper
+  // style: paper white, ink, hairlines instead of shadows, a little grain.
+  scholar: `:root:root {
+    --background: #FBF8F1; --foreground: #1A1F2B;
+    --card: #FFFDF8; --card-foreground: #1A1F2B; --popover: #FFFDF8; --popover-foreground: #1A1F2B;
+    --primary: #1E3A5F; --primary-foreground: #FFFDF8;
+    --secondary: #F1ECE0; --secondary-foreground: #1E3A5F;
+    --muted: #F1ECE0; --muted-foreground: #5E5A52;
+    --accent: #EAE3D3; --accent-foreground: #1E3A5F;
+    --border: #E3DCCB; --input: #DCD4C1; --ring: #B45309;
+    --brand: #B45309; --brand-soft: #F6E9D7;
+    --sidebar: #F4EFE3; --sidebar-accent: #EAE2D0; --sidebar-border: #E3DCCB;
+    --radius: 0.4rem;
+  }
+  body { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  [data-slot=sidebar-inset] { background: transparent; }
+  .shadow-xs, .shadow-sm, .shadow-md { box-shadow: none !important; }
+  header.sticky { border-bottom: 1px solid var(--border); box-shadow: 0 3px 0 -2px var(--border); }`,
+
+  // Glassmorphism on the Wiki/Knowledge palette (navy #1E3A8A, blue #2563EB,
+  // violet links): a sky behind, frosted panels in front.
+  frosted: `:root:root {
+    --background: #EEF3FB; --foreground: #14213D;
+    --card: rgb(255 255 255 / .62); --card-foreground: #14213D; --popover: #FFFFFF; --popover-foreground: #14213D;
+    --primary: #1E3A8A; --primary-foreground: #FFFFFF;
+    --secondary: rgb(255 255 255 / .55); --secondary-foreground: #1E3A8A;
+    --muted: rgb(255 255 255 / .5); --muted-foreground: #4A5875;
+    --accent: rgb(37 99 235 / .1); --accent-foreground: #1E3A8A;
+    --border: rgb(255 255 255 / .75); --input: rgb(30 58 138 / .16); --ring: #2563EB;
+    --brand: #2563EB; --brand-soft: rgb(37 99 235 / .12);
+    --sidebar: rgb(255 255 255 / .45); --sidebar-accent: rgb(255 255 255 / .7); --sidebar-border: rgb(255 255 255 / .7);
+    --radius: 0.9rem;
+  }
+  body { background:
+    radial-gradient(55rem 40rem at 85% 0%, #DCD6FF 0%, transparent 60%),
+    radial-gradient(60rem 45rem at 0% 30%, #CFE6FF 0%, transparent 60%),
+    radial-gradient(50rem 40rem at 60% 100%, #D7F3F0 0%, transparent 60%), #EEF3FB; background-attachment: fixed; }
+  [data-slot=sidebar-inset] { background: transparent; }
+  [data-slot=sidebar-inner], header.sticky, .bg-card, .bg-background { backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3); }
+  .bg-card { box-shadow: 0 8px 30px -12px rgb(30 58 138 / .18), inset 0 1px 0 rgb(255 255 255 / .8) !important; }
+  header.sticky { background: rgb(255 255 255 / .45) !important; }`,
+
+  // Bento Box Grid (Apple-style): #F5F5F7 ground, white tiles lifted by
+  // layered soft shadows, generous radius, system blue.
+  bento: `:root:root {
+    --background: #F5F5F7; --foreground: #1D1D1F;
+    --card: #FFFFFF; --card-foreground: #1D1D1F; --popover: #FFFFFF; --popover-foreground: #1D1D1F;
+    --primary: #1D1D1F; --primary-foreground: #FFFFFF;
+    --secondary: #EDEDF0; --secondary-foreground: #1D1D1F;
+    --muted: #EDEDF0; --muted-foreground: #6E6E73;
+    --accent: #E8E8ED; --accent-foreground: #1D1D1F;
+    --border: #E3E3E8; --input: #D9D9DE; --ring: #0071E3;
+    --brand: #0071E3; --brand-soft: #E6F0FC;
+    --sidebar: #FFFFFF; --sidebar-accent: #F2F2F5; --sidebar-border: #ECECEF;
+    --radius: 1rem;
+  }
+  [data-slot=sidebar-inset] { background: #F5F5F7; }
+  .bg-card, .shadow-xs, .shadow-sm { border-color: transparent !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 4px 12px rgb(0 0 0 / .05), 0 16px 32px -16px rgb(0 0 0 / .1) !important; }
+  header.sticky { background: rgb(245 245 247 / .8) !important; }`,
+
+  // Aurora UI on the AI/Chatbot palette (violet #7C3AED, cyan #0891B2,
+  // lavender #FAF5FF): a slow mesh of light, violet actions.
+  aurora: `:root:root {
+    --background: #FAF7FF; --foreground: #1E1B4B;
+    --card: #FFFFFF; --card-foreground: #1E1B4B; --popover: #FFFFFF; --popover-foreground: #1E1B4B;
+    --primary: #6D28D9; --primary-foreground: #FFFFFF;
+    --secondary: #F1ECFD; --secondary-foreground: #4C1D95;
+    --muted: #F3EFFC; --muted-foreground: #5B5880;
+    --accent: #EDE7FC; --accent-foreground: #4C1D95;
+    --border: #E7E0FA; --input: #DDD3F7; --ring: #7C3AED;
+    --brand: #7C3AED; --brand-soft: #F0E9FE;
+    --sidebar: #F7F3FF; --sidebar-accent: #ECE4FD; --sidebar-border: #EAE3FB;
+    --radius: 0.75rem;
+  }
+  body { background:
+    radial-gradient(40rem 26rem at 80% -5%, rgb(196 181 253 / .55), transparent 65%),
+    radial-gradient(36rem 24rem at 25% -10%, rgb(103 232 249 / .4), transparent 65%),
+    radial-gradient(30rem 22rem at 55% 10%, rgb(244 114 182 / .25), transparent 65%), #FAF7FF;
+    background-size: 140% 140%; animation: ls-aurora 12s ease-in-out infinite alternate; }
+  @keyframes ls-aurora { to { background-position: 30% 20%; } }
+  @media (prefers-reduced-motion: reduce) { body { animation: none; } }
+  [data-slot=sidebar-inset] { background: transparent; }
+  header.sticky { background: rgb(250 247 255 / .7) !important; }
+  h1.font-display { background: linear-gradient(100deg, #6D28D9, #0891B2 60%, #DB2777);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }`,
+};

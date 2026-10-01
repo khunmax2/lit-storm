@@ -5,6 +5,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   BookOpenText,
   ChevronsUpDown,
+  Cloud,
   FolderOpen,
   House,
   Languages,
@@ -254,12 +255,13 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
                 </DropdownMenuSub>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    {theme === "dark" ? <Moon /> : theme === "light" ? <Sun /> : <Monitor />}
+                    {theme === "dark" ? <Moon /> : theme === "light" ? <Sun /> : theme === "frosted" ? <Cloud /> : <Monitor />}
                     {t("theme.label")}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
                       <DropdownMenuRadioItem value="light">{t("theme.light")}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="frosted">{t("theme.frosted")}</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="dark">{t("theme.dark")}</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="system">{t("theme.system")}</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>

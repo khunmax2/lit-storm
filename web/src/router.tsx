@@ -63,7 +63,24 @@ function Header() {
         size="icon"
         className="size-9 rounded-lg shadow-xs"
         aria-label={t("theme.label")}
-        onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+        onClick={() => {
+          if (resolvedTheme === "dark") {
+            let light = "light";
+            try {
+              light = localStorage.getItem("litstorm.light-theme") || "light";
+            } catch {
+              /* ignore */
+            }
+            setTheme(light);
+          } else {
+            try {
+              localStorage.setItem("litstorm.light-theme", resolvedTheme === "frosted" ? "frosted" : "light");
+            } catch {
+              /* ignore */
+            }
+            setTheme("dark");
+          }
+        }}
       >
         {resolvedTheme === "dark" ? <Sun /> : <Moon />}
       </Button>

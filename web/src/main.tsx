@@ -23,7 +23,14 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      // Frosted Sky is a light theme of its own (styles.css, .frosted).
+      themes={["light", "dark", "frosted"]}
+      disableTransitionOnChange
+    >
       <QueryClientProvider client={queryClient}>
         <I18nProvider>
           <TooltipProvider>

@@ -58,6 +58,37 @@ const ART = {
   ),
 };
 
+/** What a research mode is good at, shown when the pointer rests on its tab:
+ *  its name, what stands out, and what it suits. Nothing for a mode whose
+ *  words are not written yet. */
+function ModeHint({ id, label }: { id: string; label: string }) {
+  const { t } = useT();
+  const key = `mode.tip.${id}`;
+  if (!has(key)) return null;
+  const fit = `${key}.fit`;
+  return (
+    <span className="grid gap-1.5">
+      <span className="text-[13px] font-semibold">{label}</span>
+      <span className="grid gap-1">
+        {t(key as Key)
+          .split("\n")
+          .map((line) => (
+            <span key={line} className="flex gap-1.5 leading-snug opacity-90">
+              <span aria-hidden className="opacity-60">•</span>
+              {line}
+            </span>
+          ))}
+      </span>
+      {has(fit) && (
+        <span className="mt-0.5 border-t border-background/20 pt-1.5 leading-snug">
+          <span className="opacity-60">{t("mode.tip.fit")}: </span>
+          {t(fit as Key)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function HomePage() {
   const { t, lang } = useT();
   const navigate = useNavigate();
@@ -106,7 +137,7 @@ export function HomePage() {
               label={t("mode.label")}
               value={mode}
               onChange={(engine) => setForm({ ...form, engine })}
-              options={engines.map((e) => ({ value: e.id, label: e.label }))}
+              options={engines.map((e) => ({ value: e.id, label: e.label, hint: <ModeHint id={e.id} label={e.label} /> }))}
             />
           )}
         </div>

@@ -2,9 +2,14 @@
 // in a grey track so a rim of grey shows around it (the reference design).
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export type Segment<T extends string> = { value: T; label: ReactNode };
+/** `hint` explains the option when the pointer rests on it a moment. */
+export type Segment<T extends string> = { value: T; label: ReactNode; hint?: ReactNode };
+
+// Long enough that sweeping across the options does not flash every hint.
+const HINT_DELAY = 600;
 
 export function Segmented<T extends string>({
   value,
@@ -73,7 +78,7 @@ export function Segmented<T extends string>({
       )}
       {options.map((o) => {
         const active = o.value === value;
-        return (
+        const button = (
           <button
             key={o.value}
             type="button"
@@ -89,6 +94,15 @@ export function Segmented<T extends string>({
           >
             {o.label}
           </button>
+        );
+        if (!o.hint) return button;
+        return (
+          <Tooltip key={o.value} delayDuration={HINT_DELAY}>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8} className="max-w-xs px-3.5 py-3 text-left">
+              {o.hint}
+            </TooltipContent>
+          </Tooltip>
         );
       })}
     </div>

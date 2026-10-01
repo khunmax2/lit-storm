@@ -629,7 +629,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                       if (text.trim() && !busy) go({ action: "say", text: text.trim() });
                     }
                   }}
-                  placeholder={t("disc.placeholder")}
+                  placeholder={t(busy ? "disc.placeholderBusy" : "disc.placeholder")}
                   maxLength={2000}
                   className="min-h-10 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent"
                 />

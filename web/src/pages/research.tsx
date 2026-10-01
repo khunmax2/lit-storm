@@ -873,6 +873,10 @@ export function SessionPage() {
   const s = session.data;
   // A Discussion lives at the same address and has a page of its own.
   if (s.kind === "discussion") return <DiscussionPage sessionId={s.id} />;
+  // A Run takes nothing more once it starts (only a Discussion is talked to
+  // along the way): while one works, its progress is the page, and starting
+  // over waits until it ends.
+  const working = s.runs.some((r) => !FINAL.has(r.status));
 
   return (
     <div className="mx-auto w-full max-w-4xl px-6 py-8">
@@ -940,8 +944,8 @@ export function SessionPage() {
           <RunCard key={r.id} run={r} confirm={confirm} />
         ))}
       </div>
-      {form && (
-        <section className="mt-10 space-y-2">
+      {form && !working && (
+        <section className="mt-10 animate-in space-y-2 duration-300 fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none">
           <h2 className="text-sm font-medium">{t("run.again")}</h2>
           <p className="text-sm text-muted-foreground">{t("run.againLead")}</p>
           <Composer form={form} setForm={setForm} onSubmit={() => again.mutate()} pending={again.isPending} size="md" />

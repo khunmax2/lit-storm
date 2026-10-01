@@ -86,3 +86,9 @@ def test_dark_follows_the_system_or_the_choice_and_print_is_light():
     assert 'data-act="theme"' in page
     printed = page[page.index("@media print"):]
     assert "--bg: #eef3fb" in printed
+
+
+def test_a_key_figure_s_number_quotes_the_passage_behind_it():
+    page = _page(_visuals(_figures()))
+    assert 'data-tip="Monthong accounts for 42.5% of plantings.' in page
+    assert '"cite_hint"' in page and "ls-cite" in page

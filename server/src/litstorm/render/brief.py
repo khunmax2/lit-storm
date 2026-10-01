@@ -47,6 +47,7 @@ LABELS = {
         "more_subs": "+{n} หัวข้อย่อย",
         "read_this": "อ่านส่วนนี้",
         "backed_by": "แหล่งที่รองรับ",
+        "cite_hint": "คลิกเพื่อดูข้อความหลักฐาน",
         "evidence_by_section": "แหล่งที่รองรับแต่ละประเด็น",
         "overview": "ภาพรวม",
         "theme": "สว่าง/มืด",
@@ -80,6 +81,7 @@ LABELS = {
         "more_subs": "+{n} subtopics",
         "read_this": "Read this part",
         "backed_by": "Backed by",
+        "cite_hint": "Click for the evidence",
         "evidence_by_section": "Sources behind each theme",
         "overview": "Overview",
         "theme": "Light/dark",
@@ -265,6 +267,28 @@ a.cite .b { font-size: 0; }
   background: var(--soft); border-left: 3px solid var(--brand); }
 .sc .ev a { display: inline-block; margin-top: .5rem; font-size: .78rem; font-weight: 500; }
 .empty { font-size: .85rem; color: var(--muted); padding: .4rem .3rem; }
+.ls-cite { position: fixed; z-index: 60; width: 300px; padding: .75rem; border-radius: .9rem; pointer-events: none;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  box-shadow: 0 18px 40px -18px rgb(15 23 42 / .45), 0 2px 6px -2px rgb(15 23 42 / .12);
+  opacity: 0; transform: translateY(var(--from, 4px)) scale(.97); transform-origin: top center;
+  transition: opacity .15s ease-out, transform .15s ease-out; }
+.ls-cite.on { opacity: 1; transform: none; }
+.ls-cite .h { display: flex; align-items: center; gap: .4rem; font-size: .75rem; color: var(--muted); min-width: 0; }
+.ls-cite .n { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 1rem; height: 1rem;
+  padding: 0 .25rem; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-size: .65rem; font-weight: 600; }
+.ls-cite .fav { flex: none; display: inline-flex; align-items: center; justify-content: center; width: .9rem; height: .9rem;
+  border-radius: 4px; font-size: .55rem; font-weight: 700; text-transform: uppercase;
+  background: oklch(.93 .045 var(--hue)); color: oklch(.42 .12 var(--hue)); }
+.ls-cite .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-cite .t { margin-top: .4rem; font-size: .88rem; font-weight: 600; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ls-cite .q { margin-top: .4rem; font-size: .76rem; line-height: 1.6; color: var(--muted);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ls-cite .k { margin-top: .5rem; font-size: .7rem; color: var(--brand); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ls-cite .fav { background: oklch(.33 .06 var(--hue)); color: oklch(.88 .07 var(--hue)); } }
+:root[data-theme="dark"] .ls-cite .fav { background: oklch(.33 .06 var(--hue)); color: oklch(.88 .07 var(--hue)); }
+@media (prefers-reduced-motion: reduce) { .ls-cite { transition: none; } }
+@media print { .ls-cite { display: none; } }
 .ls-progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--brand); transform-origin: left; transform: scaleX(0); z-index: 40; }
 
 /* The web app's frame, a laptop: a narrower map, so all three columns show. */
@@ -367,6 +391,48 @@ SCRIPT = r"""
       e.preventDefault(); light(a.dataset.id, true);
     });
   });
+  // A citation's source, beside it while the pointer rests on it (as the
+  // report page in the web app shows it). A figure's number quotes the very
+  // passage behind that figure; the text's quotes the source's first.
+  var tip = document.createElement("div");
+  tip.className = "ls-cite"; tip.setAttribute("role", "tooltip"); tip.setAttribute("aria-hidden", "true");
+  document.body.appendChild(tip);
+  var tipFor = null;
+  function hueOf(host) { var h = 0; for (var i = 0; i < host.length; i++) h = (h * 31 + host.charCodeAt(i)) % 360; return h; }
+  function hideTip() { tipFor = null; tip.classList.remove("on"); }
+  function showTip(a) {
+    var id = (a.getAttribute("href") || "").replace("#src-", ""), s = data.sources[id];
+    if (!s) return;
+    tipFor = a;
+    tip.innerHTML = "";
+    var add = function (parent, tag, cls, text) { var x = document.createElement(tag); x.className = cls; if (text != null) x.textContent = text; parent.appendChild(x); return x; };
+    var head = add(tip, "div", "h");
+    add(head, "span", "n", id);
+    var fav = add(head, "span", "fav", (s.h || "?").charAt(0));
+    fav.style.setProperty("--hue", hueOf(s.h || ""));
+    add(head, "span", "host", s.h);
+    add(tip, "div", "t", s.t);
+    var quote = a.getAttribute("data-tip") || s.e[0];
+    if (quote) add(tip, "div", "q", "\u201c" + quote + "\u201d");
+    add(tip, "div", "k", data.labels.cite_hint);
+    var at = a.getBoundingClientRect(), w = 300;
+    var left = Math.max(12, Math.min(at.left + at.width / 2 - w / 2, innerWidth - w - 12));
+    var below = at.bottom + 220 < innerHeight;
+    tip.style.left = left + "px";
+    tip.style.top = below ? (at.bottom + 8) + "px" : "";
+    tip.style.bottom = below ? "" : (innerHeight - at.top + 8) + "px";
+    tip.style.setProperty("--from", below ? "-4px" : "4px");
+    tip.classList.remove("on"); void tip.offsetWidth; tip.classList.add("on");
+  }
+  document.addEventListener("mouseover", function (e) {
+    var a = e.target.closest && e.target.closest("a.cite");
+    if (a) { if (a !== tipFor) showTip(a); } else if (tipFor) hideTip();
+  });
+  document.addEventListener("focusin", function (e) { if (e.target.matches && e.target.matches("a.cite")) showTip(e.target); });
+  document.addEventListener("focusout", hideTip);
+  addEventListener("scroll", hideTip, { passive: true });
+  document.addEventListener("click", hideTip);
+
   // A figure drawn from a table: the figure, or its data a tab away.
   document.querySelectorAll("figure.ix").forEach(function (fig) {
     var tabs = fig.querySelectorAll("[role=tab]");
@@ -492,7 +558,8 @@ def _tiles(report, visuals, labels, svg):
             f'<div class="tile c{i}"{f' id="{block_id}"' if block_id else ""}><div class="lbl">{E(item["label"])}</div>'
             f'<div class="{cls}">{value}<small>{E(item["unit"])}</small></div>'
             f'<div class="sub">{E(item["as_of"]) + " · " if item["as_of"] else ""}'
-            f'<a class="cite" href="#src-{item["cite"]["source"]}">{item["cite"]["source"]}</a></div></div>'
+            f'<a class="cite" href="#src-{item["cite"]["source"]}" data-tip="{E(item["cite"]["text"])}">'
+            f'{item["cite"]["source"]}</a></div></div>'
         )
     # Too few figures: what the report itself can say about where its
     # weight lies.
@@ -736,7 +803,8 @@ def render(report, visuals=None, engine_label="", finished_at=None, svgs=None, f
     }
     data = {"sources": sources, "cited": cited, "headings": headings, "map": map_data,
             "labels": {"open": labels["open"], "none_here": labels["none_here"],
-                       "backed_by": labels["backed_by"], "read_this": labels["read_this"]}}
+                       "backed_by": labels["backed_by"], "read_this": labels["read_this"],
+                       "cite_hint": labels["cite_hint"]}}
     note = f'<p class="note">{labels["figures_note"]}</p>' if blocks else ""
     refs = ""
     if report["sources"]:

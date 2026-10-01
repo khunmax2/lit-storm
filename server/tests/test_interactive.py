@@ -94,6 +94,16 @@ def test_the_page_is_kept_and_drawn_again_when_its_inputs_change(tmp_path, monke
     interactive.cached(path, REPORT, {**v, "hidden": ["v1"]})
     assert len(drawn) == 2
     assert len(list(tmp_path.glob("interactive-static-*.html"))) == 1
+    # New drawing code: every kept page is drawn again, with no number to bump.
+    monkeypatch.setattr(interactive, "render_code", lambda: "changed")
+    interactive.cached(path, REPORT, {**v, "hidden": ["v1"]})
+    assert len(drawn) == 3
+
+
+def test_the_drawing_code_has_one_digest_that_follows_its_files():
+    interactive.render_code.cache_clear()
+    first = interactive.render_code()
+    assert len(first) == 16 and interactive.render_code() == first
 
 
 @pytest.mark.slow
@@ -133,3 +143,10 @@ def test_a_comparison_of_words_or_mixed_units_stays_a_table():
     assert "data-tab" not in interactive._comparison(words, interactive.LABELS["th"], "th")
     money = _comparison(["ภาษีต่อปี"], [("ก่อน", ["1,600 บาท"]), ("หลัง", ["320 บาท"])])
     assert interactive.comparison_spec(money, "th")["series"][0]["values"] == [1600.0, 320.0]
+
+
+def test_one_row_of_numbers_is_drawn_as_bars_across_its_columns():
+    b = _comparison(["ก่อน", "หลัง"], [("ภาษีรถยนต์ไฟฟ้าต่อปี", ["1,600 บาท", "320 บาท"])])
+    spec = interactive.comparison_spec(b, "th")
+    assert spec["categories"] == ["ก่อน", "หลัง"]
+    assert spec["series"] == [{"name": "ภาษีรถยนต์ไฟฟ้าต่อปี", "values": [1600.0, 320.0], "labels": ["1,600 บาท", "320 บาท"]}]

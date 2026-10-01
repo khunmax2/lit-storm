@@ -31,6 +31,12 @@ import tempfile
 from litstorm import report as report_mod
 
 SCHEMA = 1
+# Bump when how blocks are asked for changes (prompt, drafts, review): a file
+# made the older way can be drawn again by its owner, who is told it could.
+GENERATION = 4
+# Bump when check() changes: a kept file is checked again when next read,
+# which needs no model and costs nothing.
+CHECKS = 3
 
 MAX_BLOCKS = 6
 TYPES = ("stat_cards", "chart", "timeline", "comparison", "diagram", "glossary")
@@ -242,6 +248,14 @@ def _year_in(date, text):
 
 
 _WORD = re.compile(r"[a-z0-9\u0e01-\u0e4e]{3,}")
+_THAI = re.compile(r"[\u0e01-\u0e4e]")
+
+
+def _across(text, passage):
+    """Written in one script, the passage in the other (a Thai report citing
+    an English source): no word could be shared, so none is asked for; the
+    reading for meaning (REVIEW) checks it instead."""
+    return bool(_THAI.search(text)) != bool(_THAI.search(passage))
 
 
 def _grounded(text, fact_text):
@@ -297,7 +311,8 @@ class _Checker:
     def _holds_row(passage, label, cells):
         """A comparison row its passage bears out: a word of it there, and
         every number in its cells written there."""
-        if not any(_grounded(t, passage) for t in [label, *cells]):
+        words = [label, *cells]
+        if not any(_grounded(t, passage) for t in words) and not all(_across(t, passage) for t in words if t.strip()):
             return False
         return all(_number_in(n, passage) for c in cells for n in numbers_in(c))
 
@@ -310,7 +325,7 @@ class _Checker:
             return None
         for fact in self.by_id.values():
             flat = re.sub(r"\s+", "", _normal(fact["text"]))
-            if all(c in flat for c in numeric) and _grounded(label, fact["text"]):
+            if all(c in flat for c in numeric) and (_grounded(label, fact["text"]) or _across(label, fact["text"])):
                 return _cite(fact["id"], self.by_id)
         return None
 
@@ -328,6 +343,9 @@ class _Checker:
                 continue
             as_of = _text(raw.get("as_of"), 20)
             if as_of and re.match(r"^\s*\d{4}", _normal(as_of)) and not _year_in(as_of, cite["text"]):
+                as_of = ""
+            # "Not stated", "N/A": a when without a number is no when.
+            if not re.search(r"\d", _normal(as_of)):
                 as_of = ""
             items.append({
                 "label": _text(raw.get("label"), MAX_TEXT["label"]),
@@ -439,7 +457,8 @@ class _Checker:
             if not cite:
                 continue
             rows.append({"label": label, "cells": cells, "cite": cite})
-        if not columns or len(rows) < 2:
+        # One row compares its columns (before | after); more compare rows.
+        if not columns or not rows or (len(rows) == 1 and len(columns) < 2):
             return None, "fewer than two rows with facts"
         # A column that says again, row by row, what a later one says: the
         # later is kept (its name tends to be the one that says what it is).
@@ -510,7 +529,11 @@ def _shows(block):
         # made" are one row said twice, and a key figure's value is the same
         # value in a row.
         numbers = [n for c in r["cells"] for n in numbers_in(c)]
-        out |= {(r["cite"]["fact"], n) for n in numbers} if numbers else {(r["cite"]["fact"], tuple(r["cells"]))}
+        if numbers:
+            out |= {(r["cite"]["fact"], n) for n in numbers}
+        else:
+            # Words by their letters alone: "Feed-in Tariff" is "Feed in Tariff".
+            out |= {(r["cite"]["fact"], re.sub(r"[\W_]+", "", _normal(c))) for c in r["cells"] if c.strip()}
     for e in block.get("events", []):
         out.add((e["cite"]["fact"], e["date"]))
     for t in block.get("terms", []):
@@ -606,6 +629,8 @@ was published, not an event: do not use it as one.
 - A label says what its fact says the number is: an increase is not a total, "about" stays \
 "about", and a figure the fact leaves unclear is left out.
 - A comparison's cells hold what differs between its rows; do not repeat the row's label in a cell.
+- When a fact is in another language than the report, put the fact's own key words in brackets \
+after yours, e.g. "ฝุ่นสะสม (dust accumulation)".
 - Plain text only: no markdown, no HTML, no links.
 
 FACTS:
@@ -618,7 +643,7 @@ TYPE_HELP = {
     "stat_cards": '{"type":"stat_cards","anchor":"s1","title":"...","items":[{"label":"...","value":42.5,"unit":"%","as_of":"2024","fact":"F3"}]}  (1-6 key figures)',
     "chart": '{"type":"chart","chart":"bar|line|pie","anchor":"s2","title":"...","unit":"...","x_label":"...","y_label":"...","series":[{"name":"...","points":[{"x":"2023","y":120,"fact":"F5"}]}]}  (line only over years; pie only for parts of one whole; 2-12 points)',
     "timeline": '{"type":"timeline","anchor":"s1","title":"...","events":[{"date":"2019","label":"...","detail":"...","fact":"F7"}]}  (2-12 dated events)',
-    "comparison": '{"type":"comparison","anchor":"s3","title":"...","columns":["...","..."],"rows":[{"label":"...","cells":["...","..."],"fact":"F9"}]}  (2-8 rows, 1-4 columns, cells as short text)',
+    "comparison": '{"type":"comparison","anchor":"s3","title":"...","columns":["...","..."],"rows":[{"label":"...","cells":["...","..."],"fact":"F9"}]}  (1-8 rows, 1-4 columns, cells as short text; one row compares its columns, e.g. before | after)',
     "diagram": '{"type":"diagram","kind":"flow|cycle|hierarchy","anchor":"s2","title":"...","nodes":[{"id":"a","label":"..."}],"edges":[{"from":"a","to":"b","label":"..."}],"facts":["F4","F8"]}  (3-10 steps; ids are short lowercase words)',
     "glossary": '{"type":"glossary","anchor":"lead","title":"...","terms":[{"term":"...","definition":"...","fact":"F2"}]}  (2-8 terms the report uses)',
 }
@@ -669,7 +694,9 @@ a forecast called a result, one province called the whole country, a cumulative 
 called one year's);
 - the points or rows of one chart or table measure different things (a yearly figure beside \
 a running total or a forecast, different units or definitions);
-- the passage is too cut off to tell what the number is.
+- the passage is too cut off to tell what the number is;
+- the passage qualifies the number ("at least", "about", "over", "ไม่น้อยกว่า", "ราว", \
+"กว่า") and the label or value states it as exact.
 Keep everything else; do not reject for style.
 
 ENTRIES:
@@ -877,6 +904,8 @@ def generate(model, api_key, api_base, report):
         "dropped": dropped,
         "hidden": [],
         "facts": len(facts_),
+        "generation": GENERATION,
+        "checks": CHECKS,
     }, tokens
 
 
@@ -911,7 +940,8 @@ def write(visuals, path):
 
 def load(path, report=None):
     """The visuals file, or None when there is none — or when it was made
-    from a different report than `report`."""
+    from a different report than `report`. Given the report, a file kept
+    under older checks is checked again by today's, and kept so."""
     if not os.path.exists(path):
         return None
     with open(path, encoding="utf-8") as f:
@@ -920,7 +950,52 @@ def load(path, report=None):
         return None
     if report is not None and visuals.get("report") != report_hash(report):
         return None
+    if report is not None and visuals.get("checks") != CHECKS:
+        visuals = recheck(visuals, report)
+        try:
+            write(visuals, path)
+        except OSError:
+            pass  # read again next time; the reader has what it needs
     return visuals
+
+
+def outdated(visuals):
+    """Made the older way: drawing again would ask as today's code asks."""
+    return int(visuals.get("generation") or 1) < GENERATION
+
+
+def _as_asked(block):
+    """A kept block as the model gave it, its facts by id: to be checked again."""
+    def back(x):
+        if isinstance(x, list):
+            return [back(v) for v in x]
+        if not isinstance(x, dict):
+            return x
+        out = {k: back(v) for k, v in x.items() if k not in ("cite", "cites")}
+        if isinstance(x.get("cite"), dict):
+            out["fact"] = x["cite"]["fact"]
+        if isinstance(x.get("cites"), list):
+            out["facts"] = [c["fact"] for c in x["cites"]]
+        return out
+
+    asked = back(block)
+    asked.pop("id", None)
+    asked.pop("sources", None)
+    return asked
+
+
+def recheck(visuals, report):
+    """The kept blocks through today's checks: what they no longer bear out
+    leaves, with why; the rest keep their names (hidden ones are by name)."""
+    old = visuals.get("blocks") or []
+    kept, dropped = check([_as_asked(b) for b in old], report, facts(report))
+    # check() names blocks by their place in what it was given.
+    name = {f"v{i + 1}": b["id"] for i, b in enumerate(old)}
+    for b in kept:
+        b["id"] = name[b["id"]]
+    again = [{**d, "id": name.get(d["id"], d["id"]), "reason": f"checked again: {d['reason']}"} for d in dropped]
+    out = {**visuals, "blocks": kept, "dropped": (visuals.get("dropped") or []) + again, "checks": CHECKS}
+    return set_hidden(out, out.get("hidden") or [])
 
 
 def set_hidden(visuals, hidden):

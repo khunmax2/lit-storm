@@ -860,7 +860,7 @@ export interface paths {
         put?: never;
         /**
          * Make Visuals
-         * @description Draw the report's visual blocks, once: one call to the fast model (or
+         * @description Draw the report's visual blocks, once (or `again`): the fast model (or
          *     the Run's own), kept as visuals.json. Takes no quota; counted against a
          *     daily cap per User, and its cost is added to the Run's.
          */
@@ -2412,6 +2412,11 @@ export interface components {
              * @default false
              */
             from_report_text: boolean;
+            /**
+             * Outdated
+             * @default false
+             */
+            outdated: boolean;
         };
     };
     responses: never;
@@ -4215,7 +4220,9 @@ export interface operations {
     };
     make_visuals_api_runs__run_id__visuals_post: {
         parameters: {
-            query?: never;
+            query?: {
+                again?: boolean;
+            };
             header?: never;
             path: {
                 run_id: string;

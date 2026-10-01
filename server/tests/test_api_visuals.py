@@ -138,3 +138,22 @@ def test_the_interactive_page_downloads_and_shows_sandboxed(finished, monkeypatc
 
     full = user.get(f"/api/runs/{run['id']}/interactive", params={"charts": "full"})
     assert 'id="ls-charts"' in full.text
+
+
+def test_the_owner_may_draw_again_as_todays_code_draws(finished, monkeypatch):
+    from litstorm import visuals
+
+    user, run = finished
+    calls = []
+    _answer(monkeypatch, _figures("929,000"), calls)
+    drawn = user.post(f"/api/runs/{run['id']}/visuals").json()
+    assert drawn["outdated"] is False
+    first = len(calls)
+    user.patch(f"/api/runs/{run['id']}/visuals", json={"hidden": [drawn["blocks"][0]["id"]]})
+
+    # A file made the older way says so; drawing again asks the model again.
+    monkeypatch.setattr(visuals, "GENERATION", visuals.GENERATION + 1)
+    assert user.get(f"/api/runs/{run['id']}/visuals").json()["outdated"] is True
+    again = user.post(f"/api/runs/{run['id']}/visuals", params={"again": "true"}).json()
+    assert len(calls) > first and again["ready"] and again["outdated"] is False
+    assert not any(b["hidden"] for b in again["blocks"])  # shown again

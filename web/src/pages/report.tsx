@@ -23,6 +23,7 @@ import {
   Loader2,
   PanelsTopLeft,
   Quote,
+  RefreshCw,
   Sparkles,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -242,6 +243,7 @@ type Visuals = {
   model: string | null;
   created_at: string | null;
   from_report_text: boolean;
+  outdated: boolean;
 };
 
 /** The report with its figures (litstorm.render.interactive), shown as the
@@ -257,8 +259,13 @@ function VisualView({ runId }: { runId: string }) {
     queryKey: key,
     queryFn: () => call(api.GET("/api/runs/{run_id}/visuals", { params: { path: { run_id: runId } } })) as Promise<Visuals>,
   });
+  // Drawn once; drawn again on the owner's word, as today's code draws (the
+  // figures kept so far stay until the new ones are in).
   const make = useMutation({
-    mutationFn: () => call(api.POST("/api/runs/{run_id}/visuals", { params: { path: { run_id: runId } } })) as Promise<Visuals>,
+    mutationFn: (again: boolean) =>
+      call(
+        api.POST("/api/runs/{run_id}/visuals", { params: { path: { run_id: runId }, query: { again } } }),
+      ) as Promise<Visuals>,
     onSuccess: (v) => client.setQueryData(key, v),
   });
   const hide = useMutation({
@@ -292,7 +299,7 @@ function VisualView({ runId }: { runId: string }) {
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t("visuals.lead")}</p>
               {v.from_report_text && <p className="mt-1 text-xs text-muted-foreground">{t("visuals.leadReport")}</p>}
             </div>
-            <Button onClick={() => make.mutate()} disabled={make.isPending} className="shrink-0">
+            <Button onClick={() => make.mutate(false)} disabled={make.isPending} className="shrink-0">
               {make.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
               {make.isPending ? t("visuals.making") : t("visuals.make")}
             </Button>
@@ -305,6 +312,21 @@ function VisualView({ runId }: { runId: string }) {
                 {t("visuals.made", { model: v.model ?? "AI", n: v.blocks.length })}
               </span>
               {v.dropped > 0 && <span className="text-xs text-muted-foreground">{t("visuals.dropped", { n: v.dropped })}</span>}
+              <span className="ml-auto flex items-center gap-2">
+                {v.outdated && !make.isPending && (
+                  <span className="text-xs text-brand">{t("visuals.outdated")}</span>
+                )}
+                <Button
+                  variant={v.outdated ? "default" : "outline"}
+                  size="sm"
+                  disabled={make.isPending}
+                  onClick={() => make.mutate(true)}
+                  title={t("visuals.againHint")}
+                >
+                  {make.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                  {make.isPending ? t("visuals.making") : t("visuals.again")}
+                </Button>
+              </span>
             </p>
             {v.blocks.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("visuals.none")}</p>

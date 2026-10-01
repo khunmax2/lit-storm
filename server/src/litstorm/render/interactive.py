@@ -24,6 +24,7 @@ report.md §6).
 """
 
 import base64
+import functools
 import glob
 import hashlib
 import html
@@ -35,8 +36,23 @@ from litstorm import report as report_mod
 from litstorm import visuals as visuals_mod
 from litstorm.render import html as page_mod
 
-# Bump when the page changes, so pages kept on disk are drawn again.
-RENDER_VERSION = 2
+@functools.lru_cache(maxsize=1)
+def render_code():
+    """What draws the page, as a digest: the code here and the faces and
+    library it embeds. A page kept on disk is drawn again whenever it
+    changes, with no number to remember to bump."""
+    digest = hashlib.sha256()
+    here = os.path.dirname(os.path.abspath(__file__))
+    for name in sorted(os.listdir(here)):
+        if name.endswith(".py"):
+            digest.update(name.encode())
+            with open(os.path.join(here, name), "rb") as f:
+                digest.update(f.read())
+    for folder in ("fonts", "vendor"):
+        for root, _, files in sorted(os.walk(os.path.join(here, folder))):
+            for name in sorted(files):
+                digest.update(f"{name}:{os.path.getsize(os.path.join(root, name))}".encode())
+    return digest.hexdigest()[:16]
 
 _VENDOR = os.path.join(os.path.dirname(__file__), "vendor")
 ECHARTS = os.path.join(_VENDOR, "echarts-6.1.0.min.js")
@@ -247,6 +263,11 @@ def comparison_spec(b, language):
     """A comparison whose columns are numbers in one unit, as a bar chart
     (None when it is not one: text stays a table). The bars carry the cells
     as written; the table stays a tab away."""
+    if len(b["rows"]) == 1 and len(b["columns"]) >= 2:
+        # One row compares its columns (before | after): its columns are the bars.
+        row = b["rows"][0]
+        b = {**b, "columns": [row["label"]],
+             "rows": [{"label": c, "cells": [row["cells"][i] if i < len(row["cells"]) else ""]} for i, c in enumerate(b["columns"])]}
     if len(b["rows"]) < 2:
         return None
     series, unit = [], None
@@ -901,7 +922,7 @@ def cached(report_path, report, visuals=None, engine_label="", finished_at=None,
     """The page, drawn once for this report, these visuals and this variant,
     and kept beside report.json (drawing charts takes Chromium a moment)."""
     key = json.dumps(
-        [RENDER_VERSION, visuals_mod.report_hash(report), visuals, engine_label, str(finished_at), bool(full)],
+        [render_code(), visuals_mod.report_hash(report), visuals, engine_label, str(finished_at), bool(full)],
         ensure_ascii=False, sort_keys=True, default=str,
     )
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]

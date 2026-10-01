@@ -962,6 +962,8 @@ class VisualsOut(BaseModel):
     created_at: str | None = None
     # Drawn from the report's own sentences: no Evidence to check against.
     from_report_text: bool = False
+    # Drawn the older way: drawing again would ask as today's code does.
+    outdated: bool = False
 
 
 class VisualsHiddenIn(BaseModel):
@@ -985,6 +987,7 @@ def _visuals_out(visuals, report):
         model=visuals.get("model"),
         created_at=visuals.get("created_at"),
         from_report_text=not visuals_mod.has_evidence(report),
+        outdated=visuals_mod.outdated(visuals),
     )
 
 
@@ -1001,8 +1004,15 @@ def get_visuals(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depe
 
 
 @router.post("/runs/{run_id}/visuals", response_model=VisualsOut)
-def make_visuals(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
-    """Draw the report's visual blocks, once: one call to the fast model (or
+def make_visuals(
+    run_id: uuid.UUID,
+    # Draw again, as today's code draws: the blocks kept so far stay until
+    # the new ones are kept, and what was hidden is shown again.
+    again: bool = False,
+    user=Depends(deps.current_user),
+    session=Depends(deps.database),
+):
+    """Draw the report's visual blocks, once (or `again`): the fast model (or
     the Run's own), kept as visuals.json. Takes no quota; counted against a
     daily cap per User, and its cost is added to the Run's."""
     from litstorm import cost, roles, security
@@ -1016,7 +1026,7 @@ def make_visuals(run_id: uuid.UUID, user=Depends(deps.current_user), session=Dep
         raise HTTPException(404, "no_report")
     report = report_mod.load(path)
     found = visuals_mod.load(visuals_mod.path_for(path), report)
-    if found:
+    if found and not again:
         return _visuals_out(found, report)
 
     day_start = datetime.now(limits.QUOTA_ZONE).replace(hour=0, minute=0, second=0, microsecond=0)

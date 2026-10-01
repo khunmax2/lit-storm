@@ -319,3 +319,91 @@ def test_a_row_showing_a_key_figure_again_is_one_too_many():
                       {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
     kept, dropped = visuals.check([stats, table], REPORT, facts)
     assert [b["type"] for b in kept] == ["stat_cards"] and dropped[0]["type"] == "comparison"
+
+
+def test_a_key_figure_dated_with_no_date_is_left_undated():
+    facts = visuals.facts(REPORT)
+    f3 = _fact(facts, "42.5")
+    raw = {"type": "stat_cards", "anchor": "lead", "items": [
+        {"label": "หมอนทอง", "value": 42.5, "unit": "%", "as_of": "ไม่ระบุ", "fact": f3},
+        {"label": "PMCS", "value": 2019, "unit": "", "as_of": "N/A", "fact": f3}]}
+    kept, _ = visuals.check([raw], REPORT, facts)
+    assert [i["as_of"] for i in kept[0]["items"]] == ["", ""]
+
+
+def _kept_file():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    chart = {"type": "chart", "chart": "bar", "anchor": "s1", "title": "ส่งออก", "x_label": "ปี",
+             "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "หมอนทอง", "value": 42.5, "unit": "%", "as_of": "2019", "fact": f3}]}
+    terms = {"type": "glossary", "anchor": "lead", "title": "ศัพท์",
+             "terms": [{"term": "GAP", "definition": "มาตรฐานการปฏิบัติทางการเกษตรที่ดี", "fact": f2},
+                       {"term": "PMCS", "definition": "traceability model", "fact": f3}]}
+    kept, _ = visuals.check([chart, stats, terms], REPORT, facts)
+    return {"schema": 1, "report": visuals.report_hash(REPORT), "model": "M", "blocks": kept, "dropped": [], "hidden": []}
+
+
+def test_checking_again_changes_nothing_that_still_holds():
+    v = _kept_file()
+    # Names as a file may have them after hiding and drawing: not in order.
+    for b, name in zip(v["blocks"], ("v2", "v5", "v7")):
+        b["id"] = name
+    v["hidden"] = ["v5"]
+    out = visuals.recheck(v, REPORT)
+    assert out["blocks"] == v["blocks"] and out["hidden"] == ["v5"] and out["checks"] == visuals.CHECKS
+
+
+def test_checking_again_drops_what_todays_checks_reject():
+    v = _kept_file()
+    v["blocks"][1]["items"][0]["as_of"] = "ไม่ระบุ"            # a when with no number
+    v["blocks"][0]["series"][0]["points"][0]["y"] = 1234.0     # a number its passage does not hold
+    v["blocks"][0]["series"][0]["points"][0]["x"] = "x"
+    v["hidden"] = ["v1"]
+    out = visuals.recheck(v, REPORT)
+    assert [b["id"] for b in out["blocks"]] == ["v2", "v3"]
+    assert out["blocks"][0]["items"][0]["as_of"] == ""
+    assert out["dropped"][0]["id"] == "v1" and out["dropped"][0]["reason"].startswith("checked again: ")
+    assert out["hidden"] == []  # what was hidden is gone
+
+
+def test_a_file_kept_under_older_checks_is_checked_again_once_when_read(tmp_path):
+    path = str(tmp_path / "visuals.json")
+    v = _kept_file()
+    v["blocks"][1]["items"][0]["as_of"] = "N/A"
+    visuals.write(v, path)
+    read = visuals.load(path, REPORT)
+    assert read["checks"] == visuals.CHECKS and read["blocks"][1]["items"][0]["as_of"] == ""
+    assert visuals.load(path)["checks"] == visuals.CHECKS  # kept so
+    assert visuals.outdated(read) and not visuals.outdated({**read, "generation": visuals.GENERATION})
+
+
+ENGLISH = {**REPORT, "sources": [
+    {**REPORT["sources"][0], "evidence": ["Dust accumulation has the greatest impact on PV output, followed by temperature."]},
+    {**REPORT["sources"][1], "evidence": ["In January 2015 the regulator replaced the adder scheme with a feed-in tariff of 5.66 baht per unit, down from 6.96 baht."]},
+    *REPORT["sources"][2:]]}
+
+
+def test_a_thai_row_may_cite_an_english_passage_but_its_numbers_still_must_be_there():
+    facts = visuals.facts(ENGLISH)
+    dust, tariff = _fact(facts, "Dust accumulation"), _fact(facts, "5.66")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ปัจจัย", "columns": ["ผลกระทบ"],
+           "rows": [{"label": "ฝุ่นสะสม", "cells": ["มากที่สุด"], "fact": dust},
+                    {"label": "อุณหภูมิ", "cells": ["รองลงมา"], "fact": dust},
+                    {"label": "ความชื้น", "cells": ["ราว 12%"], "fact": dust}]}  # a number the passage lacks
+    kept, _ = visuals.check([raw], ENGLISH, facts)
+    assert [r["label"] for r in kept[0]["rows"]] == ["ฝุ่นสะสม", "อุณหภูมิ"]
+
+
+def test_one_row_compares_its_columns_and_a_reworded_copy_is_dropped():
+    facts = visuals.facts(ENGLISH)
+    tariff = _fact(facts, "5.66")
+    one = {"type": "comparison", "anchor": "s1", "title": "กลไกรับซื้อไฟฟ้า", "columns": ["เดิม", "ใหม่ (2558)"],
+           "rows": [{"label": "รูปแบบ", "cells": ["Adder", "Feed-in Tariff"], "fact": tariff}]}
+    copy = dict(one, title="กลไกอีกแบบ", columns=["ก่อน", "หลัง"],
+                rows=[{"label": "การรับซื้อ", "cells": ["adder", "feed in tariff"], "fact": tariff}])
+    kept, dropped = visuals.check([one, copy], ENGLISH, facts)
+    assert [b["title"] for b in kept] == ["กลไกรับซื้อไฟฟ้า"] and dropped[0]["reason"] == "shows what an earlier block shows"
+    lone = dict(one, columns=["กลไก"], rows=[{"label": "รูปแบบ", "cells": ["Adder"], "fact": tariff}])
+    assert visuals.check([lone], ENGLISH, facts)[1][0]["reason"] == "fewer than two rows with facts"

@@ -67,16 +67,23 @@ def test_the_owner_draws_once_and_the_run_pays(finished, monkeypatch, db):
     assert user.get(f"/api/runs/{run['id']}/visuals").json()["ready"] is False
     drawn = user.post(f"/api/runs/{run['id']}/visuals").json()
     assert drawn["ready"] and [b["type"] for b in drawn["blocks"]] == ["stat_cards"]
-    assert drawn["dropped"] == 1 and drawn["blocks"][0]["sources"] == [1]
+    # Two drafts and a second chance, each with the same blocks: the chart
+    # dropped three times, the cards kept once and dropped as repeats twice.
+    assert drawn["dropped"] == 5 and drawn["blocks"][0]["sources"] == [1]
     # The facts went to the model, and the report's language with them.
     assert "929,000" in calls[0][0]["content"] and "Thai" in calls[0][0]["content"]
+    # A block was dropped and fewer than three kept: one second chance, told
+    # why; the same block again is not kept twice.
+    assert "rejected" in calls[2][-1]["content"] and "chart" in calls[2][-1]["content"]
+    # Then a reading of what the kept numbers mean (this one says nothing usable: all stay).
+    assert len(calls) == 4 and "ENTRIES" in calls[3][0]["content"] and "929000" in calls[3][0]["content"]
 
     db.expire_all()
-    assert db.get(Run, run["id"]).tokens_in == tokens_before + 1000
+    assert db.get(Run, run["id"]).tokens_in == tokens_before + 4000
 
-    # Asked again: the kept file, no second call.
+    # Asked again: the kept file, no further call.
     again = user.post(f"/api/runs/{run['id']}/visuals").json()
-    assert again["blocks"] == drawn["blocks"] and len(calls) == 1
+    assert again["blocks"] == drawn["blocks"] and len(calls) == 4
 
 
 def test_unreadable_json_is_repaired_once_then_given_up(finished, monkeypatch):
@@ -85,7 +92,7 @@ def test_unreadable_json_is_repaired_once_then_given_up(finished, monkeypatch):
     _answer(monkeypatch, "sorry, no JSON here", calls)
     r = user.post(f"/api/runs/{run['id']}/visuals")
     assert r.status_code == 502 and r.json()["detail"] == "visuals_failed"
-    assert len(calls) == 2  # one ask, one repair
+    assert len(calls) == 4  # each draft: one ask, one repair
 
 
 def test_only_the_owner_draws_and_hides(finished, monkeypatch, admin, browser):

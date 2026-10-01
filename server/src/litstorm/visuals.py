@@ -293,6 +293,27 @@ class _Checker:
         self.sections = {s["id"] for s in report_mod.walk(report["sections"])}
         self.numeric = has_evidence(report)
 
+    @staticmethod
+    def _holds_row(passage, label, cells):
+        """A comparison row its passage bears out: a word of it there, and
+        every number in its cells written there."""
+        if not any(_grounded(t, passage) for t in [label, *cells]):
+            return False
+        return all(_number_in(n, passage) for c in cells for n in numbers_in(c))
+
+    def _row_passage(self, label, cells):
+        """The passage a row with numbers came from, when it named the wrong
+        one: the first that holds every numeric cell as written (spaces
+        aside) and a word of its label."""
+        numeric = [re.sub(r"\s+", "", _normal(c)) for c in cells if numbers_in(c)]
+        if not numeric:
+            return None
+        for fact in self.by_id.values():
+            flat = re.sub(r"\s+", "", _normal(fact["text"]))
+            if all(c in flat for c in numeric) and _grounded(label, fact["text"]):
+                return _cite(fact["id"], self.by_id)
+        return None
+
     def anchor(self, raw):
         section = raw.get("section") if isinstance(raw, dict) else raw
         return section if section in self.sections else "lead"
@@ -386,22 +407,48 @@ class _Checker:
         return {"events": events}, None
 
     def comparison(self, b):
-        columns = [_text(c, MAX_TEXT["label"]) for c in (b.get("columns") or [])[:MAX_COLUMNS]]
+        columns = [_text(c, MAX_TEXT["label"]) for c in (b.get("columns") or [])[: MAX_COLUMNS + 1]]
         columns = [c for c in columns if c]
-        rows = []
+        raws = []
         for raw in (b.get("rows") or [])[: MAX_ITEMS["comparison"]]:
             if not isinstance(raw, dict):
                 continue
-            cite = _cite(raw.get("fact"), self.by_id)
             cells = [_text(c, MAX_TEXT["cell"]) for c in (raw.get("cells") or [])]
-            label = _text(raw.get("label"), MAX_TEXT["label"])
-            if not cite or not label or len(cells) != len(columns):
+            fact = raw.get("fact")
+            # A fact's id written as a cell, not as the row's fact.
+            ids = [c for c in cells if re.fullmatch(r"F\d+", c)]
+            if ids:
+                cells = [c for c in cells if c not in ids]
+                fact = fact or ids[0]
+            raws.append({"label": _text(raw.get("label"), MAX_TEXT["label"]), "cells": cells, "fact": fact})
+        # A first column that names what the rows are ("Measure"), its cells
+        # given as the rows' labels: a header for the labels, not a column.
+        if len(columns) > 1 and raws and all(len(r["cells"]) == len(columns) - 1 for r in raws):
+            columns = columns[1:]
+        columns = columns[:MAX_COLUMNS]
+        rows = []
+        for raw in raws:
+            label, cells = raw["label"], raw["cells"]
+            if not label or len(cells) != len(columns):
                 continue
-            if not any(_grounded(t, cite["text"]) for t in [label, *cells]):
+            cite = _cite(raw["fact"], self.by_id)
+            if not (cite and self._holds_row(cite["text"], label, cells)):
+                # The numbers are in another passage than the one named: that
+                # passage, when one holds each of them as written.
+                cite = self._row_passage(label, cells)
+            if not cite:
                 continue
             rows.append({"label": label, "cells": cells, "cite": cite})
         if not columns or len(rows) < 2:
             return None, "fewer than two rows with facts"
+        # A column that says again, row by row, what a later one says: the
+        # later is kept (its name tends to be the one that says what it is).
+        keep = [i for i in range(len(columns))
+                if not any(all(r["cells"][i] == r["cells"][j] for r in rows) for j in range(i + 1, len(columns)))]
+        if len(keep) < len(columns):
+            columns = [columns[i] for i in keep]
+            for r in rows:
+                r["cells"] = [r["cells"][i] for i in keep]
         return {"columns": columns, "rows": rows}, None
 
     def diagram(self, b):
@@ -449,12 +496,37 @@ class _Checker:
         return {"terms": terms}, None
 
 
-def check(raw_blocks, report, facts_):
+def _shows(block):
+    """What a block puts in front of the reader, as (fact, value) pairs: two
+    blocks that show the same thing are one too many."""
+    out = set()
+    for it in block.get("items", []):
+        out.add((it["cite"]["fact"], it["value"]))
+    for s in block.get("series", []):
+        for p in s["points"]:
+            out.add((p["cite"]["fact"], p["y"]))
+    for r in block.get("rows", []):
+        # By their numbers when they have some: "1:2" and "1 imported to 2
+        # made" are one row said twice, and a key figure's value is the same
+        # value in a row.
+        numbers = [n for c in r["cells"] for n in numbers_in(c)]
+        out |= {(r["cite"]["fact"], n) for n in numbers} if numbers else {(r["cite"]["fact"], tuple(r["cells"]))}
+    for e in block.get("events", []):
+        out.add((e["cite"]["fact"], e["date"]))
+    for t in block.get("terms", []):
+        out.add(("term", t["term"].casefold()))
+    return out
+
+
+def check(raw_blocks, report, facts_, start=0, room=MAX_BLOCKS, earlier=()):
     """Keep what the facts bear out. Returns (blocks, dropped): every block
-    carries its facts' passages; `dropped` says what went and why."""
+    carries its facts' passages; `dropped` says what went and why. `start`
+    numbers the blocks on from an earlier answer, `room` is what is left of
+    the cap, `earlier` the blocks that answer kept (none is shown twice)."""
     checker = _Checker(report, facts_)
     blocks, dropped = [], []
-    for i, raw in enumerate(raw_blocks if isinstance(raw_blocks, list) else []):
+    shown = set().union(*(_shows(b) for b in earlier)) if earlier else set()
+    for i, raw in enumerate(raw_blocks if isinstance(raw_blocks, list) else [], start):
         if not isinstance(raw, dict):
             continue
         kind = raw.get("type")
@@ -465,13 +537,24 @@ def check(raw_blocks, report, facts_):
         if kind in NUMERIC and not checker.numeric:
             dropped.append({"id": name, "type": kind, "reason": "the report records no evidence to check numbers against"})
             continue
-        if len(blocks) >= MAX_BLOCKS:
+        if len(blocks) >= room:
             dropped.append({"id": name, "type": kind, "reason": f"more than {MAX_BLOCKS} blocks"})
             continue
         body, reason = getattr(checker, kind)(raw)
         if body is None:
             dropped.append({"id": name, "type": kind, "reason": reason})
             continue
+        if kind == "stat_cards":
+            # A figure already on show is not shown again; the rest may be.
+            body["items"] = [it for it in body["items"] if (it["cite"]["fact"], it["value"]) not in shown]
+            if not body["items"]:
+                dropped.append({"id": name, "type": kind, "reason": "shows only what an earlier block shows"})
+                continue
+        new = _shows(body)
+        if new and len(new & shown) * 2 >= len(new):
+            dropped.append({"id": name, "type": kind, "reason": "shows what an earlier block shows"})
+            continue
+        shown |= new
         cites = body.get("cites") or [
             x["cite"] for key in ("items", "events", "rows", "terms") for x in body.get(key, [])
         ] + [p["cite"] for s in body.get("series", []) for p in s["points"]]
@@ -502,7 +585,10 @@ Sections (use an id as "anchor" to place a figure after that section, or "lead")
 {outline}
 
 Choose between 0 and {max_blocks} blocks, only where a figure genuinely helps; fewer good \
-blocks are better than many weak ones. Types:
+blocks are better than many weak ones. Look first for numbers a reader would want side by side: \
+before and after (a tax, a price, a rate, a share before and after a measure), the same measure \
+across years, places, groups or products. Two or more of those make a chart (bar across groups, \
+line across years) or a comparison whose cells are the numbers with their units. Types:
 {types}
 
 Rules:
@@ -515,6 +601,11 @@ separators). Never compute, convert, sum or estimate. A date's year must be in i
 and when. Do not widen a finding about one case into a general claim.
 - A diagram is only for steps or parts the facts describe as a process or a structure. \
 Values measured under different conditions belong in a comparison, not a diagram.
+- A date at the very start of a fact ("8 ธ.ค. 2563 ...", "Mar 3, 2024 ...") is when the page \
+was published, not an event: do not use it as one.
+- A label says what its fact says the number is: an increase is not a total, "about" stays \
+"about", and a figure the fact leaves unclear is left out.
+- A comparison's cells hold what differs between its rows; do not repeat the row's label in a cell.
 - Plain text only: no markdown, no HTML, no links.
 
 FACTS:
@@ -552,6 +643,100 @@ def prompt(report, facts_):
         types=types,
         facts=lines or "(none)",
     )
+
+
+# Answers asked for at once; their checked blocks are pooled.
+DRAFTS = 2
+# Fewer kept than this, with some dropped: ask once more, saying why.
+SECOND_CHANCE_BELOW = 3
+SECOND_CHANCE = """These blocks were rejected by the fact check:
+{why}
+
+Give up to {room} other blocks that keep to the rules exactly — numbers and years written in \
+their own fact, a line chart only over years each found in its point's fact. Fewer is fine; \
+none is fine. Answer with only the JSON object {{"blocks": [...]}}."""
+
+
+# The figures with numbers get a second reading, by the model, against their
+# facts: what the number checks cannot see (what a number counts) it can.
+REVIEWED = ("stat_cards", "chart", "comparison")
+REVIEW = """You are checking figures drawn for a research report against the passages \
+they cite. The numbers were already found in their passages; your task is what they mean.
+
+Reject an entry when:
+- its label or title says something its passage does not (an increase called a total, \
+a forecast called a result, one province called the whole country, a cumulative count \
+called one year's);
+- the points or rows of one chart or table measure different things (a yearly figure beside \
+a running total or a forecast, different units or definitions);
+- the passage is too cut off to tell what the number is.
+Keep everything else; do not reject for style.
+
+ENTRIES:
+{entries}
+
+Answer with one JSON object and nothing else:
+{{"verdicts": [{{"id": "v1", "ok": true}}, {{"id": "v2", "ok": false, "why": "a few words"}}]}}"""
+
+
+def _passage(cite):
+    return (cite.get("text") or "")[:320]
+
+
+def review_entries(blocks):
+    """What the reviewer reads: each numeric figure, with the passages behind it."""
+    out = []
+    for b in blocks:
+        if b["type"] == "stat_cards":
+            for i, it in enumerate(b["items"], 1):
+                when = f" (as of {it['as_of']})" if it.get("as_of") else ""
+                out.append(f'[{b["id"]}.{i}] key figure "{it["label"]}": {it["value"]:g} {it["unit"]}{when}\n'
+                           f'  passage: "{_passage(it["cite"])}"')
+        elif b["type"] == "chart":
+            lines = [f'[{b["id"]}] {b["chart"]} chart "{b["title"]}"' + (f' (unit: {b["unit"]})' if b.get("unit") else "")]
+            for sr in b["series"]:
+                for pt in sr["points"]:
+                    lines.append(f'  {sr["name"] or "value"} at {pt["x"]}: {pt["y"]:g}  passage: "{_passage(pt["cite"])}"')
+            out.append("\n".join(lines))
+        elif b["type"] == "comparison":
+            lines = [f'[{b["id"]}] table "{b["title"]}", columns: {" | ".join(b["columns"])}']
+            for r in b["rows"]:
+                lines.append(f'  row "{r["label"]}": {" | ".join(r["cells"])}  passage: "{_passage(r["cite"])}"')
+            out.append("\n".join(lines))
+    return "\n\n".join(out)
+
+
+def verdicts(text):
+    """The reviewer's rejections, by id, with why; nothing when unreadable."""
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", (text or "").strip())
+    match = re.search(r"\{.*\}", text, re.S)
+    try:
+        found = json.loads(match.group(0)) if match else {}
+    except ValueError:
+        return {}
+    out = {}
+    for v in (found.get("verdicts") if isinstance(found, dict) else None) or []:
+        if isinstance(v, dict) and v.get("ok") is False and isinstance(v.get("id"), str):
+            out[v["id"].strip("[] ")] = _text(v.get("why"), 120) or "rejected"
+    return out
+
+
+def apply_review(blocks, rejected):
+    """Leave out what the reviewer rejected: a key figure, or a whole figure."""
+    kept, dropped = [], []
+    for b in blocks:
+        if b["id"] in rejected:
+            dropped.append({"id": b["id"], "type": b["type"], "reason": f"review: {rejected[b['id']]}"})
+            continue
+        if b["type"] == "stat_cards":
+            items = [it for i, it in enumerate(b["items"], 1) if f'{b["id"]}.{i}' not in rejected]
+            if not items:
+                dropped.append({"id": b["id"], "type": b["type"], "reason": "review: every figure rejected"})
+                continue
+            if len(items) < len(b["items"]):
+                b = {**b, "items": items, "sources": sorted({it["cite"]["source"] for it in items})}
+        kept.append(b)
+    return kept, dropped
 
 
 class GenerateError(RuntimeError):
@@ -602,39 +787,85 @@ def _ask(model, api_key, api_base, messages):
 
 
 def generate(model, api_key, api_base, report):
-    """Ask once, repair unreadable JSON once, keep what the facts bear out.
+    """Ask for DRAFTS answers at once (each repaired once if its JSON is
+    unreadable), keep what the facts bear out in each, the best first and
+    nothing twice; give one second chance when too little survives.
 
     Returns (visuals, tokens) where tokens maps the model's name to
     [prompt_tokens, completion_tokens], as litstorm.cost counts them.
     """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
     if not api_key:
         raise GenerateError("no API key stored for this model's provider")
     facts_ = facts(report)
     messages = [{"role": "user", "content": prompt(report, facts_)}]
-    tokens = {}
+    tokens, counting = {}, threading.Lock()
 
     def ask(msgs):
         try:
             text, name, (p, c) = _ask(model, api_key, api_base, msgs)
         except Exception as error:  # noqa: BLE001 - the report still reads without figures
             raise GenerateError(f"{type(error).__name__}: {error}"[:300]) from error
-        t = tokens.setdefault(name, [0, 0])
-        t[0] += p
-        t[1] += c
+        with counting:
+            t = tokens.setdefault(name, [0, 0])
+            t[0] += p
+            t[1] += c
         return text
 
-    reply = ask(messages)
-    raw = parse(reply)
-    if raw is None:
-        # One repair, on the reply alone: cheaper than asking again.
-        reply = ask(messages + [
+    def draft(_):
+        try:
+            reply = ask(messages)
+            raw = parse(reply)
+            if raw is None:
+                # One repair, on the reply alone: cheaper than asking again.
+                reply = ask(messages + [
+                    {"role": "assistant", "content": reply[:8000]},
+                    {"role": "user", "content": 'That was not valid JSON. Answer again with only the JSON object {"blocks": [...]}.'},
+                ])
+                raw = parse(reply)
+            return reply, raw, None
+        except GenerateError as error:
+            return "", None, error
+
+    # A small model's picks vary from one answer to the next: two answers,
+    # checked alike, give a report the figures either would have found.
+    with ThreadPoolExecutor(DRAFTS) as pool:
+        drafts = list(pool.map(draft, range(DRAFTS)))
+    usable = [(reply, raw) for reply, raw, _ in drafts if raw is not None]
+    if not usable:
+        failed = next((e for _, _, e in drafts if e is not None), None)
+        raise failed or GenerateError("the model gave no readable blocks")
+    usable.sort(key=lambda d: -len(check(d[1], report, facts_)[0]))
+    blocks, dropped, asked = [], [], 0
+    for _, raw in usable:
+        more, more_dropped = check(raw, report, facts_, start=asked, room=MAX_BLOCKS - len(blocks), earlier=blocks)
+        blocks += more
+        dropped += more_dropped
+        asked += len(raw)
+    reply = usable[0][0]
+    if dropped and len(blocks) < SECOND_CHANCE_BELOW:
+        # One second chance, told exactly why: a model that misread the
+        # rules once usually keeps to them when shown where it slipped.
+        why = "\n".join(f"- {d['type']}: {d['reason']}" for d in dropped)
+        again = parse(ask(messages + [
             {"role": "assistant", "content": reply[:8000]},
-            {"role": "user", "content": 'That was not valid JSON. Answer again with only the JSON object {"blocks": [...]}.'},
-        ])
-        raw = parse(reply)
-    if raw is None:
-        raise GenerateError("the model gave no readable blocks")
-    blocks, dropped = check(raw, report, facts_)
+            {"role": "user", "content": SECOND_CHANCE.format(why=why, room=MAX_BLOCKS - len(blocks))},
+        ]))
+        if again:
+            more, more_dropped = check(again, report, facts_, start=asked, room=MAX_BLOCKS - len(blocks), earlier=blocks)
+            blocks += more
+            dropped += more_dropped
+    if any(b["type"] in REVIEWED for b in blocks):
+        # Read again for what the numbers mean; a reviewer that fails or
+        # answers nonsense leaves the checked blocks as they are.
+        try:
+            rejected = verdicts(ask([{"role": "user", "content": REVIEW.format(entries=review_entries(blocks))}]))
+        except GenerateError:
+            rejected = {}
+        blocks, more_dropped = apply_review(blocks, rejected)
+        dropped += more_dropped
     from datetime import datetime, timezone
 
     return {

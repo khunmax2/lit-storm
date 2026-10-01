@@ -83,8 +83,8 @@ def test_chart_kinds_that_would_mislead_become_bars():
     points = [{"x": "ทุเรียนสด", "y": 929000, "fact": f1}, {"x": "ปีก่อน", "y": 825000, "fact": f2}]
     line = {"type": "chart", "chart": "line", "series": [{"name": "ส่งออก", "points": points}]}
     pie = {"type": "chart", "chart": "pie", "series": [{"name": "a", "points": points}, {"name": "b", "points": points}]}
-    blocks, _ = visuals.check([line, pie], REPORT, facts)
-    assert [b["chart"] for b in blocks] == ["bar", "bar"]
+    # Each on its own: the two show the same values, and one would be dropped.
+    assert [visuals.check([b], REPORT, facts)[0][0]["chart"] for b in (line, pie)] == ["bar", "bar"]
 
 
 def test_a_line_over_years_is_ordered():
@@ -157,9 +157,11 @@ def test_a_report_without_evidence_gets_no_numbers():
 
 def test_unknown_anchor_goes_to_the_lead_and_blocks_are_capped():
     facts = visuals.facts(REPORT)
-    f1 = _fact(facts, "929,000")
-    one = {"type": "stat_cards", "anchor": {"section": "nope"}, "items": [{"label": "a", "value": 929000, "fact": f1}]}
-    blocks, dropped = visuals.check([one] * (visuals.MAX_BLOCKS + 2), REPORT, facts)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    values = [(929000, f1), (110000, f1), (2566, f1), (825000, f2), (2565, f2), (42.5, f3), (2019, f3)]
+    many = [{"type": "stat_cards", "anchor": {"section": "nope"}, "items": [{"label": "a", "value": v, "fact": f}]} for v, f in values]
+    many.append({"type": "timeline", "events": [{"date": "2566", "label": "a", "fact": f1}, {"date": "2565", "label": "b", "fact": f2}]})
+    blocks, dropped = visuals.check(many, REPORT, facts)
     assert len(blocks) == visuals.MAX_BLOCKS and blocks[0]["anchor"] == "lead"
     assert len(dropped) == 2
 
@@ -220,3 +222,100 @@ def test_a_line_is_not_made_of_citation_years_or_one_repeated_figure():
     blocks, _ = visuals.check([{"type": "timeline", "events": [
         {"date": "2000", "label": "a", "fact": people}, {"date": "1990", "label": "b", "fact": grain}]}], report, facts)
     assert not blocks
+
+
+def test_a_comparison_may_name_its_label_column():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปี", "ปริมาณ"],
+           "rows": [{"label": "2566", "cells": ["929,000 ตัน"], "fact": f1},
+                    {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    kept, dropped = visuals.check([raw], REPORT, facts)
+    assert not dropped and kept[0]["columns"] == ["ปริมาณ"] and len(kept[0]["rows"]) == 2
+
+
+def test_what_is_on_show_is_not_shown_twice():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    chart = {"type": "chart", "chart": "bar", "anchor": "s1", "title": "ส่งออก",
+             "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "ส่งออก 2566", "value": 929000, "unit": "ตัน", "fact": f1},
+                       {"label": "หมอนทอง", "value": 42.5, "unit": "%", "fact": f3}]}
+    kept, dropped = visuals.check([chart, dict(chart, title="ส่งออกอีกครั้ง"), stats], REPORT, facts)
+    assert [b["type"] for b in kept] == ["chart", "stat_cards"]
+    assert dropped == [{"id": "v2", "type": "chart", "reason": "shows what an earlier block shows"}]
+    # The figure the chart already shows is left out of the cards; the other stays.
+    assert [i["value"] for i in kept[1]["items"]] == [42.5]
+    # A second answer is checked against what the first kept.
+    more, again = visuals.check([chart], REPORT, facts, start=3, earlier=kept)
+    assert not more and again[0]["reason"] == "shows what an earlier block shows"
+
+
+def test_a_comparison_column_said_twice_is_said_once():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปี", "ปริมาณส่งออก"],
+           "rows": [{"label": "2566", "cells": ["929,000 ตัน", "929,000 ตัน"], "fact": f1},
+                    {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน", "๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    kept, _ = visuals.check([raw], REPORT, facts)
+    assert kept[0]["columns"] == ["ปริมาณส่งออก"] and kept[0]["rows"][0]["cells"] == ["929,000 ตัน"]
+
+
+def test_a_comparison_said_again_in_other_words_is_one_too_many():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    first = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปริมาณ"],
+             "rows": [{"label": "2566", "cells": ["929,000 ตัน"], "fact": f1},
+                      {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    again = dict(first, title="ส่งออกอีกแบบ", rows=[{"label": "ปี 2566", "cells": ["ส่งออก 929,000 ตัน"], "fact": f1},
+                                                    {"label": "ปี 2565", "cells": ["825,000 ตัน"], "fact": f2}])
+    kept, dropped = visuals.check([first, again], REPORT, facts)
+    assert len(kept) == 1 and dropped[0]["reason"] == "shows what an earlier block shows"
+
+
+def test_the_review_leaves_out_what_it_rejects():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    chart = {"type": "chart", "chart": "bar", "anchor": "s1", "title": "ส่งออก",
+             "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "หมอนทอง", "value": 42.5, "unit": "%", "fact": f3},
+                       {"label": "มูลค่า", "value": 110000, "unit": "ล้านบาท", "fact": f1}]}
+    kept, _ = visuals.check([chart, stats], REPORT, facts)
+    entries = visuals.review_entries(kept)
+    assert "[v1] bar chart" in entries and "[v2.1] key figure" in entries and "929,000 ตัน" in entries
+    said = visuals.verdicts('```json\n{"verdicts": [{"id": "v1", "ok": false, "why": "two kinds"}, '
+                            '{"id": "[v2.2]", "ok": false}, {"id": "v2.1", "ok": true}]}\n```')
+    assert said == {"v1": "two kinds", "v2.2": "rejected"}
+    left, dropped = visuals.apply_review(kept, said)
+    assert [b["id"] for b in left] == ["v2"] and [i["value"] for i in left[0]["items"]] == [42.5]
+    assert left[0]["sources"] == [3] and dropped[0]["reason"] == "review: two kinds"
+    # Nonsense from the reviewer rejects nothing.
+    assert visuals.verdicts("no idea") == {} and visuals.verdicts('[1, 2]') == {}
+
+
+def test_comparison_numbers_are_checked_and_their_passage_found():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปริมาณ"],
+           "rows": [{"label": "ส่งออก 2566", "cells": ["929,000 ตัน", f1]},           # its fact as a cell
+                    {"label": "ส่งออก ๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f3},   # the wrong fact named
+                    {"label": "ส่งออก 2564", "cells": ["700,000 ตัน"], "fact": f1}]}   # a number no passage holds
+    kept, _ = visuals.check([raw], REPORT, facts)
+    rows = kept[0]["rows"]
+    assert [(r["label"], r["cite"]["fact"]) for r in rows] == [("ส่งออก 2566", f1), ("ส่งออก ๒๕๖๕", f2)]
+    assert rows[0]["cells"] == ["929,000 ตัน"]
+
+
+def test_a_row_showing_a_key_figure_again_is_one_too_many():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "ส่งออก 2566", "value": 929000, "unit": "ตัน", "fact": f1},
+                       {"label": "ส่งออก 2565", "value": 825000, "unit": "ตัน", "fact": f2}]}
+    table = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปริมาณ"],
+             "rows": [{"label": "2566", "cells": ["929,000 ตัน"], "fact": f1},
+                      {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    kept, dropped = visuals.check([stats, table], REPORT, facts)
+    assert [b["type"] for b in kept] == ["stat_cards"] and dropped[0]["type"] == "comparison"

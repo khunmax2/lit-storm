@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/i18n";
@@ -213,6 +213,8 @@ function Chip({
   items,
   label,
   compact,
+  heading,
+  hint,
 }: {
   icon: ReactNode;
   value: string;
@@ -221,6 +223,9 @@ function Chip({
   label: string;
   /** Only the icon, no chevron, until pointed at or opened; the name slides out then. */
   compact?: boolean;
+  /** What the choice is for, above the choices; `hint` says more, smaller. */
+  heading?: string;
+  hint?: string;
 }) {
   return (
     // Radix may echo a value while its items mount; passing that on would
@@ -238,11 +243,19 @@ function Chip({
         )}
       </SelectTrigger>
       <SelectContent className={MENU}>
-        {items.map((i) => (
-          <SelectItem key={i.value} value={i.value} className={ITEM}>
-            {i.label}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {heading && (
+            <SelectLabel className="max-w-60 px-2 pt-1.5 pb-1">
+              <span className="block text-xs font-medium text-foreground">{heading}</span>
+              {hint && <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{hint}</span>}
+            </SelectLabel>
+          )}
+          {items.map((i) => (
+            <SelectItem key={i.value} value={i.value} className={ITEM}>
+              {i.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );
@@ -487,6 +500,8 @@ export function Composer({
       <div className="flex flex-wrap items-center gap-1.5 px-1 pt-0.5 pb-2">
         <Chip
           label={t("run.language")}
+          heading={t("run.languageHeading")}
+          hint={t("run.languageHint")}
           icon={<Globe className="size-3.5" />}
           value={form.language}
           onChange={(language) => setForm({ ...form, language })}

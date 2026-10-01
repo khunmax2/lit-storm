@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Outlet, createRootRoute, createRoute, createRouter, redirect, useNavigate } from "@tanstack/react-router";
 import { Loader2, Moon, Plus, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -20,9 +20,23 @@ import { TrashPage } from "@/pages/trash";
 // The bar over every page: new research on the left, then whatever the page
 // puts in its toolbar, and the theme switch on the right.
 function Header() {
-  const { t } = useT();
+  const { t, lang, setLang } = useT();
   const { state, isMobile } = useSidebar();
   const { resolvedTheme, setTheme } = useTheme();
+  const client = useQueryClient();
+  // The interface language, one press away, kept with the account as the
+  // account menu keeps it; it changes at once and goes back if not saved.
+  const other: Lang = lang === "th" ? "en" : "th";
+  const switchLang = useMutation({
+    mutationFn: (l: Lang) => call(api.PUT("/api/me/language", { body: { ui_language: l } })),
+    onMutate: (l) => {
+      const before = lang;
+      setLang(l);
+      return before;
+    },
+    onSuccess: (m) => client.setQueryData(["me"], m),
+    onError: (_e, _l, before) => before && setLang(before),
+  });
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur">
       {(isMobile || state === "collapsed") && <SidebarTrigger className="size-9 rounded-lg border shadow-xs" />}
@@ -33,6 +47,17 @@ function Header() {
         </Link>
       </Button>
       <div id="page-toolbar" className="flex min-w-0 flex-1 items-center gap-2 pl-1" />
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-9 rounded-lg text-xs font-semibold tracking-wide shadow-xs"
+        aria-label={t("lang.switch")}
+        title={t("lang.switch")}
+        disabled={switchLang.isPending}
+        onClick={() => switchLang.mutate(other)}
+      >
+        {lang === "th" ? "TH" : "EN"}
+      </Button>
       <Button
         variant="outline"
         size="icon"

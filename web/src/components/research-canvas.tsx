@@ -33,6 +33,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, call } from "@/api/client";
+import { useRunLive } from "@/hooks/use-run-live";
 import { useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -140,7 +141,7 @@ export function ResearchCanvas({ runId, topic, live }: { runId: string; topic: s
   const after = useRef(0);
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Every "tree" note since the last one read, page by page.
+  // Every "tree" note so far, page by page; while the Run works, the rest as they come (useRunLive).
   const events = useQuery({
     queryKey: ["research-tree", runId],
     queryFn: async () => {
@@ -154,16 +155,19 @@ export function ResearchCanvas({ runId, topic, live }: { runId: string; topic: s
       }
       return found;
     },
-    refetchInterval: live ? 2500 : false,
   });
-  useEffect(() => {
-    if (!events.data?.length) return;
+  const merge = (nodes: TreeNode[]) => {
+    if (!nodes.length) return;
     setTree((prev) => {
       const next = new Map(prev);
-      for (const n of events.data) next.set(n.id, { ...next.get(n.id), ...n });
+      for (const n of nodes) next.set(n.id, { ...next.get(n.id), ...n });
       return next;
     });
-  }, [events.data]);
+  };
+  useEffect(() => merge(events.data ?? []), [events.data]);
+  useRunLive(runId, live, (d) =>
+    merge(d.events.flatMap((e) => (e.type === "note" && e.data.kind === "tree" ? [e.data as unknown as TreeNode] : []))),
+  );
 
   const graph = useMemo(() => layout(tree, topic, selected), [tree, topic, selected]);
   // Keep the whole tree in view as it grows (until the owner moves it).

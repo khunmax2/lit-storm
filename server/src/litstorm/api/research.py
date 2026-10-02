@@ -3,19 +3,20 @@
 Every row is looked up through `deps.own`, so another User's id is a 404.
 """
 
+import asyncio
 import os
 import tempfile
 import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, modes, quota, sections, settings, trash
+from litstorm import limits, modes, notify, quota, sections, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
@@ -24,6 +25,7 @@ from litstorm.db.models import (
     CANCELLING,
     DISCUSSION,
     FAILED,
+    FINAL,
     INTERRUPTED,
     NEEDS_SELECTION,
     QUEUED,
@@ -820,6 +822,9 @@ class RunDetail(RunOut):
 _SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree"}
 
 
+EVENTS_PER_READ = 500
+
+
 @router.get("/runs/{run_id}", response_model=RunDetail)
 def get_run(
     run_id: uuid.UUID,
@@ -827,10 +832,21 @@ def get_run(
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
-    run = deps.readable(session, Run, run_id, user, "run")
+    return _run_detail(session, run_id, user, after)[0]
+
+
+def _run_detail(session, run_id, user, after, record=True):
+    """The Run with its events after `after`, the last event id read (shown
+    or not: where the next read starts), and whether more are waiting."""
+    run = deps.readable(session, Run, run_id, user, "run", record=record)
     helping = run.owner_id != user.id
-    events = session.scalars(
-        select(RunEvent).where(RunEvent.run_id == run.id, RunEvent.id > after).order_by(RunEvent.id).limit(500)
+    events = list(
+        session.scalars(
+            select(RunEvent)
+            .where(RunEvent.run_id == run.id, RunEvent.id > after)
+            .order_by(RunEvent.id)
+            .limit(EVENTS_PER_READ)
+        )
     )
     # An Administrator the owner asked for help sees every note, tracebacks
     # included: that is what the help is for.
@@ -839,7 +855,61 @@ def get_run(
         for e in events
         if e.type in ("stage", "usage") or (e.type == "note" and (helping or e.data.get("kind") in _SHOWN_NOTES))
     ]
-    return RunDetail(**run_out(run).model_dump(), events=shown, read_only=helping)
+    detail = RunDetail(**run_out(run).model_dump(), events=shown, read_only=helping)
+    return detail, (events[-1].id if events else after), len(events) == EVENTS_PER_READ
+
+
+LIVE_TIMER = 15.0  # seconds a live stream waits for a nudge before reading anyway
+LIVE_GATHER = 0.25  # after a nudge, so a burst of events goes out as one message
+
+
+@router.get("/runs/{run_id}/live")
+async def live_run(run_id: uuid.UUID, request: Request, after: int = Query(0, ge=0)):
+    """The Run page's live view, pushed (server-sent events) instead of
+    polled: each message is what GET /runs/{id}?after= would answer, sent
+    when Postgres says the Run changed (litstorm.notify), and the stream ends
+    once the Run has. A reconnecting browser's Last-Event-ID carries on from
+    the last event it had.
+
+    It holds no database connection while it waits, so a page left open
+    costs a thread nothing; between messages it sends a comment, which also
+    keeps proxies from closing it.
+    """
+    user = await deps.signed_in_user(request)
+    resumed = request.headers.get("last-event-id", "")
+    after = max(after, int(resumed)) if resumed.isdigit() else after
+    first = await deps.with_session(lambda s: _run_detail(s, run_id, user, after))
+
+    async def messages():
+        cursor, sent = after, None
+        key = notify.runs.subscribe(run_id)
+        try:
+            detail, cursor, more = first
+            while True:
+                state = detail.model_dump(mode="json", exclude={"events"})
+                if detail.events or state != sent:
+                    yield f"id: {cursor}\ndata: {detail.model_dump_json()}\n\n"
+                    sent = state
+                else:
+                    yield ": waiting\n\n"
+                if detail.status in FINAL and not more:
+                    return
+                if not more and await notify.woken(key, LIVE_TIMER):
+                    await asyncio.sleep(LIVE_GATHER)
+                if await request.is_disconnected():
+                    return
+                detail, cursor, more = await deps.with_session(
+                    lambda s: _run_detail(s, run_id, user, cursor, record=False)
+                )
+        finally:
+            notify.runs.unsubscribe(run_id, key)
+
+    return StreamingResponse(
+        messages(),
+        media_type="text/event-stream",
+        # nginx would otherwise hold the messages back to fill a buffer.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunOut)

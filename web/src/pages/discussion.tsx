@@ -72,6 +72,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { has, useT, type Key } from "@/i18n";
+import { useRunLive } from "@/hooks/use-run-live";
 import { cn } from "@/lib/utils";
 
 type Turn = Schemas["RunOut"];
@@ -167,24 +168,12 @@ function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, 
 function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) {
   const { t } = useT();
   const [browsed, setBrowsed] = useState<string[]>([]);
-  const [after, setAfter] = useState(0);
   const live = turn.status === "running" || turn.status === "cancelling";
-  const detail = useQuery({
-    queryKey: ["run", turn.id, after],
-    queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: turn.id }, query: { after } } })),
-    refetchInterval: live ? 2500 : false,
-    enabled: live,
-  });
-  useEffect(() => {
-    const d = detail.data;
-    if (!d) return;
-    if (d.events.length) {
-      setAfter(d.events[d.events.length - 1].id);
-      const urls = d.events.flatMap((e) => (e.type === "note" && e.data.kind === "browsed" ? (e.data.urls as string[]) : []));
-      if (urls.length) setBrowsed((prev) => [...new Set([...prev, ...urls])]);
-    }
+  useRunLive(turn.id, live, (d) => {
+    const urls = d.events.flatMap((e) => (e.type === "note" && e.data.kind === "browsed" ? (e.data.urls as string[]) : []));
+    if (urls.length) setBrowsed((prev) => [...new Set([...prev, ...urls])]);
     if (d.status !== turn.status || d.stage !== turn.stage) onChange();
-  }, [detail.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
 
   const action = turn.turn?.action as Asked["action"];
   return (
@@ -350,7 +339,13 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const query = useQuery({
     queryKey: ["discussion", sessionId],
     queryFn: () => call(api.GET("/api/discussions/{session_id}", { params: { path: { session_id: sessionId } } })),
-    refetchInterval: (q) => (q.state.data?.current ? 3000 : false),
+    // A waiting Turn is looked for every 3 s, to see it start; a working one tells the page itself
+    // (TurnProgress, pushed), so the page only checks now and then in case it was missed.
+    refetchInterval: (q) => {
+      const current = q.state.data?.current;
+      if (!current) return false;
+      return current.status === "running" || current.status === "cancelling" ? 30000 : 3000;
+    },
   });
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["discussion", sessionId] });

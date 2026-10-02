@@ -1,6 +1,6 @@
 """Many Runs and many people at once, on a stack of its own, at no LLM cost.
 
-    uv run python tests/load_test.py <output dir> [--keep] [--only=N ...]
+    uv run python tests/load_test.py <output dir> [--keep] [--only=N ...] [--poll]
 
 Wipes and installs its own stack (Compose project `litstorm-load` on port
 8093, behind /litstorm as on the host), signs in many Users, and has each
@@ -39,6 +39,8 @@ BASE = f"http://127.0.0.1:{PORT}/litstorm"
 ADMIN = ("admin@example.org", "load test admin pw")
 PASSWORD = "load test user pw"
 FINAL = {"succeeded", "failed", "cancelled", "interrupted"}
+QUEUED = "queued"
+LIVE = "--poll" not in sys.argv  # how the viewers watch (Viewers)
 
 # name, Users, Runs each, system ceiling, per-User ceiling, embed built in,
 # seconds of work per Run
@@ -170,11 +172,17 @@ def child_memory():
 
 
 class Viewers:
-    """Each User with a live Run polls what the Run page polls: the Run's
-    events every 2.5 s, its Session every 4 s, the sidebar every 15 s."""
+    """Each User with a Run watches it as the Run page does.
 
-    def __init__(self, users, sessions):
-        self.users, self.sessions = users, sessions
+    Live (the page since migration 0012): the sidebar every 15 s, the Session
+    every 4 s while a Run waits and every 30 s while it works, and the Run's
+    live stream while it works. Polling (`--poll`, the page before): the Run's
+    events every 2.5 s, its Session every 4 s, the sidebar every 15 s.
+    """
+
+    def __init__(self, users, sessions, live=True):
+        self.users, self.sessions, self.live = users, sessions, live
+        self.streamed = 0  # messages the live streams carried
         self.latencies, self.errors, self.lock = [], [], threading.Lock()
         self.stopping = threading.Event()
         self.pool = ThreadPoolExecutor(max_workers=len(users))
@@ -198,6 +206,8 @@ class Viewers:
             self.pool.submit(self._watch_runs, api, sessions, runs_by_user[id(api)])
 
     def _watch_runs(self, api, sessions, run_ids):
+        if self.live:
+            return self._watch_live(api, sessions, run_ids)
         try:
             after = {r: 0 for r in run_ids}
             last_session = last_recent = 0.0
@@ -222,6 +232,54 @@ class Viewers:
         except Exception as error:  # noqa: BLE001 - one viewer's fault is a finding, not a crash
             with self.lock:
                 self.errors.append(f"viewer: {type(error).__name__}: {error}")
+
+    def _watch_live(self, api, sessions, run_ids):
+        status = {r: QUEUED for r in run_ids}
+        streams = {}
+        try:
+            last_session = last_recent = 0.0
+            while not self.stopping.is_set() and any(s not in FINAL for s in status.values()):
+                now = time.time()
+                if now - last_recent >= 15:
+                    self._time(api, "/api/sessions/recent?limit=12")
+                    last_recent = now
+                waiting = any(s == QUEUED for s in status.values())
+                if now - last_session >= (4 if waiting else 30):
+                    for s in sessions:
+                        r = self._time(api, f"/api/sessions/{s}")
+                        for run in r.json()["runs"] if r is not None else ():
+                            if run["id"] in status and status[run["id"]] not in FINAL:
+                                status[run["id"]] = run["status"]
+                    last_session = now
+                for run_id, s in status.items():
+                    if s in ("running", "cancelling") and run_id not in streams:
+                        streams[run_id] = threading.Thread(target=self._stream, args=(api, run_id, status), daemon=True)
+                        streams[run_id].start()
+                self.stopping.wait(1)
+        except Exception as error:  # noqa: BLE001 - one viewer's fault is a finding, not a crash
+            with self.lock:
+                self.errors.append(f"viewer: {type(error).__name__}: {error}")
+
+    def _stream(self, api, run_id, status):
+        """The Run's live stream until the Run ends, as EventSource reads it."""
+        while not self.stopping.is_set():
+            try:
+                with api.c.stream("GET", f"/api/runs/{run_id}/live", timeout=httpx.Timeout(10, read=60)) as r:
+                    if r.status_code != 200:
+                        with self.lock:
+                            self.errors.append(f"/api/runs/live {r.status_code}")
+                        return
+                    for line in r.iter_lines():
+                        if line.startswith("data: "):
+                            status[run_id] = json.loads(line[len("data: "):])["status"]
+                            with self.lock:
+                                self.streamed += 1
+                            if status[run_id] in FINAL:
+                                return
+            except httpx.HTTPError as error:
+                with self.lock:
+                    self.errors.append(f"/api/runs/live {type(error).__name__}")
+                time.sleep(1)
 
     def stop(self):
         self.stopping.set()
@@ -304,7 +362,7 @@ def scenario(admin, users, name, n_users, runs_each, total, per_user, embed, sec
     params = json.dumps(script(seconds, embed)).replace("'", "''")
     psql(f"update runs set engine = 'fake', config = jsonb_set(config, '{{params}}', '{params}'::jsonb) where id in ({ids})")
 
-    viewers = Viewers(group, [s for s, _ in queued])
+    viewers = Viewers(group, [s for s, _ in queued], live=LIVE)
     viewers.start({id(api): runs for api, (_, runs) in zip(group, queued)})
     sampler = Sampler()
     sampler.start()
@@ -368,6 +426,9 @@ def scenario(admin, users, name, n_users, runs_each, total, per_user, embed, sec
         "api_requests": len(viewers.latencies), "api_ms_p50": pct(viewers.latencies, 50),
         "api_ms_p95": pct(viewers.latencies, 95), "api_ms_max": pct(viewers.latencies, 100),
         "api_errors": sorted(set(viewers.errors))[:20], "api_error_count": len(viewers.errors),
+        "viewers": "live stream" if viewers.live else "polling", "streamed_messages": viewers.streamed,
+        "api_cpu_avg_pct": round(statistics.mean(s["cpu"].get("api", 0) for s in sampler.samples), 1)
+        if sampler.samples else None,
         "samples": sampler.samples,
     }
 
@@ -390,6 +451,8 @@ def report(out, results):
             f"- Worker CPU peak: {r['worker_cpu_peak_pct']} % (of 1 core = 100 %)",
             f"- API memory peak {r['api_memory_peak_mib']} MiB; database peak {r['db_memory_peak_mib']} MiB, "
             f"{r['db_connections_peak']} connections",
+            f"- Viewers: {r['viewers']}; {r['streamed_messages']} messages streamed; "
+            f"API CPU average {r['api_cpu_avg_pct']} %",
             f"- API: {r['api_requests']} requests while Runs were live, p50 {r['api_ms_p50']} ms, "
             f"p95 {r['api_ms_p95']} ms, max {r['api_ms_max']} ms; {r['api_error_count']} errors "
             f"{r['api_errors'] or ''}",

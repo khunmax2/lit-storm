@@ -25,4 +25,10 @@ Engine ต้นทางทั้งสาม (STORM, agents-deep-research, dee
 ## Consequences
 
 - API ใช้ connection pool ร่วมกับทุกคำขอ `api/deps.py` จำกัดจำนวนคำขอที่ใช้ DB พร้อมกันไม่ให้เกิน pool ถ้าไม่จำกัด คำขอพร้อมกันจำนวนมากจะติดตายรอกันเอง (load test 2026-09-30, `docs/benchmarks/2026-09-30-concurrency.md`)
-- Worker เช็กคิวทุก 2 วินาที งานจึงเริ่มช้ากว่าการส่งด้วย push ได้ไม่เกินราว 2 วินาที
+- Worker ไม่ต้องรอรอบเช็กคิวแล้ว (2026-10-02, migration 0012, `litstorm/notify.py`)
+  - trigger ส่ง `pg_notify` เมื่อมี Run เข้าคิวหรือมีช่องว่าง Worker ที่ LISTEN อยู่ตื่นทันที
+  - ยังเช็กคิวเองทุก 5 วินาที เพื่อจับสิ่งที่ไม่มี notification บอก เช่น Admin เพิ่มเพดาน หรือ lease หมดอายุ
+- หน้า Run ไม่ poll แล้ว เปลี่ยนเป็นรับ stream (SSE, `GET /api/runs/{id}/live`)
+  - API แต่ละ process เปิด LISTEN 1 connection แล้วกระจายสัญญาณให้ทุก stream ใน process
+  - stream ไม่ถือ connection ระหว่างรอ
+  - นี่คือสิ่งที่ DeepTutor ใช้ Redis Streams ทำ แต่เราใช้ Postgres ทำได้ โดยไม่ต้องเพิ่ม service

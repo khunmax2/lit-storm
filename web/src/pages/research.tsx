@@ -38,6 +38,7 @@ import { ResearchCanvas } from "@/components/research-canvas";
 import { SupportDialog } from "@/components/support-dialog";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
+import { useRunLive } from "@/hooks/use-run-live";
 import {
   Composer,
   QuotaLine,
@@ -509,23 +510,14 @@ function LiveProgress({ run }: { run: Run }) {
   const { t } = useT();
   const queryClient = useQueryClient();
   const [events, setEvents] = useState<Schemas["EventOut"][]>([]);
-  const after = events.length ? events[events.length - 1].id : 0;
   const live = run.status === "running" || run.status === "cancelling";
-  const detail = useQuery({
-    queryKey: ["run", run.id, after],
-    queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: run.id }, query: { after } } })),
-    refetchInterval: live ? 2500 : false,
-    enabled: live,
-  });
-  useEffect(() => {
-    const d = detail.data;
-    if (!d) return;
+  useRunLive(run.id, live, (d) => {
     if (d.events.length) setEvents((prev) => [...prev, ...d.events]);
     if (d.status !== run.status || d.stage !== run.stage) {
       queryClient.invalidateQueries({ queryKey: ["session", run.session_id] });
       queryClient.invalidateQueries({ queryKey: ["recent"] });
     }
-  }, [detail.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
 
   const browsed = useMemo(
     () => [
@@ -814,7 +806,13 @@ export function SessionPage() {
   const session = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => call(api.GET("/api/sessions/{session_id}", { params: { path: { session_id: sessionId } } })),
-    refetchInterval: (q) => (q.state.data?.runs.some((r) => !FINAL.has(r.status)) ? 4000 : false),
+    // A waiting Run is looked for every 4 s, to see it start. A working one tells this page itself when
+    // it changes (LiveProgress, pushed), so the page only checks now and then in case it was missed.
+    refetchInterval: (q) => {
+      const open = q.state.data?.runs.filter((r) => !FINAL.has(r.status)) ?? [];
+      if (!open.length) return false;
+      return open.some((r) => r.status !== "running" && r.status !== "cancelling") ? 4000 : 30000;
+    },
   });
   const [moving, setMoving] = useState(false);
   const latest = session.data?.runs[0];

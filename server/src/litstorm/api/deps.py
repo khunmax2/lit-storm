@@ -55,6 +55,28 @@ async def database():
             await anyio.to_thread.run_sync(session.close, limiter=anyio.CapacityLimiter(1))
 
 
+async def with_session(fn):
+    """`fn(session)` on a thread, with a session of its own, holding a request
+    slot only while it runs. For a request that lasts (a live stream): it
+    reads now and then and must hold no connection in between."""
+
+    def call():
+        with db.sessions()() as session:
+            return fn(session)
+
+    async with _request_slots():
+        return await anyio.to_thread.run_sync(call)
+
+
+async def signed_in_user(request: Request) -> User:
+    """current_user for a long-lived GET: the same check, without holding a
+    session for the request's whole life."""
+    user, _ = await with_session(lambda session: _signed_in(request, session))
+    if user is None:
+        raise HTTPException(401, "not_signed_in")
+    return user
+
+
 def _signed_in(request, session):
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
@@ -105,7 +127,7 @@ def own(session, model, row_id, user):
     return row
 
 
-def readable(session, model, row_id, user, what):
+def readable(session, model, row_id, user, what, record=True):
     """Like `own`, for reading only: the owner, or an Administrator the owner
     granted access to this Run or Discussion (litstorm.support), whose read
     is then recorded for the owner to see. Anyone else gets the same 404."""
@@ -128,7 +150,8 @@ def readable(session, model, row_id, user, what):
         grant = support.covering(session, user, research_session=row)
     if grant is None:
         raise HTTPException(404, "not_found")
-    support.record(session, grant, what)
+    if record:  # a live stream's later reads are the same look, recorded once
+        support.record(session, grant, what)
     return row
 
 

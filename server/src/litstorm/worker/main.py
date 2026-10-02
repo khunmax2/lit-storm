@@ -1,7 +1,8 @@
 """The Worker: `python -m litstorm.worker.main`.
 
 One loop claims queued Runs while there are free slots and starts a thread
-for each; the thread runs the Run's process through the supervisor and
+for each, then sleeps until Postgres says the queue changed (litstorm.notify)
+or its timer runs out; the thread runs the Run's process through the supervisor and
 reports to the database as it goes. The same loop sweeps Runs whose Worker
 went away (docs/adr/0003: scheduled work lives in the Worker).
 
@@ -15,7 +16,7 @@ import signal
 import threading
 import time
 
-from litstorm import db, search_cache, settings, trash
+from litstorm import db, notify, search_cache, settings, trash
 from litstorm import report as report_mod
 from litstorm.db.models import RunEvent
 from litstorm.runner.supervisor import Spare, supervise
@@ -23,7 +24,11 @@ from litstorm.worker import queue
 
 log = logging.getLogger("litstorm.worker")
 
-POLL = 2.0  # seconds between looking for work
+# Seconds between looks at the queue when nothing says to look sooner: a Run
+# queued or a slot freed wakes the loop at once (litstorm.notify). The timer
+# still catches what no notification marks: an Administrator raising a
+# ceiling, a lease running out.
+POLL = 5.0
 PURGE_EVERY = 600.0  # seconds between emptying expired Trash
 DB_TOUCH = 10.0  # seconds between lease renewals and cancel checks
 
@@ -113,6 +118,7 @@ def main():
     purge_now = _Throttle(PURGE_EVERY, purge)
     spare = Spare()
     spare.refill()
+    wakeup = notify.QueueWakeup()
 
     log.info("worker ready")
     while not stopping.is_set():
@@ -134,11 +140,12 @@ def main():
             threads.append(thread)
 
         threads = [t for t in threads if t.is_alive()]
-        stopping.wait(POLL)
+        wakeup.wait(POLL, stopping)
 
     # A Worker told to stop leaves its Runs to be swept as interrupted:
     # they are not restarted, by design.
     log.info("worker stopping with %d run(s) in progress", len(threads))
+    wakeup.close()
     spare.close()
 
 

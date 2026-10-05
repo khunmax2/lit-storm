@@ -36,7 +36,7 @@ SCHEMA = 1
 GENERATION = 4
 # Bump when check() changes: a kept file is checked again when next read,
 # which needs no model and costs nothing.
-CHECKS = 3
+CHECKS = 4
 
 MAX_BLOCKS = 6
 TYPES = ("stat_cards", "chart", "timeline", "comparison", "diagram", "glossary")
@@ -294,6 +294,35 @@ def _number(value):
     return None
 
 
+# "%", "percent", "ร้อยละ", "เปอร์เซ็นต์": a share of a hundred.
+_PERCENT_UNIT = re.compile(r"%|percent|per\s*cent|ร้อยละ|เปอร์เซ็น", re.IGNORECASE)
+
+
+def _as_percent(value, text):
+    """The passage writes the value as a percent: "99.5%", "98.9 percent",
+    "ร้อยละ 42.5"."""
+    text = _normal(text)
+    for m in re.finditer(r"(ร้อยละ\s*)?(\d[\d,]*(?:[.,]\d+)?)\s*(%|percent|per\s*cent|เปอร์เซ็น)?", text, re.IGNORECASE):
+        if (m.group(1) or m.group(3)) and _number_in(value, m.group(2)):
+            return True
+    return False
+
+
+def _one_whole(series, unit):
+    """A pie shows the parts of one whole: one series, none negative, some
+    of it there — and percentages that add up to a hundred, give or take
+    rounding, not 99.5% and 98.9% of two different things."""
+    if len(series) != 1:
+        return False
+    points = series[0]["points"]
+    values = [p["y"] for p in points]
+    if len(points) < 2 or any(v < 0 for v in values) or sum(values) <= 0:
+        return False
+    percent = bool(_PERCENT_UNIT.search(_normal(unit or ""))) or all(
+        _as_percent(p["y"], p["cite"]["text"]) for p in points)
+    return not (percent and sum(values) > 101)
+
+
 def _cite(fact_id, by_id):
     fact = by_id.get(str(fact_id or "").strip().upper())
     if not fact:
@@ -381,9 +410,8 @@ class _Checker:
         # Too little survives, or too much was not found: the picture would mislead.
         if kept < 2 or kept * 2 < asked:
             return None, f"{kept} of {asked} values found in their facts"
-        if kind == "pie":
-            if len(series) != 1 or any(p["y"] < 0 for p in series[0]["points"]):
-                kind = "bar"  # a pie of several series, or of negatives, is no pie
+        if kind == "pie" and not _one_whole(series, b.get("unit")):
+            kind = "bar"
         if kind == "line":
             # A line joins points in order: they must be years or dates, each
             # year in its own fact. A series needs two such points, and not

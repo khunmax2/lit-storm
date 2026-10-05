@@ -407,3 +407,25 @@ def test_one_row_compares_its_columns_and_a_reworded_copy_is_dropped():
     assert [b["title"] for b in kept] == ["กลไกรับซื้อไฟฟ้า"] and dropped[0]["reason"] == "shows what an earlier block shows"
     lone = dict(one, columns=["กลไก"], rows=[{"label": "รูปแบบ", "cells": ["Adder"], "fact": tariff}])
     assert visuals.check([lone], ENGLISH, facts)[1][0]["reason"] == "fewer than two rows with facts"
+
+
+def test_a_pie_of_percentages_that_are_not_parts_of_one_whole_is_a_bar():
+    report = {**REPORT, "sources": [
+        {**REPORT["sources"][0], "evidence": ["Farmers who own a smartphone: 99.5% of those surveyed."]},
+        {**REPORT["sources"][1], "evidence": ["Households with electricity reached 98.9 percent in 2565."]},
+        {**REPORT["sources"][2], "evidence": ["Rice took 60% of farm land, rubber 25% and fruit 15%."]},
+    ]}
+    facts = visuals.facts(report)
+    phone, power, land = _fact(facts, "99.5"), _fact(facts, "98.9"), _fact(facts, "Rice took")
+
+    def pie(unit, points):
+        return {"type": "chart", "chart": "pie", "unit": unit, "series": [{"name": "a", "points": points}]}
+
+    apart = [{"x": "สมาร์ทโฟน", "y": 99.5, "fact": phone}, {"x": "ไฟฟ้า", "y": 98.9, "fact": power}]
+    whole = [{"x": "ข้าว", "y": 60, "fact": land}, {"x": "ยาง", "y": 25, "fact": land},
+             {"x": "ผลไม้", "y": 15, "fact": land}]
+    kinds = [visuals.check([b], report, facts)[0][0]["chart"]
+             for b in (pie("%", apart), pie("", apart), pie("ร้อยละ", whole))]
+    # 198.4%, said a percent or only written so in its facts: no one whole.
+    # Shares that add up to one whole stay a pie.
+    assert kinds == ["bar", "bar", "pie"]

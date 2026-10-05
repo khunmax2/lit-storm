@@ -819,7 +819,7 @@ class RunDetail(RunOut):
 
 # Notes an owner sees while waiting. Tracebacks and the like stay in the
 # database for whoever debugs; they are not the owner's reading.
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree"}
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow"}
 
 
 EVENTS_PER_READ = 500

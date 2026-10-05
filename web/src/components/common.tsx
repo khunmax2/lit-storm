@@ -117,6 +117,26 @@ export function domainOf(url: string) {
   }
 }
 
+export function Favicon({ url, className = "size-4" }: { url: string; className?: string }) {
+  // A letter, not a fetched icon: the page stays free of third-party requests.
+  // Each site keeps its own hue, so sources from one place are seen together.
+  const d = domainOf(url);
+  let hue = 0;
+  for (const ch of d) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
+  return (
+    <span
+      style={{ ["--h" as string]: hue }}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-[5px] text-[0.6rem] font-semibold uppercase",
+        "bg-[oklch(0.93_0.045_var(--h))] text-[oklch(0.42_0.12_var(--h))] dark:bg-[oklch(0.33_0.06_var(--h))] dark:text-[oklch(0.88_0.07_var(--h))]",
+        className,
+      )}
+    >
+      {d.charAt(0)}
+    </span>
+  );
+}
+
 /** Put page-specific content (breadcrumbs, actions) in the app's top bar. */
 // Renders children into an element a layout left for them, found by id.
 export function PortalTo({ id, children }: { id: string; children: ReactNode }) {

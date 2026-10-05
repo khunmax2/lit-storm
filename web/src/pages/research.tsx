@@ -34,6 +34,7 @@ import {
 } from "@/components/common";
 import { MoveSessionDialog } from "@/components/move-session";
 import { ProjectSettingsDialog } from "@/components/project-settings";
+import { AgentFlowCanvas } from "@/components/agent-flow-canvas";
 import { ResearchCanvas } from "@/components/research-canvas";
 import { SupportDialog } from "@/components/support-dialog";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
@@ -771,7 +772,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />
-        {run.engine === "deep" && run.status !== "queued" && run.status !== "needs_selection" && (
+        {(run.engine === "deep" || run.engine === "agent") && run.status !== "queued" && run.status !== "needs_selection" && (
           <details
             className="group"
             open={mapOpen}
@@ -779,12 +780,16 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
           >
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
               <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
-              {t("canvas.title")}
+              {run.engine === "agent" ? t("flow.title") : t("canvas.title")}
             </summary>
             {/* Drawn only when open: a canvas laid out while folded has no size to fit. */}
             {mapOpen && (
               <div className="mt-2">
-                <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
+                {run.engine === "agent" ? (
+                  <AgentFlowCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
+                ) : (
+                  <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
+                )}
               </div>
             )}
           </details>

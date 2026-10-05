@@ -339,3 +339,19 @@
     transform: none;
   }
 }
+
+/* Agent Research's flow canvas: an edge the work is travelling along. */
+@keyframes lit-flow {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+.lit-flow-edge {
+  stroke-dasharray: 6 5;
+  animation: lit-flow 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lit-flow-edge {
+    animation: none;
+  }
+}

@@ -24,6 +24,7 @@ import time
 from litstorm import instructions, outcomes, sections
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
 from litstorm.engines import sources
+from litstorm.engines.agent import flow as agent_flow
 from litstorm.engines.base import EngineFailure
 
 from . import normalize
@@ -211,6 +212,7 @@ class AgentEngine:
         meter = _Meter(names, "SearXNG" if kind == "searchxng" else "Tavily", bridge)
         found = {}
         _hook(meter, found, progress, cancel)
+        flow = agent_flow.hook(progress)  # the steps, for the web app's flow canvas
 
         params = {**DEFAULTS, **(config.params or {})}
         mode = params.get("mode", "iterative")
@@ -234,6 +236,7 @@ class AgentEngine:
                     report_plan = await plan(query)
                     if config.sections:
                         report_plan.report_outline = planned_sections(report_plan.report_outline, config.sections, config.topic)
+                    flow.plan(report_plan)
                     return report_plan
 
                 async def staged_loops(report_plan):
@@ -244,6 +247,7 @@ class AgentEngine:
                 async def staged_write(*args, **kwargs):
                     meter.flush(progress, "research")
                     progress.stage("report")
+                    flow.note("compose")
                     return await write(*args, **kwargs)
 
                 researcher._build_report_plan = staged_plan

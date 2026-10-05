@@ -157,6 +157,7 @@ const en = {
   "run.note.cutShort": "Written from what it had found after {n} min, to finish on time",
   "run.note.embeddingFallback": "The embedding service failed; sources were matched with the built-in model",
   "run.note.cached": "{n} searches answered from the last 24 hours",
+  "run.note.rewritten": "The report was written again: the first draft stopped part-way",
   "run.refunded": "Quota refunded",
   "run.closeSafe": "You can close this page — the research keeps going.",
   "run.browsed": "Read {n} sources",
@@ -200,6 +201,7 @@ const en = {
   "reason.interrupted": "The worker stopped while this was running.",
   "reason.timed_out": "It ran past the time limit.",
   "reason.empty_report": "The research found nothing to write about.",
+  "reason.truncated_report": "The model stopped writing the report part-way, twice. Try again: it costs no quota.",
   "reason.refused": "The model declined this topic.",
   "reason.engine_error": "Something went wrong inside the research engine.",
 
@@ -758,6 +760,7 @@ const th: Record<Key, string> = {
   "run.note.cutShort": "เขียนจากข้อมูลที่ค้นได้ใน {n} นาที เพื่อให้เสร็จทันเวลา",
   "run.note.embeddingFallback": "บริการ embedding ล่ม ใช้โมเดลในตัวจับคู่แหล่งอ้างอิงแทน",
   "run.note.cached": "ใช้ผลค้นหาจาก 24 ชั่วโมงที่ผ่านมา {n} ครั้ง",
+  "run.note.rewritten": "เขียนรายงานใหม่ 1 ครั้ง เพราะร่างแรกเขียนไม่จบ",
   "run.refunded": "คืนโควตาแล้ว",
   "run.closeSafe": "ปิดหน้านี้ได้ การค้นคว้ายังทำต่อ",
   "run.browsed": "อ่านแล้ว {n} แหล่ง",
@@ -801,6 +804,7 @@ const th: Record<Key, string> = {
   "reason.interrupted": "ระบบประมวลผลหยุดทำงานระหว่างรอบนี้",
   "reason.timed_out": "ใช้เวลาเกินกำหนด",
   "reason.empty_report": "ค้นคว้าแล้วไม่พบเนื้อหาที่จะเขียนรายงาน",
+  "reason.truncated_report": "โมเดลเขียนรายงานไม่จบ 2 ครั้ง ลองใหม่ได้ ไม่เสียโควตา",
   "reason.refused": "โมเดลปฏิเสธหัวข้อนี้",
   "reason.engine_error": "เกิดข้อผิดพลาดภายในระบบค้นคว้า",
 

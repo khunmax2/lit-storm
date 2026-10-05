@@ -87,7 +87,8 @@ export function Stepper({ stage, status, engine }: { stage: string | null; statu
 }
 
 // How a Run went, where the owner should know: it wrote from what it had
-// when its time ran short, or matched sources with the fallback model.
+// when its time ran short, wrote its report a second time because the first
+// stopped part-way, or matched sources with the fallback model.
 // Cached searches are good news, said quietly.
 export function RunNotes({ notes }: { notes: Record<string, unknown> }) {
   const { t } = useT();
@@ -95,7 +96,8 @@ export function RunNotes({ notes }: { notes: Record<string, unknown> }) {
   const fallback = notes.embedding as { fallback?: boolean } | undefined;
   const cache = notes.search_cache as { hits?: number } | undefined;
   const skipped = Object.keys((notes.sources_skipped as { sources?: Record<string, string> } | undefined)?.sources ?? {});
-  if (!cut && !fallback?.fallback && !cache?.hits && !skipped.length) return null;
+  const rewritten = !!notes.rewritten;
+  if (!cut && !fallback?.fallback && !cache?.hits && !skipped.length && !rewritten) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       {cut && (
@@ -108,6 +110,12 @@ export function RunNotes({ notes }: { notes: Record<string, unknown> }) {
         <span className="flex items-center gap-1 text-warning">
           <Info className="size-3" />
           {t("run.note.sourcesSkipped", { names: skipped.join(", ") })}
+        </span>
+      )}
+      {rewritten && (
+        <span className="flex items-center gap-1 text-warning">
+          <Info className="size-3" />
+          {t("run.note.rewritten")}
         </span>
       )}
       {fallback?.fallback && (

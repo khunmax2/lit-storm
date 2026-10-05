@@ -18,10 +18,11 @@ iterations.
 """
 
 import asyncio
+import contextvars
 import os
 import time
 
-from litstorm import instructions, outcomes, sections
+from litstorm import completeness, instructions, outcomes, sections
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
 from litstorm.engines import sources
 from litstorm.engines.agent import flow as agent_flow
@@ -76,8 +77,47 @@ def _model(llm, api_key, timeout):
             ):
                 yield event
 
+        async def _fetch_response(self, *args, **kwargs):
+            response = await super()._fetch_response(*args, **kwargs)
+            # Why the model stopped, for the writer's check (litstorm.completeness).
+            heard = FINISHES.get()
+            choices = getattr(response, "choices", None)
+            if heard is not None and choices:
+                heard.append(choices[0].finish_reason or "")
+            return response
+
     client = AsyncOpenAI(api_key=api_key, base_url=base, timeout=timeout, max_retries=2)
     return Settled(model=llm["model"], openai_client=client)
+
+
+# The finish reasons of the calls made while it is set: the writer's, for
+# its check. A list each call appends to; a task started inside shares it.
+FINISHES = contextvars.ContextVar("litstorm_agent_finishes", default=None)
+
+
+async def written_whole(write, args, kwargs, *, progress, workspace, found):
+    """The writer's report, written once more if it came out unfinished
+    (litstorm.completeness); unfinished twice, the Run fails saying so.
+    `found` is the pages read, for how long a report they should make."""
+    for attempt in (1, 2):
+        heard = []
+        token = FINISHES.set(heard)
+        try:
+            text = await write(*args, **kwargs)
+        finally:
+            FINISHES.reset(token)
+        verdict = completeness.check(text, sources_read=len(found), finish_reasons=heard)
+        progress.note("writer", attempt=attempt, chars=len(text or ""), finish_reasons=heard, unfinished=verdict.reasons)
+        if verdict.whole:
+            return text
+        with open(os.path.join(workspace, f"report-unfinished-{attempt}.md"), "w", encoding="utf-8") as f:
+            f.write(text or "")
+        if attempt == 1:
+            progress.note("rewritten", reasons=verdict.reasons)
+    raise EngineFailure(
+        outcomes.TRUNCATED_REPORT,
+        f"the model stopped writing part-way, twice ({completeness.summary(verdict)})",
+    )
 
 
 class _Meter:
@@ -214,6 +254,9 @@ class AgentEngine:
         _hook(meter, found, progress, cancel)
         flow = agent_flow.hook(progress)  # the steps, for the web app's flow canvas
 
+        async def whole(write, *args, **kwargs):
+            return await written_whole(write, args, kwargs, progress=progress, workspace=workspace, found=found)
+
         params = {**DEFAULTS, **(config.params or {})}
         mode = params.get("mode", "iterative")
         budget = (config.target_seconds or 300) * GATHER_SHARE.get(mode, 0.8) / 60
@@ -248,7 +291,7 @@ class AgentEngine:
                     meter.flush(progress, "research")
                     progress.stage("report")
                     flow.note("compose")
-                    return await write(*args, **kwargs)
+                    return await whole(write, *args, **kwargs)
 
                 researcher._build_report_plan = staged_plan
                 researcher._run_research_loops = staged_loops
@@ -273,7 +316,7 @@ class AgentEngine:
             async def staged_write(*args, **kwargs):
                 meter.flush(progress, "research")
                 progress.stage("report")
-                return await write(*args, **kwargs)
+                return await whole(write, *args, **kwargs)
 
             researcher._create_final_report = staged_write
             progress.stage("research")

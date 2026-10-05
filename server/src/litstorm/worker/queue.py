@@ -240,7 +240,7 @@ def set_stage(session, claim, stage):
 
 
 # The engine's notes an owner is shown on the Run, not only in its log.
-NOTE_KINDS = ("research_cut_short", "embedding", "search_cache", "sources_skipped")
+NOTE_KINDS = ("research_cut_short", "embedding", "search_cache", "sources_skipped", "rewritten")
 
 
 def add_note(session, claim, kind, data):

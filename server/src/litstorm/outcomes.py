@@ -11,6 +11,7 @@ BAD_CONFIGURATION = "bad_configuration"  # wrong key, no credit, unknown model o
 INTERRUPTED = "interrupted"  # the Worker went away
 TIMED_OUT = "timed_out"  # past the Run's wall-clock ceiling
 EMPTY_REPORT = "empty_report"  # finished, with nothing to read
+TRUNCATED_REPORT = "truncated_report"  # the model stopped writing part-way, twice (litstorm.completeness)
 REFUSED = "refused"  # the model declined the topic
 ENGINE_ERROR = "engine_error"  # a fault in our code or the engine's
 
@@ -20,6 +21,7 @@ REFUNDED = {
     INTERRUPTED,
     TIMED_OUT,
     EMPTY_REPORT,
+    TRUNCATED_REPORT,
     ENGINE_ERROR,
 }
 

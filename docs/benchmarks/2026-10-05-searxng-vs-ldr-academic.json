@@ -1,0 +1,1931 @@
+[
+ {
+  "q": "retrieval augmented generation evaluation",
+  "mode": "ours: SearXNG (general)",
+  "seconds": 1.4,
+  "n": 32,
+  "engines": [
+   [
+    "google cse",
+    20
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://arxiv.org/abs/2504.14891",
+    "[2504.14891] Retrieval Augmented Generation Evaluation in the Era ..."
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://arxiv.org/abs/2405.07437",
+    "[2405.07437] Evaluation of Retrieval-Augmented Generation: A ..."
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://dictionary.cambridge.org/dictionary/english/retrieval",
+    "RETRIEVAL | English meaning - Cambridge Dictionary"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://link.springer.com/article/10.1007/s42979-026-05134-x",
+    "Evaluating Retrieval Augmented Generation: A Comprehensive ..."
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://dict.longdo.com/search/%2Aretrieval%2A",
+    "*retrieval* แปลว่าอะไร ดูความหมาย ตัวอย่างประโยค หมายความว่า …"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 1,
+  "unresponsive": [
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "duckduckgo",
+    "CAPTCHA"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ]
+  ]
+ },
+ {
+  "q": "retrieval augmented generation evaluation",
+  "mode": "ours: LDR-academic provider",
+  "seconds": 2.9,
+  "n": 119,
+  "engines": [
+   [
+    "europepmc",
+    20
+   ],
+   [
+    "pubmed",
+    20
+   ],
+   [
+    "crossref",
+    19
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "semantic scholar",
+    10
+   ],
+   [
+    "openairepublications",
+    10
+   ],
+   [
+    "openairedatasets",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2506.06962v3",
+    "AR-RAG: Autoregressive Retrieval Augmentation for Image Generation"
+   ],
+   [
+    [
+     "openalex"
+    ],
+    "http://arxiv.org/abs/2505.04680",
+    "Retrieval Augmented Generation Evaluation for Health Documents"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://dl.acm.org/doi/abs/10.1145/3626772.3657957",
+    "Evaluating retrieval quality in retrieval-augmented generation"
+   ],
+   [
+    [
+     "semantic scholar"
+    ],
+    "https://arxiv.org/pdf/2504.14891.pdf",
+    "Retrieval Augmented Generation Evaluation in the Era of Large Language"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "https://CRAN.R-project.org/package=ragR",
+    "ragR: Retrieval-Augmented Generation and RAG Evaluation Tools"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": []
+ },
+ {
+  "q": "retrieval augmented generation evaluation",
+  "mode": "fork: default search",
+  "seconds": 6.0,
+  "n": 96,
+  "engines": [
+   [
+    "encyclosearch",
+    15
+   ],
+   [
+    "mojeek",
+    10
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "semantic scholar",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ],
+   [
+    "wikiversity",
+    5
+   ],
+   [
+    "wikibooks",
+    5
+   ],
+   [
+    "wikisource",
+    5
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "mojeek",
+     "yahoo"
+    ],
+    "https://arxiv.org/abs/2405.07437",
+    "[2405.07437] Evaluation of Retrieval-Augmented Generation: A ..."
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://dictionary.cambridge.org/dictionary/english/retrieval",
+    "RETRIEVAL | English meaning - Cambridge Dictionary"
+   ],
+   [
+    [
+     "encyclosearch"
+    ],
+    "https://handwiki.org/wiki/Computational_creativity",
+    "Computational creativity"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://dict.longdo.com/search/%2Aretrieval%2A",
+    "*retrieval* แปลว่าอะไร ดูความหมาย ตัวอย่างประโยค หมายความว่า …"
+   ],
+   [
+    [
+     "wikiversity"
+    ],
+    "https://en.wikiversity.org/wiki/Digital_Media_Concepts/Latimer",
+    "Digital Media Concepts/Latimer"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 1,
+  "unresponsive": [
+   [
+    "base",
+    "timeout"
+   ],
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "retrieval augmented generation evaluation",
+  "mode": "fork: academic category",
+  "seconds": 2.5,
+  "n": 99,
+  "engines": [
+   [
+    "pubmed",
+    20
+   ],
+   [
+    "crossref",
+    19
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "semantic scholar",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "openairedatasets",
+    10
+   ],
+   [
+    "openairepublications",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2506.06962v3",
+    "AR-RAG: Autoregressive Retrieval Augmentation for Image Generation"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://aclanthology.org/2024.eacl-demo.16/",
+    "Ragas: Automated evaluation of retrieval augmented generation"
+   ],
+   [
+    [
+     "semantic scholar"
+    ],
+    "https://arxiv.org/pdf/2504.14891.pdf",
+    "Retrieval Augmented Generation Evaluation in the Era of Large Language"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "https://CRAN.R-project.org/package=ragR",
+    "ragR: Retrieval-Augmented Generation and RAG Evaluation Tools"
+   ],
+   [
+    [
+     "openalex"
+    ],
+    "http://arxiv.org/abs/2505.04680",
+    "Retrieval Augmented Generation Evaluation for Health Documents"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "base",
+    "Suspended: timeout"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "CRISPR off-target effects",
+  "mode": "ours: SearXNG (general)",
+  "seconds": 1.0,
+  "n": 33,
+  "engines": [
+   [
+    "google cse",
+    20
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.sciencedirect.com/science/article/pii/S2162253125001908",
+    "Off-target effects in CRISPR-Cas genome editing for human ..."
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://blog.addgene.org/crispr-101-off-target-effects",
+    "CRISPR 101: Off-Target Effects - Addgene Blog"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://lifesciences.danaher.com/us/en/library/crispr-off-target-effects.html",
+    "Off-Target Effects in CRISPR Gene Editing - Danaher Life Sciences"
+   ],
+   [
+    [
+     "google cse"
+    ],
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC10034092/",
+    "Off-target effects in CRISPR/Cas9 gene editing - PMC - NIH"
+   ],
+   [
+    [
+     "google cse"
+    ],
+    "https://bioscience.lonza.com/lonza_bs/CH/en/crispr-off-target-effects",
+    "CRISPR off target effects | Lonza"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 2,
+  "unresponsive": [
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "duckduckgo",
+    "CAPTCHA"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ]
+  ]
+ },
+ {
+  "q": "CRISPR off-target effects",
+  "mode": "ours: LDR-academic provider",
+  "seconds": 2.6,
+  "n": 112,
+  "engines": [
+   [
+    "europepmc",
+    20
+   ],
+   [
+    "pubmed",
+    20
+   ],
+   [
+    "crossref",
+    19
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "semantic scholar",
+    10
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "openairepublications",
+    10
+   ],
+   [
+    "openairedatasets",
+    4
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "openalex",
+     "semantic scholar"
+    ],
+    "https://doi.org/10.1177/1535676017694148",
+    "Approaches to Reduce CRISPR Off-Target Effects for Safer Genome Editin"
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2305.06769v1",
+    "Comparative Analysis of Machine Learning Algorithms for Predicting On-"
+   ],
+   [
+    [
+     "europepmc"
+    ],
+    "https://europepmc.org/article/MED/42541388",
+    "Nonhuman Primate Genomes Have Limited Relevance for Evaluating Human C"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://www.nature.com/articles/nbt.3437",
+    "Optimized sgRNA design to maximize activity and minimize off-target ef"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "http://bioscipublisher.com/index.php/cmb/article/view/4113",
+    "Computational Prediction of Off-Target Effects in CRISPR Systems CRISP"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": []
+ },
+ {
+  "q": "CRISPR off-target effects",
+  "mode": "fork: default search",
+  "seconds": 6.0,
+  "n": 94,
+  "engines": [
+   [
+    "encyclosearch",
+    15
+   ],
+   [
+    "semantic scholar",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "mojeek",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ],
+   [
+    "wikisource",
+    5
+   ],
+   [
+    "wikiversity",
+    4
+   ],
+   [
+    "wikibooks",
+    4
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "semantic scholar",
+     "openalex"
+    ],
+    "https://doi.org/10.1177/1535676017694148",
+    "Approaches to Reduce CRISPR Off-Target Effects for Safer Genome Editin"
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2305.06769v1",
+    "Comparative Analysis of Machine Learning Algorithms for Predicting On-"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://www.nature.com/articles/nbt.3437",
+    "Optimized sgRNA design to maximize activity and minimize off-target ef"
+   ],
+   [
+    [
+     "openalex"
+    ],
+    "https://doi.org/10.1042/etls20180146",
+    "Quantifying CRISPR off-target effects"
+   ],
+   [
+    [
+     "semantic scholar"
+    ],
+    "https://doi.org/10.1038/nbt.3437",
+    "Optimized sgRNA design to maximize activity and minimize off-target ef"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "base",
+    "timeout"
+   ],
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "CRISPR off-target effects",
+  "mode": "fork: academic category",
+  "seconds": 3.2,
+  "n": 83,
+  "engines": [
+   [
+    "pubmed",
+    20
+   ],
+   [
+    "crossref",
+    19
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "openairepublications",
+    10
+   ],
+   [
+    "openairedatasets",
+    4
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2305.06769v1",
+    "Comparative Analysis of Machine Learning Algorithms for Predicting On-"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://www.nature.com/articles/nbt.3437",
+    "Optimized sgRNA design to maximize activity and minimize off-target ef"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "http://bioscipublisher.com/index.php/cmb/article/view/4113",
+    "Computational Prediction of Off-Target Effects in CRISPR Systems CRISP"
+   ],
+   [
+    [
+     "openalex"
+    ],
+    "https://doi.org/10.1042/etls20180146",
+    "Quantifying CRISPR off-target effects"
+   ],
+   [
+    [
+     "pubmed"
+    ],
+    "https://www.ncbi.nlm.nih.gov/pubmed/42829072",
+    "CRISPR-based genome editing of smooth muscle cells: Disease models, th"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "base",
+    "Suspended: timeout"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "Thailand electric vehicle market 2025",
+  "mode": "ours: SearXNG (general)",
+  "seconds": 2.0,
+  "n": 36,
+  "engines": [
+   [
+    "google cse",
+    20
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://marqstats.com/reports/thailand-electric-vehicle-market/",
+    "Thailand Electric Vehicle Market Size, Share & Forecast 2026 – 2030"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://en.wikipedia.org/wiki/Thailand",
+    "Thailand - Wikipedia"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://www.marketsandmarkets.com/Market-Reports/geography/electric-vehicle-market/thailan",
+    "thailand Electric Vehicle Market Size, Share,Trends, Growth ..."
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://www.tourismthailand.org/",
+    "The official website of Tourism Authority of Thailand"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://www.reportlinker.com/dlp/16ce9fe3622107f1b43a8fc7beca8e53",
+    "Thailand Electric Vehicle Market Report- Q1 2025"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "duckduckgo",
+    "CAPTCHA"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "wikipedia",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "Thailand electric vehicle market 2025",
+  "mode": "ours: LDR-academic provider",
+  "seconds": 2.5,
+  "n": 71,
+  "engines": [
+   [
+    "europepmc",
+    20
+   ],
+   [
+    "crossref",
+    20
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "pubmed",
+    1
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "google scholar"
+    ],
+    "https://s-space.snu.ac.kr/handle/10371/229349",
+    "Understanding Consumer Demand in Thailand's Battery Electric Vehicle M"
+   ],
+   [
+    [
+     "europepmc"
+    ],
+    "https://europepmc.org/article/MED/42173958",
+    "Market sentiment of electric vehicles in Malaysia."
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2512.03189v1",
+    "The First Crypto President: Presidential Power and Cryptocurrency Mark"
+   ],
+   [
+    [
+     "openalex"
+    ],
+    "https://so02.tci-thaijo.org/index.php/larts-journal/article/view/258772",
+    "CHINESE ELECTRIC VEHICLES IN THE THAILAND MARKET: OPPORTUNITIES AND CH"
+   ],
+   [
+    [
+     "pubmed"
+    ],
+    "https://www.ncbi.nlm.nih.gov/pubmed/39546619",
+    "End-of-life management of electric vehicle batteries utilizing the lif"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "semantic scholar",
+    "parsing error"
+   ]
+  ]
+ },
+ {
+  "q": "Thailand electric vehicle market 2025",
+  "mode": "fork: default search",
+  "seconds": 6.0,
+  "n": 81,
+  "engines": [
+   [
+    "encyclosearch",
+    15
+   ],
+   [
+    "mojeek",
+    10
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ],
+   [
+    "wikibooks",
+    5
+   ],
+   [
+    "wikisource",
+    5
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "mojeek",
+     "yahoo"
+    ],
+    "https://thaitimes.com/thailand-s-electric-vehicle-market-set-for-40-sales-surge-in-2025",
+    "Thailand's Electric Vehicle Market Set for 40% Sales Surge in ..."
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://en.wikipedia.org/wiki/Thailand",
+    "Thailand - Wikipedia"
+   ],
+   [
+    [
+     "encyclosearch"
+    ],
+    "https://en.wikipedia.org/wiki/Plug-in_electric_vehicle",
+    "Plug-in electric vehicle"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://www.marketsandmarkets.com/Market-Reports/geography/electric-vehicle-market/thailan",
+    "thailand Electric Vehicle Market Size, Share,Trends, Growth ..."
+   ],
+   [
+    [
+     "wikibooks"
+    ],
+    "https://en.wikibooks.org/wiki/Transportation_Deployment_Casebook/2024/Electric_Vehicles#Ma",
+    "Transportation Deployment Casebook/2024/Electric Vehicles / Market Dev"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "base",
+    "timeout"
+   ],
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "Thailand electric vehicle market 2025",
+  "mode": "fork: academic category",
+  "seconds": 2.0,
+  "n": 51,
+  "engines": [
+   [
+    "crossref",
+    20
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "openalex",
+    10
+   ],
+   [
+    "pubmed",
+    1
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2512.03189v1",
+    "The First Crypto President: Presidential Power and Cryptocurrency Mark"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://s-space.snu.ac.kr/handle/10371/229349",
+    "Understanding Consumer Demand in Thailand's Battery Electric Vehicle M"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "https://www.mdpi.com/2032-6653/16/1/29",
+    "Modeling the Used Vehicle Market Share in the Electric Vehicle Transit"
+   ],
+   [
+    [
+     "openalex"
+    ],
+    "https://so02.tci-thaijo.org/index.php/larts-journal/article/view/258772",
+    "CHINESE ELECTRIC VEHICLES IN THE THAILAND MARKET: OPPORTUNITIES AND CH"
+   ],
+   [
+    [
+     "pubmed"
+    ],
+    "https://www.ncbi.nlm.nih.gov/pubmed/39546619",
+    "End-of-life management of electric vehicle batteries utilizing the lif"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 0,
+  "unresponsive": [
+   [
+    "base",
+    "Suspended: timeout"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "รถยนต์ไฟฟ้าในประเทศไทย",
+  "mode": "ours: SearXNG (general)",
+  "seconds": 1.0,
+  "n": 34,
+  "engines": [
+   [
+    "google cse",
+    20
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.bydbdautogroup.com/th/electric-car-brand-th/",
+    "12 แบรนด์รถยนต์ไฟฟ้าในไทยยอดนิยม รู้จักค่าย EV ก่อนตัดสินใจซื้อ [อัปเด"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://line.me/th/",
+    "LINE｜เคียงข้างคุณเสมอ"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://letsgoelectric.co/th",
+    "รถยนต์ไฟฟ้าในประเทศไทย"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://help.line.me/line/smartphone/pc?contentid=50001182&lang=th",
+    "หน้าหลัก | LINE ศูนย์ช่วยเหลือ"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://linedevth.line.me/th/line-beacon",
+    "LINE Beacon"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 5,
+  "unresponsive": [
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "duckduckgo",
+    "CAPTCHA"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ]
+  ]
+ },
+ {
+  "q": "รถยนต์ไฟฟ้าในประเทศไทย",
+  "mode": "ours: LDR-academic provider",
+  "seconds": 1.6,
+  "n": 10,
+  "engines": [
+   [
+    "google scholar",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "google scholar"
+    ],
+    "https://so06.tci-thaijo.org/index.php/ve-irj/article/view/264829",
+    "ปัจจัย ทาง เศรษฐกิจ ที่ มี ผล ต่อ การ ใช้ รถยนต์ ไฟฟ้า ใน ประเทศไทย"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://so02.tci-thaijo.org/index.php/jam/article/download/277365/184714/1216709",
+    "การ ประเมิน ผล กระทบ ของ มาตรการ EV3. 0 และ ปัจจัย ที่ ส่ง ผล ต่อ อุปส"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/6960/",
+    "การ ศึกษา ปัจจัย และ ประเมิน การ เติบโต ของ รถยนต์ ไฟฟ้า ใน ประเทศไทย"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://so07.tci-thaijo.org/index.php/STECOJournal/article/download/2722/2507/28860",
+    "ภาพ รวม ของ ธุรกิจ จุด ชาร์จ รถยนต์ ไฟฟ้า ใน ประเทศไทย"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://mfuir.mfu.ac.th/xmlui/handle/123456789/796",
+    "มาตรการ ทาง กฎหมาย ว่า ด้วย การ ส่งเสริม และ พัฒนา จัด ทำ ระบบ ถนน ที่"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 5,
+  "unresponsive": [
+   [
+    "semantic scholar",
+    "parsing error"
+   ]
+  ]
+ },
+ {
+  "q": "รถยนต์ไฟฟ้าในประเทศไทย",
+  "mode": "fork: default search",
+  "seconds": 6.0,
+  "n": 27,
+  "engines": [
+   [
+    "bing",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "bing"
+    ],
+    "https://www.geeksforgeeks.org/blogs/backend-development/",
+    "Backend Development - GeeksforGeeks"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://letsgoelectric.co/th",
+    "รถยนต์ไฟฟ้าในประเทศไทย"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://roadmap.sh/backend",
+    "Backend Developer Roadmap: What is Backend Development"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://evme.io/th/articles/ev-brands-in-thailand",
+    "23 ยี่ห้อรถ EV ในไทย สรุปทุกจุดแข็ง อัปเดตปี 2568"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://www.geeksforgeeks.org/blogs/60-days-of-backend-development/",
+    "60 Days of Backend Development: A Complete Guide For Beginners"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 2,
+  "unresponsive": [
+   [
+    "base",
+    "timeout"
+   ],
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "รถยนต์ไฟฟ้าในประเทศไทย",
+  "mode": "fork: academic category",
+  "seconds": 2.0,
+  "n": 10,
+  "engines": [
+   [
+    "google scholar",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "google scholar"
+    ],
+    "https://mba.nida.ac.th/wp-content/uploads/2025/11/232048cbfe7df3f617819450cbdfcebd_th.pdf",
+    "Competitiveness of Thailand's Electric Vehicle Industry"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://ph01.tci-thaijo.org/index.php/kmutnb-journal/article/download/245372/166851/865764",
+    "Electric Vehicle: EV Industry and Impacts to Thai Industry"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "http://202.44.33.99/dspace/handle/123456789/414",
+    "A Study on the Alignment of Growth of the Electric Vehicles with Thail"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://so04.tci-thaijo.org/index.php/journalmbsmut/article/view/276631",
+    "Factors Affecting Consumers' Purchase Intention of Electric Vehicles i"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "http://ithesis-ir.su.ac.th/dspace/handle/123456789/5316",
+    "Prediction of Electrical Energy Consumption for Electric Vehicles Acco"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 3,
+  "unresponsive": [
+   [
+    "base",
+    "Suspended: timeout"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "โมเดลภาษาขนาดใหญ่ภาษาไทย",
+  "mode": "ours: SearXNG (general)",
+  "seconds": 1.0,
+  "n": 33,
+  "engines": [
+   [
+    "google cse",
+    20
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://thaillm.or.th/",
+    "ThaiLLM - Thai Large Language Model"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.nstda.or.th/nac/2025/exhibitions/ai04/",
+    "OpenThaiLLM – โมเดลภาษาพื้นฐานขนาดใหญ่สำหรับภาษาไทย - NAC2025"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://developers.google.com/machine-learning/crash-course/llm/transformers?hl=th",
+    "LLM: โมเดลภาษาขนาดใหญ่คืออะไร | Machine Learning | Google for ..."
+   ],
+   [
+    [
+     "google cse"
+    ],
+    "https://www.facebook.com/bdithailand/posts/thaillm-%E0%B8%AB%E0%B8%A3%E0%B8%B7%E0%B8%AD-th",
+    "ThaiLLM หรือ Thai Large Language Model คือ โมเดลทางภาษาขนาด ..."
+   ],
+   [
+    [
+     "google cse"
+    ],
+    "https://www.thaipbs.or.th/sciandtech/thai-genius/4426",
+    "Pathumma Connect อัปเกรดจากโมเดล AI ภาษาไทย สู่ Agentic AI เพื่อ ..."
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 5,
+  "unresponsive": [
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "duckduckgo",
+    "CAPTCHA"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ]
+  ]
+ },
+ {
+  "q": "โมเดลภาษาขนาดใหญ่ภาษาไทย",
+  "mode": "ours: LDR-academic provider",
+  "seconds": 1.6,
+  "n": 10,
+  "engines": [
+   [
+    "google scholar",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/74808/",
+    "การ ค้นหา ค่า สั ม ประ สิทธ์ การ ปล่อย ก๊าซ เรือน กระจก บน พื้นฐาน แบบ"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/11999/",
+    "ระบบ การ เรียน ปฏิบัติการ ร่วม กัน จาก ระยะ ไกล ร่วม กับ โมเดล ภาษา ขน"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/75534/",
+    "การ พัฒนา ระบบ ช่วย ประเมิน การ อ่าน แจก ลูก สะกด คำ ไทย เพื่อ อ่าน โด"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://ph01.tci-thaijo.org/index.php/scudru/article/view/270117",
+    "การ ปรับปรุง ระบบ สกัด รวบรวม ข้อมูล และ สรุป เหตุการณ์ น้ำ ท่วม จาก ข"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://so01.tci-thaijo.org/index.php/AJA/article/download/274059/178740",
+    "… in Thailand: From Research Synthesis by Large Language Models= เมือง"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 5,
+  "unresponsive": [
+   [
+    "semantic scholar",
+    "parsing error"
+   ]
+  ]
+ },
+ {
+  "q": "โมเดลภาษาขนาดใหญ่ภาษาไทย",
+  "mode": "fork: default search",
+  "seconds": 6.0,
+  "n": 27,
+  "engines": [
+   [
+    "bing",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo"
+    ],
+    "https://thaillm.or.th/",
+    "ThaiLLM - Thai Large Language Model"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://classroom.google.com/",
+    "Sign in - Google Accounts"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://aws.amazon.com/th/what-is/large-language-model/",
+    "LLM คืออะไร - คำอธิบายโมเดลภาษาขนาดใหญ่ - AWS"
+   ],
+   [
+    [
+     "bing"
+    ],
+    "https://ipv4.google.com/?hl=es_MX",
+    "Google"
+   ],
+   [
+    [
+     "yahoo"
+    ],
+    "https://www.nstda.or.th/nac/2025/exhibitions/ai04/",
+    "OpenThaiLLM – โมเดลภาษาพื้นฐานขนาดใหญ่สำหรับภาษาไทย - NAC2025"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 3,
+  "unresponsive": [
+   [
+    "base",
+    "timeout"
+   ],
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "โมเดลภาษาขนาดใหญ่ภาษาไทย",
+  "mode": "fork: academic category",
+  "seconds": 2.0,
+  "n": 10,
+  "engines": [
+   [
+    "google scholar",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/74819/",
+    "Enhancing large language models for Thai legal chatbots"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "http://202.44.33.99/dspace/handle/123456789/429",
+    "Sentiment analysis system for Thai reviews using long short-term memor"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "http://ithesis-ir.su.ac.th/dspace/handle/123456789/5891",
+    "Developing Framework for Consistency Evaluation of Article Writing Sty"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "http://ithesis-ir.su.ac.th/dspace/handle/123456789/5258",
+    "Using machine learning for Thai defamatory text classification on publ"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://he03.tci-thaijo.org/index.php/jtmi/article/view/199",
+    "Automated chief complaints visualization using word cloud form textual"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 2,
+  "unresponsive": [
+   [
+    "base",
+    "Suspended: timeout"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพ",
+  "mode": "ours: SearXNG (general)",
+  "seconds": 1.2,
+  "n": 33,
+  "engines": [
+   [
+    "google cse",
+    20
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.bangkokhospital.com/th/bangkok/content/pm-2-5-health-effects",
+    "ผลกระทบสุขภาพจากฝุ่น PM 2.5 | โรงพยาบาลกรุงเทพ สำนักงานใหญ่"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.rama.mahidol.ac.th/ramachannel/article/%E0%B8%9D%E0%B8%B8%E0%B9%88%E0%B8%99-pm",
+    "ฝุ่น PM 2.5 ละอองเล็กจิ๋ว แต่ส่งผลเสียร้ายแรงต่อสุขภาพ"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.bnhhospital.com/th/pm2-5-health-impact-and-prevention/",
+    "PM2.5 ผลกระทบสุขภาพมากกว่าที่คิด: วิธีป้องกันและตรวจปอดที่ตรงจุด"
+   ],
+   [
+    [
+     "yahoo",
+     "google cse"
+    ],
+    "https://www.samitivejhospitals.com/th/article/detail/%E0%B8%AD%E0%B8%B1%E0%B8%99%E0%B8%95%",
+    "PM 2.5 ฝุ่นละอองเล็กจิ๋ว แต่ส่งผลเสีย (ต่อสุขภาพ) มหาศาล - Samitivej"
+   ],
+   [
+    [
+     "google cse"
+    ],
+    "https://rajthanee-nongkhae.com/home/th/%E0%B8%9C%E0%B8%A5%E0%B8%81%E0%B8%A3%E0%B8%B0%E0%B8",
+    "ผลกระทบจาก PM2.5 และ 5 ข้อวิธีป้องกัน"
+   ]
+  ],
+  "top5_academic": 0,
+  "top5_thai": 5,
+  "unresponsive": [
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "duckduckgo",
+    "CAPTCHA"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ]
+  ]
+ },
+ {
+  "q": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพ",
+  "mode": "ours: LDR-academic provider",
+  "seconds": 1.8,
+  "n": 58,
+  "engines": [
+   [
+    "pubmed",
+    20
+   ],
+   [
+    "crossref",
+    18
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "crossref"
+    ],
+    "https://www.nature.com/articles/s41393-021-00744-z",
+    "The CanPain SCI clinical practice guidelines for rehabilitation manage"
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2002.12898v2",
+    "PM2.5-GNN: A Domain Knowledge Enhanced Graph Neural Network For PM2.5 "
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://updc.up.ac.th/handle/123456789/1608",
+    "การ ประเมิน ผล กระทบ ของ PM2. 5 ต่อ สุขภาพ ประชาชน ภาค เหนือ ตอน บน ปร"
+   ],
+   [
+    [
+     "pubmed"
+    ],
+    "https://www.ncbi.nlm.nih.gov/pubmed/42830867",
+    "Park Proximity and Emergency Department Visit Rates for Asthma and Acu"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "https://linkinghub.elsevier.com/retrieve/pii/S1352231000005744",
+    "Comparative receptor modelling study of TSP, PM2 and PM2−10 in Ho Chi "
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 1,
+  "unresponsive": [
+   [
+    "semantic scholar",
+    "parsing error"
+   ]
+  ]
+ },
+ {
+  "q": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพ",
+  "mode": "fork: default search",
+  "seconds": 6.0,
+  "n": 47,
+  "engines": [
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ],
+   [
+    "bing",
+    10
+   ],
+   [
+    "mojeek",
+    10
+   ],
+   [
+    "yahoo",
+    7
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2002.12898v2",
+    "PM2.5-GNN: A Domain Knowledge Enhanced Graph Neural Network For PM2.5 "
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/4882/",
+    "The health impact assessment of particulate matter (PM 2.5) in Thailan"
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2604.22787v1",
+    "Conformal PM2.5 Mapping Under Spatial Covariate Shift: Satellite-Reana"
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/75226/",
+    "Health impact assessment from fine particulate matter PM10 and PM2. 5 "
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/1909.03816v1",
+    "Multivariate spectral downscaling for PM2.5 species"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 1,
+  "unresponsive": [
+   [
+    "base",
+    "timeout"
+   ],
+   [
+    "brave",
+    "Suspended: too many requests"
+   ],
+   [
+    "google",
+    "Suspended: access denied"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ },
+ {
+  "q": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพ",
+  "mode": "fork: academic category",
+  "seconds": 2.0,
+  "n": 58,
+  "engines": [
+   [
+    "pubmed",
+    20
+   ],
+   [
+    "crossref",
+    18
+   ],
+   [
+    "arxiv",
+    10
+   ],
+   [
+    "google scholar",
+    10
+   ]
+  ],
+  "top5": [
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2002.12898v2",
+    "PM2.5-GNN: A Domain Knowledge Enhanced Graph Neural Network For PM2.5 "
+   ],
+   [
+    [
+     "google scholar"
+    ],
+    "https://digital.car.chula.ac.th/chulaetd/4882/",
+    "The health impact assessment of particulate matter (PM 2.5) in Thailan"
+   ],
+   [
+    [
+     "crossref"
+    ],
+    "https://www.nature.com/articles/s41393-021-00744-z",
+    "The CanPain SCI clinical practice guidelines for rehabilitation manage"
+   ],
+   [
+    [
+     "pubmed"
+    ],
+    "https://www.ncbi.nlm.nih.gov/pubmed/42830867",
+    "Park Proximity and Emergency Department Visit Rates for Asthma and Acu"
+   ],
+   [
+    [
+     "arxiv"
+    ],
+    "http://arxiv.org/abs/2604.22787v1",
+    "Conformal PM2.5 Mapping Under Spatial Covariate Shift: Satellite-Reana"
+   ]
+  ],
+  "top5_academic": 5,
+  "top5_thai": 1,
+  "unresponsive": [
+   [
+    "base",
+    "Suspended: timeout"
+   ],
+   [
+    "semantic scholar",
+    "parsing error"
+   ],
+   [
+    "wolframalpha",
+    "timeout"
+   ]
+  ]
+ }
+]

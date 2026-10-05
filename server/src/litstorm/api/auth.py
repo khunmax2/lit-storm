@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from litstorm import security, settings
 from litstorm.api import deps
-from litstorm.db.models import AuthSession, PasswordSetupToken, SearchProvider, SystemSetting, User
+from litstorm.db.models import PERSON, AuthSession, PasswordSetupToken, SearchProvider, SystemSetting, User
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -162,6 +162,7 @@ def login(body: LoginIn, response: Response, session=Depends(deps.database)):
     if (
         user is None
         or not user.is_active
+        or user.kind != PERSON  # an integration account holds tokens, never a session
         or user.must_set_password
         or not security.verify_password(user.password_hash, body.password)
     ):

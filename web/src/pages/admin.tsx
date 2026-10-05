@@ -19,6 +19,7 @@ import {
   Info,
   KeyRound,
   LifeBuoy,
+  Plug,
   Layers,
   Link2,
   Loader2,
@@ -37,6 +38,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+
+import { McpSettings } from "@/components/mcp-admin";
 
 import { api, call, type Schemas } from "@/api/client";
 import { ErrorText, LoadingRows, PageHeader, PortalTo, StatusBadge, Toolbar, errorMessage, formatDate } from "@/components/common";
@@ -2155,6 +2158,7 @@ export const SETTINGS = [
   { id: "limits", label: "admin.limits", lead: "settings.limitsLead", icon: Gauge, page: Limits },
   { id: "usage", label: "admin.usage", lead: "settings.usageLead", icon: ChartColumn, page: Usage },
   { id: "support", label: "admin.support", lead: "settings.supportLead", icon: LifeBuoy, page: Support },
+  { id: "mcp", label: "mcp.title", lead: "mcp.lead", icon: Plug, page: McpSettings },
 ] as const;
 
 // A section's main action sits beside its title at the top of the page.

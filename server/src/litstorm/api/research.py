@@ -517,6 +517,8 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
     """
     if body.engine not in modes.offered(session):
         raise HTTPException(422, "engine_not_available")
+    if owner.allowed_engines is not None and body.engine not in owner.allowed_engines:
+        raise HTTPException(422, "engine_not_allowed")  # an integration account's limits (api/tokens.py)
     # Co-STORM talks in Turns, in a Discussion of its own (api/discussions.py).
     if body.engine == "co-storm" or research_session.kind == DISCUSSION:
         raise HTTPException(422, "use_discussion")

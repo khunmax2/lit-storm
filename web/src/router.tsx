@@ -16,6 +16,7 @@ import { HomePage } from "@/pages/home";
 import { ReportPage } from "@/pages/report";
 import { AllResearchPage, ProjectPage, ProjectsPage, SessionPage } from "@/pages/research";
 import { TrashPage } from "@/pages/trash";
+import { ConnectionsPage } from "@/pages/connections";
 
 // The bar over every page: new research on the left, then whatever the page
 // puts in its toolbar, and the theme switch on the right.
@@ -149,12 +150,13 @@ const adminRoute = createRoute({
   },
 });
 const trashRoute = createRoute({ getParentRoute: () => appRoute, path: "trash", component: TrashPage });
+const connectionsRoute = createRoute({ getParentRoute: () => appRoute, path: "connections", component: ConnectionsPage });
 
 const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
   setPasswordRoute,
-  appRoute.addChildren([homeRoute, allResearchRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, trashRoute]),
+  appRoute.addChildren([homeRoute, allResearchRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, trashRoute, connectionsRoute]),
 ]);
 
 export const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });

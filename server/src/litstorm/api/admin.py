@@ -18,7 +18,7 @@ from litstorm import checks, embedding, limits, modes, quota, roles, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
-from litstorm.db.models import AuthSession, LlmCredential, LlmModel, Run, SearchProvider, User
+from litstorm.db.models import PERSON, AuthSession, LlmCredential, LlmModel, Run, SearchProvider, User
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(deps.admin)])
 
@@ -88,7 +88,8 @@ def list_users(session=Depends(deps.database)):
     configured = limits.load(session)
     return [
         user_out(u, quota.usage(session, u, configured=configured))
-        for u in session.scalars(select(User).order_by(User.created_at))
+        # Integration accounts have a page of their own (api/tokens.py).
+        for u in session.scalars(select(User).where(User.kind == PERSON).order_by(User.created_at))
     ]
 
 
@@ -112,7 +113,7 @@ def reset_link(user_id: uuid.UUID, admin=Depends(deps.admin), session=Depends(de
     a reset: the old password stops working and the User is signed out
     everywhere until they choose a new one."""
     user = session.get(User, user_id)
-    if user is None:
+    if user is None or user.kind != PERSON:  # an integration account never signs in
         raise HTTPException(404, "not_found")
     link, expires = issue_link(session, user)
     if user.password_hash:

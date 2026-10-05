@@ -16,6 +16,7 @@ import {
   Search,
   Settings,
   Sun,
+  Plug,
   Trash2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -267,6 +268,10 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
                     </DropdownMenuRadioGroup>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuItem onClick={() => navigate({ to: "/connections" })}>
+                  <Plug />
+                  {t("nav.connections")}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => logout.mutate()}>
                   <LogOut />

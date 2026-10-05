@@ -35,6 +35,10 @@ def _now():
     return mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+PERSON = "person"
+INTEGRATION = "integration"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -56,6 +60,30 @@ class User(Base):
     # waited longest since their last turn.
     last_run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
+    # "person", or "integration": an account an Administrator makes for
+    # another system, which never signs in and holds API tokens (adr/0009).
+    kind: Mapped[str] = mapped_column(String(20), default=PERSON, server_default=PERSON)
+    # The modes this account may start; null for all.
+    allowed_engines: Mapped[list | None] = mapped_column(JSONB)
+
+
+class ApiToken(Base):
+    """A key another program calls the MCP server with, on its User's behalf.
+    Only its hash is kept; the token is shown once, when made."""
+
+    __tablename__ = "api_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    prefix: Mapped[str] = mapped_column(String(16))  # what is shown of it: "dlk_Ab12"
+    scopes: Mapped[list] = mapped_column(JSONB)  # litstorm.tokens.SCOPES
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _now()
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuthSession(Base):
@@ -271,6 +299,8 @@ class Run(Base):
     # from what it had when time ran short, its embedding service failed,
     # some searches came from the cache (worker.queue.NOTE_KINDS).
     notes: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
+    # The API token it was started with (MCP), for the Run card and usage.
+    via_token_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("api_tokens.id", ondelete="SET NULL"))
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The browser's id for one press of "Start" (see migration 0002).
     request_key: Mapped[str | None] = mapped_column(String(64))

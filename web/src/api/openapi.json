@@ -3020,6 +3020,419 @@
     }
    }
   },
+  "/api/me/connection": {
+   "get": {
+    "tags": [
+     "tokens"
+    ],
+    "summary": "Connection",
+    "operationId": "connection_api_me_connection_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConnectionOut"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/me/tokens": {
+   "get": {
+    "tags": [
+     "tokens"
+    ],
+    "summary": "My Tokens",
+    "operationId": "my_tokens_api_me_tokens_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TokenOut"
+         },
+         "type": "array",
+         "title": "Response My Tokens Api Me Tokens Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "tokens"
+    ],
+    "summary": "Make Token",
+    "operationId": "make_token_api_me_tokens_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TokenIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NewTokenOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/me/tokens/{token_id}": {
+   "delete": {
+    "tags": [
+     "tokens"
+    ],
+    "summary": "Revoke Mine",
+    "operationId": "revoke_mine_api_me_tokens__token_id__delete",
+    "parameters": [
+     {
+      "name": "token_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Token Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/mcp": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Get Mcp",
+    "operationId": "get_mcp_api_admin_mcp_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Settings"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Put Mcp",
+    "operationId": "put_mcp_api_admin_mcp_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Settings"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Settings"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/tokens": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "All Tokens",
+    "operationId": "all_tokens_api_admin_tokens_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TokenOut"
+         },
+         "type": "array",
+         "title": "Response All Tokens Api Admin Tokens Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/tokens/{token_id}": {
+   "delete": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Revoke Any",
+    "operationId": "revoke_any_api_admin_tokens__token_id__delete",
+    "parameters": [
+     {
+      "name": "token_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Token Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/integrations": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "List Integrations",
+    "operationId": "list_integrations_api_admin_integrations_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/IntegrationOut"
+         },
+         "type": "array",
+         "title": "Response List Integrations Api Admin Integrations Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Create Integration",
+    "description": "An account for another system. It has no password and never signs\nin; its address is made up, unique, and reaches no one.",
+    "operationId": "create_integration_api_admin_integrations_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IntegrationIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/integrations/{account_id}": {
+   "patch": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Patch Integration",
+    "operationId": "patch_integration_api_admin_integrations__account_id__patch",
+    "parameters": [
+     {
+      "name": "account_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Account Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IntegrationPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IntegrationOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/integrations/{account_id}/tokens": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Make Integration Token",
+    "operationId": "make_integration_token_api_admin_integrations__account_id__tokens_post",
+    "parameters": [
+     {
+      "name": "account_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Account Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IntegrationTokenIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NewTokenOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/health": {
    "get": {
     "summary": "Health",
@@ -3265,6 +3678,46 @@
      "seconds"
     ],
     "title": "CheckOut"
+   },
+   "ConnectionOut": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "may_create": {
+      "type": "boolean",
+      "title": "May Create"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Scopes"
+     },
+     "lifetimes": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Lifetimes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url",
+     "enabled",
+     "may_create",
+     "scopes",
+     "lifetimes"
+    ],
+    "title": "ConnectionOut",
+    "description": "What a client needs to reach the server, for the setup page."
    },
    "CredentialIn": {
     "properties": {
@@ -3919,6 +4372,293 @@
     "type": "object",
     "title": "HTTPValidationError"
    },
+   "IntegrationIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "monthly_run_quota": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Run Quota"
+     },
+     "max_concurrent_runs": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Concurrent Runs"
+     },
+     "max_queued_runs": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Queued Runs"
+     },
+     "allowed_engines": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Allowed Engines"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "IntegrationIn"
+   },
+   "IntegrationOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "is_active": {
+      "type": "boolean",
+      "title": "Is Active"
+     },
+     "monthly_run_quota": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Run Quota"
+     },
+     "max_concurrent_runs": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Concurrent Runs"
+     },
+     "max_queued_runs": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Queued Runs"
+     },
+     "allowed_engines": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Allowed Engines"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "quota_limit": {
+      "type": "integer",
+      "title": "Quota Limit"
+     },
+     "quota_used": {
+      "type": "integer",
+      "title": "Quota Used"
+     },
+     "runs": {
+      "type": "integer",
+      "title": "Runs"
+     },
+     "cost_usd": {
+      "type": "number",
+      "title": "Cost Usd"
+     },
+     "tokens": {
+      "items": {
+       "$ref": "#/components/schemas/TokenOut"
+      },
+      "type": "array",
+      "title": "Tokens"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "is_active",
+     "monthly_run_quota",
+     "max_concurrent_runs",
+     "max_queued_runs",
+     "allowed_engines",
+     "created_at",
+     "quota_limit",
+     "quota_used",
+     "runs",
+     "cost_usd",
+     "tokens"
+    ],
+    "title": "IntegrationOut"
+   },
+   "IntegrationPatch": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "monthly_run_quota": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Monthly Run Quota"
+     },
+     "max_concurrent_runs": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Concurrent Runs"
+     },
+     "max_queued_runs": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Queued Runs"
+     },
+     "allowed_engines": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Allowed Engines"
+     }
+    },
+    "type": "object",
+    "title": "IntegrationPatch"
+   },
+   "IntegrationTokenIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Scopes"
+     },
+     "days": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Days"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "IntegrationTokenIn"
+   },
    "LanguageIn": {
     "properties": {
      "ui_language": {
@@ -4537,6 +5277,24 @@
      "language"
     ],
     "title": "NewSessionIn"
+   },
+   "NewTokenOut": {
+    "properties": {
+     "token": {
+      "type": "string",
+      "title": "Token"
+     },
+     "record": {
+      "$ref": "#/components/schemas/TokenOut"
+     }
+    },
+    "type": "object",
+    "required": [
+     "token",
+     "record"
+    ],
+    "title": "NewTokenOut",
+    "description": "The token itself, shown this once, and its record."
    },
    "Options": {
     "properties": {
@@ -6066,6 +6824,22 @@
     ],
     "title": "SetPasswordIn"
    },
+   "Settings": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+     },
+     "users_create_tokens": {
+      "type": "boolean",
+      "title": "Users Create Tokens",
+      "default": true
+     }
+    },
+    "type": "object",
+    "title": "Settings"
+   },
    "SetupIn": {
     "properties": {
      "code": {
@@ -6114,6 +6888,124 @@
      "code_configured"
     ],
     "title": "SetupStatus"
+   },
+   "TokenIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Scopes"
+     },
+     "days": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Days",
+      "default": 90
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "TokenIn"
+   },
+   "TokenOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "prefix": {
+      "type": "string",
+      "title": "Prefix"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Scopes"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "owner_id": {
+      "type": "string",
+      "title": "Owner Id"
+     },
+     "owner_name": {
+      "type": "string",
+      "title": "Owner Name",
+      "default": ""
+     },
+     "owner_kind": {
+      "type": "string",
+      "title": "Owner Kind",
+      "default": "person"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "prefix",
+     "scopes",
+     "created_at",
+     "expires_at",
+     "last_used_at",
+     "state",
+     "owner_id"
+    ],
+    "title": "TokenOut"
    },
    "TrashItem": {
     "properties": {

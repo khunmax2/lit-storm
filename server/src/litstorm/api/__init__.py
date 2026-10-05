@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from litstorm.api import admin, auth, discussions, research, support
+from litstorm.api import admin, auth, discussions, research, support, tokens
 
 
 def create_app():
@@ -12,6 +12,8 @@ def create_app():
     app.include_router(research.router)
     app.include_router(discussions.router)
     app.include_router(support.router)
+    app.include_router(tokens.router)
+    app.include_router(tokens.admin)
 
     @app.get("/api/health")
     def health():

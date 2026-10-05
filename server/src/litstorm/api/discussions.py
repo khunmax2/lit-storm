@@ -236,6 +236,8 @@ def start(body: DiscussionIn, user=Depends(deps.current_user), session=Depends(d
         return discussion_out(session, session.get(ResearchSession, earlier.session_id))
     if ENGINE not in modes.offered(session):
         raise HTTPException(422, "engine_not_available")
+    if user.allowed_engines is not None and ENGINE not in user.allowed_engines:
+        raise HTTPException(422, "engine_not_allowed")
     model = _pick(session, LlmModel, body.llm_model_id)
     provider = _pick(session, SearchProvider, body.search_provider_id)
     if not modes.search_fits(ENGINE, provider):

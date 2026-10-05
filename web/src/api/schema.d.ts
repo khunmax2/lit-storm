@@ -1070,6 +1070,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Connection */
+        get: operations["connection_api_me_connection_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Tokens */
+        get: operations["my_tokens_api_me_tokens_get"];
+        put?: never;
+        /** Make Token */
+        post: operations["make_token_api_me_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Mine */
+        delete: operations["revoke_mine_api_me_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mcp */
+        get: operations["get_mcp_api_admin_mcp_get"];
+        /** Put Mcp */
+        put: operations["put_mcp_api_admin_mcp_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All Tokens */
+        get: operations["all_tokens_api_admin_tokens_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Any */
+        delete: operations["revoke_any_api_admin_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Integrations */
+        get: operations["list_integrations_api_admin_integrations_get"];
+        put?: never;
+        /**
+         * Create Integration
+         * @description An account for another system. It has no password and never signs
+         *     in; its address is made up, unique, and reaches no one.
+         */
+        post: operations["create_integration_api_admin_integrations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/integrations/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Integration */
+        patch: operations["patch_integration_api_admin_integrations__account_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/integrations/{account_id}/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make Integration Token */
+        post: operations["make_integration_token_api_admin_integrations__account_id__tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1166,6 +1326,22 @@ export interface components {
              * @default []
              */
             samples: string[];
+        };
+        /**
+         * ConnectionOut
+         * @description What a client needs to reach the server, for the setup page.
+         */
+        ConnectionOut: {
+            /** Url */
+            url: string;
+            /** Enabled */
+            enabled: boolean;
+            /** May Create */
+            may_create: boolean;
+            /** Scopes */
+            scopes: string[];
+            /** Lifetimes */
+            lifetimes: number[];
         };
         /** CredentialIn */
         CredentialIn: {
@@ -1424,6 +1600,75 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** IntegrationIn */
+        IntegrationIn: {
+            /** Name */
+            name: string;
+            /** Monthly Run Quota */
+            monthly_run_quota?: number | null;
+            /** Max Concurrent Runs */
+            max_concurrent_runs?: number | null;
+            /** Max Queued Runs */
+            max_queued_runs?: number | null;
+            /** Allowed Engines */
+            allowed_engines?: string[] | null;
+        };
+        /** IntegrationOut */
+        IntegrationOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Monthly Run Quota */
+            monthly_run_quota: number | null;
+            /** Max Concurrent Runs */
+            max_concurrent_runs: number | null;
+            /** Max Queued Runs */
+            max_queued_runs: number | null;
+            /** Allowed Engines */
+            allowed_engines: string[] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Quota Limit */
+            quota_limit: number;
+            /** Quota Used */
+            quota_used: number;
+            /** Runs */
+            runs: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /** Tokens */
+            tokens: components["schemas"]["TokenOut"][];
+        };
+        /** IntegrationPatch */
+        IntegrationPatch: {
+            /** Name */
+            name?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Monthly Run Quota */
+            monthly_run_quota?: number | null;
+            /** Max Concurrent Runs */
+            max_concurrent_runs?: number | null;
+            /** Max Queued Runs */
+            max_queued_runs?: number | null;
+            /** Allowed Engines */
+            allowed_engines?: string[] | null;
+        };
+        /** IntegrationTokenIn */
+        IntegrationTokenIn: {
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes?: string[];
+            /** Days */
+            days?: number | null;
+        };
         /** LanguageIn */
         LanguageIn: {
             /** Ui Language */
@@ -1669,6 +1914,15 @@ export interface components {
             request_key?: string | null;
             /** Project Id */
             project_id?: string | null;
+        };
+        /**
+         * NewTokenOut
+         * @description The token itself, shown this once, and its record.
+         */
+        NewTokenOut: {
+            /** Token */
+            token: string;
+            record: components["schemas"]["TokenOut"];
         };
         /** Options */
         Options: {
@@ -2221,6 +2475,19 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** Settings */
+        Settings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Users Create Tokens
+             * @default true
+             */
+            users_create_tokens: boolean;
+        };
         /** SetupIn */
         SetupIn: {
             /** Code */
@@ -2241,6 +2508,52 @@ export interface components {
             needed: boolean;
             /** Code Configured */
             code_configured: boolean;
+        };
+        /** TokenIn */
+        TokenIn: {
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes?: string[];
+            /**
+             * Days
+             * @default 90
+             */
+            days: number | null;
+        };
+        /** TokenOut */
+        TokenOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /** Scopes */
+            scopes: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** State */
+            state: string;
+            /** Owner Id */
+            owner_id: string;
+            /**
+             * Owner Name
+             * @default
+             */
+            owner_name: string;
+            /**
+             * Owner Kind
+             * @default person
+             */
+            owner_kind: string;
         };
         /** TrashItem */
         TrashItem: {
@@ -4649,6 +4962,333 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GrantOut"][];
+                };
+            };
+        };
+    };
+    connection_api_me_connection_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionOut"];
+                };
+            };
+        };
+    };
+    my_tokens_api_me_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenOut"][];
+                };
+            };
+        };
+    };
+    make_token_api_me_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewTokenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_mine_api_me_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mcp_api_admin_mcp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+        };
+    };
+    put_mcp_api_admin_mcp_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Settings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    all_tokens_api_admin_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenOut"][];
+                };
+            };
+        };
+    };
+    revoke_any_api_admin_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_integrations_api_admin_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"][];
+                };
+            };
+        };
+    };
+    create_integration_api_admin_integrations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_integration_api_admin_integrations__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_integration_token_api_admin_integrations__account_id__tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewTokenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

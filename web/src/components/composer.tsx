@@ -94,10 +94,13 @@ export function runBody(form: RunForm, request_key: string) {
  *  Session's id, which is where the page goes next. */
 export function startResearch(form: RunForm, request_key: string, project_id?: string): Promise<{ id: string }> {
   if (form.engine === "co-storm") {
-    const { topic, language, llm_model_id, search_provider_id, depth } = runBody(form, request_key);
+    const { topic, language, llm_model_id, search_provider_id, extra_search_provider_ids, depth } = runBody(form, request_key);
     return call(
       api.POST("/api/discussions", {
-        body: { topic, language, llm_model_id, search_provider_id, depth, project_id: project_id ?? null, request_key },
+        body: {
+          topic, language, llm_model_id, search_provider_id, extra_search_provider_ids, depth,
+          project_id: project_id ?? null, request_key,
+        },
       }),
     );
   }

@@ -773,6 +773,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live Run
+         * @description The Run page's live view, pushed (server-sent events) instead of
+         *     polled: each message is what GET /runs/{id}?after= would answer, sent
+         *     when Postgres says the Run changed (litstorm.notify), and the stream ends
+         *     once the Run has. A reconnecting browser's Last-Event-ID carries on from
+         *     the last event it had.
+         *
+         *     It holds no database connection while it waits, so a page left open
+         *     costs a thread nothing; between messages it sends a comment, which also
+         *     keeps proxies from closing it.
+         */
+        get: operations["live_run_api_runs__run_id__live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -1198,6 +1226,8 @@ export interface components {
             llm_model_id?: string | null;
             /** Search Provider Id */
             search_provider_id?: string | null;
+            /** Extra Search Provider Ids */
+            extra_search_provider_ids?: string[];
             /**
              * Depth
              * @default standard
@@ -4063,6 +4093,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    live_run_api_runs__run_id__live_get: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

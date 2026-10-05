@@ -43,9 +43,10 @@ def test_the_administrator_switches_a_mode_off_but_not_the_last(admin, browser, 
     assert admin.put("/api/admin/engines/nope", json={"enabled": False}).status_code == 404
 
 
-def test_a_mode_takes_only_its_search_kinds_and_tool_models(admin, browser, configured, monkeypatch):
-    """Agent Research searches only with SearXNG or Tavily, and needs a model
-    whose test showed it calls tools."""
+def test_agent_research_needs_a_model_that_calls_tools(admin, browser, configured, monkeypatch):
+    """Agent Research searches with any Search Provider (through the search
+    bridge where its library cannot reach it), and needs a model whose test
+    showed it calls tools."""
     model, arxiv = configured
     searxng = admin.post("/api/admin/search-providers",
                          json={"label": "S", "kind": "searxng", "endpoint": "http://s.test"}).json()
@@ -53,7 +54,7 @@ def test_a_mode_takes_only_its_search_kinds_and_tool_models(admin, browser, conf
     body = {"topic": "Songkran", "language": "th", "engine": "agent"}
 
     r = user.post("/api/sessions", json={**body, "search_provider_id": arxiv["id"]})
-    assert r.json()["detail"] == "search_not_for_engine"
+    assert r.json()["detail"] == "model_cannot_use_tools"  # arXiv is fine; the model is untested
     r = user.post("/api/sessions", json={**body, "search_provider_id": searxng["id"]})
     assert r.json()["detail"] == "model_cannot_use_tools"  # untested
 

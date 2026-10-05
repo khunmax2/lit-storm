@@ -1,13 +1,18 @@
 """Stands in for the Deep Research CLI (cli/litstorm.ts) in tests: reads the
 config line, then writes the events its topic asks for, as JSON lines.
 
-    topic "[hang] ..." | "[fail] ..." | "[empty] ..."; anything else: ok
+    topic "[hang] ..." | "[fail] ..." | "[empty] ..." | "[search] ..."; anything else: ok
+
+"[search]" asks the search address it was given, as the CLI asks a SearXNG,
+and reports on the first result.
 """
 
 import json
 import os
 import sys
 import time
+import urllib.parse
+import urllib.request
 
 line = json.loads(sys.stdin.readline())
 out = sys.stdout
@@ -27,6 +32,15 @@ if not os.environ.get("LITSTORM_AI_API_KEY"):
 emit(type="stage", stage="research")
 emit(type="usage", promptTokens=100, completionTokens=20)
 emit(type="searched", urls=["https://a.test/x", "https://b.test/y"], titles=["A", "B"])
+if script == "search":
+    url = line["search"]["apiBase"] + "?" + urllib.parse.urlencode({"q": "Songkran", "format": "json"})
+    found = json.loads(urllib.request.urlopen(url, timeout=10).read())["results"]
+    first = found[0]
+    emit(type="searched", urls=[r["url"] for r in found], titles=[r["title"] for r in found])
+    emit(type="stage", stage="report")
+    emit(type="report", markdown="# Songkran\n\nIt is the Thai New Year [1].",
+         learnings=[{"url": first["url"], "title": first["title"], "learning": "New Year", "excerpt": first["content"]}])
+    sys.exit(0)
 if script == "hang":
     while True:
         time.sleep(1)

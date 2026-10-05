@@ -23,6 +23,7 @@ import time
 
 from litstorm import instructions, outcomes, sections
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
+from litstorm.engines import sources
 from litstorm.engines.base import EngineFailure
 
 from . import normalize
@@ -81,9 +82,10 @@ def _model(llm, api_key, timeout):
 class _Meter:
     """Tokens by model and searches by service, handed on stage by stage."""
 
-    def __init__(self, names, search_name):
+    def __init__(self, names, search_name, bridge=None):
         self.names = names  # model id -> the name cost.estimate knows it by
         self.search_name = search_name
+        self.bridge = bridge  # its count by source, when the Run searches through one
         self.tokens = {}
         self.searches = 0
 
@@ -94,7 +96,8 @@ class _Meter:
         t["completion_tokens"] += int(getattr(usage, "output_tokens", 0) or 0)
 
     def flush(self, progress, stage):
-        progress.usage(stage, llm=self.tokens, search={self.search_name: self.searches})
+        search = self.bridge.usage() if self.bridge is not None else {self.search_name: self.searches}
+        progress.usage(stage, llm=self.tokens, search=search)
         self.tokens, self.searches = {}, 0
 
 
@@ -163,15 +166,23 @@ class AgentEngine:
     name = "agent"
 
     def run(self, config, secrets, workspace, progress, cancel):
+        # Any source but the one SearXNG or Tavily the library speaks, or
+        # several, is searched through a bridge it takes for a SearXNG.
+        with sources.bridge_for(config, secrets, SEARCH) as bridge:
+            return self._run(config, secrets, workspace, progress, cancel, bridge)
+
+    def _run(self, config, secrets, workspace, progress, cancel, bridge):
         started = time.time()
         search = config.search
-        kind = SEARCH.get(search.get("provider"))
+        kind = "searchxng" if bridge is not None else SEARCH.get(search.get("provider"))
         if kind is None:
             raise EngineFailure(outcomes.BAD_CONFIGURATION, f"Agent Research cannot search with {search.get('provider')!r}")
         # Where the library looks for its search service: this process only.
-        if kind == "searchxng":
+        os.environ.pop("SEARCHXNG_ENGINES", None)
+        if bridge is not None:
+            os.environ["SEARCHXNG_HOST"] = bridge.url
+        elif kind == "searchxng":
             os.environ["SEARCHXNG_HOST"] = search.get("endpoint", "")
-            os.environ.pop("SEARCHXNG_ENGINES", None)
             if search.get("engines"):
                 os.environ["SEARCHXNG_ENGINES"] = search["engines"]
         else:
@@ -197,7 +208,7 @@ class AgentEngine:
         }
         if config.fast_llm:
             names[config.fast_llm["model"]] = LLM_PROVIDERS[config.fast_llm["provider"]]["prefix"] + config.fast_llm["model"]
-        meter = _Meter(names, "SearXNG" if kind == "searchxng" else "Tavily")
+        meter = _Meter(names, "SearXNG" if kind == "searchxng" else "Tavily", bridge)
         found = {}
         _hook(meter, found, progress, cancel)
 

@@ -126,12 +126,13 @@ def test_one_source_switched_off_is_left_out_when_the_run_starts(admin, browser,
 
 
 @pytest.mark.db
-def test_only_an_engine_that_can_search_several_is_given_several(admin, browser, sources):
+def test_a_run_searches_at_most_three_sources(admin, browser, sources):
     arxiv, tci, tavily = sources
     user = make_user(admin, browser)
     body = {"topic": "Songkran", "language": "th", "search_provider_id": tavily["id"]}
+    # Every mode, Deep Research included (through the search bridge).
     r = user.post("/api/sessions", json={**body, "engine": "deep", "extra_search_provider_ids": [tci["id"]]})
-    assert r.json()["detail"] == "too_many_sources"
+    assert r.status_code == 201
     r = user.post("/api/sessions", json={**body, "extra_search_provider_ids": [tci["id"], arxiv["id"]]})
     assert r.status_code == 201  # three in all
     arxiv2 = admin.post("/api/admin/search-providers", json={"label": "arXiv 2", "kind": "arxiv"}).json()

@@ -2180,6 +2180,59 @@
     }
    }
   },
+  "/api/runs/{run_id}/live": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Live Run",
+    "description": "The Run page's live view, pushed (server-sent events) instead of\npolled: each message is what GET /runs/{id}?after= would answer, sent\nwhen Postgres says the Run changed (litstorm.notify), and the stream ends\nonce the Run has. A reconnecting browser's Last-Event-ID carries on from\nthe last event it had.\n\nIt holds no database connection while it waits, so a page left open\ncosts a thread nothing; between messages it sends a comment, which also\nkeeps proxies from closing it.",
+    "operationId": "live_run_api_runs__run_id__live_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "After"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}/cancel": {
    "post": {
     "tags": [
@@ -3358,6 +3411,14 @@
        }
       ],
       "title": "Search Provider Id"
+     },
+     "extra_search_provider_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "title": "Extra Search Provider Ids"
      },
      "depth": {
       "type": "string",

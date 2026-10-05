@@ -40,20 +40,25 @@ ENGINES = {
         "needs_tools": False,
         # A Discussion, not a Run: started from POST /api/discussions.
         "ready": True,
+        "max_sources": 3,
     },
     "deep": {
         "label": "Deep Research",
-        "search": ("searxng", "tavily"),
+        # Any provider: one its own client does not speak, or several, is
+        # searched through litstorm.engines.sources.SearchBridge.
+        "search": SEARCH_PROVIDERS,
         "stages": ("research", "report"),
         "needs_tools": False,
         "ready": True,
+        "max_sources": 3,
     },
     "agent": {
         "label": "Agent Research",
-        "search": ("searxng", "tavily"),
+        "search": SEARCH_PROVIDERS,  # as Deep Research: through the bridge
         "stages": ("plan", "research", "report"),
         "needs_tools": True,
         "ready": True,
+        "max_sources": 3,
     },
 }
 

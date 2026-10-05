@@ -36,6 +36,7 @@ from knowledge_storm.logging_wrapper import LoggingWrapper
 
 from litstorm import outcomes, search_cache
 from litstorm.discussion import ACTIONS, STATE, VIEW
+from litstorm.engines import sources
 from litstorm.engines.base import EngineFailure
 from litstorm.engines.storm import normalize, providers
 
@@ -99,13 +100,11 @@ def build_runner(config, secrets, encoder, callbacks=None):
         strong = providers.build_lm(
             config.llm, secrets.llm_api_key, params["max_tokens"]["writing"], config.request_timeout
         )
-        rm = providers.build_rm(config.search, secrets.search_api_key, params["retrieve_top_k"], config.request_timeout)
+        # The Discussion's sources, one or several searched as one, cached
+        # as a STORM Run's are (litstorm.engines.sources).
+        rm = sources.build_search(config, secrets, params["retrieve_top_k"])
     except providers.ProviderConfigError as error:
         raise EngineFailure(outcomes.BAD_CONFIGURATION, str(error)) from error
-    if config.search_cache_dir:
-        rm = search_cache.CachedRM(
-            rm, config.search_cache_dir, search_cache.identity(config.search, params["retrieve_top_k"])
-        )
 
     lm_config = CollaborativeStormLMConfigs()
     lm_config.set_question_answering_lm(strong)
@@ -387,8 +386,13 @@ class CoStormEngine:
             if dropped:
                 progress.note("dropped_citations", count=dropped)
 
-        if isinstance(rm, search_cache.CachedRM) and rm.hits:
-            progress.note("search_cache", hits=rm.hits, misses=rm.misses)
+        caches = [c for c in getattr(rm, "retrievers", [rm]) if isinstance(c, search_cache.CachedRM)]
+        hits = sum(c.hits for c in caches)
+        if hits:
+            progress.note("search_cache", hits=hits, misses=sum(c.misses for c in caches))
+        if getattr(rm, "failures", None):
+            # A source that failed was skipped; the others carried the Turn.
+            progress.note("sources_skipped", sources={name: message for name, (_, message) in rm.failures.items()})
         if encoder.fell_back:
             progress.note("embedding", fallback=True, provider=encoder.provider, message=encoder.fell_back)
         state = _state(runner)

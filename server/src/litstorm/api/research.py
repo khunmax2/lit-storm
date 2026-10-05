@@ -293,7 +293,7 @@ class RunIn(BaseModel):
     llm_model_id: uuid.UUID | None = None  # default model when absent
     search_provider_id: uuid.UUID | None = None  # default provider when absent
     # More Search Providers to search beside it, for an Engine that can
-    # (catalog.ENGINES max_sources): STORM, up to two more. The first may be
+    # (catalog.ENGINES max_sources): every mode, up to two more. The first may be
     # repeated here; what counts is after that is taken out.
     extra_search_provider_ids: list[uuid.UUID] = Field(default_factory=list, max_length=3)
     # The report's top-level sections, one per item (litstorm.sections).

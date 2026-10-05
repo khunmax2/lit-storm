@@ -8,6 +8,7 @@ the same queue as Runs; the page polls the Discussion to see it done.
 import json
 import os
 import uuid
+from types import SimpleNamespace
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,6 +21,7 @@ from litstorm.api.research import (
     RunOut,
     _commit_once,
     _existing,
+    _extra_searches,
     _pick,
     _snapshot,
     run_out,
@@ -45,6 +47,8 @@ class DiscussionIn(BaseModel):
     language: str = Field(pattern="^(th|en)$")
     llm_model_id: uuid.UUID | None = None
     search_provider_id: uuid.UUID | None = None
+    # Searched with the first, as a STORM Run's are (catalog max_sources).
+    extra_search_provider_ids: list[uuid.UUID] = Field(default_factory=list)
     depth: Literal["fast", "standard", "deep"] = "standard"
     project_id: uuid.UUID | None = None
     request_key: str | None = Field(default=None, max_length=64)
@@ -105,6 +109,14 @@ def _load_view(rows):
         return None
 
 
+def _search_label(turn):
+    """The Discussion's sources as one label: "SearXNG + arXiv"."""
+    if turn is None:
+        return ""
+    searches = [turn.config.get("search", {}), *(turn.config.get("search_extra") or [])]
+    return " + ".join(s.get("label", "") for s in searches if s.get("label"))
+
+
 def discussion_out(session, rs):
     rows = discussion.turns(session, rs)
     configured = limits.load(session)
@@ -121,7 +133,7 @@ def discussion_out(session, rs):
         language=first.language if first else "th",
         depth=first.config.get("depth", "standard") if first else "standard",
         model_label=(last.config.get("llm", {}).get("label", "") if last else ""),
-        search_label=(last.config.get("search", {}).get("label", "") if last else ""),
+        search_label=_search_label(last),
         turns=[run_out(r) for r in rows],
         allowance=AllowanceOut(
             per_block=allowed.per_block, blocks=allowed.blocks, used=allowed.used, remaining=allowed.remaining
@@ -149,8 +161,11 @@ def _discussion(session, session_id, user, lock=False):
     return rs
 
 
-def new_turn(session, user, rs, asked, model=None, provider=None, depth=None, language=None, extend=False):
-    """Queue a Turn after checking it may be asked now. Commits."""
+def new_turn(
+    session, user, rs, asked, model=None, provider=None, depth=None, language=None, extend=False, extra=None
+):
+    """Queue a Turn after checking it may be asked now. Commits. A Turn
+    searches the sources the Discussion started with unless given `extra`."""
     rows = discussion.turns(session, rs)
     if discussion.in_progress(rows):
         raise HTTPException(409, "turn_in_progress")
@@ -181,6 +196,8 @@ def new_turn(session, user, rs, asked, model=None, provider=None, depth=None, la
     if model is None or provider is None:
         raise HTTPException(422, "choice_not_available")
     depth = depth or (last.config.get("depth", "standard") if last else "standard")
+    if extra is None:
+        extra = (last.config.get("search_extra") or []) if last else []
     language = language or (last.language if last else "th")
     turn = {"action": action}
     if action == "say":
@@ -195,7 +212,7 @@ def new_turn(session, user, rs, asked, model=None, provider=None, depth=None, la
         language=language,
         llm_model_id=model.id,
         search_provider_id=provider.id,
-        config=_snapshot(session, model, provider, depth, ENGINE),
+        config={**_snapshot(session, model, provider, depth, ENGINE), **({"search_extra": extra} if extra else {})},
         status=QUEUED,
         quota_month=limits.quota_month(),
         quota_units=units,
@@ -225,6 +242,9 @@ def start(body: DiscussionIn, user=Depends(deps.current_user), session=Depends(d
         raise HTTPException(422, "search_not_for_engine")
     if not modes.model_fits(ENGINE, model):
         raise HTTPException(422, "model_cannot_use_tools")
+    extra = _extra_searches(
+        session, SimpleNamespace(engine=ENGINE, extra_search_provider_ids=body.extra_search_provider_ids), provider
+    )
     project = deps.own(session, Project, body.project_id, user) if body.project_id else None
     rs = ResearchSession(
         project_id=project.id if project else None, owner_id=user.id, title=body.topic.strip()[:300], kind=DISCUSSION
@@ -233,7 +253,7 @@ def start(body: DiscussionIn, user=Depends(deps.current_user), session=Depends(d
     session.flush()
     run = new_turn(
         session, user, rs, {"action": "start", "request_key": body.request_key},
-        model=model, provider=provider, depth=body.depth, language=body.language,
+        model=model, provider=provider, depth=body.depth, language=body.language, extra=extra,
     )
     return discussion_out(session, session.get(ResearchSession, run.session_id))
 

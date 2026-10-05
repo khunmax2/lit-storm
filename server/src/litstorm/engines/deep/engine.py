@@ -23,6 +23,7 @@ import time
 
 from litstorm import instructions, outcomes
 from litstorm.catalog import LLM_PROVIDERS, reasoning_kwargs, routing_kwargs
+from litstorm.engines import sources
 from litstorm.engines.base import Cancelled, EngineFailure
 
 from litstorm.engines.agent import normalize
@@ -43,8 +44,9 @@ AI = {
 SEARCH = {"searxng": "searxng", "tavily": "tavily"}
 
 
-def cli_input(config, secrets):
-    """The CLI's config line, and its environment."""
+def cli_input(config, secrets, bridge=None):
+    """The CLI's config line, and its environment. With a SearchBridge the
+    CLI searches the Run's sources through it, as if it were a SearXNG."""
     llm = config.llm
     provider, base = AI.get(llm.get("provider"), (None, None))
     if provider is None:
@@ -53,9 +55,13 @@ def cli_input(config, secrets):
     extra = dict(reasoning_kwargs(llm.get("reasoning"), llm["provider"]))
     extra.update(routing_kwargs(llm["provider"], extra).get("extra_body", {}))
 
-    search = SEARCH.get(config.search.get("provider"))
-    if search is None:
-        raise EngineFailure(outcomes.BAD_CONFIGURATION, f"Deep Research cannot search with {config.search.get('provider')!r}")
+    if bridge is not None:
+        search, endpoint, engines, search_key = "searxng", bridge.url, None, ""
+    else:
+        search = SEARCH.get(config.search.get("provider"))
+        if search is None:
+            raise EngineFailure(outcomes.BAD_CONFIGURATION, f"Deep Research cannot search with {config.search.get('provider')!r}")
+        endpoint, engines, search_key = config.search.get("endpoint"), config.search.get("engines"), secrets.search_api_key
     params = {**DEFAULTS, **(config.params or {})}
     query = config.topic
     focus = instructions.focus(config)
@@ -70,15 +76,19 @@ def cli_input(config, secrets):
         "depth": int(params["depth"]),
         "gatherMs": int((config.target_seconds or 300) * GATHER_SHARE * 1000),
         "ai": {"provider": provider, "model": llm["model"], "apiBase": base, "extraBody": extra or None},
-        "search": {"provider": search, "apiBase": config.search.get("endpoint"), "engines": config.search.get("engines")},
+        "search": {"provider": search, "apiBase": endpoint, "engines": engines},
     }
     # Its own small environment: never the Worker's, which holds its secrets.
     env = {
         "PATH": os.environ.get("PATH", ""),
         "HOME": os.environ.get("HOME", "/tmp"),
         "LITSTORM_AI_API_KEY": secrets.llm_api_key,
-        "LITSTORM_SEARCH_API_KEY": secrets.search_api_key,
+        "LITSTORM_SEARCH_API_KEY": search_key,
     }
+    # Windows (where the tests run) opens no socket without it, the search
+    # bridge's included; on Linux it is not set.
+    if os.environ.get("SYSTEMROOT"):
+        env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
     return line, env
 
 
@@ -86,7 +96,11 @@ class DeepEngine:
     name = "deep"
 
     def run(self, config, secrets, workspace, progress, cancel):
-        line, env = cli_input(config, secrets)
+        with sources.bridge_for(config, secrets, SEARCH) as bridge:
+            return self._run(config, secrets, workspace, progress, cancel, bridge)
+
+    def _run(self, config, secrets, workspace, progress, cancel, bridge):
+        line, env = cli_input(config, secrets, bridge)
         model_name = LLM_PROVIDERS[config.llm["provider"]]["prefix"] + config.llm["model"]
         search_name = "SearXNG" if line["search"]["provider"] == "searxng" else "Tavily"
         stderr = open(os.path.join(workspace, "deep-research.log"), "wb")
@@ -114,7 +128,9 @@ class DeepEngine:
         def flush(name):
             nonlocal tokens, searches
             if name:
-                progress.usage(name, llm={model_name: tokens}, search={search_name: searches})
+                # Through the bridge, its count by source; else the CLI's own.
+                search = bridge.usage() if bridge is not None else {search_name: searches}
+                progress.usage(name, llm={model_name: tokens}, search=search)
             tokens, searches = {"prompt_tokens": 0, "completion_tokens": 0}, 0
 
         try:

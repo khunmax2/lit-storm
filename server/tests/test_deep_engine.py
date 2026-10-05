@@ -88,7 +88,7 @@ def test_the_cli_gets_the_runs_settings_and_only_its_keys():
     assert line["ai"] == {"provider": "openrouter", "model": "google/x", "apiBase": None,
                           "extraBody": {"reasoning": {"effort": "minimal"}, "provider": {"require_parameters": True}}}
     assert line["search"]["provider"] == "searxng" and line["query"].endswith("Focus: Which era? Ayutthaya")
-    assert set(env) == {"PATH", "HOME", "LITSTORM_AI_API_KEY", "LITSTORM_SEARCH_API_KEY"}
+    assert set(env) - {"SYSTEMROOT"} == {"PATH", "HOME", "LITSTORM_AI_API_KEY", "LITSTORM_SEARCH_API_KEY"}
 
 
 def test_a_failure_and_an_empty_result_are_told_apart(engine, tmp_path):
@@ -107,7 +107,43 @@ def test_a_stop_kills_the_cli(engine, tmp_path):
         run(engine, tmp_path, "hang", cancel=cancel)
 
 
-def test_a_search_it_cannot_use_is_a_configuration_error(engine, tmp_path):
+class _Source:
+    """A retriever that answers every query with one paper."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def forward(self, query_or_queries, exclude_urls=None):
+        self.calls += 1
+        return [{"url": "https://arxiv.test/1", "title": "A paper", "description": "",
+                 "snippets": ["Songkran is the Thai New Year."]}]
+
+    def get_usage_and_reset(self):
+        calls, self.calls = self.calls, 0
+        return {"ArxivRM": calls}
+
+
+def test_a_source_the_cli_cannot_reach_is_searched_through_the_bridge(engine, tmp_path, monkeypatch):
+    from litstorm.engines.storm import providers
+
+    monkeypatch.setattr(providers, "build_rm", lambda search, key, k, timeout: _Source())
+    report, progress = run(engine, tmp_path, "search", search={"provider": "arxiv", "label": "arXiv"})
+    assert [s["url"] for s in report["sources"]] == ["https://arxiv.test/1"]
+    assert report["sources"][0]["evidence"] == ["Songkran is the Thai New Year."]
+    # Counted by the bridge, by source, not as the CLI's own SearXNG.
+    assert progress.usages[0][2] == {"ArxivRM": 1}
+
+
+def test_the_bridge_is_used_only_when_needed():
+    from litstorm.engines import sources
+    from litstorm.engines.deep.engine import SEARCH
+
+    assert not sources.bridged(_config(), SEARCH)  # one SearXNG: the CLI's own client
+    assert sources.bridged(_config(search={"provider": "tci"}), SEARCH)
+    assert sources.bridged(_config(search_extra=[{"provider": "searxng", "endpoint": "http://x"}]), SEARCH)
+
+
+def test_a_search_no_one_can_reach_is_a_configuration_error(engine, tmp_path):
     with pytest.raises(EngineFailure) as bad:
-        run(engine, tmp_path, search={"provider": "arxiv"})
+        run(engine, tmp_path, search={"provider": "bing"})
     assert bad.value.reason == "bad_configuration"

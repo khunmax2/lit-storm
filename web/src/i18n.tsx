@@ -5,7 +5,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 export type Lang = "th" | "en";
 
 const en = {
-  app: "lit-storm",
+  app: "DeepLit",
   signIn: "Sign in",
   signOut: "Sign out",
   email: "Email",
@@ -23,13 +23,13 @@ const en = {
   yes: "Yes",
   no: "No",
 
-  "setup.title": "Set up lit-storm",
+  "setup.title": "Set up DeepLit",
   "setup.lead": "Create the first Administrator. You need the setup code the installer put in the Docker secret.",
   "setup.code": "Setup code",
   "setup.submit": "Create Administrator",
   "setup.noCode": "No setup code is configured. Add LITSTORM_BOOTSTRAP_CODE_FILE to the api service and restart it.",
 
-  "login.title": "Sign in to lit-storm",
+  "login.title": "Sign in to DeepLit",
   "login.failed": "That email and password do not match an account.",
 
   "pw.title": "Choose your password",
@@ -294,7 +294,7 @@ const en = {
   "nav.settings": "Settings",
   "nav.noRecent": "Nothing yet",
   "home.title": "What should we research today?",
-  "home.subtitle": "lit-storm reads the sources, writes a cited report, and keeps going if you close the page.",
+  "home.subtitle": "DeepLit reads the sources, writes a cited report, and keeps going if you close the page.",
   "home.placeholder": "Ask about a topic, e.g. the history of Songkran or retrieval-augmented generation",
   "home.project": "Project",
   "home.newProject": "New project…",
@@ -582,7 +582,7 @@ const en = {
 export type Key = keyof typeof en;
 
 const th: Record<Key, string> = {
-  app: "lit-storm",
+  app: "DeepLit",
   signIn: "เข้าสู่ระบบ",
   signOut: "ออกจากระบบ",
   email: "อีเมล",
@@ -600,13 +600,13 @@ const th: Record<Key, string> = {
   yes: "ใช่",
   no: "ไม่",
 
-  "setup.title": "ตั้งค่า lit-storm",
+  "setup.title": "ตั้งค่า DeepLit",
   "setup.lead": "สร้างผู้ดูแลระบบคนแรก ต้องใช้รหัสตั้งต้นที่ผู้ติดตั้งกำหนดไว้ใน Docker secret",
   "setup.code": "รหัสตั้งต้น",
   "setup.submit": "สร้างผู้ดูแลระบบ",
   "setup.noCode": "ยังไม่ได้กำหนดรหัสตั้งต้น ให้เพิ่ม LITSTORM_BOOTSTRAP_CODE_FILE ให้ service api แล้ว restart",
 
-  "login.title": "เข้าสู่ระบบ lit-storm",
+  "login.title": "เข้าสู่ระบบ DeepLit",
   "login.failed": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
 
   "pw.title": "ตั้งรหัสผ่าน",
@@ -871,7 +871,7 @@ const th: Record<Key, string> = {
   "nav.settings": "การตั้งค่า",
   "nav.noRecent": "ยังไม่มีรายการ",
   "home.title": "วันนี้อยากค้นคว้าเรื่องอะไร?",
-  "home.subtitle": "lit-storm อ่านแหล่งข้อมูล เขียนรายงานพร้อมอ้างอิง และทำต่อให้แม้ปิดหน้าเว็บ",
+  "home.subtitle": "DeepLit อ่านแหล่งข้อมูล เขียนรายงานพร้อมอ้างอิง และทำต่อให้แม้ปิดหน้าเว็บ",
   "home.placeholder": "พิมพ์หัวข้อ เช่น ประวัติเทศกาลสงกรานต์ หรือ Retrieval-Augmented Generation",
   "home.project": "โปรเจกต์",
   "home.newProject": "โปรเจกต์ใหม่…",

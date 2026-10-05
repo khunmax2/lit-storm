@@ -6,7 +6,7 @@ from litstorm.api import admin, auth, discussions, research, support
 
 
 def create_app():
-    app = FastAPI(title="lit-storm", version="0.1.0")
+    app = FastAPI(title="DeepLit", version="0.1.0")
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(research.router)

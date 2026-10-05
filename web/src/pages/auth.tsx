@@ -23,7 +23,7 @@ function Centered({ title, description, children }: { title: string; description
             <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <BookOpenText className="size-4" />
             </div>
-            lit-storm
+            DeepLit
           </div>
           <Button variant="ghost" size="sm" onClick={() => setLang(lang === "th" ? "en" : "th")}>
             {lang === "th" ? "English" : "ไทย"}

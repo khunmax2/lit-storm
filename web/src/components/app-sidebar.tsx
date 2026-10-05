@@ -128,7 +128,7 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
               <BookOpenText className="size-4" />
             </div>
             <span className="truncate text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-              lit-storm
+              DeepLit
             </span>
           </Link>
           <SidebarTrigger className="text-muted-foreground group-data-[collapsible=icon]:hidden" />

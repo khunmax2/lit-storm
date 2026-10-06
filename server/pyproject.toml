@@ -22,6 +22,7 @@ dependencies = [
     # so Linux images take the CPU build below instead of several GB of CUDA.
     "torch",
     "deep-researcher",
+    "mcp>=1.12",
 ]
 
 [project.optional-dependencies]

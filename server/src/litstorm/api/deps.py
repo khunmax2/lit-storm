@@ -15,7 +15,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 
 from litstorm import db, security
-from litstorm.db.models import AuthSession, User
+from litstorm.db.models import INTEGRATION, AuthSession, User
 
 SESSION_COOKIE = "litstorm_session"
 CSRF_COOKIE = "litstorm_csrf"
@@ -140,6 +140,11 @@ def readable(session, model, row_id, user, what, record=True):
         if user.role != "admin":
             raise
     row = session.get(model, row_id)
+    # An integration account's research is no person's: its Administrators
+    # read it, as they read it through its tokens (docs/adr/0009).
+    owner = session.get(User, row.owner_id) if row is not None else None
+    if owner is not None and owner.kind == INTEGRATION and not getattr(row, "trashed_at", None):
+        return row
     alive = row is not None and (
         trash.run_alive(session, row) if model is Run else trash.session_alive(session, row)
     )

@@ -219,3 +219,40 @@ def test_a_token_is_held_to_its_rate(admin, browser, monkeypatch):
                    "Content-Type": "application/json"}
         codes = [client.post("/api/mcp", headers=headers, content=json.dumps(listing)).status_code for _ in range(3)]
     assert codes[-1] == 429
+
+
+def test_a_run_from_mcp_shows_its_token_and_an_integrations_is_read_by_admins(admin, browser, configured, db):  # noqa: F811
+    from datetime import datetime, timezone
+
+    from litstorm.db.models import Run
+
+    account = admin.post("/api/admin/integrations", json={"name": "DeepWitya"}).json()
+    token = admin.post(f"/api/admin/integrations/{account['id']}/tokens", json={"name": "server", "days": None}).json()["token"]
+
+    async def steps(session):
+        return _data(await session.call_tool("research_start", {"topic": "Songkran", "wait_seconds": 0}))
+
+    started = _call(token, steps)
+    assert "web_url" not in started  # no one signs in as an integration account
+    run = admin.get(f"/api/runs/{started['id']}")
+    assert run.status_code == 200 and run.json()["via_token"] == "server"  # an Administrator reads it
+    assert make_user(admin, browser).get(f"/api/runs/{started['id']}").status_code == 404  # no one else does
+    assert [r["id"] for r in admin.get("/api/admin/integrations").json()[0]["recent"]] == [started["id"]]
+
+    db.get(Run, started["id"]).started_at = datetime.now(timezone.utc)
+    db.commit()
+    rows = {r["name"]: r for r in admin.get("/api/admin/usage").json()["rows"]}
+    assert rows["DeepWitya"]["kind"] == "integration" and rows["DeepWitya"]["mcp_runs"] == 1
+    latest = admin.get("/api/admin/runs").json()[0]
+    assert (latest["name"], latest["kind"]) == ("DeepWitya", "integration")  # not its made-up address
+
+
+def test_progress_only_goes_forward():
+    from types import SimpleNamespace
+
+    from litstorm.api.mcp import _progress
+
+    steps = [_progress(SimpleNamespace(engine="deep", status=status, stage=stage))
+             for status, stage in [("queued", None), ("running", "research"), ("running", "report"),
+                                   ("running", "normalize"), ("succeeded", "normalize")]]
+    assert [s for s, _ in steps] == [0, 1, 2, 2, 3] and {t for _, t in steps} == {3}

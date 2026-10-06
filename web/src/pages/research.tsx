@@ -9,6 +9,7 @@ import {
   FolderPlus,
   LifeBuoy,
   Gauge,
+  Plug,
   Globe,
   MoreHorizontal,
   RotateCcw,
@@ -676,6 +677,12 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                 <span className="flex items-center gap-1">
                   <BookOpen className="size-3" />
                   {t("run.sources", { n: run.source_count })}
+                </span>
+              )}
+              {run.via_token && (
+                <span className="flex items-center gap-1 rounded-md bg-brand-soft px-1.5 py-0.5 text-brand">
+                  <Plug className="size-3" />
+                  {t("run.viaMcp", { name: run.via_token })}
                 </span>
               )}
             </div>

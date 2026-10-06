@@ -163,6 +163,7 @@ class IntegrationOut(BaseModel):
     runs: int
     cost_usd: float
     tokens: list[TokenOut]
+    recent: list[dict] = []  # its latest Runs, for an Administrator to open
 
 
 class IntegrationIn(BaseModel):
@@ -208,6 +209,13 @@ def integration_out(session, user, configured):
         max_queued_runs=user.max_queued_runs, allowed_engines=user.allowed_engines, created_at=user.created_at,
         quota_limit=usage.limit, quota_used=usage.used, runs=runs, cost_usd=float(cost),
         tokens=[token_out(t, user) for t in rows],
+        recent=[
+            {"id": str(r.id), "topic": r.topic, "status": r.status, "title": r.report_title,
+             "queued_at": r.queued_at.isoformat(), "via_token": r.via_token.name if r.via_token else None}
+            for r in session.scalars(
+                select(Run).where(Run.owner_id == user.id, Run.trashed_at.is_(None)).order_by(Run.queued_at.desc()).limit(10)
+            )
+        ],
     )
 
 

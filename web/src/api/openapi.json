@@ -3504,6 +3504,16 @@
       "type": "string",
       "title": "Email"
      },
+     "name": {
+      "type": "string",
+      "title": "Name",
+      "default": ""
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "default": "person"
+     },
      "status": {
       "type": "string",
       "title": "Status"
@@ -4525,6 +4535,15 @@
       },
       "type": "array",
       "title": "Tokens"
+     },
+     "recent": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Recent",
+      "default": []
      }
     },
     "type": "object",
@@ -5965,6 +5984,17 @@
       "title": "Notes",
       "default": {}
      },
+     "via_token": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Via Token"
+     },
      "refinement": {
       "items": {
        "$ref": "#/components/schemas/QuestionAnswer"
@@ -6291,6 +6321,17 @@
       "type": "object",
       "title": "Notes",
       "default": {}
+     },
+     "via_token": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Via Token"
      },
      "refinement": {
       "items": {
@@ -7135,6 +7176,21 @@
      "email": {
       "type": "string",
       "title": "Email"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name",
+      "default": ""
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind",
+      "default": "person"
+     },
+     "mcp_runs": {
+      "type": "integer",
+      "title": "Mcp Runs",
+      "default": 0
      },
      "runs": {
       "type": "integer",

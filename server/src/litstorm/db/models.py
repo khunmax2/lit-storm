@@ -24,7 +24,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -301,6 +301,7 @@ class Run(Base):
     notes: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
     # The API token it was started with (MCP), for the Run card and usage.
     via_token_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("api_tokens.id", ondelete="SET NULL"))
+    via_token: Mapped["ApiToken | None"] = relationship()
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The browser's id for one press of "Start" (see migration 0002).
     request_key: Mapped[str | None] = mapped_column(String(64))

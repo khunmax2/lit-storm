@@ -150,6 +150,8 @@ def _progress(run):
         return len(stages) + 1, len(stages) + 1
     if run.stage in stages:
         return stages.index(run.stage) + 1, len(stages) + 1
+    if run.stage == "normalize":  # every engine's last step, after its own
+        return len(stages), len(stages) + 1
     return 0, len(stages) + 1
 
 

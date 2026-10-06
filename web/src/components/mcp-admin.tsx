@@ -1,12 +1,13 @@
 // Settings › MCP: the server on or off, who may make tokens, integration accounts for other systems, and
 // every token there is (server: api/tokens.py, docs/adr/0009).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Pencil, Plug, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { api, call, type Schemas } from "@/api/client";
-import { ErrorText, LoadingRows, PortalTo } from "@/components/common";
+import { ErrorText, LoadingRows, PortalTo, StatusBadge, timeAgo } from "@/components/common";
 import { useRunOptions } from "@/components/composer";
 import { useConfirm } from "@/components/run-parts";
 import { NewTokenDialog, TokenTable } from "@/components/tokens";
@@ -127,8 +128,11 @@ function AccountDialog({ account, open, onOpenChange }: { account: Account | nul
   );
 }
 
+type RecentRun = { id: string; topic: string; status: string; title: string | null; queued_at: string };
+
 function AccountCard({ account, revoke }: { account: Account; revoke: (id: string, name: string) => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const recent = (account.recent ?? []) as unknown as RecentRun[];
   const queryClient = useQueryClient();
   const engines = useRunOptions().data?.engines ?? [];
   const [editing, setEditing] = useState(false);
@@ -172,6 +176,24 @@ function AccountCard({ account, revoke }: { account: Account; revoke: (id: strin
         </div>
       </div>
       <TokenTable rows={account.tokens} onRevoke={(r) => revoke(r.id, r.name)} />
+      <div className="grid gap-1.5">
+        <div className="text-xs font-medium text-muted-foreground">{t("integrations.recent")}</div>
+        {recent.length ? (
+          <ul className="grid gap-1">
+            {recent.map((r) => (
+              <li key={r.id} className="flex items-center gap-2 text-sm">
+                <StatusBadge status={r.status} />
+                <Link to="/runs/$runId" params={{ runId: r.id }} className="min-w-0 truncate hover:underline">
+                  {r.title || r.topic}
+                </Link>
+                <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(r.queued_at, lang)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">{t("integrations.noRuns")}</p>
+        )}
+      </div>
       {editing && <AccountDialog account={account} open={editing} onOpenChange={setEditing} />}
       <NewTokenDialog
         open={making}

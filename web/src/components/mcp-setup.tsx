@@ -1,9 +1,10 @@
 // How to point an AI tool or a program at DeepLit's MCP server: one snippet per client, ready to copy,
 // with the token filled in when there is one to fill in (docs/adr/0009).
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Loader2, PlugZap } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { BASE } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,60 @@ export function snippet(client: Client, url: string, token: string) {
   }
 }
 
+/** Call research_options with the token, as a client would, and say what came back. */
+async function tryToken(token: string) {
+  const r = await fetch(`${BASE}/api/mcp`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "research_options", arguments: {} } }),
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    let why = `HTTP ${r.status}`;
+    try {
+      why = JSON.parse(text).message || why;
+    } catch {
+      // Not JSON: the status says enough.
+    }
+    throw new Error(why);
+  }
+  // A Streamable HTTP answer: server-sent events, the message on a data line.
+  const line = text.split(/\r?\n/).find((l) => l.startsWith("data: "));
+  const message = JSON.parse(line ? line.slice(6) : text);
+  if (message.error) throw new Error(message.error.message);
+  const result = message.result;
+  if (result.isError) throw new Error(result.content?.[0]?.text ?? "error");
+  const options = result.structuredContent?.result ?? result.structuredContent ?? JSON.parse(result.content[0].text);
+  return { modes: options.engines.length as number, left: options.quota.remaining as number };
+}
+
+function TestConnection({ token }: { token: string }) {
+  const { t } = useT();
+  const [state, setState] = useState<{ busy?: boolean; ok?: boolean; text?: string }>({});
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={state.busy}
+        onClick={async () => {
+          setState({ busy: true });
+          try {
+            setState({ ok: true, text: t("connections.testOk", await tryToken(token)) });
+          } catch (error) {
+            setState({ ok: false, text: t("connections.testFail", { why: (error as Error).message }) });
+          }
+        }}
+      >
+        {state.busy ? <Loader2 className="animate-spin" /> : <PlugZap />}
+        {state.busy ? t("connections.testing") : t("connections.test")}
+      </Button>
+      {state.text && <span className={cn("text-xs", state.ok ? "text-success" : "text-destructive")}>{state.text}</span>}
+    </div>
+  );
+}
+
 export function McpSetup({ url, token, compact = false }: { url: string; token?: string; compact?: boolean }) {
   const { t } = useT();
   const [client, setClient] = useState<Client>("claude-code");
@@ -124,7 +179,7 @@ export function McpSetup({ url, token, compact = false }: { url: string; token?:
           {copied ? t("copied") : t("copy")}
         </Button>
       </div>
-      {!token && <p className="text-xs text-muted-foreground">{t("connections.placeholder")}</p>}
+      {token ? <TestConnection token={token} /> : <p className="text-xs text-muted-foreground">{t("connections.placeholder")}</p>}
     </section>
   );
 }

@@ -580,6 +580,9 @@ def switch_engine(engine: str, body: EngineSwitch, session=Depends(deps.database
 class UsageRow(BaseModel):
     user_id: str
     email: str
+    name: str = ""
+    kind: str = "person"  # or "integration" (api/tokens.py)
+    mcp_runs: int = 0  # started through the MCP server
     runs: int
     succeeded: int
     failed: int
@@ -616,15 +619,19 @@ def usage(month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"), ses
             func.coalesce(func.sum(Run.search_calls), 0),
             func.sum(Run.cost_usd),
             func.count(Run.id).filter(started, Run.finished_at.is_not(None), Run.cost_usd.is_(None)),
+            User.name,
+            User.kind,
+            func.count(Run.id).filter(started, Run.via_token_id.is_not(None)),
         )
         .join(Run, (Run.owner_id == User.id) & (Run.quota_month == month))
-        .group_by(User.id, User.email)
+        .group_by(User.id, User.email, User.name, User.kind)
         .order_by(User.email)
     ).all()
     out = [
         UsageRow(
             user_id=str(r[0]), email=r[1], runs=r[2], succeeded=r[3], failed=r[4], refunded=r[5],
             tokens_in=r[6], tokens_out=r[7], search_calls=r[8], cost_usd=r[9], cost_incomplete=r[10] > 0,
+            name=r[11], kind=r[12], mcp_runs=r[13],
         )
         for r in rows
     ]
@@ -635,6 +642,8 @@ def usage(month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"), ses
 class AdminRunOut(BaseModel):
     id: str
     email: str
+    name: str = ""
+    kind: str = PERSON
     status: str
     reason: str | None
     model_label: str
@@ -651,17 +660,17 @@ class AdminRunOut(BaseModel):
 @router.get("/runs", response_model=list[AdminRunOut])
 def recent_runs(limit: int = Query(default=100, le=500), session=Depends(deps.database)):
     rows = session.execute(
-        select(Run, User.email).join(User, User.id == Run.owner_id).order_by(Run.queued_at.desc()).limit(limit)
+        select(Run, User.email, User.name, User.kind).join(User, User.id == Run.owner_id).order_by(Run.queued_at.desc()).limit(limit)
     ).all()
     return [
         AdminRunOut(
-            id=str(run.id), email=email, status=run.status, reason=run.reason,
+            id=str(run.id), email=email, name=name, kind=kind, status=run.status, reason=run.reason,
             model_label=run.config.get("llm", {}).get("label", ""),
             queued_at=run.queued_at, started_at=run.started_at, finished_at=run.finished_at,
             tokens_in=run.tokens_in, tokens_out=run.tokens_out, search_calls=run.search_calls,
             cost_usd=run.cost_usd, quota_refunded=run.quota_refunded,
         )
-        for run, email in rows
+        for run, email, name, kind in rows
     ]
 
 

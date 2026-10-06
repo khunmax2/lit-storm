@@ -1276,6 +1276,16 @@ export interface components {
             id: string;
             /** Email */
             email: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Kind
+             * @default person
+             */
+            kind: string;
             /** Status */
             status: string;
             /** Reason */
@@ -1644,6 +1654,13 @@ export interface components {
             cost_usd: number;
             /** Tokens */
             tokens: components["schemas"]["TokenOut"][];
+            /**
+             * Recent
+             * @default []
+             */
+            recent: {
+                [key: string]: unknown;
+            }[];
         };
         /** IntegrationPatch */
         IntegrationPatch: {
@@ -2162,6 +2179,8 @@ export interface components {
             notes: {
                 [key: string]: unknown;
             };
+            /** Via Token */
+            via_token?: string | null;
             /**
              * Refinement
              * @default []
@@ -2280,6 +2299,8 @@ export interface components {
             notes: {
                 [key: string]: unknown;
             };
+            /** Via Token */
+            via_token?: string | null;
             /**
              * Refinement
              * @default []
@@ -2614,6 +2635,21 @@ export interface components {
             user_id: string;
             /** Email */
             email: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Kind
+             * @default person
+             */
+            kind: string;
+            /**
+             * Mcp Runs
+             * @default 0
+             */
+            mcp_runs: number;
             /** Runs */
             runs: number;
             /** Succeeded */

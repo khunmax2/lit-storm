@@ -189,7 +189,7 @@ export function NewTokenDialog({
           >
             <div className="grid gap-1.5">
               <Label htmlFor="token-name">{t("tokens.name")}</Label>
-              <Input id="token-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("tokens.namePlaceholder")} autoFocus />
+              <Input id="token-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t(allowForever ? "tokens.serverPlaceholder" : "tokens.namePlaceholder")} autoFocus />
             </div>
             <div className="grid gap-2">
               <Label>{t("tokens.scopes")}</Label>

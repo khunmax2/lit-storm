@@ -622,6 +622,7 @@ const en = {
   "tokens.newLead": "A token lets a program act as this account through the MCP server. You will see it once.",
   "tokens.name": "Name",
   "tokens.namePlaceholder": "Claude on my laptop",
+  "tokens.serverPlaceholder": "Production server",
   "tokens.scopes": "What it may do",
   "tokens.scope.read": "Read",
   "tokens.scope.research": "Research",
@@ -671,11 +672,27 @@ const en = {
   "error.token_needs_expiry": "A personal token needs an expiry.",
   "error.engine_not_allowed": "This account may not start this mode.",
   "error.unknown_engine": "Unknown mode.",
+  "run.viaMcp": "via MCP · {name}",
+  "usage.viaMcp": "Via MCP",
+  "integrations.recent": "Latest research",
+  "integrations.noRuns": "No research yet.",
+  "connections.test": "Test the connection",
+  "connections.testing": "Testing…",
+  "connections.testOk": "Connected: {modes} modes, {left} Runs left this month.",
+  "connections.testFail": "Could not connect: {why}",
 };
 
 export type Key = keyof typeof en;
 
 const th: Record<Key, string> = {
+  "run.viaMcp": "ผ่าน MCP · {name}",
+  "usage.viaMcp": "ผ่าน MCP",
+  "integrations.recent": "งานล่าสุด",
+  "integrations.noRuns": "ยังไม่มีงาน",
+  "connections.test": "ทดสอบการเชื่อมต่อ",
+  "connections.testing": "กำลังทดสอบ…",
+  "connections.testOk": "เชื่อมต่อได้: ใช้ได้ {modes} โหมด เดือนนี้เหลือ {left} Run",
+  "connections.testFail": "เชื่อมต่อไม่ได้: {why}",
   "nav.connections": "การเชื่อมต่อ (MCP)",
   "connections.title": "การเชื่อมต่อ",
   "connections.lead": "ให้เครื่องมือ AI และโปรแกรมอื่นสั่งค้นคว้าและอ่านรายงานผ่าน MCP server ของ DeepLit ด้วย token ที่สร้างที่นี่",
@@ -695,6 +712,7 @@ const th: Record<Key, string> = {
   "tokens.newLead": "token ให้โปรแกรมทำงานในนามบัญชีนี้ผ่าน MCP server คุณจะเห็น token แค่ครั้งเดียว",
   "tokens.name": "ชื่อ",
   "tokens.namePlaceholder": "Claude บนโน้ตบุ๊ก",
+  "tokens.serverPlaceholder": "เซิร์ฟเวอร์ใช้งานจริง",
   "tokens.scopes": "ทำอะไรได้บ้าง",
   "tokens.scope.read": "อ่าน",
   "tokens.scope.research": "สั่งค้นคว้า",

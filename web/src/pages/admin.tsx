@@ -1973,6 +1973,7 @@ function Usage() {
                 <TableRow>
                   <TableHead>{t("usage.user")}</TableHead>
                   <TableHead className={right}>{t("usage.runs")}</TableHead>
+                  <TableHead className={right}>{t("usage.viaMcp")}</TableHead>
                   <TableHead className={right}>{t("usage.ok")}</TableHead>
                   <TableHead className={right}>{t("usage.failed")}</TableHead>
                   <TableHead className={right}>{t("usage.refunded")}</TableHead>
@@ -1984,8 +1985,18 @@ function Usage() {
               <TableBody>
                 {usage.data.rows.map((r) => (
                   <TableRow key={r.user_id}>
-                    <TableCell>{r.email}</TableCell>
+                    <TableCell>
+                      {r.kind === "integration" ? (
+                        <span className="flex items-center gap-1.5">
+                          <Plug className="size-3.5 text-brand" />
+                          {r.name}
+                        </span>
+                      ) : (
+                        r.email
+                      )}
+                    </TableCell>
                     <TableCell className={right}>{r.runs}</TableCell>
+                    <TableCell className={right}>{r.mcp_runs || ""}</TableCell>
                     <TableCell className={right}>{r.succeeded}</TableCell>
                     <TableCell className={right}>{r.failed}</TableCell>
                     <TableCell className={right}>{r.refunded}</TableCell>
@@ -2037,7 +2048,16 @@ function Usage() {
               {runs.data?.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{formatDate(r.queued_at, lang)}</TableCell>
-                  <TableCell>{r.email}</TableCell>
+                  <TableCell>
+                    {r.kind === "integration" ? (
+                      <span className="flex items-center gap-1.5">
+                        <Plug className="size-3.5 text-brand" />
+                        {r.name}
+                      </span>
+                    ) : (
+                      r.email
+                    )}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={r.status} />
                     {r.reason && r.reason !== r.status && r.reason !== "cancelled" && (

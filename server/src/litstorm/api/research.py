@@ -336,6 +336,8 @@ class RunOut(BaseModel):
     source_count: int | None
     # How the Run went, by kind (worker.queue.NOTE_KINDS).
     notes: dict = {}
+    # The API token's name when it was started through the MCP server.
+    via_token: str | None = None
     # The clarifying questions the owner answered before it started.
     refinement: list[QuestionAnswer] = []
     # The report's sections, as the owner set them.
@@ -379,6 +381,7 @@ def run_out(run):
         instructions=run.config.get("instructions", {}),
         turn=run.turn,
         quota_units=run.quota_units if run.quota_units is not None else 1,
+        via_token=run.via_token.name if run.via_token_id and run.via_token else None,
     )
 
 

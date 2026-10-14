@@ -391,3 +391,10 @@ def test_a_repeated_start_is_the_same_run_and_costs_nothing(admin, browser, conf
     assert sorted(r["id"] for r in listed) == sorted([first["id"], deeper["id"]])
     # Inside a client that cancels a tool call after 30 seconds (Agenta), by default.
     assert schema["research_start"]["properties"]["wait_seconds"]["default"] == 20
+
+
+def test_a_thai_title_keeps_its_vowels_in_the_file_name():
+    from litstorm.api.research import _filename
+
+    title = "ฝุ่น PM2.5 ในประเทศไทย: สาเหตุและมาตรการแก้ไข"
+    assert _filename({"title": title}, "html") == "ฝุ่น PM2_5 ในประเทศไทย_ สาเหตุและมาตรการแก้ไข.html"

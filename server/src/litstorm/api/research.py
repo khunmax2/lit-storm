@@ -1014,7 +1014,14 @@ def get_report(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depen
 
 
 def _filename(report, ext):
-    safe = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in report["title"]).strip()[:80]
+    import unicodedata
+
+    # Combining marks (Thai vowels and tone marks above and below) are part of
+    # the word they sit on, not punctuation to replace.
+    safe = "".join(
+        ch if ch.isalnum() or ch in " -_" or unicodedata.category(ch).startswith("M") else "_"
+        for ch in report["title"]
+    ).strip()[:80]
     return f"{safe or 'report'}.{ext}"
 
 

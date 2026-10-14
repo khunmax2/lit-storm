@@ -23,9 +23,19 @@ DeepLit เปิดงานวิจัยให้เครื่องมื
    - ปิด MCP อยู่หรือบัญชีถูกระงับได้ 403
    - ส่งเกิน 60 ครั้งต่อนาทีต่อ token ได้ 429 (นับแยกแต่ละ process 2 process จึงรับได้ถึง 120 ครั้งต่อนาที ซึ่งพอสำหรับกันการวนผิดพลาด)
    - ปัญหาเรื่อง token จึงได้คำตอบเป็น HTTP status ที่ client เข้าใจ ไม่ใช่ error ของ JSON-RPC
-7. **tool 6 ตัว คำอธิบายเป็นภาษาอังกฤษ**
-   - `research_options`, `research_start`, `research_status`, `research_report` (full / outline / section:N), `research_list` และ `research_cancel`
-   - start และ status รอได้นานสุด 45 วินาที ระหว่างรอส่ง progress notification จากสัญญาณ `pg_notify` เดิม (`notify.runs`) แล้วคืน id ให้ถามต่อ จึงไม่ติด timeout ของ client ทั่วไป
+7. **tool 7 ตัว คำอธิบายเป็นภาษาอังกฤษ** (บวก `research_events` สำหรับ canvas ใน ADR 0010)
+   - `research_options`, `research_start`, `research_status`, `research_report` (full / outline / section:N), `research_list`, `research_cancel` และ `research_export`
+   - **การรอของ start และ status:**
+     - รอ 20 วินาทีเป็นค่าเริ่มต้น และขอได้สูงสุด 45 วินาที
+     - ระหว่างรอส่ง progress notification จากสัญญาณ `pg_notify` เดิม (`notify.runs`) แล้วคืน id ให้ถามต่อ
+     - ค่าเริ่มต้นเคยเป็น 45 วินาที แต่ Agenta ตัด tool call ที่เกิน 30 วินาที client จึงเรียกซ้ำ และงานถูกสร้างซ้ำ (2026-10-14)
+   - **กันการเริ่มซ้ำ:** `research_start` ที่ซ้ำกับงานที่ token เดิมเริ่มภายใน 10 นาที (หัวข้อ โหมด ความลึก ภาษา แหล่ง และโมเดลเดียวกัน) จะคืนงานเดิม และไม่ใช้โควตา
+   - **`research_export`:**
+     - คืนลิงก์ดาวน์โหลดไฟล์รายงาน ได้แก่ interactive HTML ที่มีกราฟ, HTML ธรรมดา, Markdown หรือ PDF
+     - ลิงก์เซ็นด้วย HMAC ของ secret key และใช้ได้ 15 นาที (`litstorm/exports.py`)
+     - `GET /api/exports/{token}` ไม่ต้อง login เพราะลิงก์เป็นตัวให้สิทธิ์ แต่ใช้ได้กับ Run และรูปแบบเดียว และตรวจซ้ำว่า Run ยังเป็นของเจ้าของ
+     - ตัวไฟล์ไม่ผ่าน MCP เพราะไฟล์ใหญ่จะล้น context ของ LLM agent จึงดาวน์โหลดเอง
+     - ถ้า client เข้าถึง API ด้วยชื่ออื่นที่ไม่ใช่ public URL ให้ตั้ง `LITSTORM_EXPORT_URL` (เช่น Agenta ผ่าน Docker network)
    - ยังไม่มี Discussion (Co-STORM) เพราะต้องโต้ตอบหลายรอบกับคน
 8. **เปิดเป็นค่าเริ่มต้น** การตั้งค่าที่ผู้ดูแลแก้ได้ (`system_settings["mcp"]`) คือ เปิด/ปิดทั้งระบบ และ "ผู้ใช้สร้าง token เองได้" ทั้งสองค่าเริ่มต้นเป็นเปิด เพราะไม่มี token ก็ใช้อะไรไม่ได้ และผู้ดูแลปิดได้ทันที
 

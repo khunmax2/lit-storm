@@ -21,7 +21,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
+# Pinned by digest: a new uv under the same tag would change this layer and rebuild every one
+# after it (all the Python dependencies, Chromium, the embedding model).
+COPY --from=ghcr.io/astral-sh/uv:0.9@sha256:538e0b39736e7feae937a65983e49d2ab75e1559d35041f9878b7b7e51de91e4 /uv /usr/local/bin/uv
 # Node, only to run the Deep Research CLI: the binary and its bundle, no
 # node_modules (the same Debian release as this image).
 COPY --from=deep-cli /usr/local/bin/node /usr/local/bin/node

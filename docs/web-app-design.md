@@ -552,7 +552,7 @@ needs_selection ─ยกเลิก─▶ cancelled
   - แสดงครั้งเดียว มีสิทธิ์ "อ่าน" (ดูงานและรายงาน ไม่ใช้โควตา) และ "สั่งค้นคว้า" (เริ่มและยกเลิกงาน)
   - อายุ 30/90/365 วัน ค่าเริ่มต้น 90 วัน ส่วน token ของบัญชีเชื่อมต่อไม่หมดอายุได้
   - เพิกถอนได้ทุกเมื่อ ส่งได้ 60 ครั้งต่อนาทีต่อ token
-- **tool:** `research_options`, `research_start`, `research_status`, `research_report` (ทั้งรายงาน / โครงร่าง / ทีละหัวข้อ), `research_list`, `research_cancel` และ `research_export` (ลิงก์ดาวน์โหลดไฟล์รายงาน 15 นาที)
+- **tool:** `research_options`, `research_start`, `research_status`, `research_report` (ทั้งรายงาน / โครงร่าง / ทีละหัวข้อ), `research_list`, `research_cancel` และ `research_export` (ลิงก์ดาวน์โหลดไฟล์รายงาน 15 นาที รวมถึงไฟล์ observatory ตาม [ADR-0011](./adr/0011-observatory.md))
   - start และ status รอ 20 วินาทีเป็นค่าเริ่มต้น (สูงสุด 45) ระหว่างรอส่งความคืบหน้า แล้วคืน id ให้ถามต่อ เริ่มงานเดิมซ้ำภายใน 10 นาทีได้งานเดิมคืน
   - ยังไม่มี Discussion
 - **หน้าเว็บ:**

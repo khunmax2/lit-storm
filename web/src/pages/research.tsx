@@ -12,6 +12,7 @@ import {
   Plug,
   Globe,
   MoreHorizontal,
+  Radar,
   RotateCcw,
   Settings2,
   Sparkles,
@@ -21,7 +22,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { api, call, type Schemas } from "@/api/client";
+import { api, BASE, call, type Schemas } from "@/api/client";
 import {
   ErrorText,
   LoadingRows,
@@ -712,6 +713,14 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {run.status !== "queued" && run.status !== "needs_selection" && (
+              <Button variant="outline" asChild title={t("run.observatoryHint")}>
+                <a href={`${BASE}/api/runs/${run.id}/observatory`} target="_blank" rel="noopener">
+                  <Radar />
+                  <span className="hidden sm:inline">{t("run.observatory")}</span>
+                </a>
+              </Button>
+            )}
             {readable && (
               <Button asChild>
                 <Link to="/runs/$runId" params={{ runId: run.id }}>

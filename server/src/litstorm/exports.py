@@ -17,8 +17,8 @@ import time
 
 from litstorm import settings
 
-FORMATS = ("interactive", "html", "md", "pdf")
-EXTENSIONS = {"interactive": "html", "html": "html", "md": "md", "pdf": "pdf"}
+FORMATS = ("interactive", "html", "md", "pdf", "observatory")
+EXTENSIONS = {"interactive": "html", "html": "html", "md": "md", "pdf": "pdf", "observatory": "observatory.html"}
 LIFETIME = 15 * 60  # seconds
 
 

@@ -493,9 +493,11 @@ def build():
         ctx: Context,
         id: Annotated[str, Field(description="The research id.")],
         format: Annotated[
-            Literal["interactive", "html", "md", "pdf"],
+            Literal["interactive", "html", "md", "pdf", "observatory"],
             Field(description="'interactive' (the default: one HTML file with the report's charts and figures, "
-                              "opens offline), 'html' (the plain report page), 'md' (Markdown) or 'pdf'."),
+                              "opens offline), 'html' (the plain report page), 'md' (Markdown), 'pdf', or "
+                              "'observatory' (one HTML file that replays the research: its agents being spawned, "
+                              "what they read, then each cited sentence lit up against its source's passage)."),
         ] = "interactive",
     ) -> dict:
         """A download link for a finished report as a file, good for 15 minutes and for that one file: fetch it

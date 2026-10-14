@@ -26,7 +26,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { api, call, type Schemas } from "@/api/client";
@@ -74,6 +74,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { has, useT, type Key } from "@/i18n";
 import { useRunLive } from "@/hooks/use-run-live";
 import { cn } from "@/lib/utils";
+
+// three.js comes only with the 3D table, when someone opens it.
+const CoStormObservatory3D = lazy(() =>
+  import("@/components/agent-observatory-3d").then((m) => ({ default: m.CoStormObservatory3D })),
+);
 
 type Turn = Schemas["RunOut"];
 type Discussion = Schemas["DiscussionOut"];
@@ -331,6 +336,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
   const [helping, setHelping] = useState(false);
+  const [table3d, setTable3d] = useState(false);
   const [text, setText] = useState("");
   // A Turn waiting for the owner to agree to another quota unit.
   const [extending, setExtending] = useState<Asked | null>(null);
@@ -535,6 +541,26 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             </span>
           </div>
 
+          {started && (
+            <details className="group mb-6" open={table3d} onToggle={(e) => setTable3d((e.target as HTMLDetailsElement).open)}>
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
+                <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+                {t("obs3d.costorm")}
+              </summary>
+              {/* Drawn only when open: three.js loads then, and a canvas laid out while folded has no size. */}
+              {table3d && (
+                <div className="mt-2">
+                  <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
+                    <CoStormObservatory3D
+                      view={view ?? null}
+                      currentId={d.current?.id ?? null}
+                      live={!!d.current && !FINAL.has(d.current.status)}
+                    />
+                  </Suspense>
+                </div>
+              )}
+            </details>
+          )}
           {started && (
             <details className="mb-6 rounded-xl border px-4 py-3 lg:hidden">
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none">

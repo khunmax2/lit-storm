@@ -79,6 +79,7 @@ function useDirector() {
   const queue = useRef<(() => number)[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const paused = useRef(false);
+  const flushing = useRef(false);
   const seq = useRef(0);
 
   const tick = useCallback(() => {
@@ -98,6 +99,7 @@ function useDirector() {
     [tick],
   );
   const send = useCallback((from: string, to: string, color: string, ms = 900) => {
+    if (flushing.current) return;
     const a = world.current.cores.get(from)?.pos;
     const b = world.current.cores.get(to)?.pos;
     if (!a || !b) return;
@@ -122,8 +124,19 @@ function useDirector() {
     },
     [tick],
   );
+  /** Everything still waiting, at once and without packets: what happens now must not wait behind
+   *  a replay of what happened before. */
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = undefined;
+    flushing.current = true;
+    while (queue.current.length) queue.current.shift()!();
+    flushing.current = false;
+    setPackets([]);
+    setVersion((v) => v + 1);
+  }, []);
   useEffect(() => () => clearTimeout(timer.current), []);
-  return { world, packets, push, send, arrive, reset, pause, paused };
+  return { world, packets, push, send, arrive, reset, pause, paused, flush };
 }
 
 function core(w: World, c: Omit<Core, "status"> & { status?: Status }) {
@@ -294,10 +307,13 @@ function MindStars({ stars }: { stars: Star[] }) {
 }
 
 /** Keeps each core's label (a DOM element over the canvas) on its core: projected every frame,
- *  hidden while the core is behind the camera. */
+ *  hidden while the core is behind the camera. Labels that would cover one another make way: the
+ *  nearest keeps its place, a farther one moves up or down a line, and one with no free line left
+ *  near its core is dimmed rather than drawn on top. */
 function LabelSync({ registry, labels }: { registry: Registry; labels: Map<string, HTMLDivElement> }) {
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
+    const seen: { el: HTMLDivElement; x: number; y: number; z: number; w: number; h: number }[] = [];
     labels.forEach((el, id) => {
       const obj = registry.get(id);
       if (!obj) {
@@ -312,9 +328,30 @@ function LabelSync({ registry, labels }: { registry: Registry; labels: Map<strin
         return;
       }
       el.style.display = "";
-      el.style.transform = `translate3d(${((v.x + 1) / 2) * size.width}px, ${((1 - v.y) / 2) * size.height}px, 0) translate(-50%, -100%)`;
-      el.style.zIndex = String(Math.round((1 - v.z) * 1000));
+      // Read every size before writing any position, so the page lays out once a frame.
+      seen.push({ el, x: ((v.x + 1) / 2) * size.width, y: ((1 - v.y) / 2) * size.height, z: v.z, w: el.offsetWidth, h: el.offsetHeight });
     });
+    seen.sort((a, b) => a.z - b.z);
+    const placed: { l: number; r: number; t: number; b: number }[] = [];
+    const free = (l: number, r: number, t: number, b: number) => placed.every((p) => r < p.l || l > p.r || b < p.t || t > p.b);
+    for (const s of seen) {
+      const l = s.x - s.w / 2 - 2, r = s.x + s.w / 2 + 2;
+      let dy = 0;
+      let ok = false;
+      for (const k of [0, -1, 1, -2, 2]) {
+        const top = s.y - s.h + k * (s.h + 2);
+        if (free(l, r, top, top + s.h)) {
+          dy = k * (s.h + 2);
+          ok = true;
+          break;
+        }
+      }
+      const top = s.y - s.h + dy;
+      if (ok) placed.push({ l, r, t: top, b: top + s.h });
+      s.el.style.opacity = ok ? "" : "0.18";
+      s.el.style.transform = `translate3d(${s.x}px, ${s.y + dy}px, 0) translate(-50%, -100%)`;
+      s.el.style.zIndex = String(Math.round((1 - s.z) * 1000));
+    }
   });
   return null;
 }
@@ -743,7 +780,16 @@ export function CoStormObservatory3D({ view, currentId, live }: { view: Discussi
     (v: DiscussionView, k: number): (() => number)[] => {
       const turn = v.turns[k];
       const who = speakerOf(turn.role);
-      const label = who === "you" ? t("obs3d.you") : who === "moderator" ? t("obs3d.moderator") : who === "bg" ? t("obs3d.bgExpert") : turn.role;
+      const label =
+        who === "you"
+          ? t("obs3d.you")
+          : who === "moderator"
+            ? t("obs3d.moderator")
+            : who === "bg"
+              ? t("obs3d.bgExpert")
+              : turn.role === "General Knowledge Provider"
+                ? t("obs3d.general")
+                : turn.role;
       const cited = [...new Set(turn.cited)].slice(0, 3);
       return [
         () => {
@@ -794,15 +840,21 @@ export function CoStormObservatory3D({ view, currentId, live }: { view: Discussi
     if (!view) return;
     if (played.current === 0) play(view);
     else if (view.turns.length > played.current) {
-      // A new Turn finished: rebuild the stars and play only what was said since.
+      // A new Turn finished: catch up at once, rebuild the stars, and play only what was said since.
+      director.flush();
       build(view);
       for (let k = played.current; k < view.turns.length; k++) push(...turnSteps(view, k));
       played.current = view.turns.length;
     }
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // While a Turn works: what it reads goes from the web to the knowledge base.
+  // While a Turn works: what it reads goes from the web to the knowledge base, ahead of any replay.
+  const caughtUp = useRef<string | null>(null);
   useRunLive(currentId ?? "", live && !!currentId, (r) => {
+    if (caughtUp.current !== currentId) {
+      caughtUp.current = currentId;
+      director.flush();
+    }
     for (const e of r.events as unknown as Ev[]) {
       const d = e.data || {};
       if (e.type === "note" && d.kind === "browsed") {

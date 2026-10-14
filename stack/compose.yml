@@ -82,7 +82,10 @@ services:
     depends_on: [api]
 
   searxng:
-    image: searxng/searxng:latest
+    # Pinned, tag and digest (the digest is what is used): a rebuild must not
+    # change the engines under a Run. To upgrade, change both and check search
+    # still answers (server/tests/compare_searxng.py).
+    image: searxng/searxng:2026.9.20-2e624bed4@sha256:76f9ec5b3832921c8734c06c34248c9538d94a6cae0cf5e579fa5b41c8479789
     restart: unless-stopped
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro

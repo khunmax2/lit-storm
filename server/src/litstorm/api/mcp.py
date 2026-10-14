@@ -19,6 +19,7 @@ import re
 import time
 import uuid
 from collections import defaultdict, deque
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -37,7 +38,15 @@ from litstorm.catalog import ENGINES
 from litstorm.db.models import FINAL, INTEGRATION, ApiToken, LlmModel, Run, SearchProvider, User
 
 PATH = "/api/mcp"
-WAIT = 45  # seconds a tool follows a Run before handing back its id
+# Seconds a tool follows a Run before handing back its id: WAIT unless the
+# client asks for up to MAX_WAIT. Agenta, for one, cancels any tool call after
+# 30 seconds (its gateway's budget), so the default stays well inside that.
+WAIT = 20
+MAX_WAIT = 45
+# A research_start that repeats one this token made within this many seconds
+# returns that Run instead of starting (and paying for) another: a client
+# that gave up waiting and called again must not cost a second unit.
+REPEAT_WINDOW = 10 * 60
 CALLS_PER_MINUTE = 60  # per token, per API process
 
 # The MCP App (docs/adr/0010): a host that renders MCP Apps shows this page
@@ -50,8 +59,10 @@ ON_CANVAS = {"ui": {"resourceUri": CANVAS_URI}}
 INSTRUCTIONS = """DeepLit researches a topic on the web and in academic sources, then writes a report \
 whose every claim cites its sources. Research takes from about one minute (depth "fast") to ten or more \
 ("deep"). Start it with research_start; if it is not finished when the call returns, follow it with \
-research_status (each call waits up to 45 seconds), then read it with research_report. Reports can be \
-written in English ("en") or Thai ("th"). research_options lists the modes, depths, sources and the quota left. Clients that show MCP Apps draw research_start and research_status as a live canvas of the research agents."""
+research_status (each call follows it for 20 seconds by default, up to 45), then read it with research_report. Reports can be \
+written in English ("en") or Thai ("th"). research_export gives a short-lived download link for a finished \
+report as a file (one HTML page with its charts, plain HTML, Markdown or PDF). research_options lists the modes, \
+depths, sources and the quota left. Clients that show MCP Apps draw research_start and research_status as a live canvas of the research agents."""
 
 # What an API refusal means, for whoever reads the tool's error.
 _MEANING = {
@@ -200,7 +211,7 @@ def _run_facts(session, user, run_id):
 async def _follow(ctx, user, run_id, seconds):
     """The Run's facts, after following it for up to `seconds`, telling its
     progress as its stage changes."""
-    deadline = time.monotonic() + max(0, min(seconds, WAIT))
+    deadline = time.monotonic() + max(0, min(seconds, MAX_WAIT))
     key = notify.runs.subscribe(run_id)
     told = None
     try:
@@ -216,6 +227,32 @@ async def _follow(ctx, user, run_id, seconds):
             await notify.woken(key, min(left, 10))
     finally:
         notify.runs.unsubscribe(run_id, key)
+
+
+def _repeat_of(session, user, token, topic, mode, depth, language, provider_ids, model_id):
+    """The Run this token started for the very same request within REPEAT_WINDOW,
+    unless it ended without a report; else None."""
+    from datetime import timedelta
+
+    since = datetime.now(UTC) - timedelta(seconds=REPEAT_WINDOW)
+    query = (
+        select(Run)
+        .where(
+            Run.owner_id == user.id, Run.via_token_id == token.id, Run.turn.is_(None),
+            Run.topic == topic.strip(), Run.engine == mode, Run.language == language,
+            Run.queued_at >= since, Run.status.not_in(("failed", "cancelled", "interrupted")),
+        )
+        .order_by(Run.queued_at.desc())
+    )
+    for run in session.scalars(query):
+        if (run.config or {}).get("depth", "standard") != depth:
+            continue
+        if provider_ids and run.search_provider_id != provider_ids[0]:
+            continue
+        if model_id and run.llm_model_id != model_id:
+            continue
+        return run
+    return None
 
 
 def _uuid(value):
@@ -349,7 +386,11 @@ def build():
                               "Omit for the server's default."),
         ] = None,
         model: Annotated[str | None, Field(description="A model by name or id; omit for the default.")] = None,
-        wait_seconds: Annotated[int, Field(description="How long to follow it before returning (0 to 45).", ge=0, le=45)] = WAIT,
+        wait_seconds: Annotated[
+            int,
+            Field(description="How long to follow it before returning: 0 to 45 seconds, 20 by default. Stay under your "
+                              "client's own limit for a tool call.", ge=0, le=MAX_WAIT),
+        ] = WAIT,
     ) -> dict:
         """Start researching a topic. Returns when the research finishes or after wait_seconds, whichever
         comes first, with its id and status; then use research_status to keep following it and
@@ -362,9 +403,13 @@ def build():
 
         def start(session):
             provider_ids = [_pick_named(session, SearchProvider, s, "source").id for s in (sources or [])]
+            model_id = _pick_named(session, LlmModel, model, "model").id if model else None
+            again = _repeat_of(session, user, token, topic, mode, depth, language, provider_ids, model_id)
+            if again is not None:
+                return again.id, True
             body = research.NewSessionIn(
                 topic=topic, language=language, engine=mode, depth=depth,
-                llm_model_id=_pick_named(session, LlmModel, model, "model").id if model else None,
+                llm_model_id=model_id,
                 search_provider_id=provider_ids[0] if provider_ids else None,
                 extra_search_provider_ids=provider_ids[1:],
             )
@@ -375,19 +420,27 @@ def build():
             run = session.get(Run, uuid.UUID(made.runs[0].id))
             run.via_token_id = token.id
             session.commit()
-            return run.id
+            return run.id, False
 
         try:
-            run_id = await deps.with_session(start)
+            run_id, repeated = await deps.with_session(start)
         except ValueError as error:  # the body's own checks: a topic too short, too long
             raise ToolError(str(error).splitlines()[0]) from error
-        return await _follow(ctx, user, run_id, wait_seconds)
+        facts = await _follow(ctx, user, run_id, wait_seconds)
+        if repeated:
+            facts["repeated"] = ("This token started the same research a moment ago; this is that run, "
+                                 "not a new one, and no quota was used. Follow it with research_status.")
+        return facts
 
     @server.tool(meta=ON_CANVAS)
     async def research_status(
         ctx: Context,
         id: Annotated[str, Field(description="The research id from research_start or research_list.")],
-        wait_seconds: Annotated[int, Field(description="How long to follow it before returning (0 to 45).", ge=0, le=45)] = WAIT,
+        wait_seconds: Annotated[
+            int,
+            Field(description="How long to follow it before returning: 0 to 45 seconds, 20 by default. Stay under your "
+                              "client's own limit for a tool call.", ge=0, le=MAX_WAIT),
+        ] = WAIT,
     ) -> dict:
         """Follow a research run: returns when it finishes or after wait_seconds, with its status, stage,
         sources found so far, and what to do next."""
@@ -434,6 +487,49 @@ def build():
         if part != "full":
             raise ToolError("part is 'full', 'outline', or 'section:N'.")
         return markdown.render(report)
+
+    @server.tool()
+    async def research_export(
+        ctx: Context,
+        id: Annotated[str, Field(description="The research id.")],
+        format: Annotated[
+            Literal["interactive", "html", "md", "pdf"],
+            Field(description="'interactive' (the default: one HTML file with the report's charts and figures, "
+                              "opens offline), 'html' (the plain report page), 'md' (Markdown) or 'pdf'."),
+        ] = "interactive",
+    ) -> dict:
+        """A download link for a finished report as a file, good for 15 minutes and for that one file: fetch it
+        with a plain GET, no sign-in (to save it beside your work, or for a person to open). The file itself
+        does not pass through this call."""
+        from litstorm import exports
+        from litstorm.api import research
+
+        user, _ = await _caller(ctx, "read")
+        run_id = _uuid(id)
+
+        def read(session):
+            run = deps.own(session, Run, run_id, user)
+            if run.status != "succeeded":
+                raise HTTPException(409, "no_report")
+            return research._report(session, run_id, user, "export")[1]
+
+        try:
+            report = await deps.with_session(read)
+        except HTTPException as error:
+            _fail(error)
+        token, expires = exports.sign(run_id, user.id, format)
+        filename = research._filename(report, exports.EXTENSIONS[format])
+        url = f"{settings.get().export_url}/api/exports/{token}"
+        return {
+            "id": str(run_id),
+            "format": format,
+            "filename": filename,
+            "url": url,
+            "expires_at": datetime.fromtimestamp(expires, UTC).isoformat(),
+            "next": f"Download it within {exports.LIFETIME // 60} minutes, e.g. "
+                    f"curl -fsSL -o '{filename}' '{url}'. The link opens this report without signing in: "
+                    "keep it to whoever should read it.",
+        }
 
     @server.tool()
     async def research_list(

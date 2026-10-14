@@ -4,6 +4,7 @@ Streamable HTTP, against the app in process (api/mcp.py)."""
 import asyncio
 import json
 import os
+import time
 
 import httpx
 import pytest
@@ -91,7 +92,7 @@ def test_the_tools_with_instructions(admin, browser):
     assert all(t.description == " ".join(t.description.split()) for t in tools)  # one clean line each
     assert sorted(t.name for t in tools) == sorted([
         "research_options", "research_start", "research_status", "research_report", "research_list", "research_cancel",
-        "research_events",
+        "research_events", "research_export",
     ])
     # The MCP App: start and status are drawn on the canvas; its feed is for the canvas, not the model.
     meta = {t.name: (t.meta or {}).get("ui") for t in tools}
@@ -222,22 +223,28 @@ def test_refusals_say_what_is_wrong(admin, browser, configured):  # noqa: F811
     assert "Discussions" in texts[1] and "not a research id" in texts[2] and "No research with that id" in texts[3]
 
 
-def test_a_finished_report_is_read_whole_or_in_parts(admin, browser, configured, db):  # noqa: F811
+def _finished_run(user, db, topic="Songkran"):
+    """A Run of `user`'s marked succeeded, with the fake engine's report on disk."""
     from litstorm import settings
     from litstorm.db.models import Run
     from litstorm.engines.fake import sample_report
 
-    user = make_user(admin, browser)
-    token = _token(user)
-    run_id = user.post("/api/sessions", json={"topic": "Songkran", "language": "en"}).json()["runs"][0]["id"]
+    run_id = user.post("/api/sessions", json={"topic": topic, "language": "en"}).json()["runs"][0]["id"]
     run = db.get(Run, run_id)
     run.status = "succeeded"
     db.commit()
     folder = os.path.join(settings.get().runs_dir, run_id)
     os.makedirs(folder, exist_ok=True)
-    report = sample_report(type("C", (), {"topic": "Songkran", "language": "en"})())
+    report = sample_report(type("C", (), {"topic": topic, "language": "en"})())
     with open(os.path.join(folder, "report.json"), "w", encoding="utf-8") as f:
         json.dump(report, f)
+    return run_id
+
+
+def test_a_finished_report_is_read_whole_or_in_parts(admin, browser, configured, db):  # noqa: F811
+    user = make_user(admin, browser)
+    token = _token(user)
+    run_id = _finished_run(user, db)
 
     async def steps(session):
         return [
@@ -317,3 +324,70 @@ def test_progress_only_goes_forward():
              for status, stage in [("queued", None), ("running", "research"), ("running", "report"),
                                    ("running", "normalize"), ("succeeded", "normalize")]]
     assert [s for s, _ in steps] == [0, 1, 2, 2, 3] and {t for _, t in steps} == {3}
+
+
+def test_a_finished_report_is_exported_through_a_short_lived_link(admin, browser, configured, db):  # noqa: F811
+    from fastapi.testclient import TestClient
+
+    from litstorm import exports, settings
+    from litstorm.api import create_app
+
+    user = make_user(admin, browser)
+    token = _token(user, scopes=("read",))
+    run_id = _finished_run(user, db)
+    waiting = user.post("/api/sessions", json={"topic": "Loy Krathong", "language": "en"}).json()["runs"][0]["id"]
+
+    async def steps(session):
+        made = [_data(await session.call_tool("research_export", {"id": run_id, "format": f}))
+                for f in ("interactive", "html", "md")]
+        unfinished = await session.call_tool("research_export", {"id": waiting})
+        return made, unfinished
+
+    (interactive, page, md), unfinished = _call(token, steps)
+    assert unfinished.isError and "no report" in unfinished.content[0].text
+    base = settings.get().export_url
+    assert interactive["filename"] == page["filename"] == "Songkran.html" and md["filename"] == "Songkran.md"
+    assert interactive["url"].startswith(f"{base}/api/exports/") and "curl" in interactive["next"]
+    # The interactive page draws its charts in a Chromium (tests/test_interactive.py); the
+    # link itself works the same for every format, so the plain page and Markdown are fetched.
+
+    with TestClient(create_app()) as client:  # no cookie, no token: the link alone
+        r = client.get(page["url"][len(base):])
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"].startswith("text/html") and "attachment" in r.headers["content-disposition"]
+        assert r.headers["cache-control"] == "private, no-store" and "Songkran" in r.text
+        r = client.get(md["url"][len(base):])
+        assert r.status_code == 200 and r.text.startswith("# Songkran")
+
+        link = page["url"].rsplit("/", 1)[1]
+        payload, signature = link.split(".")
+        assert client.get(f"/api/exports/{payload}.{signature[:-2]}AA").status_code == 404  # tampered
+        assert client.get("/api/exports/not-a-link").status_code == 404
+        owner = user.get("/api/me").json()["id"]
+        old, _ = exports.sign(run_id, owner, "md", now=time.time() - exports.LIFETIME - 1)
+        assert client.get(f"/api/exports/{old}").status_code == 410
+        # Someone else's id in a link the server signed still opens nothing that is not theirs.
+        other = make_user(admin, browser, email="other@example.org")
+        theirs, _ = exports.sign(run_id, other.get("/api/me").json()["id"], "md")
+        assert client.get(f"/api/exports/{theirs}").status_code == 404
+
+
+
+def test_a_repeated_start_is_the_same_run_and_costs_nothing(admin, browser, configured):  # noqa: F811
+    token = _token(make_user(admin, browser))
+
+    async def steps(session):
+        args = {"topic": "Songkran water festival", "language": "en", "depth": "fast", "wait_seconds": 0}
+        first = _data(await session.call_tool("research_start", args))
+        again = _data(await session.call_tool("research_start", {**args, "topic": " Songkran water festival "}))
+        deeper = _data(await session.call_tool("research_start", {**args, "depth": "standard"}))
+        listed = _data(await session.call_tool("research_list", {}))
+        schema = {t.name: t.inputSchema for t in (await session.list_tools()).tools}
+        return first, again, deeper, listed, schema
+
+    first, again, deeper, listed, schema = _call(token, steps)
+    assert again["id"] == first["id"] and "repeated" in again and "repeated" not in first
+    assert deeper["id"] != first["id"]
+    assert sorted(r["id"] for r in listed) == sorted([first["id"], deeper["id"]])
+    # Inside a client that cancels a tool call after 30 seconds (Agenta), by default.
+    assert schema["research_start"]["properties"]["wait_seconds"]["default"] == 20

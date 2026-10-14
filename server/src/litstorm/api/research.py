@@ -36,6 +36,7 @@ from litstorm.db.models import (
     Run,
     RunEvent,
     SearchProvider,
+    User,
 )
 
 router = APIRouter(prefix="/api", tags=["research"])
@@ -1219,9 +1220,39 @@ def export_report(
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
+    run, report = _report(session, run_id, user, "export")
+    return _export(run, report, format, evidence, charts)
+
+
+@router.get("/exports/{token}")
+def export_by_link(token: str, session=Depends(deps.database)):
+    """A report's file through a link research_export made (litstorm.exports):
+    no sign-in, the link is the permission, for its one Run and format, until
+    it expires. The Run must still be its owner's and have its report."""
+    from litstorm import exports
+
+    try:
+        link = exports.verify(token)
+    except exports.Expired:
+        raise HTTPException(410, "link_expired") from None
+    except exports.Invalid:
+        raise HTTPException(404, "not_found") from None
+    owner = session.get(User, uuid.UUID(link["user_id"]))
+    if owner is None or not owner.is_active:
+        raise HTTPException(404, "not_found")
+    run = deps.own(session, Run, uuid.UUID(link["run_id"]), owner)
+    if run.status != "succeeded":
+        raise HTTPException(404, "not_found")
+    run, report = _report(session, run.id, owner, "export")
+    response = _export(run, report, link["format"], False, "static")
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _export(run, report, format, evidence, charts):
     from urllib.parse import quote
 
-    run, report = _report(session, run_id, user, "export")
     name = _filename(report, "html" if format == "interactive" else format)
     # The facts the page shows above the title, as the web app shows them.
     facts = {

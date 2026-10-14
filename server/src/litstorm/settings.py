@@ -29,6 +29,10 @@ class Settings:
     cookie_secure: bool
     # Where the web app is reached, for the set-password links admins copy.
     public_url: str
+    # Where the download links research_export hands to MCP clients point:
+    # public_url, unless the clients reach the API by another name (Agenta's
+    # agents on a shared Docker network, for one).
+    export_url: str = ""
 
     @property
     def runs_dir(self):
@@ -59,5 +63,6 @@ def get():
         or os.environ.get("LITSTORM_SECRET_KEY", ""),
         bootstrap_code=_read_file(os.environ.get("LITSTORM_BOOTSTRAP_CODE_FILE")),
         cookie_secure=os.environ.get("LITSTORM_COOKIE_SECURE", "false").lower() == "true",
-        public_url=os.environ.get("LITSTORM_PUBLIC_URL", "http://localhost:8090").rstrip("/"),
+        public_url=(public := os.environ.get("LITSTORM_PUBLIC_URL", "http://localhost:8090").rstrip("/")),
+        export_url=os.environ.get("LITSTORM_EXPORT_URL", "").rstrip("/") or public,
     )

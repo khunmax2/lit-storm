@@ -49,6 +49,10 @@ services:
       LITSTORM_BOOTSTRAP_CODE_FILE: /run/secrets/bootstrap_code
       # uvicorn processes; each holds up to 30 database connections.
       LITSTORM_API_WORKERS: ${LITSTORM_API_WORKERS:-2}
+      # Where research_export's download links point, when MCP clients reach the
+      # API by another name than the public URL (Agenta on a shared Docker
+      # network: http://deeplit-api:8000). Empty: the public URL.
+      LITSTORM_EXPORT_URL: ${LITSTORM_EXPORT_URL:-}
     secrets: [secret_key, bootstrap_code]
     # Services on the machine itself (Ollama for embeddings) are reached as
     # host.docker.internal, on Docker Desktop and on Linux alike.

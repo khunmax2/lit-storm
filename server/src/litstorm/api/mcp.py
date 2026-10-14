@@ -19,6 +19,8 @@ import re
 import time
 import uuid
 from collections import defaultdict, deque
+from functools import cache
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import HTTPException
@@ -38,11 +40,18 @@ PATH = "/api/mcp"
 WAIT = 45  # seconds a tool follows a Run before handing back its id
 CALLS_PER_MINUTE = 60  # per token, per API process
 
+# The MCP App (docs/adr/0010): a host that renders MCP Apps shows this page
+# beside research_start and research_status, a live canvas of the agents a
+# Run spawns, fed by research_events. Other clients just get the tools' text.
+CANVAS_URI = "ui://deeplit/research-canvas.html"
+APP_MIME = "text/html;profile=mcp-app"
+ON_CANVAS = {"ui": {"resourceUri": CANVAS_URI}}
+
 INSTRUCTIONS = """DeepLit researches a topic on the web and in academic sources, then writes a report \
 whose every claim cites its sources. Research takes from about one minute (depth "fast") to ten or more \
 ("deep"). Start it with research_start; if it is not finished when the call returns, follow it with \
 research_status (each call waits up to 45 seconds), then read it with research_report. Reports can be \
-written in English ("en") or Thai ("th"). research_options lists the modes, depths, sources and the quota left."""
+written in English ("en") or Thai ("th"). research_options lists the modes, depths, sources and the quota left. Clients that show MCP Apps draw research_start and research_status as a live canvas of the research agents."""
 
 # What an API refusal means, for whoever reads the tool's error.
 _MEANING = {
@@ -262,6 +271,30 @@ def _section(report, wanted):
     return text + ("\n\n## Sources\n\n" + "\n".join(sources) if sources else "")
 
 
+# --- the canvas (MCP App) -----------------------------------------------------------------------
+
+
+@cache
+def _canvas_html():
+    return (Path(__file__).parent / "mcp_canvas.html").read_text(encoding="utf-8")
+
+
+def _events(session, user, run_id, after):
+    """What the canvas draws: the Run's facts and its events after `after`."""
+    from litstorm.api import research
+
+    run, facts = _run_facts(session, user, run_id)  # the owner's only, as every tool
+    detail, last, more = research._run_detail(session, run_id, user, after, record=False)
+    facts["engine"] = run.engine
+    return {
+        "run": facts,
+        "events": [e.model_dump(mode="json") for e in detail.events],
+        "after": last,
+        "more": more,
+        "final": run.status in FINAL and not more,
+    }
+
+
 # --- the server -----------------------------------------------------------------------------
 
 
@@ -298,7 +331,7 @@ def build():
 
         return await deps.with_session(read)
 
-    @server.tool()
+    @server.tool(meta=ON_CANVAS)
     async def research_start(
         ctx: Context,
         topic: Annotated[str, Field(description="What to research, as a question or a subject (3 to 500 characters).")],
@@ -350,7 +383,7 @@ def build():
             raise ToolError(str(error).splitlines()[0]) from error
         return await _follow(ctx, user, run_id, wait_seconds)
 
-    @server.tool()
+    @server.tool(meta=ON_CANVAS)
     async def research_status(
         ctx: Context,
         id: Annotated[str, Field(description="The research id from research_start or research_list.")],
@@ -448,6 +481,29 @@ def build():
             return _run_facts(session, user, run_id)[1]
 
         return await deps.with_session(cancel)
+
+    @server.tool(meta={"ui": {"resourceUri": CANVAS_URI, "visibility": ["app"]}})
+    async def research_events(
+        ctx: Context,
+        id: Annotated[str, Field(description="The research id.")],
+        after: Annotated[int, Field(description="The last event id already read; 0 for all.", ge=0)] = 0,
+    ) -> dict:
+        """The research canvas's feed, called by the canvas itself: a run's status and its events
+        (stages, perspectives, research tree, agent steps, pages read) after the given event id."""
+        user, _ = await _caller(ctx, "read")
+        run_id = _uuid(id)
+        try:
+            return await deps.with_session(lambda s: _events(s, user, run_id, after))
+        except HTTPException as error:
+            _fail(error)
+
+    @server.resource(
+        CANVAS_URI, name="research-canvas", title="DeepLit research canvas", mime_type=APP_MIME,
+        description="A live canvas of the agents a DeepLit research run spawns.",
+        meta={"ui": {"prefersBorder": True}},
+    )
+    def research_canvas() -> str:
+        return _canvas_html()
 
     # A docstring's line breaks and indent are for this file, not for the
     # model reading the description.

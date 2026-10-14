@@ -81,7 +81,7 @@ def test_no_token_no_server(admin, browser, db):
     assert r.status_code == 403 and r.json()["error"] == "mcp_disabled"
 
 
-def test_six_tools_with_instructions(admin, browser):
+def test_the_tools_with_instructions(admin, browser):
     token = _token(make_user(admin, browser))
 
     async def steps(session):
@@ -91,7 +91,68 @@ def test_six_tools_with_instructions(admin, browser):
     assert all(t.description == " ".join(t.description.split()) for t in tools)  # one clean line each
     assert sorted(t.name for t in tools) == sorted([
         "research_options", "research_start", "research_status", "research_report", "research_list", "research_cancel",
+        "research_events",
     ])
+    # The MCP App: start and status are drawn on the canvas; its feed is for the canvas, not the model.
+    meta = {t.name: (t.meta or {}).get("ui") for t in tools}
+    assert meta["research_start"] == meta["research_status"] == {"resourceUri": "ui://deeplit/research-canvas.html"}
+    assert meta["research_events"] == {"resourceUri": "ui://deeplit/research-canvas.html", "visibility": ["app"]}
+    assert meta["research_report"] is None
+
+
+def test_the_canvas_is_an_mcp_app_resource(admin, browser):
+    token = _token(make_user(admin, browser), scopes=("read",))
+
+    async def steps(session):
+        listed = (await session.list_resources()).resources
+        read = await session.read_resource("ui://deeplit/research-canvas.html")
+        return listed, read.contents[0]
+
+    listed, content = _call(token, steps)
+    canvas = next(r for r in listed if str(r.uri) == "ui://deeplit/research-canvas.html")
+    assert canvas.mimeType == "text/html;profile=mcp-app" and (canvas.meta or {})["ui"] == {"prefersBorder": True}
+    assert content.mimeType == "text/html;profile=mcp-app"
+    html = content.text
+    assert html.startswith("<!doctype html>") and '"ui/initialize"' in html and '"research_events"' in html
+    assert "http://" not in html.replace("http://www.w3.org/2000/svg", "")  # nothing from the network
+    assert "https://" not in html
+
+
+def test_the_canvas_reads_a_runs_events_and_only_its_owners(admin, browser, configured, db):  # noqa: F811
+    from litstorm.db.models import Run, RunEvent
+
+    user = make_user(admin, browser)
+    token = _token(user, scopes=("read",))
+    run_id = user.post("/api/sessions", json={"topic": "Songkran", "language": "en"}).json()["runs"][0]["id"]
+    for type_, data in [
+        ("stage", {"stage": "research"}),
+        ("note", {"kind": "flow", "event": "plan", "sections": [{"id": "s1", "title": "History"}]}),
+        ("note", {"kind": "flow", "event": "tasks", "lane": "s1", "round": 1, "queries": [{"agent": "search", "query": "q"}]}),
+        ("note", {"kind": "traceback", "text": "for whoever debugs"}),
+        ("note", {"kind": "browsed", "urls": ["https://example.org/a"]}),
+    ]:
+        db.add(RunEvent(run_id=run_id, type=type_, data=data))
+    run = db.get(Run, run_id)
+    run.status = "succeeded"
+    db.commit()
+    other = _token(make_user(admin, browser, email="someone@example.org"), scopes=("read",))
+
+    async def steps(session):
+        first = _data(await session.call_tool("research_events", {"id": run_id}))
+        rest = _data(await session.call_tool("research_events", {"id": run_id, "after": first["after"]}))
+        return first, rest
+
+    first, rest = _call(token, steps)
+    assert first["run"]["id"] == run_id and first["run"]["engine"] == "storm" and first["final"] is True
+    # What the web shows the owner; a traceback stays in the database.
+    assert [e["data"].get("kind", e["type"]) for e in first["events"]] == ["stage", "flow", "flow", "browsed"]
+    assert rest["events"] == [] and rest["after"] == first["after"]
+
+    async def theirs(session):
+        return await session.call_tool("research_events", {"id": run_id})
+
+    refused = _call(other, theirs)
+    assert refused.isError and "No research with that id" in refused.content[0].text
 
 
 def test_options_name_the_modes_sources_and_quota(admin, browser, configured):  # noqa: F811

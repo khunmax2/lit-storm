@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepLit research canvas</title>
+<!--
+  DeepLit's MCP App (docs/adr/0010): a research Run as a live canvas of the
+  agents it spawns. A host that speaks MCP Apps renders this ui:// resource
+  beside research_start / research_status; the page asks the host for the
+  Run's events (tools/call research_events) every 2 s and draws:
+    STORM           the perspectives (personas) it finds, then its writers
+    Deep Research   the research tree: one researcher per query, as it grows
+    Agent Research  the planner, one researcher per section (lane), the
+                    search agents each round sends, and the writers
+  Self-contained: no network, no libraries (the host's CSP allows none).
+  Opened outside a host, or with #demo, it plays a built-in sample.
+-->
+<style>
+:root {
+  --bg: var(--color-background-primary, #ffffff);
+  --bg2: var(--color-background-secondary, #f5f6f8);
+  --bg3: var(--color-background-tertiary, #eceef2);
+  --fg: var(--color-text-primary, #16181d);
+  --fg2: var(--color-text-secondary, #5b6170);
+  --fg3: var(--color-text-tertiary, #8b91a0);
+  --line: var(--color-border-primary, #d9dce3);
+  --line2: var(--color-border-secondary, #e7e9ee);
+  --node: #ffffff; --node-line: #d3d7df;
+  --ok: var(--color-text-success, #1f8a4c);
+  --bad: var(--color-text-danger, #c43c3c);
+  --font: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", sans-serif);
+  --lead: #6d5ce8; --plan: #2f7fd8; --persona: #c2569b; --research: #0f9488; --tool: #d98a1c; --write: #4f8a2b;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: var(--color-background-primary, #17191e);
+  --bg2: var(--color-background-secondary, #1f2228);
+  --bg3: var(--color-background-tertiary, #2a2e36);
+  --fg: var(--color-text-primary, #eceef2);
+  --fg2: var(--color-text-secondary, #a9afbd);
+  --fg3: var(--color-text-tertiary, #7c8394);
+  --line: var(--color-border-primary, #353a44);
+  --line2: var(--color-border-secondary, #2b2f37);
+  --node: #272b33; --node-line: #424854;
+  --ok: var(--color-text-success, #4cc27e);
+  --bad: var(--color-text-danger, #ef6b6b);
+  --lead: #9488ff; --plan: #5aa5f5; --persona: #e47dbd; --research: #2cc2b3; --tool: #f0a840; --write: #7fbf55;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 var(--font); }
+body { padding: 12px 14px 14px; }
+header { display: flex; gap: 10px; align-items: flex-start; }
+.mark { width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
+  background: var(--lead); color: #fff; font-weight: 700; font-size: 14px; letter-spacing: -.5px; }
+.head { min-width: 0; flex: 1; }
+.topic { font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--bg2); color: var(--fg2); border: 1px solid var(--line2); }
+.chip.live { color: var(--research); border-color: currentColor; }
+.chip.live::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  margin-right: 5px; vertical-align: 1px; animation: blink 1.2s infinite; }
+.chip.done { color: var(--ok); border-color: currentColor; }
+.chip.fail { color: var(--bad); border-color: currentColor; }
+.steps { display: flex; gap: 4px; margin: 12px 0 6px; }
+.step { flex: 1; min-width: 0; }
+.step i { display: block; height: 4px; border-radius: 4px; background: var(--bg3); overflow: hidden; position: relative; }
+.step.done i { background: var(--research); }
+.step.now i::after { content: ""; position: absolute; inset: 0; width: 40%; background: var(--research); border-radius: 4px;
+  animation: slide 1.4s ease-in-out infinite; }
+.step span { display: block; font-size: 10.5px; color: var(--fg3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step.now span { color: var(--fg); font-weight: 600; }
+.stage { position: relative; border: 1px solid var(--line2); border-radius: 12px; background:
+  radial-gradient(circle at 1px 1px, var(--line2) 1px, transparent 0) 0 0 / 18px 18px, var(--bg2); overflow: hidden; }
+svg { display: block; width: 100%; }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.6; transition: stroke .3s; }
+.edge.new { stroke-dasharray: 600; stroke-dashoffset: 600; animation: draw .7s ease-out forwards; }
+.edge.flow { stroke: var(--c); stroke-dasharray: 5 6; animation: flow .8s linear infinite; }
+.node { transition: transform .6s cubic-bezier(.2,.8,.2,1.15), opacity .45s; }
+.node.born { opacity: 0; }
+.node rect.box { fill: var(--node); stroke: var(--node-line); stroke-width: 1.2; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.12)); }
+.node.active rect.box { stroke: var(--c); stroke-width: 1.8; }
+.node.done rect.box { stroke: var(--node-line); }
+.node.fail rect.box { stroke: var(--bad); }
+.node.muted { opacity: .5; }
+.node rect.bar { fill: var(--c); }
+.node .ring { fill: none; stroke: var(--c); stroke-width: 2; opacity: 0; }
+.node.active .ring { animation: ring 1.6s ease-out infinite; }
+.node text { fill: var(--fg); font-family: var(--font); }
+.node .t { font-size: 12px; font-weight: 600; }
+.node .s { font-size: 10.5px; fill: var(--fg2); }
+.node .k { font-size: 9.5px; fill: var(--c); font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+.node .badge { font-size: 10px; fill: var(--fg3); }
+.node .tick { fill: var(--ok); font-size: 12px; font-weight: 700; }
+.node .x { fill: var(--bad); font-size: 12px; font-weight: 700; }
+.burst { fill: none; stroke: var(--c); stroke-width: 2; animation: burst .7s ease-out forwards; }
+.empty { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; color: var(--fg3); font-size: 12px; pointer-events: none; }
+.stats { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 2px 0; color: var(--fg2); font-size: 12px; }
+.stats b { color: var(--fg); font-size: 15px; margin-right: 3px; font-variant-numeric: tabular-nums; }
+.log { margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line2); max-height: 156px; overflow: auto; }
+.log li { display: flex; gap: 8px; padding: 5px 2px; border-bottom: 1px solid var(--line2); font-size: 12px; color: var(--fg2);
+  animation: rise .35s ease-out; }
+.log li time { color: var(--fg3); font-variant-numeric: tabular-nums; flex: none; }
+.log li .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; margin-top: 6px; }
+.log li span { overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+button { font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+  color: var(--fg); cursor: pointer; }
+button:hover { background: var(--bg2); }
+button.primary { background: var(--lead); border-color: var(--lead); color: #fff; }
+button[hidden] { display: none; }
+.note { color: var(--fg3); font-size: 11.5px; margin-top: 8px; }
+@keyframes blink { 50% { opacity: .25; } }
+@keyframes slide { 0% { left: -40%; } 100% { left: 100%; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes flow { to { stroke-dashoffset: -22; } }
+@keyframes ring { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes burst { 0% { r: 6; opacity: .9; } 100% { r: 46; opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="mark">DL</div>
+  <div class="head">
+    <div class="topic" id="topic">DeepLit</div>
+    <div class="chips" id="chips"></div>
+  </div>
+</header>
+<div class="steps" id="steps"></div>
+<div class="stage" id="stage">
+  <svg id="svg" role="img" aria-label="Research agents"><g id="edges"></g><g id="nodes"></g><g id="fx"></g></svg>
+  <div class="empty" id="empty"></div>
+</div>
+<div class="stats" id="stats"></div>
+<ul class="log" id="log"></ul>
+<div class="actions">
+  <button class="primary" id="read" hidden></button>
+  <button id="open" hidden></button>
+  <button id="full" hidden></button>
+</div>
+<div class="note" id="note" hidden></div>
+<script>
+"use strict";
+(() => {
+  // ---------------------------------------------------------------- words
+  const WORDS = {
+    en: {
+      waiting: "Starting the research…", agents: "agents", sources: "sources", rounds: "rounds", searches: "searches",
+      lead: "DeepLit", orchestrator: "Orchestrator", planner: "Planner", perspective: "Perspective finder", persona: "Perspective",
+      researcher: "Researcher", search: "Search agent", crawl: "Crawl agent", writer: "Writer", outline: "Outline writer",
+      article: "Section writers", polish: "Polisher", compose: "Long writer", experts: "Topic experts",
+      read: "Read the report", open: "Open in DeepLit", full: "Full screen",
+      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish" },
+      status: { queued: "Queued", running: "Running", succeeded: "Done", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted", needs_selection: "Needs a choice" },
+      phase: { observe: "observing", gap: "finding the gap", select: "choosing searches", search: "searching" },
+      tree: { generating_query: "writing a query", generated_query: "query ready", searching: "searching", search_complete: "search done",
+        processing_search_result: "reading results", node_complete: "done", no_evidence: "no evidence", error: "error" },
+      round: (r, m) => `round ${r}/${m}`,
+      log: {
+        stage: (s) => `Stage: ${s}`, perspectives: (n) => `Found ${n} perspectives; each interviews a topic expert`,
+        browsed: (n) => `Read ${n} pages`, plan: (n) => `Planned ${n} sections, one researcher each`,
+        gap: (l, g) => `${l}: gap — ${g}`, complete: (l) => `${l}: research complete`,
+        found: (l, n) => `${l}: found ${n} sources`, write: (l) => `${l}: writing`, compose: "Composing the sections into one report",
+        node: (q) => `New researcher: ${q}`, done: "Finished", failed: (m) => `Ended: ${m}`,
+      },
+      noTools: "This client does not let the canvas fetch updates; ask for research_status to see more.",
+      readAsk: (id) => `Read the DeepLit report of research ${id} with research_report (outline first if it is long) and summarise it.`,
+    },
+    th: {
+      waiting: "กำลังเริ่มค้นคว้า…", agents: "เอเจนต์", sources: "แหล่งข้อมูล", rounds: "รอบ", searches: "การค้น",
+      lead: "DeepLit", orchestrator: "ผู้ประสานงาน", planner: "ผู้วางแผน", perspective: "ผู้หามุมมอง", persona: "มุมมอง",
+      researcher: "นักค้นคว้า", search: "เอเจนต์ค้นหา", crawl: "เอเจนต์อ่านเว็บ", writer: "ผู้เขียน", outline: "ผู้วางโครงเรื่อง",
+      article: "ผู้เขียนแต่ละหัวข้อ", polish: "ผู้เกลาเนื้อหา", compose: "ผู้รวมรายงาน", experts: "ผู้เชี่ยวชาญหัวข้อ",
+      read: "อ่านรายงาน", open: "เปิดใน DeepLit", full: "เต็มจอ",
+      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน" },
+      status: { queued: "รอคิว", running: "กำลังทำงาน", succeeded: "เสร็จแล้ว", failed: "ไม่สำเร็จ", cancelled: "ยกเลิกแล้ว", interrupted: "ถูกขัดจังหวะ", needs_selection: "ต้องเลือกใหม่" },
+      phase: { observe: "สังเกต", gap: "หาช่องว่างความรู้", select: "เลือกคำค้น", search: "กำลังค้น" },
+      tree: { generating_query: "กำลังคิดคำค้น", generated_query: "ได้คำค้นแล้ว", searching: "กำลังค้น", search_complete: "ค้นเสร็จ",
+        processing_search_result: "กำลังอ่านผล", node_complete: "เสร็จ", no_evidence: "ไม่พบหลักฐาน", error: "ผิดพลาด" },
+      round: (r, m) => `รอบ ${r}/${m}`,
+      log: {
+        stage: (s) => `ขั้นตอน: ${s}`, perspectives: (n) => `พบ ${n} มุมมอง แต่ละมุมมองสัมภาษณ์ผู้เชี่ยวชาญหัวข้อ`,
+        browsed: (n) => `อ่าน ${n} หน้าเว็บ`, plan: (n) => `วางแผน ${n} หัวข้อ แยกนักค้นคว้าหัวข้อละคน`,
+        gap: (l, g) => `${l}: ช่องว่าง — ${g}`, complete: (l) => `${l}: ค้นคว้าครบแล้ว`,
+        found: (l, n) => `${l}: ได้ ${n} แหล่ง`, write: (l) => `${l}: กำลังเขียน`, compose: "กำลังรวมทุกหัวข้อเป็นรายงานเดียว",
+        node: (q) => `นักค้นคว้าใหม่: ${q}`, done: "เสร็จสิ้น", failed: (m) => `จบลง: ${m}`,
+      },
+      noTools: "client นี้ไม่ให้ canvas ดึงข้อมูลเพิ่ม ให้ถาม research_status เพื่อดูความคืบหน้า",
+      readAsk: (id) => `อ่านรายงาน DeepLit ของงานวิจัย ${id} ด้วย research_report (ถ้ายาวให้ดู outline ก่อน) แล้วสรุปให้ฟัง`,
+    },
+  };
+  let W = WORDS.en;
+  const STAGES = { storm: ["research", "outline", "article", "polish"], deep: ["research", "report"], agent: ["plan", "research", "report"] };
+  const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+
+  // ---------------------------------------------------------------- state
+  const state = {
+    run: null, engine: null, after: 0, final: false, polling: false, stage: null,
+    nodes: new Map(), order: [], sources: 0, searches: 0, rounds: 0, lanes: new Map(), toolSeq: 0, spawned: 0,
+  };
+
+  function node(id, parent, kind, title, sub) {
+    let n = state.nodes.get(id);
+    if (n) { if (title != null) n.title = title; if (sub != null) n.sub = sub; return n; }
+    n = { id, parent, kind, title, sub: sub || "", badge: "", state: "active", el: null, born: true };
+    state.nodes.set(id, n);
+    state.order.push(id);
+    if (kind !== "lead") state.spawned += 1;
+    if (parent && state.nodes.has(parent)) burst(parent, kind);
+    return n;
+  }
+  const set = (id, s) => { const n = state.nodes.get(id); if (n) n.state = s; };
+  const children = (id) => state.order.filter((k) => state.nodes.get(k).parent === id);
+  const finishAll = (pred) => state.nodes.forEach((n) => { if (n.state === "active" && (!pred || pred(n))) n.state = "done"; });
+  function drop(id) { children(id).forEach(drop); state.nodes.delete(id); state.order = state.order.filter((k) => k !== id); }
+
+  // ---------------------------------------------------------------- events -> agents
+  function lead() {
+    const r = state.run || {};
+    return node("lead", null, "lead", W.lead, [r.mode, r.depth].filter(Boolean).join(" · "));
+  }
+
+  function stageAgent(stage) {
+    const e = state.engine;
+    if (e === "storm") {
+      finishAll();
+      if (stage === "research") node("perspective", "lead", "persona", W.perspective, W.experts);
+      if (stage === "outline") node("outline", "lead", "write", W.outline, "");
+      if (stage === "article") node("article", "outline", "write", W.article, "");
+      if (stage === "polish") node("polish", "article", "write", W.polish, "");
+    } else if (e === "deep") {
+      if (stage === "report") { finishAll(); node("writer", "lead", "write", W.writer, ""); }
+    } else if (e === "agent") {
+      if (stage === "plan") node("planner", "lead", "plan", W.planner, "");
+      if (stage === "report") { finishAll((n) => n.kind !== "write"); }
+    }
+  }
+
+  function laneNode(lane) {
+    if (state.lanes.has(lane)) return state.lanes.get(lane);
+    const id = "lane:" + lane;
+    const parent = state.nodes.has("planner") ? "planner" : "lead";
+    const n = node(id, parent, "research", lane === "main" ? W.researcher : W.researcher + " " + lane.replace(/^s/, ""), "");
+    state.lanes.set(lane, n);
+    return n;
+  }
+  const laneName = (lane) => { const n = state.lanes.get(lane); return n ? n.title : lane; };
+
+  function apply(ev) {
+    const d = ev.data || {};
+    if (ev.type === "stage") {
+      state.stage = d.stage;
+      stageAgent(d.stage);
+      say("lead", W.log.stage(W.stages[d.stage] || d.stage), ev.at);
+      return;
+    }
+    if (ev.type !== "note") return;
+    const kind = d.kind;
+    if (kind === "browsed") {
+      const n = (d.urls || []).length;
+      state.sources += n;
+      state.nodes.forEach((x) => { if (x.state === "active" && (x.kind === "persona" || x.kind === "research")) x.pulse = Date.now(); });
+      return;
+    }
+    if (kind === "perspectives") {
+      const list = d.perspectives || [];
+      list.forEach((p, i) => {
+        const [name, ...rest] = String(p).split(":");
+        node("persona:" + i, "perspective", "persona", clip(name, 40), clip(rest.join(":"), 70));
+      });
+      set("perspective", "done");
+      say("persona", W.log.perspectives(list.length), ev.at);
+      return;
+    }
+    if (kind === "tree") {
+      const id = "tree:" + d.id;
+      const parent = d.parent != null ? "tree:" + d.parent : (d.id === "0" ? "lead" : "tree:" + String(d.id).split("-").slice(0, -1).join("-"));
+      if (!state.nodes.has(parent) && parent !== "lead") node(parent, "lead", "plan", W.planner, "");
+      const fresh = !state.nodes.has(id);
+      const n = node(id, parent, d.id === "0" ? "plan" : "research", d.id === "0" ? W.planner : (d.query ? clip(d.query, 60) : W.researcher), null);
+      if (d.query && d.id !== "0") n.title = clip(d.query, 60);
+      if (d.goal) n.sub = clip(d.goal, 90);
+      const st = d.status;
+      n.badge = W.tree[st] || st || "";
+      if (d.sources != null) n.badge += ` · ${d.sources} ${W.sources}`;
+      n.state = st === "node_complete" ? "done" : st === "no_evidence" ? "muted" : st === "error" ? "fail" : "active";
+      if (st === "searching") state.searches += 1;
+      if (fresh && d.id !== "0" && d.query) say("research", W.log.node(clip(d.query, 80)), ev.at);
+      return;
+    }
+    if (kind === "flow") {
+      const lane = d.lane || "main";
+      switch (d.event) {
+        case "plan": {
+          node("planner", "lead", "plan", W.planner, "");
+          (d.sections || []).forEach((s) => {
+            const n = laneNode(s.id);
+            n.title = clip(s.title, 48);
+          });
+          set("planner", "done");
+          say("plan", W.log.plan((d.sections || []).length), ev.at);
+          break;
+        }
+        case "round": {
+          const n = laneNode(lane);
+          n.state = "active";
+          n.round = d.round; n.max = d.max;
+          n.badge = W.round(d.round, d.max);
+          state.rounds = Math.max(state.rounds, d.round);
+          children(n.id).filter((k) => state.nodes.get(k).kind === "tool").forEach(drop);
+          break;
+        }
+        case "phase": {
+          const n = laneNode(lane);
+          n.badge = (n.round ? W.round(n.round, n.max) + " · " : "") + (W.phase[d.phase] || d.phase);
+          break;
+        }
+        case "observed": { laneNode(lane).sub = clip(d.text, 90); break; }
+        case "gap": {
+          const n = laneNode(lane);
+          if (d.complete) { say("research", W.log.complete(n.title), ev.at); }
+          else if (d.gap) { n.sub = clip(d.gap, 90); say("research", W.log.gap(n.title, clip(d.gap, 110)), ev.at); }
+          break;
+        }
+        case "tasks": {
+          const n = laneNode(lane);
+          (d.queries || []).forEach((q) => {
+            state.toolSeq += 1; state.searches += 1;
+            node("tool:" + state.toolSeq, n.id, "tool", clip(q.query, 48), (q.agent === "crawl" ? W.crawl : W.search) + (q.site ? " · " + q.site : ""));
+          });
+          break;
+        }
+        case "found": {
+          const n = laneNode(lane);
+          children(n.id).forEach((k) => { const c = state.nodes.get(k); if (c.kind === "tool") c.state = "done"; });
+          say("tool", W.log.found(n.title, d.sources || 0), ev.at);
+          break;
+        }
+        case "write": {
+          const n = laneNode(lane);
+          n.state = "done"; n.badge = n.round ? W.round(n.round, n.max) : "";
+          node("write:" + lane, state.nodes.has("planner") ? n.id : "lead", "write", W.writer, n.title);
+          say("write", W.log.write(n.title), ev.at);
+          break;
+        }
+        case "compose": {
+          state.nodes.forEach((x) => { if (x.id.startsWith("write:")) x.state = "done"; });
+          node("compose", state.nodes.has("planner") ? "planner" : "lead", "write", W.compose, "");
+          say("write", W.log.compose, ev.at);
+          break;
+        }
+      }
+    }
+  }
+
+  function settle(run) {
+    if (!FINAL.has(run.status)) return;
+    const ok = run.status === "succeeded";
+    state.nodes.forEach((n) => { if (n.state === "active") n.state = ok ? "done" : "fail"; });
+    set("lead", ok ? "done" : "fail");
+    if (!state.settled) {
+      state.settled = true;
+      say("lead", ok ? W.log.done : W.log.failed(run.message || run.reason || run.status));
+    }
+  }
+
+  // ---------------------------------------------------------------- log
+  const COLORS = { lead: "--lead", plan: "--plan", persona: "--persona", research: "--research", tool: "--tool", write: "--write" };
+  function say(kind, text, at) {
+    const li = document.createElement("li");
+    li.style.setProperty("--c", `var(${COLORS[kind] || "--lead"})`);
+    const t = at ? new Date(at) : new Date();
+    li.innerHTML = `<i class="dot"></i><time></time><span></span>`;
+    li.querySelector("time").textContent = t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    li.querySelector("span").textContent = text;
+    const log = $("log");
+    log.prepend(li);
+    while (log.children.length > 60) log.lastChild.remove();
+  }
+
+  // ---------------------------------------------------------------- layout + draw
+  const NW = 178, NH = 58, GX = 18, GY = 64, PAD = 22, LX = 54, LY = 12;
+  // Top-down while the tree fits the frame at a readable size; a broad tree (Deep Research's)
+  // is laid out left to right instead, its levels across and its siblings down the page.
+  function layout(across) {
+    const pos = new Map();
+    let cursor = 0;
+    const place = (id, depth) => {
+      const kids = children(id);
+      let at;
+      if (!kids.length) { at = cursor; cursor += across ? NH + LY : NW + GX; }
+      else {
+        const all = kids.map((k) => place(k, depth + 1));
+        at = (all[0] + all[all.length - 1]) / 2;
+      }
+      pos.set(id, across ? { x: depth * (NW + LX), y: at } : { x: at, y: depth * (NH + GY) });
+      return at;
+    };
+    state.order.filter((k) => !state.nodes.get(k).parent).forEach((r) => place(r, 0));
+    return pos;
+  }
+
+  function extent(pos) {
+    let minX = Infinity, maxX = -Infinity, maxY = 0;
+    pos.forEach((p) => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x + NW); maxY = Math.max(maxY, p.y + NH); });
+    if (!pos.size) { minX = 0; maxX = NW; }
+    return { minX, maxX, maxY };
+  }
+
+  function burst(parentId, kind) {
+    if (state.replayFast) return;
+    state.bursts = state.bursts || [];
+    state.bursts.push({ parentId, kind });
+  }
+
+  function textEl(cls, x, y, s) {
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("class", cls); t.setAttribute("x", x); t.setAttribute("y", y); t.textContent = s;
+    return t;
+  }
+
+  function fit(s, px) { // a rough fit by width: Thai and Latin glyphs average ~6.6px at 12px
+    const max = Math.max(4, Math.floor(px / 6.6));
+    return clip(s, max);
+  }
+
+  function draw() {
+    const width = $("stage").clientWidth || 600;
+    let pos = layout(false), box = extent(pos);
+    const across = (box.maxX - box.minX + PAD * 2) > width / 0.62;
+    if (across) { pos = layout(true); box = extent(pos); }
+    state.across = across;
+    const { minX, maxX, maxY } = box;
+    const svg = $("svg"), gn = $("nodes"), ge = $("edges"), fx = $("fx");
+    const vbW = Math.max(maxX - minX + PAD * 2, 360), vbH = maxY + PAD * 2;
+    const ox = PAD - minX + (vbW - (maxX - minX + PAD * 2)) / 2, oy = PAD;
+    svg.setAttribute("viewBox", `0 0 ${vbW} ${vbH}`);
+    const scale = Math.min(1, width / vbW);
+    svg.style.height = Math.max(150, Math.min(vbH * scale, across ? 1600 : 620)) + "px";
+
+    // edges
+    ge.textContent = "";
+    state.order.forEach((id) => {
+      const n = state.nodes.get(id), p = n.parent && pos.get(n.parent), c = pos.get(id);
+      if (!p || !c) return;
+      const path = document.createElementNS(NS, "path");
+      if (across) {
+        const x1 = p.x + ox + NW, y1 = p.y + oy + NH / 2, x2 = c.x + ox, y2 = c.y + oy + NH / 2, mx = (x1 + x2) / 2;
+        path.setAttribute("d", `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+      } else {
+        const x1 = p.x + ox + NW / 2, y1 = p.y + oy + NH, x2 = c.x + ox + NW / 2, y2 = c.y + oy, my = (y1 + y2) / 2;
+        path.setAttribute("d", `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`);
+      }
+      let cls = "edge";
+      if (n.born && !state.replayFast) cls += " new";
+      else if (n.state === "active") cls += " flow";
+      path.setAttribute("class", cls);
+      path.style.setProperty("--c", `var(${COLORS[n.kind]})`);
+      ge.appendChild(path);
+    });
+
+    // nodes
+    const seen = new Set();
+    state.order.forEach((id) => {
+      const n = state.nodes.get(id), p = pos.get(id);
+      seen.add(id);
+      const tx = p.x + ox, ty = p.y + oy;
+      if (!n.el) {
+        const g = document.createElementNS(NS, "g");
+        g.dataset.id = id;
+        const parent = n.parent && pos.get(n.parent);
+        const sx = parent ? parent.x + ox : tx, sy = parent ? parent.y + oy : ty;
+        g.setAttribute("class", "node born");
+        g.style.transform = `translate(${sx}px, ${sy}px) scale(.4)`;
+        gn.appendChild(g);
+        n.el = g;
+        if (state.replayFast) { g.style.transition = "none"; }
+        const grow = () => {
+          if (!g.classList.contains("born")) return;
+          g.style.transition = "";
+          g.classList.remove("born");
+          g.style.transform = g.dataset.to;
+        };
+        requestAnimationFrame(() => requestAnimationFrame(grow));
+        setTimeout(grow, 60);
+      } else if (!n.el.classList.contains("born")) {
+        n.el.style.transform = `translate(${tx}px, ${ty}px)`;
+      }
+      const g = n.el;
+      g.dataset.to = `translate(${tx}px, ${ty}px)`;
+      g.style.setProperty("--c", `var(${COLORS[n.kind]})`);
+      g.classList.toggle("active", n.state === "active");
+      g.classList.toggle("done", n.state === "done");
+      g.classList.toggle("fail", n.state === "fail");
+      g.classList.toggle("muted", n.state === "muted");
+      g.textContent = "";
+      const ring = document.createElementNS(NS, "rect");
+      Object.entries({ class: "ring", x: -3, y: -3, width: NW + 6, height: NH + 6, rx: 12 }).forEach(([k, v]) => ring.setAttribute(k, v));
+      ring.style.transformOrigin = `${NW / 2}px ${NH / 2}px`;
+      const box = document.createElementNS(NS, "rect");
+      Object.entries({ class: "box", width: NW, height: NH, rx: 10 }).forEach(([k, v]) => box.setAttribute(k, v));
+      const bar = document.createElementNS(NS, "rect");
+      Object.entries({ class: "bar", x: 0, y: 8, width: 3, height: NH - 16, rx: 1.5 }).forEach(([k, v]) => bar.setAttribute(k, v));
+      g.append(ring, box, bar);
+      const kindWord = { lead: "lead", plan: W.planner, persona: W.persona, research: W.researcher, tool: n.sub.startsWith(W.crawl) ? W.crawl : W.search, write: W.writer }[n.kind];
+      g.append(textEl("k", 12, 15, fit(n.kind === "lead" ? W.orchestrator : kindWord, NW - 40)));
+      g.append(textEl("t", 12, 31, fit(n.title, NW - 22)));
+      const sub = n.badge || n.sub;
+      if (sub) g.append(textEl(n.badge ? "badge" : "s", 12, 47, fit(sub, NW - 22)));
+      if (n.state === "done") g.append(textEl("tick", NW - 18, 16, "✓"));
+      if (n.state === "fail") g.append(textEl("x", NW - 18, 16, "!"));
+      const title = document.createElementNS(NS, "title");
+      title.textContent = [n.title, n.sub, n.badge].filter(Boolean).join("\n");
+      g.append(title);
+      n.born = false;
+    });
+    [...gn.children].forEach((g) => { if (!seen.has(g.dataset.id)) g.remove(); });
+
+    // spawn bursts at the parent
+    (state.bursts || []).forEach(({ parentId, kind }) => {
+      const p = pos.get(parentId);
+      if (!p) return;
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("class", "burst");
+      c.setAttribute("cx", p.x + ox + (across ? NW : NW / 2)); c.setAttribute("cy", p.y + oy + (across ? NH / 2 : NH)); c.setAttribute("r", 6);
+      c.style.setProperty("--c", `var(${COLORS[kind]})`);
+      fx.appendChild(c);
+      setTimeout(() => c.remove(), 800);
+    });
+    state.bursts = [];
+    $("empty").textContent = state.nodes.size > 1 ? "" : W.waiting;
+    header();
+  }
+
+  function header() {
+    const r = state.run || {};
+    $("topic").textContent = r.title || r.topic || "DeepLit";
+    const chips = $("chips");
+    chips.textContent = "";
+    const add = (text, cls) => { const s = document.createElement("span"); s.className = "chip" + (cls ? " " + cls : ""); s.textContent = text; chips.append(s); };
+    if (r.status) add(W.status[r.status] || r.status, r.status === "succeeded" ? "done" : FINAL.has(r.status) ? "fail" : "live");
+    if (r.mode) add(r.mode);
+    if (r.depth) add(r.depth);
+    if (r.language) add(r.language.toUpperCase());
+    const steps = $("steps");
+    steps.textContent = "";
+    const list = STAGES[state.engine] || [];
+    const at = list.indexOf(state.stage);
+    list.forEach((s, i) => {
+      const d = document.createElement("div");
+      const done = FINAL.has(r.status) ? r.status === "succeeded" || i < at : i < at;
+      d.className = "step" + (done ? " done" : i === at && !FINAL.has(r.status) ? " now" : "");
+      d.innerHTML = "<i></i><span></span>";
+      d.querySelector("span").textContent = W.stages[s] || s;
+      steps.append(d);
+    });
+    const stats = [[state.spawned, W.agents], [Math.max(state.sources, r.sources || 0), W.sources], [state.searches, W.searches]];
+    if (state.engine === "agent" && state.rounds) stats.push([state.rounds, W.rounds]);
+    $("stats").innerHTML = stats.map(([n, w]) => `<span><b>${n}</b>${w}</span>`).join("");
+    const read = $("read"), open = $("open");
+    read.hidden = !(r.status === "succeeded" && bridge.connected);
+    read.textContent = W.read;
+    open.hidden = !(r.web_url && bridge.connected);
+    open.textContent = W.open;
+    $("full").textContent = W.full;
+    $("full").hidden = !(bridge.modes || []).includes("fullscreen");
+  }
+
+  // ---------------------------------------------------------------- feeding events
+  async function feed(events, replay) {
+    if (!events.length) return;
+    if (replay && events.length > 3) {
+      // A Run already under way: play what came before quickly, so its agents still spawn in order.
+      state.replayFast = events.length > 160;
+      const step = Math.max(12, Math.min(90, 5000 / events.length));
+      for (const ev of events) {
+        apply(ev);
+        draw();
+        await new Promise((r) => setTimeout(r, state.replayFast ? 0 : step));
+      }
+      state.replayFast = false;
+    } else {
+      events.forEach(apply);
+    }
+  }
+
+  function takeRun(run) {
+    state.run = { ...(state.run || {}), ...run };
+    if (run.engine) state.engine = run.engine;
+    if (!state.engine && run.mode) state.engine = { "STORM": "storm", "Deep Research": "deep", "Agent Research": "agent" }[run.mode] || null;
+    const l = lead();
+    l.title = W.lead;
+    l.sub = [state.run.mode, state.run.depth].filter(Boolean).join(" · ");
+  }
+
+  async function pull() {
+    if (state.polling || !state.run || !state.run.id) return;
+    state.polling = true;
+    let replay = state.after === 0;
+    while (!state.final && !bridge.closed) {
+      let out;
+      try {
+        out = await bridge.callTool("research_events", { id: state.run.id, after: state.after });
+      } catch (e) {
+        await new Promise((r) => setTimeout(r, 5000));
+        continue;
+      }
+      if (!out) break;
+      takeRun(out.run || {});
+      await feed(out.events || [], replay);
+      replay = false;
+      state.after = out.after || state.after;
+      settle(state.run);
+      draw();
+      if (out.final) { state.final = true; break; }
+      if (!out.more) await new Promise((r) => setTimeout(r, 2500));
+    }
+    state.polling = false;
+  }
+
+  function fromResult(result) {
+    if (!result) return null;
+    if (result.structuredContent) return result.structuredContent.result || result.structuredContent;
+    const text = (result.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
+    try { return JSON.parse(text); } catch { return null; }
+  }
+
+  // ---------------------------------------------------------------- the host (MCP Apps, JSON-RPC over postMessage)
+  const bridge = {
+    connected: false, closed: false, tools: false, modes: [], seq: 0, waiting: new Map(),
+    send(msg) { window.parent.postMessage(msg, "*"); },
+    request(method, params, timeout = 60000) {
+      const id = ++this.seq;
+      this.send({ jsonrpc: "2.0", id, method, params });
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => { this.waiting.delete(id); reject(new Error("timeout " + method)); }, timeout);
+        this.waiting.set(id, { resolve: (v) => { clearTimeout(t); resolve(v); }, reject: (e) => { clearTimeout(t); reject(e); } });
+      });
+    },
+    notify(method, params) { this.send({ jsonrpc: "2.0", method, params: params || {} }); },
+    async callTool(name, args) {
+      if (!this.tools) return null;
+      const result = await this.request("tools/call", { name, arguments: args });
+      if (result && result.isError) throw new Error("tool error");
+      return fromResult(result);
+    },
+  };
+
+  function theme(ctx) {
+    if (!ctx) return;
+    if (ctx.theme) document.documentElement.dataset.theme = ctx.theme;
+    const vars = ctx.styles && ctx.styles.variables;
+    if (vars) Object.entries(vars).forEach(([k, v]) => { if (v) document.documentElement.style.setProperty(k, v); });
+    if (ctx.locale) { W = String(ctx.locale).toLowerCase().startsWith("th") ? WORDS.th : WORDS.en; document.documentElement.lang = ctx.locale; }
+    if (ctx.availableDisplayModes) bridge.modes = ctx.availableDisplayModes;
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent) return;
+    const m = event.data;
+    if (!m || m.jsonrpc !== "2.0") return;
+    if (m.id != null && !m.method) {
+      const w = bridge.waiting.get(m.id);
+      if (!w) return;
+      bridge.waiting.delete(m.id);
+      m.error ? w.reject(m.error) : w.resolve(m.result);
+      return;
+    }
+    if (m.method === "ui/resource-teardown") { bridge.closed = true; if (m.id != null) bridge.send({ jsonrpc: "2.0", id: m.id, result: {} }); return; }
+    if (m.id != null) { bridge.send({ jsonrpc: "2.0", id: m.id, result: {} }); }
+    if (m.method === "ui/notifications/host-context-changed") { theme(m.params); draw(); }
+    if (m.method === "ui/notifications/tool-input") {
+      const a = (m.params && m.params.arguments) || {};
+      if (a.topic && !state.run) { takeRun({ topic: a.topic, language: a.language, depth: a.depth }); state.engine = a.mode || "storm"; takeRun({}); draw(); }
+      if (a.id) { takeRun({ id: a.id }); pull(); }
+    }
+    if (m.method === "ui/notifications/tool-result") {
+      const facts = fromResult(m.params);
+      if (facts && facts.id) { takeRun(facts); settle(state.run); draw(); pull(); }
+      else if (facts && facts.run) { takeRun(facts.run); pull(); }
+    }
+  });
+
+  async function connect() {
+    try {
+      const init = await bridge.request("ui/initialize", {
+        appInfo: { name: "deeplit-research-canvas", version: "1.0.0" },
+        appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
+        protocolVersion: "2026-01-26",
+      }, 8000);
+      bridge.connected = true;
+      bridge.tools = !!(init && init.hostCapabilities && init.hostCapabilities.serverTools);
+      theme(init && init.hostContext);
+      bridge.notify("ui/notifications/initialized", {});
+      if (!bridge.tools) { $("note").hidden = false; $("note").textContent = W.noTools; }
+      draw();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // size for the host
+  let lastH = 0;
+  new ResizeObserver(() => {
+    const h = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    if (bridge.connected && Math.abs(h - lastH) > 2) { lastH = h; bridge.notify("ui/notifications/size-changed", { height: h }); }
+    if (!state.resizing) { state.resizing = true; requestAnimationFrame(() => { state.resizing = false; draw(); }); }
+  }).observe(document.body);
+
+  $("read").onclick = () => bridge.request("ui/message", { role: "user", content: [{ type: "text", text: W.readAsk(state.run.id) }] }).catch(() => {});
+  $("open").onclick = () => bridge.request("ui/open-link", { url: state.run.web_url }).catch(() => {});
+  $("full").onclick = () => bridge.request("ui/request-display-mode", { mode: "fullscreen" }).catch(() => {});
+
+  // ---------------------------------------------------------------- demo (opened on its own)
+  function demo(kind) {
+    W = (navigator.language || "").toLowerCase().startsWith("th") ? WORDS.th : WORDS.en;
+    const now = Date.now();
+    const at = (i) => new Date(now + i * 900).toISOString();
+    const evs = [];
+    const push = (type, data) => evs.push({ id: evs.length + 1, at: at(evs.length), type, data });
+    let run;
+    if (kind === "storm") {
+      run = { id: "demo", topic: "Retrieval-augmented generation", mode: "STORM", engine: "storm", depth: "standard", language: "en", status: "running" };
+      push("stage", { stage: "research" });
+      push("note", { kind: "perspectives", perspectives: ["Basic fact writer: covers the basic facts", "Retrieval architect: vector stores and rankers", "Evaluator: how RAG is measured", "Practitioner: deploying RAG in products"] });
+      for (let i = 0; i < 6; i++) push("note", { kind: "browsed", urls: ["a", "b", "c"] });
+      ["outline", "article", "polish"].forEach((s) => push("stage", { stage: s }));
+    } else if (kind === "deep") {
+      run = { id: "demo", topic: "Solar energy in Thailand", mode: "Deep Research", engine: "deep", depth: "standard", language: "en", status: "running" };
+      push("stage", { stage: "research" });
+      push("note", { kind: "tree", id: "0", status: "node_complete" });
+      const qs = ["Thailand solar capacity 2026", "Solar rooftop policy Thailand", "PV costs in Southeast Asia"];
+      qs.forEach((q, i) => {
+        push("note", { kind: "tree", id: `0-${i}`, parent: "0", status: "generating_query" });
+        push("note", { kind: "tree", id: `0-${i}`, query: q, goal: "Find current figures", status: "searching" });
+      });
+      qs.forEach((q, i) => {
+        push("note", { kind: "tree", id: `0-${i}`, query: q, status: "search_complete", sources: 4 + i });
+        push("note", { kind: "browsed", urls: ["a", "b", "c", "d"] });
+        push("note", { kind: "tree", id: `0-${i}-0`, parent: `0-${i}`, query: q + " details", status: "searching" });
+        push("note", { kind: "tree", id: `0-${i}`, query: q, status: "node_complete" });
+      });
+      qs.forEach((q, i) => push("note", { kind: "tree", id: `0-${i}-0`, query: q + " details", status: i === 1 ? "no_evidence" : "node_complete" }));
+      push("stage", { stage: "report" });
+    } else {
+      run = { id: "demo", topic: "Mangosteen farming in Eastern Thailand", mode: "Agent Research", engine: "agent", depth: "deep", language: "en", status: "running" };
+      push("stage", { stage: "plan" });
+      push("note", { kind: "flow", event: "plan", sections: [{ id: "s1", title: "Climate and soil" }, { id: "s2", title: "Pests and diseases" }, { id: "s3", title: "Markets and prices" }] });
+      push("stage", { stage: "research" });
+      for (let r = 1; r <= 2; r++) {
+        ["s1", "s2", "s3"].forEach((lane) => {
+          push("note", { kind: "flow", event: "round", lane, round: r, max: 3 });
+          push("note", { kind: "flow", event: "phase", lane, round: r, phase: "observe" });
+        });
+        ["s1", "s2", "s3"].forEach((lane) => {
+          push("note", { kind: "flow", event: "gap", lane, round: r, gap: `What is still unknown about ${lane}`, complete: false });
+          push("note", { kind: "flow", event: "tasks", lane, round: r, queries: [{ agent: "search", query: `${lane} query A r${r}` }, { agent: r === 2 ? "crawl" : "search", query: `${lane} query B r${r}`, site: r === 2 ? "doa.go.th" : null }] });
+          push("note", { kind: "flow", event: "phase", lane, round: r, phase: "search" });
+        });
+        ["s1", "s2", "s3"].forEach((lane) => {
+          push("note", { kind: "browsed", urls: ["a", "b", "c"] });
+          push("note", { kind: "flow", event: "found", lane, round: r, sources: 3, urls: [] });
+        });
+      }
+      ["s1", "s2", "s3"].forEach((lane) => push("note", { kind: "flow", event: "write", lane }));
+      push("note", { kind: "flow", event: "compose" });
+      push("stage", { stage: "report" });
+    }
+    takeRun(run);
+    draw();
+    let i = 0;
+    const tick = () => {
+      if (i < evs.length) { apply(evs[i]); i += 1; draw(); setTimeout(tick, 650); }
+      else { state.run.status = "succeeded"; settle(state.run); draw(); }
+    };
+    setTimeout(tick, 600);
+  }
+
+  (async () => {
+    draw();
+    const inHost = window.parent !== window && !location.hash.startsWith("#demo");
+    if (inHost && (await connect())) return;
+    demo((location.hash.split("=")[1] || "agent").toLowerCase());
+  })();
+})();
+</script>
+</body>
+</html>

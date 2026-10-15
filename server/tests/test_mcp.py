@@ -512,3 +512,21 @@ def test_each_mode_draws_its_own_canvas():
         assert "/*CONFIG*/" not in html and "<!--SCENES-->" not in html
         assert f'"events": "{mode + "_research" if mode else "research"}_events"' in html
         assert "http://" not in html.replace("http://www.w3.org/2000/svg", "") and "https://" not in html
+
+
+def test_another_modes_run_is_named_with_the_right_article(admin, browser, configured, db):  # noqa: F811
+    from litstorm.db.models import Run
+
+    token = _token(make_user(admin, browser))
+
+    async def on_deep(session):
+        return _data(await session.call_tool("deep_research_start", {"topic": "Songkran", "wait_seconds": 0}))
+
+    started = _call(token, on_deep, url=URL + "/deep")
+    db.get(Run, started["id"]).engine = "agent"  # the fixture's model cannot call tools, as Agent Research needs
+    db.commit()
+
+    async def on_storm(session):
+        return await session.call_tool("storm_research_status", {"id": started["id"], "wait_seconds": 0})
+
+    assert "is an Agent Research run" in _call(token, on_storm, url=URL + "/storm").content[0].text

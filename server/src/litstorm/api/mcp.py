@@ -260,7 +260,8 @@ def _own(session, user, run_id, mode=None):
         label = ENGINES.get(run.engine, {}).get("label", run.engine)
         where = (f"DeepLit's {label} server (deeplit-{run.engine}, {settings.get().public_url.rstrip('/')}"
                  f"{path_for(run.engine)}) or " if run.engine in MODES else "")
-        raise ToolError(f"That research is a {label} run, and this is DeepLit's {ENGINES[mode]['label']} "
+        article = "an" if label[:1].upper() in "AEIOU" else "a"
+        raise ToolError(f"That research is {article} {label} run, and this is DeepLit's {ENGINES[mode]['label']} "
                         f"server: read it through {where}the combined DeepLit server (deeplit).")
     return run
 

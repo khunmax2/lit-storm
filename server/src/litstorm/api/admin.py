@@ -14,7 +14,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import checks, embedding, limits, modes, quota, roles, security
+from litstorm import checks, cost, embedding, limits, modes, quota, roles, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
@@ -206,14 +206,24 @@ class ModelIn(BaseModel):
 
 class ModelOut(ModelIn):
     id: str
+    # LiteLLM's price, USD per million tokens, used when none is set above,
+    # and the name its table knows the model by; None when it has none, and
+    # then the model's Runs cost is unknown until a price is set.
+    table_price_in: Decimal | None = None
+    table_price_out: Decimal | None = None
+    table_name: str | None = None
 
 
 def model_out(m):
+    table = cost.table_rates(LLM_PROVIDERS.get(m.provider, {}).get("prefix", "") + m.model)
     return ModelOut(
         id=str(m.id), label=m.label, provider=m.provider, model=m.model, reasoning=m.reasoning,
         max_tokens=m.max_tokens or {}, enabled=m.enabled, is_default=m.is_default,
         price_in_per_mtok=m.price_in_per_mtok, price_out_per_mtok=m.price_out_per_mtok,
         supports_tools=m.supports_tools,
+        table_price_in=table[0] if table else None,
+        table_price_out=table[1] if table else None,
+        table_name=table[2] if table else None,
     )
 
 
@@ -654,6 +664,10 @@ class AdminRunOut(BaseModel):
     tokens_out: int | None
     search_calls: int | None
     cost_usd: Decimal | None
+    # The models no price was found for, and those priced under another
+    # name of LiteLLM's table (cost.price).
+    cost_unpriced: list[str] = []
+    cost_priced_as: dict[str, str] = {}
     quota_refunded: bool
 
 
@@ -669,6 +683,8 @@ def recent_runs(limit: int = Query(default=100, le=500), session=Depends(deps.da
             queued_at=run.queued_at, started_at=run.started_at, finished_at=run.finished_at,
             tokens_in=run.tokens_in, tokens_out=run.tokens_out, search_calls=run.search_calls,
             cost_usd=run.cost_usd, quota_refunded=run.quota_refunded,
+            cost_unpriced=(run.notes or {}).get("cost", {}).get("unpriced", []),
+            cost_priced_as=(run.notes or {}).get("cost", {}).get("priced_as", {}),
         )
         for run, email, name, kind in rows
     ]

@@ -1309,6 +1309,18 @@ export interface components {
             search_calls: number | null;
             /** Cost Usd */
             cost_usd: string | null;
+            /**
+             * Cost Unpriced
+             * @default []
+             */
+            cost_unpriced: string[];
+            /**
+             * Cost Priced As
+             * @default {}
+             */
+            cost_priced_as: {
+                [key: string]: string;
+            };
             /** Quota Refunded */
             quota_refunded: boolean;
         };
@@ -1894,6 +1906,12 @@ export interface components {
             supports_tools?: boolean | null;
             /** Id */
             id: string;
+            /** Table Price In */
+            table_price_in?: string | null;
+            /** Table Price Out */
+            table_price_out?: string | null;
+            /** Table Name */
+            table_name?: string | null;
         };
         /** MoveIn */
         MoveIn: {

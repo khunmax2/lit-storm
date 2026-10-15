@@ -25,7 +25,7 @@ def _token(user, scopes=("read", "research")):
     return r.json()["token"]
 
 
-def _call(token, steps, progress=None):
+def _call(token, steps, progress=None, url=URL):
     """Run `steps(session)` against a fresh app with an MCP client session."""
     from litstorm.api import create_app
 
@@ -36,7 +36,7 @@ def _call(token, steps, progress=None):
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app), headers={"Authorization": f"Bearer {token}"}, timeout=60
             ) as http:
-                async with streamable_http_client(URL, http_client=http) as (read, write, _):
+                async with streamable_http_client(url, http_client=http) as (read, write, _):
                     async with ClientSession(read, write) as session:
                         await session.initialize()
                         return await steps(session)
@@ -398,3 +398,105 @@ def test_a_thai_title_keeps_its_vowels_in_the_file_name():
 
     title = "ฝุ่น PM2.5 ในประเทศไทย: สาเหตุและมาตรการแก้ไข"
     assert _filename({"title": title}, "html") == "ฝุ่น PM2_5 ในประเทศไทย_ สาเหตุและมาตรการแก้ไข.html"
+
+
+# --- one server per mode ------------------------------------------------------------------------
+
+
+def _session_info(token, url):
+    """The server's name and instructions, and its tools, as a client sees them."""
+    from litstorm.api import create_app
+
+    app = create_app()
+
+    async def go():
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), headers={"Authorization": f"Bearer {token}"}, timeout=60
+            ) as http:
+                async with streamable_http_client(url, http_client=http) as (read, write, _):
+                    async with ClientSession(read, write) as session:
+                        info = await session.initialize()
+                        return info, (await session.list_tools()).tools
+
+    return asyncio.run(go())
+
+
+def test_each_mode_has_a_server_named_for_it(admin, browser):
+    token = _token(make_user(admin, browser))
+    info, tools = _session_info(token, URL + "/deep")
+    assert info.serverInfo.name == "DeepLit Deep Research"
+    assert "deeplit-storm" in info.instructions and "does not open pages" in info.instructions
+    assert sorted(t.name for t in tools) == sorted(f"deep_research_{v}" for v in (
+        "options", "start", "status", "report", "export", "list", "cancel", "events"))
+    start = next(t for t in tools if t.name == "deep_research_start")
+    assert "mode" not in start.inputSchema["properties"] and start.description.startswith("Start Deep Research")
+    assert "deep_research_status" in start.description and "research_status " not in start.description.replace(
+        "deep_research_status", "")
+    meta = {t.name: (t.meta or {}).get("ui") for t in tools}
+    assert meta["deep_research_start"] == {"resourceUri": "ui://deeplit/deep-canvas.html"}
+    combined, _ = _session_info(token, URL)
+    assert combined.serverInfo.name == "DeepLit"
+
+
+def test_a_mode_server_starts_its_mode_and_sees_only_its_runs(admin, browser, configured, db):  # noqa: F811
+    from litstorm.db.models import Run
+
+    token = _token(make_user(admin, browser))
+
+    async def on_deep(session):
+        options = _data(await session.call_tool("deep_research_options", {}))
+        started = _data(await session.call_tool("deep_research_start", {"topic": "Songkran", "wait_seconds": 0}))
+        canvas = await session.read_resource("ui://deeplit/deep-canvas.html")
+        return options, started, canvas.contents[0].text
+
+    options, started, canvas = _call(token, on_deep, url=URL + "/deep")
+    assert [e["id"] for e in options["engines"]] == ["deep"]
+    assert db.get(Run, started["id"]).engine == "deep" and "deep_research_status" in started["next"]
+    assert '"deep_research_events"' in canvas and '"research_events"' not in canvas
+
+    async def on_storm(session):
+        return (
+            _data(await session.call_tool("storm_research_list", {})),
+            await session.call_tool("storm_research_status", {"id": started["id"], "wait_seconds": 0}),
+            await session.call_tool("storm_research_events", {"id": started["id"]}),
+            await session.call_tool("storm_research_cancel", {"id": started["id"]}),
+        )
+
+    listed, status, events, cancel = _call(token, on_storm, url=URL + "/storm")
+    assert listed == []
+    for refused in (status, events, cancel):
+        assert refused.isError and "is a Deep Research run" in refused.content[0].text
+        assert "deeplit-deep" in refused.content[0].text and "/api/mcp/deep" in refused.content[0].text
+    assert db.get(Run, started["id"]).status == "queued"  # the refused cancel did nothing
+
+    async def on_combined(session):
+        return _data(await session.call_tool("research_list", {}))
+
+    assert [r["id"] for r in _call(token, on_combined)] == [started["id"]]
+
+
+def test_a_mode_server_is_closed_to_who_may_not_use_the_mode(admin, browser):
+    listing = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    account = admin.post("/api/admin/integrations", json={"name": "DeepWitya", "allowed_engines": ["deep"]}).json()
+    token = admin.post(f"/api/admin/integrations/{account['id']}/tokens", json={"name": "server", "days": None}).json()["token"]
+
+    def post(path, raw):
+        from fastapi.testclient import TestClient
+
+        from litstorm.api import create_app
+
+        with TestClient(create_app()) as client:
+            return client.post(path, content=json.dumps(listing), headers={
+                "Authorization": f"Bearer {raw}", "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json"})
+
+    assert post("/api/mcp/deep", token).status_code == 200
+    refused = post("/api/mcp/storm", token)
+    assert refused.status_code == 403 and refused.json()["error"] == "mode_not_allowed"
+    assert "STORM" in refused.json()["message"]
+    person = _token(make_user(admin, browser))
+    admin.put("/api/admin/engines/agent", json={"enabled": False})
+    refused = post("/api/mcp/agent", person)
+    assert refused.status_code == 403 and refused.json()["error"] == "mode_disabled"
+    assert post("/api/mcp", person).status_code == 200  # the combined server stays open

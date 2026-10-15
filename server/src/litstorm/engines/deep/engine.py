@@ -41,7 +41,13 @@ AI = {
     "groq": ("openai-compatible", "https://api.groq.com/openai/v1"),
     "openai-compatible": ("openai-compatible", None),
 }
-SEARCH = {"searxng": "searxng", "tavily": "tavily"}
+# The search the CLI does itself. SearXNG is not among them: the CLI kept
+# SearXNG's first five results as they came, and when an engine behind it
+# answered some other query those five could all be about something else.
+# A fast Thai Run ended empty that way (2026-10-06). Through the SearchBridge
+# it gets the retriever STORM uses, which leaves such results out
+# (knowledge_storm.rm.on_topic).
+SEARCH = {"tavily": "tavily"}
 
 
 def cli_input(config, secrets, bridge=None):

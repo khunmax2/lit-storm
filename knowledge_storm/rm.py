@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from typing import Callable, Union, List
 
 import backoff
@@ -641,6 +642,35 @@ class BraveRM(dspy.Retrieve):
         return collected_results
 
 
+def _trigrams(text):
+    """A text's letters and digits, lower-cased, as three-character pieces:
+    wording two texts share, found without splitting words, which Thai does
+    not mark."""
+    s = re.sub(r"[\W_]+", "", (text or "").lower())
+    return {s[i : i + 3] for i in range(len(s) - 2)}
+
+
+def on_topic(query, text):
+    """Whether a result shares any of the query's wording: a tenth of its
+    three-character pieces, and never more than four are asked for.
+
+    The engines behind a SearXNG can answer some other query entirely. On
+    2026-10-06 Bing gave Thai and English queries alike pages on Windows,
+    Roblox, LINE or Chinese Q&A, and SearXNG ranks them among the real ones.
+    Deep Research keeps the first five, and a fast Run whose five were all
+    of these ended with nothing to report. Measured on that day's results,
+    every relevant one shared at least five pieces of its query; this drops
+    69 of 79 of Bing's. A result that shares only part of the query, as when
+    an engine searched its first word alone, is not caught here
+    (docs/research/2026-10-06-thai-deep-empty-report.md).
+    """
+    wanted = _trigrams(query)
+    if not wanted:
+        return True
+    needed = min(4, -(-len(wanted) // 10))
+    return len(wanted & _trigrams(text)) >= needed
+
+
 class SearXNGConfigError(RuntimeError):
     """The instance is reachable but not set up for this client.
 
@@ -693,6 +723,8 @@ class SearXNG(dspy.Retrieve):
         # topic has no sources.
         self.refused = 0
         self.last_refusal = ""
+        # Results left out for answering some other query (`on_topic`).
+        self.off_topic = 0
 
         if is_valid_source:
             self.is_valid_source = is_valid_source
@@ -775,9 +807,13 @@ class SearXNG(dspy.Retrieve):
                 # whole page — twenty or thirty results per query — and STORM
                 # went on to read all of them.
                 added = 0
+                dropped = 0
                 for r in results.get("results", []):
                     if added >= self.k:
                         break
+                    if not on_topic(query, f"{r.get('title') or ''} {r.get('content') or ''}"):
+                        dropped += 1
+                        continue
                     if self.is_valid_source(r["url"]) and r["url"] not in exclude_urls:
                         collected_results.append(
                             {
@@ -788,6 +824,13 @@ class SearXNG(dspy.Retrieve):
                             }
                         )
                         added += 1
+                self.off_topic += dropped
+                if dropped:
+                    logging.warning(
+                        "SearXNG: %d results for %r were about something else",
+                        dropped,
+                        query,
+                    )
 
                 # An instance whose engines are all refusing answers 200 with
                 # an empty list, so a run collects nothing and no one is told

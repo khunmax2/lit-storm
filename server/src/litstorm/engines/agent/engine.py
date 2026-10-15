@@ -37,7 +37,12 @@ BASES = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "groq": "https://api.groq.com/openai/v1",
 }
-SEARCH = {"searxng": "searchxng", "tavily": "tavily"}
+# The search the library does itself. SearXNG goes through the SearchBridge
+# instead, as for Deep Research: its own client keeps SearXNG's results
+# unchecked, and the engines behind SearXNG can answer some other query
+# entirely; the bridge's retriever leaves those out (knowledge_storm.rm.
+# on_topic, docs/research/2026-10-06-thai-deep-empty-report.md).
+SEARCH = {"tavily": "tavily"}
 
 # Share of the level's time target the research loop may use before it
 # writes. The deep level writes section by section, so it stops sooner.

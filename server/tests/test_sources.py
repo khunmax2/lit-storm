@@ -152,3 +152,17 @@ def test_four_sources_are_too_many_for_a_discussion(admin, browser, configured):
     r = user.post("/api/discussions", json={"topic": "Songkran", "language": "th", "search_provider_id": arxiv["id"],
                                             "extra_search_provider_ids": others})
     assert r.status_code == 422 and r.json()["detail"] == "too_many_sources"
+
+
+def test_agent_research_searches_searxng_through_the_bridge():
+    """As Deep Research does: the bridge's retriever leaves out results about something else."""
+    from litstorm.engines import sources
+    from litstorm.engines.agent.engine import SEARCH
+    from litstorm.engines.base import RunConfig
+
+    def config(**over):
+        return RunConfig(**{"run_id": "r", "engine": "agent", "topic": "t", "language": "th",
+                            "llm": {}, "search": {"provider": "searxng", "endpoint": "http://s"}, **over})
+
+    assert sources.bridged(config(), SEARCH)
+    assert not sources.bridged(config(search={"provider": "tavily"}), SEARCH)  # the library's own client

@@ -76,8 +76,8 @@ ABOUT = {
         "Best for a specific question, a comparison or the latest on something, quickly and cheaply: the "
         "fastest and cheapest mode. It works from the search results' text and does not open pages, so it "
         "cites fewer sources (about 3 at depth fast, 15 standard, 20 deep). Each finding keeps the passage it "
-        "came from. Usually under 1 minute (fast), about 1 (standard), 2 to 3 (deep). Thai topics may find "
-        "little; English ones find more."
+        "came from. Usually under 1 minute (fast), about 1 (standard), 2 to 3 (deep). Works in Thai and "
+        "English; depth fast sends only two queries, so a narrow topic can come back thin: standard is safer."
     ),
     "agent": (
         "Agent Research runs a loop of agents. It notes what it knows, names the biggest knowledge gap, picks "

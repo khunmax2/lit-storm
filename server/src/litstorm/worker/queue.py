@@ -13,11 +13,13 @@ started longest ago goes next, with their oldest Run. Someone who queued ten
 Runs does not make everyone else wait for all ten.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select, text, update
+from sqlalchemy import func, literal, or_, select, text, update
+from sqlalchemy.dialects.postgresql import JSONB
 
 from litstorm import cost, discussion, embedding, limits, quota, security, settings
 from litstorm.db.models import (
@@ -34,6 +36,8 @@ from litstorm.db.models import (
     User,
 )
 from litstorm.engines.base import RunConfig, Secrets
+
+log = logging.getLogger("litstorm.worker")
 
 LEASE = timedelta(seconds=60)
 CLAIM_LOCK = 7_211_001  # arbitrary, fixed: the advisory lock id for claims
@@ -255,10 +259,21 @@ def add_note(session, claim, kind, data):
 def finish(session, claim, outcome, report_title=None, source_count=None):
     """Write the final status once. False if the Run was no longer ours."""
     tokens_in, tokens_out, searches, by_model = cost.totals(outcome.usage)
+    priced = cost.price(by_model, prices=claim.prices)
+    extra = {}
+    if priced.unpriced or priced.priced_as:
+        # Said on the Run and in the log, never silently a NULL cost: the
+        # Administrator can set the model's price (Settings › Models).
+        extra["notes"] = Run.notes.op("||")(
+            literal({"cost": {"unpriced": priced.unpriced, "priced_as": priced.priced_as}}, JSONB)
+        )
+    if priced.unpriced:
+        log.warning("run %s: no price for %s; its cost is unknown", claim.run_id, ", ".join(priced.unpriced))
     done = session.execute(
         update(Run)
         .where(_held(claim))
         .values(
+            **extra,
             status=outcome.status,
             reason=outcome.reason,
             message=(outcome.message or None),
@@ -270,7 +285,7 @@ def finish(session, claim, outcome, report_title=None, source_count=None):
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             search_calls=searches,
-            cost_usd=cost.estimate(by_model, prices=claim.prices),
+            cost_usd=priced.usd,
         )
     ).rowcount
     session.commit()

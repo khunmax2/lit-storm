@@ -998,6 +998,22 @@ function ModelDialog({
   );
 }
 
+// What the model's Runs are priced at: the Administrator's price, or else
+// LiteLLM's table (perhaps under the vendor's name), or nothing.
+function ModelPrice({ m }: { m: Schemas["ModelOut"] }) {
+  const { t } = useT();
+  const rate = (v: string | number) => String(Number(Number(v).toFixed(4)));
+  if (m.price_in_per_mtok != null && m.price_out_per_mtok != null)
+    return <div className="text-xs text-muted-foreground">{t("admin.priceSet", { in: rate(m.price_in_per_mtok), out: rate(m.price_out_per_mtok) })}</div>;
+  if (m.table_price_in != null && m.table_price_out != null)
+    return (
+      <div className="text-xs text-muted-foreground">
+        {t("admin.priceTable", { in: rate(m.table_price_in), out: rate(m.table_price_out), name: m.table_name ?? "" })}
+      </div>
+    );
+  return null;
+}
+
 function Models() {
   const { t } = useT();
   const keys = useQuery({ queryKey: ["admin-keys"], queryFn: () => call(api.GET("/api/admin/llm-credentials")) });
@@ -1033,8 +1049,19 @@ function Models() {
                       {m.label}
                       {m.is_default && <Badge variant="secondary">{t("admin.default")}</Badge>}
                       {m.supports_tools && <Badge variant="outline">{t("modelKind.toolsBadge")}</Badge>}
+                      {m.price_in_per_mtok == null && m.table_price_in == null && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="bg-warning-soft text-warning">
+                              {t("admin.noPrice")}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>{t("admin.noPriceHint")}</TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="font-mono text-xs text-muted-foreground">{m.model}</div>
+                    <ModelPrice m={m} />
                   </TableCell>
                   <TableCell>{m.provider}</TableCell>
                   <TableCell className="font-mono text-xs">{m.reasoning || "—"}</TableCell>
@@ -2067,7 +2094,12 @@ function Usage() {
                   <TableCell className="text-xs">{r.model_label}</TableCell>
                   <TableCell className={right}>{r.tokens_in != null ? `${n(r.tokens_in)} / ${n(r.tokens_out ?? 0)}` : "–"}</TableCell>
                   <TableCell className={right}>{r.search_calls != null ? n(r.search_calls) : "–"}</TableCell>
-                  <TableCell className={right}>{usd(r.cost_usd)}</TableCell>
+                  <TableCell className={right}>
+                    {usd(r.cost_usd)}
+                    {!!r.cost_unpriced?.length && (
+                      <div className="text-xs text-warning">{t("usage.noPrice", { names: r.cost_unpriced.join(", ") })}</div>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

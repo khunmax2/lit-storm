@@ -3690,6 +3690,22 @@
       ],
       "title": "Cost Usd"
      },
+     "cost_unpriced": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Cost Unpriced",
+      "default": []
+     },
+     "cost_priced_as": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Cost Priced As",
+      "default": {}
+     },
      "quota_refunded": {
       "type": "boolean",
       "title": "Quota Refunded"
@@ -5294,6 +5310,41 @@
      "id": {
       "type": "string",
       "title": "Id"
+     },
+     "table_price_in": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Table Price In"
+     },
+     "table_price_out": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Table Price Out"
+     },
+     "table_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Table Name"
      }
     },
     "type": "object",

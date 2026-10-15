@@ -376,7 +376,8 @@ def run_out(run):
         finished_at=run.finished_at,
         report_title=run.report_title,
         source_count=run.source_count,
-        notes=run.notes or {},
+        # What it cost is the Administrator's to know (admin.recent_runs).
+        notes={k: v for k, v in (run.notes or {}).items() if k != "cost"},
         refinement=run.config.get("refinement", []),
         sections=run.config.get("sections", []),
         instructions=run.config.get("instructions", {}),

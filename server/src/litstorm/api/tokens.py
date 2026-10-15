@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from litstorm import limits, quota, settings, tokens
+from litstorm import limits, modes, quota, settings, tokens
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
 from litstorm.db.models import INTEGRATION, ApiToken, Run, User
@@ -70,20 +70,49 @@ def _checked(body, allow_forever=False):
 # --- a User's own ---------------------------------------------------------
 
 
+class EndpointOut(BaseModel):
+    """One MCP server: the combined one ("all") or one mode's (docs/adr/0009)."""
+
+    id: str  # all | storm | deep | agent
+    name: str  # what a client calls it: deeplit, deeplit-deep, ...
+    path: str
+    url: str
+    tool_prefix: str  # research, deep_research, ...
+    allowed: bool  # this account may use it now
+
+
 class ConnectionOut(BaseModel):
     """What a client needs to reach the server, for the setup page."""
 
     url: str
+    endpoints: list[EndpointOut]
     enabled: bool
     may_create: bool
     scopes: list[str]
     lifetimes: list[int]
 
 
+def endpoints(session, user):
+    from litstorm.api import mcp
+
+    base = settings.get().public_url.rstrip("/")
+    offered = set(modes.offered(session))
+    out = [EndpointOut(id="all", name="deeplit", path=MCP_PATH, url=base + MCP_PATH, tool_prefix="research",
+                       allowed=True)]
+    for mode in mcp.MODES:
+        path = mcp.path_for(mode)
+        out.append(EndpointOut(
+            id=mode, name=f"deeplit-{mode}", path=path, url=base + path, tool_prefix=f"{mode}_research",
+            allowed=mode in offered and (user.allowed_engines is None or mode in user.allowed_engines),
+        ))
+    return out
+
+
 @router.get("/me/connection", response_model=ConnectionOut)
 def connection(user=Depends(deps.current_user), session=Depends(deps.database)):
     return ConnectionOut(
         url=settings.get().public_url.rstrip("/") + MCP_PATH,
+        endpoints=endpoints(session, user),
         enabled=tokens.load(session).enabled,
         may_create=tokens.may_create(session, user),
         scopes=list(tokens.SCOPES),
@@ -164,6 +193,7 @@ class IntegrationOut(BaseModel):
     cost_usd: float
     tokens: list[TokenOut]
     recent: list[dict] = []  # its latest Runs, for an Administrator to open
+    endpoints: list[EndpointOut] = []  # the MCP servers it may reach, to hand over with a token
 
 
 class IntegrationIn(BaseModel):
@@ -209,6 +239,7 @@ def integration_out(session, user, configured):
         max_queued_runs=user.max_queued_runs, allowed_engines=user.allowed_engines, created_at=user.created_at,
         quota_limit=usage.limit, quota_used=usage.used, runs=runs, cost_usd=float(cost),
         tokens=[token_out(t, user) for t in rows],
+        endpoints=endpoints(session, user),
         recent=[
             {"id": str(r.id), "topic": r.topic, "status": r.status, "title": r.report_title,
              "queued_at": r.queued_at.isoformat(), "via_token": r.via_token.name if r.via_token else None}

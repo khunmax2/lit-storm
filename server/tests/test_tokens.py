@@ -138,3 +138,15 @@ def test_an_account_starts_only_the_modes_it_is_allowed(admin, browser, configur
     db.commit()
     r = user.post("/api/sessions", json={"topic": "Songkran", "language": "th", "engine": "storm"})
     assert r.status_code == 422 and r.json()["detail"] == "engine_not_allowed"
+
+
+def test_the_setup_page_names_every_mcp_server_and_who_may_use_it(admin, browser):
+    user = make_user(admin, browser)
+    endpoints = {e["id"]: e for e in user.get("/api/me/connection").json()["endpoints"]}
+    assert list(endpoints) == ["all", "storm", "deep", "agent"] and all(e["allowed"] for e in endpoints.values())
+    assert endpoints["deep"]["path"] == "/api/mcp/deep" and endpoints["deep"]["name"] == "deeplit-deep"
+    assert endpoints["deep"]["url"].endswith("/api/mcp/deep") and endpoints["deep"]["tool_prefix"] == "deep_research"
+    admin.put("/api/admin/engines/agent", json={"enabled": False})
+    assert not {e["id"]: e for e in user.get("/api/me/connection").json()["endpoints"]}["agent"]["allowed"]
+    account = admin.post("/api/admin/integrations", json={"name": "DeepWitya", "allowed_engines": ["deep"]}).json()
+    assert {e["id"] for e in account["endpoints"] if e["allowed"]} == {"all", "deep"}

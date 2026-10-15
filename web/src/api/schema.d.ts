@@ -1388,6 +1388,8 @@ export interface components {
         ConnectionOut: {
             /** Url */
             url: string;
+            /** Endpoints */
+            endpoints: components["schemas"]["EndpointOut"][];
             /** Enabled */
             enabled: boolean;
             /** May Create */
@@ -1542,6 +1544,24 @@ export interface components {
              * @default false
              */
             has_key: boolean;
+        };
+        /**
+         * EndpointOut
+         * @description One MCP server: the combined one ("all") or one mode's (docs/adr/0009).
+         */
+        EndpointOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /** Url */
+            url: string;
+            /** Tool Prefix */
+            tool_prefix: string;
+            /** Allowed */
+            allowed: boolean;
         };
         /**
          * EngineChoice
@@ -1705,6 +1725,11 @@ export interface components {
             recent: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Endpoints
+             * @default []
+             */
+            endpoints: components["schemas"]["EndpointOut"][];
         };
         /** IntegrationPatch */
         IntegrationPatch: {

@@ -3778,6 +3778,13 @@
       "type": "string",
       "title": "Url"
      },
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/EndpointOut"
+      },
+      "type": "array",
+      "title": "Endpoints"
+     },
      "enabled": {
       "type": "boolean",
       "title": "Enabled"
@@ -3804,6 +3811,7 @@
     "type": "object",
     "required": [
      "url",
+     "endpoints",
      "enabled",
      "may_create",
      "scopes",
@@ -4182,6 +4190,45 @@
     },
     "type": "object",
     "title": "EmbeddingOut"
+   },
+   "EndpointOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "path": {
+      "type": "string",
+      "title": "Path"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "tool_prefix": {
+      "type": "string",
+      "title": "Tool Prefix"
+     },
+     "allowed": {
+      "type": "boolean",
+      "title": "Allowed"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "path",
+     "url",
+     "tool_prefix",
+     "allowed"
+    ],
+    "title": "EndpointOut",
+    "description": "One MCP server: the combined one (\"all\") or one mode's (docs/adr/0009)."
    },
    "EngineChoice": {
     "properties": {
@@ -4626,6 +4673,14 @@
       },
       "type": "array",
       "title": "Recent",
+      "default": []
+     },
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/EndpointOut"
+      },
+      "type": "array",
+      "title": "Endpoints",
       "default": []
      }
     },

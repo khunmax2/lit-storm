@@ -10,6 +10,7 @@ import { api, call, type Schemas } from "@/api/client";
 import { ErrorText, LoadingRows, PortalTo, StatusBadge, timeAgo } from "@/components/common";
 import { useRunOptions } from "@/components/composer";
 import { useConfirm } from "@/components/run-parts";
+import { McpSetup } from "@/components/mcp-setup";
 import { NewTokenDialog, TokenTable } from "@/components/tokens";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,7 @@ function AccountCard({ account, revoke }: { account: Account; revoke: (id: strin
           if (!o) queryClient.invalidateQueries({ queryKey: ["integrations"] });
         }}
         allowForever
+        after={(made) => <McpSetup endpoints={account.endpoints ?? []} token={made.token} compact />}
         make={(body) =>
           call(api.POST("/api/admin/integrations/{account_id}/tokens", { params: { path: { account_id: account.id } }, body }))
         }

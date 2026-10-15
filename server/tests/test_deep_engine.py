@@ -67,7 +67,8 @@ def run(engine, tmp_path, script="ok", cancel=None, **over):
 
 
 def test_a_run_becomes_a_report_with_evidence(engine, tmp_path):
-    report, progress = run(engine, tmp_path)
+    # Tavily: the CLI searches it itself, and counts its own searches.
+    report, progress = run(engine, tmp_path, search={"provider": "tavily"})
     report_mod.validate(report)
     assert report["engine"] == "deep" and report["title"] == "Songkran"
     # Learnings 1 and 3 share a URL: one source, with both passages.
@@ -76,18 +77,22 @@ def test_a_run_becomes_a_report_with_evidence(engine, tmp_path):
     assert report["sources"][0]["evidence"] == ["Songkran marks the Thai New Year.", "People splash water."]
     assert progress.stages == ["research", "report", "normalize"]
     assert progress.usages[0] == ("research", {"openrouter/google/x": {"prompt_tokens": 100, "completion_tokens": 20}},
-                                 {"SearXNG": 1})
+                                 {"Tavily": 1})
     assert progress.usages[1][1]["openrouter/google/x"] == {"prompt_tokens": 300, "completion_tokens": 200}
 
 
 def test_the_cli_gets_the_runs_settings_and_only_its_keys():
     from litstorm.engines.deep.engine import cli_input
 
-    line, env = cli_input(_config(), Secrets(llm_api_key="sk-or-1", search_api_key=""))
+    class Bridge:
+        url = "http://127.0.0.1:5000/search"
+
+    line, env = cli_input(_config(), Secrets(llm_api_key="sk-or-1", search_api_key=""), Bridge())
     assert (line["breadth"], line["depth"], line["gatherMs"]) == (2, 1, 96000)
     assert line["ai"] == {"provider": "openrouter", "model": "google/x", "apiBase": None,
                           "extraBody": {"reasoning": {"effort": "minimal"}, "provider": {"require_parameters": True}}}
-    assert line["search"]["provider"] == "searxng" and line["query"].endswith("Focus: Which era? Ayutthaya")
+    assert line["search"] == {"provider": "searxng", "apiBase": Bridge.url, "engines": None}
+    assert line["query"].endswith("Focus: Which era? Ayutthaya")
     assert set(env) - {"SYSTEMROOT"} == {"PATH", "HOME", "LITSTORM_AI_API_KEY", "LITSTORM_SEARCH_API_KEY"}
 
 
@@ -134,11 +139,44 @@ def test_a_source_the_cli_cannot_reach_is_searched_through_the_bridge(engine, tm
     assert progress.usages[0][2] == {"ArxivRM": 1}
 
 
+def test_searxng_reaches_the_cli_without_results_about_something_else(engine, tmp_path, monkeypatch):
+    """The CLI keeps SearXNG's first results as they come. A fast Thai Run
+    ended empty when an engine behind SearXNG answered other queries and its
+    pages came first (2026-10-06); through the bridge they are left out."""
+    import requests
+
+    asked = []
+
+    class Resp:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [
+                {"url": "https://www.zhihu.com/q/1", "title": "如何证明数学等式 1 + 1 = 2 的成立？ - 知乎", "content": "知乎"},
+                {"url": "https://support.microsoft.com/1", "title": "Snipping Tool", "content": "Take a screenshot"},
+                {"url": "https://songkran.test/1", "title": "Songkran", "content": "Songkran is the Thai New Year."},
+            ]}
+
+    def get(url, headers, params, timeout):
+        asked.append((url, params))
+        return Resp()
+
+    monkeypatch.setattr(requests, "get", get)
+    report, progress = run(engine, tmp_path, "search", search={"provider": "searxng", "endpoint": "http://searxng:8080"})
+    assert asked == [("http://searxng:8080/search", {"q": "Songkran", "format": "json"})]
+    assert [s["url"] for s in report["sources"]] == ["https://songkran.test/1"]
+    assert progress.usages[0][2] == {"SearXNG": 1}
+
+
 def test_the_bridge_is_used_only_when_needed():
     from litstorm.engines import sources
     from litstorm.engines.deep.engine import SEARCH
 
-    assert not sources.bridged(_config(), SEARCH)  # one SearXNG: the CLI's own client
+    assert not sources.bridged(_config(search={"provider": "tavily"}), SEARCH)  # the CLI's own client
+    assert sources.bridged(_config(), SEARCH)  # SearXNG: through STORM's retriever
     assert sources.bridged(_config(search={"provider": "tci"}), SEARCH)
     assert sources.bridged(_config(search_extra=[{"provider": "searxng", "endpoint": "http://x"}]), SEARCH)
 

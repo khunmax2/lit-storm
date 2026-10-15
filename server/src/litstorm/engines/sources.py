@@ -9,7 +9,10 @@ which speaks to SearXNG or Tavily and nothing else. For any other source, or
 several, `SearchBridge` puts that same retriever behind a SearXNG-shaped
 address on this machine (`GET /search?q=...&format=json`) and the Engine is
 pointed at it as if at a SearXNG instance. A Run whose one source the Engine
-already speaks keeps the Engine's own client (`bridged`).
+already speaks keeps the Engine's own client (`bridged`), except SearXNG for
+Deep Research: its client keeps SearXNG's first results unchecked, and
+STORM's retriever leaves out those about something else
+(docs/research/2026-10-06-thai-deep-empty-report.md).
 """
 
 import json

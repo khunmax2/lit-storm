@@ -153,7 +153,7 @@ def test_searxng_skips_blank_queries_and_one_it_rejects(monkeypatch):
             pass
 
         def json(self):
-            return {"results": [{"url": "https://a.test/" + asked[-1], "title": "A", "content": "c"}]}
+            return {"results": [{"url": "https://a.test/" + asked[-1], "title": asked[-1], "content": "c"}]}
 
     def get(url, headers, params, timeout):
         asked.append(params["q"])
@@ -193,6 +193,52 @@ def test_searxng_counts_queries_its_engines_refused(monkeypatch):
     assert rm.forward(["songkran", "rag"]) == []
     assert rm.refused == 2
     assert rm.last_refusal == "brave: Suspended: too many requests, duckduckgo: timeout"
+
+
+def test_searxng_leaves_out_results_about_something_else(monkeypatch):
+    """A fast Thai Deep Research Run ended empty (2026-10-06): Bing, behind
+    SearXNG, answered other queries, and its pages sat among the real ones.
+    The results here are that day's, for the query the Run asked."""
+    import requests
+
+    from knowledge_storm.rm import SearXNG
+
+    query = "ปัญหาและอุปสรรค โครงการรถไฟความเร็วสูง กรุงเทพ-หนองคาย"
+    answer = [
+        ("https://www.windows-10-forum.com/1", "Defender vertauscht Datum und Uhrzeit", "Windows 10 Forum"),
+        ("https://www.myhora.com/1", "ปฏิทิน พ.ศ.2569/2026 จันทรคติไทย ...", "ปฏิทินวันพระ วันหยุด"),
+        ("https://odl.parliament.go.th/1", "โอกาส และความท้าทาย : โครงการรถไฟความเร็วสูง ช่วง ...", ""),
+        ("https://www.zhihu.com/1", "如何证明数学等式 1 + 1 = 2 的成立？ - 知乎", ""),
+        ("https://www.otp.go.th/1", "โครงการศึกษาและออกแบบรถไฟความเร็วสูง สายกรุงเทพฯ – หนองคาย .", ""),
+    ]
+
+    class Resp:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [{"url": u, "title": t, "content": c} for u, t, c in answer]}
+
+    monkeypatch.setattr(requests, "get", lambda *a, **kw: Resp())
+    rm = SearXNG("http://searxng.test", k=5)
+    found = rm.forward(query)
+    assert [r["url"] for r in found] == ["https://odl.parliament.go.th/1", "https://www.otp.go.th/1"]
+    assert rm.off_topic == 3
+
+    # The weakest relevant result that day, for the Run's other query: its
+    # wording is not the query's ("ไฮสปีด" for "รถไฟความเร็วสูง").
+    answer[:] = [("https://mgronline.com/1", "ส่องแผน”ไฮสปีด 8 สาย” 1.78 ล้านล้านบาท สายแรก“ไทย-จีน”สร้าง 9 ปีได้แค่ ...",
+                  "Jul 23, 2026 · ส่องแผน”ไฮสปีด 8 สาย” 1.78 ล้านล้านบาท สายแรก“ไทย-จีน”สร้าง 9 ปีได้แค่ 55% "
+                  "งบส่อพุ่งทะลุ 1.79 แสนล้าน ลุ้นเปิดปี 74 เผยแพร่: 23 ก.ค. 2569 12:25")]
+    assert len(SearXNG("http://searxng.test", k=5).forward("ความคืบหน้าล่าสุด โครงการรถไฟความเร็วสูงไทย-จีน 2569")) == 1
+
+    # English is the same; a query too short to measure keeps everything.
+    answer[:] = [("https://g.test/1", "Google Account", "Sign in to your account"),
+                 ("https://n.test/1", "Off-target effects of CRISPR-Cas9", "Unintended edits")]
+    assert [r["url"] for r in SearXNG("http://searxng.test", k=5).forward("CRISPR off-target effects")] == ["https://n.test/1"]
+    assert len(SearXNG("http://searxng.test", k=5).forward("AI")) == 2
 
 
 def test_tavily_skips_blank_queries_and_one_it_rejects(monkeypatch):

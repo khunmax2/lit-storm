@@ -12,16 +12,17 @@ import {
   Plug,
   Globe,
   MoreHorizontal,
+  Radar,
   RotateCcw,
   Settings2,
   Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { api, call, type Schemas } from "@/api/client";
+import { api, BASE, call, type Schemas } from "@/api/client";
 import {
   ErrorText,
   LoadingRows,
@@ -37,6 +38,9 @@ import { MoveSessionDialog } from "@/components/move-session";
 import { ProjectSettingsDialog } from "@/components/project-settings";
 import { AgentFlowCanvas } from "@/components/agent-flow-canvas";
 import { ResearchCanvas } from "@/components/research-canvas";
+
+// three.js comes only with the 3D view, when someone opens it.
+const StormObservatory3D = lazy(() => import("@/components/agent-observatory-3d").then((m) => ({ default: m.StormObservatory3D })));
 import { SupportDialog } from "@/components/support-dialog";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
@@ -712,6 +716,14 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {run.status !== "queued" && run.status !== "needs_selection" && (
+              <Button variant="outline" asChild title={t("run.observatoryHint")}>
+                <a href={`${BASE}/api/runs/${run.id}/observatory`} target="_blank" rel="noopener">
+                  <Radar />
+                  <span className="hidden sm:inline">{t("run.observatory")}</span>
+                </a>
+              </Button>
+            )}
             {readable && (
               <Button asChild>
                 <Link to="/runs/$runId" params={{ runId: run.id }}>
@@ -779,7 +791,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />
-        {(run.engine === "deep" || run.engine === "agent") && run.status !== "queued" && run.status !== "needs_selection" && (
+        {(run.engine === "deep" || run.engine === "agent" || run.engine === "storm") && run.status !== "queued" && run.status !== "needs_selection" && (
           <details
             className="group"
             open={mapOpen}
@@ -787,12 +799,16 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
           >
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
               <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
-              {run.engine === "agent" ? t("flow.title") : t("canvas.title")}
+              {run.engine === "agent" ? t("flow.title") : run.engine === "storm" ? t("obs3d.open") : t("canvas.title")}
             </summary>
             {/* Drawn only when open: a canvas laid out while folded has no size to fit. */}
             {mapOpen && (
               <div className="mt-2">
-                {run.engine === "agent" ? (
+                {run.engine === "storm" ? (
+                  <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
+                    <StormObservatory3D runId={run.id} live={!FINAL.has(run.status)} />
+                  </Suspense>
+                ) : run.engine === "agent" ? (
                   <AgentFlowCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
                 ) : (
                   <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />

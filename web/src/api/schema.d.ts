@@ -923,6 +923,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/observatory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * View Observatory
+         * @description The Run's agents at work, then its report's citations against their
+         *     Sources (litstorm.render.observatory): live while it runs, a replay once
+         *     it has ended. Opened in a tab of its own, signed in.
+         */
+        get: operations["view_observatory_api_runs__run_id__observatory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/export": {
         parameters: {
             query?: never;
@@ -932,6 +954,28 @@ export interface paths {
         };
         /** Export Report */
         get: operations["export_report_api_runs__run_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/exports/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export By Link
+         * @description A report's file through a link research_export made (litstorm.exports):
+         *     no sign-in, the link is the permission, for its one Run and format, until
+         *     it expires. The Run must still be its owner's and have its report.
+         */
+        get: operations["export_by_link_api_exports__token__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1344,6 +1388,8 @@ export interface components {
         ConnectionOut: {
             /** Url */
             url: string;
+            /** Endpoints */
+            endpoints: components["schemas"]["EndpointOut"][];
             /** Enabled */
             enabled: boolean;
             /** May Create */
@@ -1498,6 +1544,24 @@ export interface components {
              * @default false
              */
             has_key: boolean;
+        };
+        /**
+         * EndpointOut
+         * @description One MCP server: the combined one ("all") or one mode's (docs/adr/0009).
+         */
+        EndpointOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /** Url */
+            url: string;
+            /** Tool Prefix */
+            tool_prefix: string;
+            /** Allowed */
+            allowed: boolean;
         };
         /**
          * EngineChoice
@@ -1661,6 +1725,11 @@ export interface components {
             recent: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Endpoints
+             * @default []
+             */
+            endpoints: components["schemas"]["EndpointOut"][];
         };
         /** IntegrationPatch */
         IntegrationPatch: {
@@ -4732,6 +4801,37 @@ export interface operations {
             };
         };
     };
+    view_observatory_api_runs__run_id__observatory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_report_api_runs__run_id__export_get: {
         parameters: {
             query: {
@@ -4742,6 +4842,37 @@ export interface operations {
             header?: never;
             path: {
                 run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_by_link_api_exports__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
             };
             cookie?: never;
         };

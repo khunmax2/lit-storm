@@ -22,6 +22,7 @@ import {
   Library,
   Loader2,
   PanelsTopLeft,
+  Radar,
   Quote,
   RefreshCw,
   Sparkles,
@@ -200,6 +201,7 @@ function ExportMenu({ runId }: { runId: string }) {
         {item("html", "HTML", FileCode2)}
         {item("md", "Markdown", FileType2)}
         {item("interactive", t("report.exportInteractive"), PanelsTopLeft)}
+        {item("observatory", t("report.exportObservatory"), Radar)}
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={evidence}

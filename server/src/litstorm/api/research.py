@@ -36,6 +36,7 @@ from litstorm.db.models import (
     Run,
     RunEvent,
     SearchProvider,
+    User,
 )
 
 router = APIRouter(prefix="/api", tags=["research"])
@@ -1013,7 +1014,14 @@ def get_report(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depen
 
 
 def _filename(report, ext):
-    safe = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in report["title"]).strip()[:80]
+    import unicodedata
+
+    # Combining marks (Thai vowels and tone marks above and below) are part of
+    # the word they sit on, not punctuation to replace.
+    safe = "".join(
+        ch if ch.isalnum() or ch in " -_" or unicodedata.category(ch).startswith("M") else "_"
+        for ch in report["title"]
+    ).strip()[:80]
     return f"{safe or 'report'}.{ext}"
 
 
@@ -1209,26 +1217,114 @@ def view_interactive(
     )
 
 
+# The live observatory reads the Run and its report from this origin, and nothing else.
+OBSERVATORY_HEADERS = {"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer"}
+
+
+@router.get("/runs/{run_id}/observatory")
+def view_observatory(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """The Run's agents at work, then its report's citations against their
+    Sources (litstorm.render.observatory): live while it runs, a replay once
+    it has ended. Opened in a tab of its own, signed in."""
+    from litstorm.render import observatory
+
+    run = deps.readable(session, Run, run_id, user, "run")
+    report = None
+    if run.status == "succeeded" and os.path.exists(_report_path(run)):
+        report = report_mod.load(_report_path(run))
+    page = observatory.render(
+        _observatory_facts(run),
+        _observatory_events(session, run),
+        report,
+        # Relative to this page, /api/runs/{id}/observatory: the Run, then its report.
+        live={"run": f"../{run.id}", "report": "report"},
+    )
+    return Response(
+        page,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Security-Policy": observatory.LIVE_CSP + "; frame-ancestors 'self'", **OBSERVATORY_HEADERS},
+    )
+
+
+def _observatory_facts(run):
+    from litstorm.render import observatory
+
+    return observatory.run_facts(
+        run, ENGINES.get(run.engine, {}).get("label", run.engine), (run.config or {}).get("llm", {}).get("label", "")
+    )
+
+
+def _observatory_events(session, run):
+    from litstorm.render import observatory
+
+    return observatory.events_out(
+        session.scalars(select(RunEvent).where(RunEvent.run_id == run.id).order_by(RunEvent.id).limit(OBSERVATORY_EVENTS))
+    )
+
+
+OBSERVATORY_EVENTS = 8000  # a deep Deep Research Run writes about 2,000
+
+
 @router.get("/runs/{run_id}/export")
 def export_report(
     run_id: uuid.UUID,
-    format: str = Query(pattern="^(html|md|pdf|interactive)$"),
+    format: str = Query(pattern="^(html|md|pdf|interactive|observatory)$"),
     evidence: bool = False,
     # The interactive page's charts: drawn as pictures, or alive (+1.1 MB).
     charts: str = Query("static", pattern="^(static|full)$"),
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
+    run, report = _report(session, run_id, user, "export")
+    return _export(run, report, format, evidence, charts, session)
+
+
+@router.get("/exports/{token}")
+def export_by_link(token: str, session=Depends(deps.database)):
+    """A report's file through a link research_export made (litstorm.exports):
+    no sign-in, the link is the permission, for its one Run and format, until
+    it expires. The Run must still be its owner's and have its report."""
+    from litstorm import exports
+
+    try:
+        link = exports.verify(token)
+    except exports.Expired:
+        raise HTTPException(410, "link_expired") from None
+    except exports.Invalid:
+        raise HTTPException(404, "not_found") from None
+    owner = session.get(User, uuid.UUID(link["user_id"]))
+    if owner is None or not owner.is_active:
+        raise HTTPException(404, "not_found")
+    run = deps.own(session, Run, uuid.UUID(link["run_id"]), owner)
+    if run.status != "succeeded":
+        raise HTTPException(404, "not_found")
+    run, report = _report(session, run.id, owner, "export")
+    response = _export(run, report, link["format"], False, "static", session)
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _export(run, report, format, evidence, charts, session):
     from urllib.parse import quote
 
-    run, report = _report(session, run_id, user, "export")
-    name = _filename(report, "html" if format == "interactive" else format)
+    from litstorm import exports
+
+    name = _filename(report, exports.EXTENSIONS[format])
     # The facts the page shows above the title, as the web app shows them.
     facts = {
         "engine_label": ENGINES.get(report.get("engine") or run.engine, {}).get("label", ""),
         "finished_at": run.finished_at,
     }
     disposition = f"attachment; filename*=UTF-8''{quote(name)}"
+    if format == "observatory":
+        from litstorm.render import observatory
+
+        return Response(
+            observatory.render(_observatory_facts(run), _observatory_events(session, run), report),
+            media_type="text/html; charset=utf-8",
+            headers={"Content-Disposition": disposition},
+        )
     if format == "interactive":
         return Response(
             _interactive(run, report, facts, charts == "full"),

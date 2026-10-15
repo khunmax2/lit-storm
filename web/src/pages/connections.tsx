@@ -54,7 +54,7 @@ export function ConnectionsPage() {
             <AlertDescription>{t("connections.notAllowed")}</AlertDescription>
           </Alert>
         )}
-        {c && <McpSetup url={c.url} />}
+        {c && <McpSetup endpoints={c.endpoints} />}
         <section className="grid gap-3">
           <h2 className="text-sm font-medium">{t("tokens.title")}</h2>
           {tokens.isLoading ? (
@@ -75,7 +75,7 @@ export function ConnectionsPage() {
           if (!o) queryClient.invalidateQueries({ queryKey: ["my-tokens"] });
         }}
         make={(body) => call(api.POST("/api/me/tokens", { body }))}
-        after={(made) => c && <McpSetup url={c.url} token={made.token} compact />}
+        after={(made) => c && <McpSetup endpoints={c.endpoints} token={made.token} compact />}
       />
       {dialog}
     </div>

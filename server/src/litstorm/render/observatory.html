@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="__OBS_LANG__">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="__OBS_CSP__">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>__OBS_TITLE__</title>
+<!--
+  DeepLit Observatory (litstorm.render.observatory): a Run's agents at work, drawn from its own
+  events, then the report it wrote with every cited sentence lit up against the Source passage it
+  rests on. One file, no library, no request of its own unless it is the live page in the web app,
+  which reads the Run and its report from the same origin. Every string from the Run or the model
+  goes in as text, never as markup.
+-->
+<style>
+  :root {
+    --bg: #03060c; --bg2: #071224; --panel: rgba(8, 20, 38, .78); --line: rgba(64, 196, 255, .22);
+    --grid: rgba(64, 196, 255, .055); --text: #d4ebff; --dim: #7591ad; --faint: #3a5068;
+    --cyan: #22e4ff; --magenta: #ff3df2; --lime: #7dff6a; --amber: #ffb547; --red: #ff4d6d; --violet: #a084ff;
+    --lead: var(--cyan); --plan: var(--violet); --persona: var(--amber); --research: var(--cyan);
+    --tool: var(--lime); --write: var(--magenta);
+    --mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, "Noto Sans Mono", monospace;
+    --sans: "Noto Sans Thai", "Sarabun", "Leelawadee UI", "Segoe UI", Tahoma, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(1200px 700px at 70% -10%, #0b2242 0%, transparent 60%),
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg);
+    color: var(--text); font: 13px/1.55 var(--sans); overflow: hidden;
+  }
+  body::after { /* scan lines */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px);
+  }
+  .hud { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; gap: 8px; padding: 10px 12px 12px; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-width: 0; }
+  .brand { font: 700 12px var(--mono); letter-spacing: .22em; color: var(--cyan); text-shadow: 0 0 10px rgba(34,228,255,.7); white-space: nowrap; }
+  .brand b { color: var(--magenta); text-shadow: 0 0 10px rgba(255,61,242,.7); }
+  .topic { font-size: 15px; font-weight: 600; min-width: 0; flex: 1 1 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font: 11px var(--mono); padding: 2px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+  .status { font: 700 11px var(--mono); padding: 3px 10px; border-radius: 3px; letter-spacing: .14em; border: 1px solid currentColor; }
+  .status.live { color: var(--lime); box-shadow: 0 0 12px rgba(125,255,106,.35) inset; animation: blink 1.6s infinite; }
+  .status.replay { color: var(--cyan); }
+  .status.done { color: var(--lime); }
+  .status.fail { color: var(--red); }
+  .clock { font: 600 13px var(--mono); color: var(--cyan); min-width: 84px; text-align: right; }
+  .controls { display: flex; gap: 4px; }
+  .controls button { font: 600 11px var(--mono); color: var(--text); background: rgba(34,228,255,.07); border: 1px solid var(--line); border-radius: 3px; padding: 4px 9px; cursor: pointer; letter-spacing: .05em; }
+  .controls button:hover { border-color: var(--cyan); box-shadow: 0 0 10px rgba(34,228,255,.35); }
+  .controls button[aria-pressed="true"] { color: var(--bg); background: var(--cyan); }
+  .meters { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
+  .meter { flex: 1 1 110px; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 5px 10px; position: relative; overflow: hidden; }
+  .meter::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--c, var(--cyan)); box-shadow: 0 0 8px var(--c, var(--cyan)); }
+  .meter span { display: block; font: 10px var(--mono); color: var(--dim); letter-spacing: .14em; text-transform: uppercase; }
+  .meter b { font: 700 18px var(--mono); color: var(--c, var(--cyan)); text-shadow: 0 0 10px color-mix(in srgb, var(--c, var(--cyan)) 60%, transparent); }
+  .pipeline { display: flex; gap: 0; flex: 3 1 360px; align-items: center; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 5px 8px; }
+  .pipeline i { flex: 1; text-align: center; font: 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding: 4px 2px; border-bottom: 2px solid var(--faint); margin: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: normal; }
+  .pipeline i.past { color: var(--dim); border-color: var(--dim); }
+  .pipeline i.now { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 4px 10px -4px var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+  main { display: grid; grid-template-columns: minmax(280px, 30fr) minmax(360px, 44fr) minmax(260px, 26fr); gap: 8px; min-height: 0; }
+  .panel { position: relative; border: 1px solid var(--line); background: var(--panel); border-radius: 5px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .panel::before, .panel::after { content: ""; position: absolute; width: 14px; height: 14px; border: 2px solid var(--cyan); pointer-events: none; opacity: .8; }
+  .panel::before { left: -1px; top: -1px; border-right: 0; border-bottom: 0; }
+  .panel::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; }
+  .panel > h2 { margin: 0; padding: 7px 12px; font: 700 10.5px var(--mono); letter-spacing: .2em; color: var(--cyan); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; text-transform: uppercase; }
+  .panel > h2 small { color: var(--dim); font-weight: 400; letter-spacing: .08em; }
+  #graph { flex: 1; min-height: 0; position: relative; overflow: auto; }
+  #svg { width: 100%; height: 100%; display: block; }
+  .edge { fill: none; stroke: var(--faint); stroke-width: 1.4; }
+  .edge.on { stroke: var(--c); stroke-dasharray: 5 6; animation: flow 1s linear infinite; opacity: .9; }
+  .node { transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+  .node rect.box { fill: rgba(6, 16, 30, .92); stroke: var(--c); stroke-width: 1.2; rx: 6; }
+  .node.s-active rect.box { filter: drop-shadow(0 0 6px var(--c)); animation: glow 1.8s ease-in-out infinite; }
+  .node.s-done rect.box { stroke-opacity: .55; }
+  .node.s-muted rect.box { stroke: var(--faint); }
+  .node.s-fail rect.box { stroke: var(--red); }
+  .node.born { animation: born .7s cubic-bezier(.2,1.4,.4,1) both; }
+  .node.ping rect.box { animation: ping .7s ease-out; }
+  .node text { fill: var(--text); font: 11.5px var(--sans); }
+  .node text.sub { fill: var(--dim); font-size: 10px; }
+  .node text.badge { fill: var(--c); font: 9.5px var(--mono); letter-spacing: .04em; }
+  .node circle.dot { fill: var(--c); }
+  .node.s-active circle.dot { animation: blink 1s infinite; }
+  .shock { fill: none; stroke: var(--c); stroke-width: 2; animation: shock .9s ease-out forwards; }
+  #center { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #intake { flex: 1; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .card { border: 1px solid var(--line); border-left: 2px solid var(--c, var(--cyan)); background: rgba(4, 12, 24, .7); border-radius: 3px; padding: 6px 10px; animation: slide .45s ease-out both; min-width: 0; }
+  .card .k { font: 10px var(--mono); color: var(--c, var(--cyan)); letter-spacing: .12em; text-transform: uppercase; }
+  .card .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .u { font: 11px var(--mono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #docWrap { flex: 1; overflow: auto; position: relative; scroll-behavior: smooth; }
+  #doc { padding: 16px 22px 40px; max-width: 860px; margin: 0 auto; font-size: 14px; line-height: 1.85; }
+  #doc h1 { font-size: 20px; line-height: 1.4; margin: 4px 0 12px; color: #fff; text-shadow: 0 0 14px rgba(34,228,255,.35); }
+  #doc h2 { font-size: 16px; margin: 22px 0 6px; color: var(--cyan); }
+  #doc h3 { font-size: 14.5px; margin: 16px 0 4px; color: #bfe9ff; }
+  #doc p { margin: 0 0 10px; color: #c3d9ee; }
+  #doc .lead { color: #e2f2ff; }
+  #doc sup.cite { font: 600 9.5px var(--mono); color: var(--dim); padding: 0 1px; transition: color .3s, text-shadow .3s; }
+  #doc sup.cite.hot { color: var(--magenta); text-shadow: 0 0 8px var(--magenta); }
+  #doc sup.cite.ok { color: var(--lime); text-shadow: 0 0 6px rgba(125,255,106,.6); }
+  #overlay { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+  .hl { position: absolute; border: 1.5px solid var(--c); border-radius: 4px; background: color-mix(in srgb, var(--c) 9%, transparent);
+    box-shadow: 0 0 10px var(--c), 0 0 22px color-mix(in srgb, var(--c) 45%, transparent), inset 0 0 10px color-mix(in srgb, var(--c) 30%, transparent);
+    animation: draw .35s ease-out both; transition: border-color .3s, box-shadow .3s, opacity .4s; }
+  .hl-label { position: absolute; font: 700 10px var(--mono); letter-spacing: .08em; color: var(--bg); background: var(--c); padding: 2px 7px; border-radius: 3px;
+    box-shadow: 0 0 12px var(--c); white-space: nowrap; transform-origin: left bottom; animation: pop .3s cubic-bezier(.2,1.6,.4,1) both; transition: background .3s, box-shadow .3s, opacity .4s; }
+  .fade { opacity: 0 !important; }
+  #evidence { border-top: 1px solid var(--line); padding: 8px 12px 10px; background: rgba(3, 9, 18, .85); min-height: 92px; max-height: 34%; overflow: auto; }
+  #evidence .k { font: 10px var(--mono); letter-spacing: .14em; color: var(--magenta); text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; }
+  #evidence .src { font-weight: 600; margin: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #evidence .src a { color: var(--text); text-decoration: none; }
+  #evidence .src a:hover { text-decoration: underline; }
+  #evidence .snip { color: #aec6dc; font-size: 12.5px; }
+  #evidence mark { background: rgba(125,255,106,.16); color: var(--lime); border-radius: 2px; box-shadow: 0 0 6px rgba(125,255,106,.35); padding: 0 1px; }
+  .bar { height: 3px; background: var(--faint); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--lime); box-shadow: 0 0 8px var(--lime); transition: width .5s; }
+  #log { list-style: none; margin: 0; padding: 6px 0; overflow: auto; flex: 1; font: 11.5px/1.5 var(--mono); }
+  #log li { display: grid; grid-template-columns: 58px 10px 1fr; gap: 6px; padding: 2px 10px; animation: slide .3s ease-out both; }
+  #log li time { color: var(--faint); }
+  #log li i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); margin-top: 6px; }
+  #log li span { color: #b9d3ea; word-break: break-word; font-family: var(--sans); font-size: 12px; }
+  #log li.k-ground span { color: var(--lime); }
+  .empty { color: var(--dim); font: 12px var(--mono); padding: 20px; text-align: center; }
+  @keyframes blink { 50% { opacity: .45; } }
+  @keyframes glow { 50% { filter: drop-shadow(0 0 12px var(--c)); } }
+  @keyframes flow { to { stroke-dashoffset: -22; } }
+  @keyframes born { from { opacity: 0; transform: var(--to) scale(.3); } }
+  @keyframes ping { 0% { filter: drop-shadow(0 0 2px var(--c)); } 30% { filter: drop-shadow(0 0 16px var(--c)); } }
+  @keyframes shock { from { r: 6; opacity: 1; } to { r: 70; opacity: 0; } }
+  @keyframes slide { from { opacity: 0; transform: translateY(6px); } }
+  @keyframes draw { from { opacity: 0; transform: scale(1.06); } }
+  @keyframes pop { from { opacity: 0; transform: scale(.6); } }
+  @media (max-width: 1000px) {
+    body { overflow: auto; }
+    .hud { height: auto; }
+    main { grid-template-columns: 1fr; }
+    .panel { min-height: 320px; }
+    #center { min-height: 520px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="hud">
+  <header>
+    <div class="brand">DEEPLIT <b>//</b> OBSERVATORY</div>
+    <div class="topic" id="topic"></div>
+    <div class="chips" id="chips"></div>
+    <div class="status" id="status"></div>
+    <div class="clock" id="clock">T+00:00</div>
+    <div class="controls" id="controls" hidden>
+      <button id="play" type="button"></button>
+      <button id="restart" type="button">⟲</button>
+      <button data-speed="1" type="button">1×</button>
+      <button data-speed="2" type="button">2×</button>
+      <button data-speed="4" type="button">4×</button>
+      <button data-speed="8" type="button">8×</button>
+      <button id="skip" type="button"></button>
+    </div>
+  </header>
+  <div class="meters">
+    <div class="meter" style="--c:var(--cyan)"><span id="mAgentsL"></span><b id="mAgents">0</b></div>
+    <div class="meter" style="--c:var(--lime)"><span id="mSearchL"></span><b id="mSearch">0</b></div>
+    <div class="meter" style="--c:var(--amber)"><span id="mPagesL"></span><b id="mPages">0</b></div>
+    <div class="meter" style="--c:var(--violet)"><span id="mTokensL"></span><b id="mTokens">0</b></div>
+    <div class="meter" style="--c:var(--magenta)"><span id="mClaimsL"></span><b id="mClaims">—</b></div>
+    <div class="pipeline" id="pipeline"></div>
+  </div>
+  <main>
+    <section class="panel">
+      <h2><span id="hAgents"></span><small id="hAgentsN"></small></h2>
+      <div id="graph"><svg id="svg" xmlns="http://www.w3.org/2000/svg"><g id="gEdges"></g><g id="gFx"></g><g id="gNodes"></g></svg></div>
+    </section>
+    <section class="panel" id="center">
+      <h2><span id="hCenter"></span><small id="hCenterN"></small></h2>
+      <div id="intake"></div>
+      <div id="docWrap" hidden><div id="doc"></div><div id="overlay"></div></div>
+      <div id="evidence" hidden></div>
+    </section>
+    <section class="panel">
+      <h2><span id="hLog"></span><small id="hLogN"></small></h2>
+      <ol id="log"></ol>
+    </section>
+  </main>
+</div>
+<script type="application/json" id="obs-data">__OBS_DATA__</script>
+<script>
+"use strict";
+(() => {
+  const DATA = JSON.parse(document.getElementById("obs-data").textContent);
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const clip = (s, n) => { s = String(s == null ? "" : s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
+  const STAGES = { storm: ["research", "outline", "article", "polish"], deep: ["research", "report"], agent: ["plan", "research", "report"] };
+
+  // ---------------------------------------------------------------- words
+  const WORDS = {
+    en: {
+      agents: "Agent constellation", intake: "Intake stream", doc: "Citation map", log: "Real-time processing log",
+      mAgents: "Agents", mSearch: "Searches", mPages: "Pages read", mTokens: "Tokens", mClaims: "Claims grounded",
+      live: "LIVE", replay: "REPLAY", done: "COMPLETE", fail: "ENDED", queued: "QUEUED",
+      play: "▶ PLAY", pause: "❚❚ PAUSE", skip: "▸▸ REPORT", grounding: "Grounding",
+      lead: "DeepLit", planner: "Planner", perspective: "Perspective finder", researcher: "Researcher",
+      search: "Search agent", crawl: "Crawl agent", writer: "Writer", outline: "Outline writer", article: "Section writers",
+      polish: "Polisher", compose: "Long writer", experts: "Topic experts",
+      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish", grounding: "Citation map" },
+      tree: { generating_query: "writing a query", generated_query: "query ready", searching: "searching", search_complete: "search done",
+        processing_search_result: "reading results", node_complete: "done", no_evidence: "no evidence", error: "error" },
+      phase: { observe: "observing", gap: "finding the gap", select: "choosing searches", search: "searching" },
+      round: (r, m) => `round ${r}/${m}`, sources: "sources",
+      k: { query: "Query", page: "Page read", persona: "Perspective", plan: "Plan", write: "Writing" },
+      say: {
+        start: (t) => `Run opened: ${t}`, stage: (s) => `Stage → ${s}`, perspectives: (n) => `Spawned ${n} perspective agents; each interviews a topic expert`,
+        browsed: (n) => `Retrieved ${n} page${n === 1 ? "" : "s"}`, plan: (n) => `Planned ${n} sections, one researcher each`,
+        gap: (l, g) => `${l}: knowledge gap — ${g}`, complete: (l) => `${l}: research complete`, found: (l, n) => `${l}: ${n} sources found`,
+        write: (l) => `${l}: writing`, compose: "Composing every section into one report", node: (q) => `Researcher spawned: ${q}`,
+        tasks: (l, n) => `${l}: dispatched ${n} search agent${n === 1 ? "" : "s"}`,
+        done: "Run finished", failed: (m) => `Run ended: ${m}`, report: (n, s) => `Report loaded: ${n} cited claims over ${s} sources`,
+        extract: (sec) => `Extracting context · ${sec}`, match: (n, d) => `Similarity search → [${n}] ${d}`,
+        grounded: (n, p) => `Claim grounded in [${n}] · lexical overlap ${p}%`, mapped: (c, s) => `Citation map complete: ${c} claims ↔ ${s} sources`,
+        noReport: "No report to map: the run did not finish with one", offline: "Lost contact with DeepLit; retrying…",
+      },
+      label: { extract: "EXTRACTING CONTEXT", match: (n) => `SIMILARITY SEARCH → [${n}]`, grounded: (p) => `GROUNDED · ${p}% OVERLAP` },
+      evidence: "Evidence", overlap: "lexical overlap", waiting: "Waiting for the agents' first move…",
+    },
+    th: {
+      agents: "กลุ่มดาวเอเจนต์", intake: "สิ่งที่เอเจนต์ดึงเข้ามา", doc: "แผนที่การอ้างอิง", log: "บันทึกการทำงานแบบสด",
+      mAgents: "เอเจนต์", mSearch: "การค้น", mPages: "หน้าที่อ่าน", mTokens: "โทเคน", mClaims: "ข้อความที่มีหลักฐาน",
+      live: "สด", replay: "เล่นซ้ำ", done: "เสร็จสิ้น", fail: "จบลง", queued: "รอคิว",
+      play: "▶ เล่น", pause: "❚❚ หยุด", skip: "▸▸ ไปที่รายงาน", grounding: "โยงหลักฐาน",
+      lead: "DeepLit", planner: "ผู้วางแผน", perspective: "ผู้หามุมมอง", researcher: "นักค้นคว้า",
+      search: "เอเจนต์ค้นหา", crawl: "เอเจนต์อ่านเว็บ", writer: "ผู้เขียน", outline: "ผู้วางโครงเรื่อง", article: "ผู้เขียนแต่ละหัวข้อ",
+      polish: "ผู้เกลาเนื้อหา", compose: "ผู้รวมรายงาน", experts: "ผู้เชี่ยวชาญหัวข้อ",
+      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน", grounding: "โยงหลักฐาน" },
+      tree: { generating_query: "กำลังคิดคำค้น", generated_query: "ได้คำค้นแล้ว", searching: "กำลังค้น", search_complete: "ค้นเสร็จ",
+        processing_search_result: "กำลังอ่านผล", node_complete: "เสร็จ", no_evidence: "ไม่พบหลักฐาน", error: "ผิดพลาด" },
+      phase: { observe: "สังเกต", gap: "หาช่องว่างความรู้", select: "เลือกคำค้น", search: "กำลังค้น" },
+      round: (r, m) => `รอบ ${r}/${m}`, sources: "แหล่ง",
+      k: { query: "คำค้น", page: "หน้าที่อ่าน", persona: "มุมมอง", plan: "แผน", write: "กำลังเขียน" },
+      say: {
+        start: (t) => `เปิดงาน: ${t}`, stage: (s) => `ขั้นตอน → ${s}`, perspectives: (n) => `สร้างเอเจนต์มุมมอง ${n} ตัว แต่ละตัวสัมภาษณ์ผู้เชี่ยวชาญหัวข้อ`,
+        browsed: (n) => `ดึงหน้าเว็บ ${n} หน้า`, plan: (n) => `วางแผน ${n} หัวข้อ แยกนักค้นคว้าหัวข้อละคน`,
+        gap: (l, g) => `${l}: ช่องว่างความรู้ — ${g}`, complete: (l) => `${l}: ค้นคว้าครบแล้ว`, found: (l, n) => `${l}: ได้ ${n} แหล่ง`,
+        write: (l) => `${l}: กำลังเขียน`, compose: "กำลังรวมทุกหัวข้อเป็นรายงานเดียว", node: (q) => `สร้างนักค้นคว้า: ${q}`,
+        tasks: (l, n) => `${l}: ส่งเอเจนต์ค้นหา ${n} ตัว`,
+        done: "งานเสร็จสิ้น", failed: (m) => `งานจบลง: ${m}`, report: (n, s) => `โหลดรายงานแล้ว: ${n} ข้อความที่อ้างอิง จาก ${s} แหล่ง`,
+        extract: (sec) => `ดึงบริบท · ${sec}`, match: (n, d) => `ค้นหาความคล้าย → [${n}] ${d}`,
+        grounded: (n, p) => `ข้อความมีหลักฐานจาก [${n}] · คำซ้อนกัน ${p}%`, mapped: (c, s) => `โยงครบแล้ว: ${c} ข้อความ ↔ ${s} แหล่ง`,
+        noReport: "ไม่มีรายงานให้โยง งานนี้ไม่ได้จบพร้อมรายงาน", offline: "ติดต่อ DeepLit ไม่ได้ กำลังลองใหม่…",
+      },
+      label: { extract: "กำลังดึงบริบท", match: (n) => `ค้นหาความคล้าย → [${n}]`, grounded: (p) => `มีหลักฐาน · ซ้อนกัน ${p}%` },
+      evidence: "หลักฐาน", overlap: "คำซ้อนกัน", waiting: "รอเอเจนต์เริ่มทำงาน…",
+    },
+  };
+  const W = WORDS[(DATA.run && DATA.run.language) === "th" ? "th" : "en"];
+
+  // ---------------------------------------------------------------- state
+  let S;
+  function fresh() {
+    S = {
+      run: Object.assign({}, DATA.run), engine: DATA.run.engine, stage: null, nodes: new Map(), order: [], lanes: new Map(),
+      spawned: 0, searches: 0, pages: 0, tokens: 0, toolSeq: 0, settled: false, fast: false, t0: null, now: null,
+      claims: [], grounded: 0, phase: "research", cursor: 0, fx: [],
+    };
+  }
+  const t = (iso) => (iso ? Date.parse(iso) : NaN);
+
+  function node(id, parent, kind, title, sub) {
+    let n = S.nodes.get(id);
+    if (n) { if (title != null) n.title = title; if (sub != null) n.sub = sub; return n; }
+    n = { id, parent, kind, title, sub: sub || "", badge: "", state: "active", born: !S.fast };
+    S.nodes.set(id, n); S.order.push(id);
+    if (kind !== "lead") S.spawned += 1;
+    if (parent && !S.fast) S.fx.push(parent);
+    return n;
+  }
+  const setState = (id, s) => { const n = S.nodes.get(id); if (n) n.state = s; };
+  const kids = (id) => S.order.filter((k) => S.nodes.get(k).parent === id);
+  const finishAll = (pred) => S.nodes.forEach((n) => { if (n.state === "active" && n.kind !== "lead" && (!pred || pred(n))) n.state = "done"; });
+  function drop(id) { kids(id).forEach(drop); S.nodes.delete(id); S.order = S.order.filter((k) => k !== id); }
+  function lead() { return node("lead", null, "lead", W.lead, [S.run.engine_label, S.run.depth].filter(Boolean).join(" · ")); }
+
+  // ---------------------------------------------------------------- events -> agents (as the MCP canvas, ADR 0010)
+  function stageAgent(stage) {
+    const e = S.engine;
+    if (e === "storm") {
+      finishAll();
+      if (stage === "research") node("perspective", "lead", "persona", W.perspective, W.experts);
+      if (stage === "outline") node("outline", "lead", "write", W.outline, "");
+      if (stage === "article") node("article", S.nodes.has("outline") ? "outline" : "lead", "write", W.article, "");
+      if (stage === "polish") node("polish", S.nodes.has("article") ? "article" : "lead", "write", W.polish, "");
+    } else if (e === "deep") {
+      if (stage === "report") { finishAll(); node("writer", "lead", "write", W.writer, ""); }
+    } else if (e === "agent") {
+      if (stage === "plan") node("planner", "lead", "plan", W.planner, "");
+      if (stage === "report") finishAll((n) => n.kind !== "write");
+    }
+  }
+  function laneNode(lane) {
+    if (S.lanes.has(lane)) return S.lanes.get(lane);
+    const parent = S.nodes.has("planner") ? "planner" : "lead";
+    const n = node("lane:" + lane, parent, "research", lane === "main" ? W.researcher : W.researcher + " " + String(lane).replace(/^s/, ""), "");
+    S.lanes.set(lane, n);
+    return n;
+  }
+
+  function apply(ev) {
+    const d = ev.data || {};
+    if (ev.at) { const at = t(ev.at); if (!isNaN(at)) { if (S.t0 == null) S.t0 = t(S.run.started_at) || at; S.now = at; } }
+    S.cursor = Math.max(S.cursor, ev.id || 0);
+    if (ev.type === "usage") {
+      Object.values(d.llm || {}).forEach((u) => { S.tokens += (u.prompt_tokens || 0) + (u.completion_tokens || 0); });
+      return;
+    }
+    if (ev.type === "stage") {
+      S.stage = d.stage; stageAgent(d.stage);
+      say("lead", W.say.stage(W.stages[d.stage] || d.stage));
+      return;
+    }
+    if (ev.type !== "note") return;
+    switch (d.kind) {
+      case "browsed": {
+        const urls = d.urls || [];
+        S.pages += urls.length;
+        if (S.engine === "storm" && urls.length) S.searches += 1; // STORM notes no queries: one retrieval, one read
+        S.nodes.forEach((x) => { if (x.state === "active" && (x.kind === "persona" || x.kind === "research" || x.kind === "tool")) x.ping = true; });
+        urls.slice(0, 6).forEach((u) => intake("page", host(u), readable(u), "--amber"));
+        if (urls.length) say("tool", W.say.browsed(urls.length));
+        return;
+      }
+      case "perspectives": {
+        const list = d.perspectives || [];
+        list.forEach((p, i) => {
+          const [name, ...rest] = String(p).split(":");
+          node("persona:" + i, S.nodes.has("perspective") ? "perspective" : "lead", "persona", clip(name, 40), clip(rest.join(":"), 70));
+          intake("persona", clip(name, 80), clip(rest.join(":"), 140), "--persona");
+        });
+        setState("perspective", "done");
+        say("persona", W.say.perspectives(list.length));
+        return;
+      }
+      case "tree": {
+        const id = "tree:" + d.id;
+        const parent = d.parent != null ? "tree:" + d.parent : (d.id === "0" ? "lead" : "tree:" + String(d.id).split("-").slice(0, -1).join("-"));
+        if (!S.nodes.has(parent) && parent !== "lead") node(parent, "lead", "plan", W.planner, "");
+        const isNew = !S.nodes.has(id);
+        const n = node(id, parent, d.id === "0" ? "plan" : "research", d.id === "0" ? W.planner : (d.query ? clip(d.query, 60) : W.researcher), null);
+        if (d.query && d.id !== "0") n.title = clip(d.query, 60);
+        if (d.goal) n.sub = clip(d.goal, 90);
+        n.badge = (W.tree[d.status] || d.status || "") + (d.sources != null ? ` · ${d.sources} ${W.sources}` : "");
+        n.state = d.status === "node_complete" ? "done" : d.status === "no_evidence" ? "muted" : d.status === "error" ? "fail" : "active";
+        if (d.status === "searching") S.searches += 1;
+        if (isNew && d.id !== "0" && d.query) { say("research", W.say.node(clip(d.query, 90))); intake("query", clip(d.query, 120), d.goal ? clip(d.goal, 140) : "", "--cyan"); }
+        return;
+      }
+      case "flow": {
+        const lane = d.lane || "main";
+        switch (d.event) {
+          case "plan": {
+            node("planner", "lead", "plan", W.planner, "");
+            (d.sections || []).forEach((s) => { const n = laneNode(s.id); n.title = clip(s.title, 48); intake("plan", clip(s.title, 120), "", "--plan"); });
+            setState("planner", "done");
+            say("plan", W.say.plan((d.sections || []).length));
+            break;
+          }
+          case "round": {
+            const n = laneNode(lane);
+            n.state = "active"; n.round = d.round; n.max = d.max; n.badge = W.round(d.round, d.max);
+            kids(n.id).filter((k) => S.nodes.get(k).kind === "tool").forEach(drop);
+            break;
+          }
+          case "phase": { const n = laneNode(lane); n.badge = (n.round ? W.round(n.round, n.max) + " · " : "") + (W.phase[d.phase] || d.phase); break; }
+          case "observed": laneNode(lane).sub = clip(d.text, 90); break;
+          case "gap": {
+            const n = laneNode(lane);
+            if (d.complete) say("research", W.say.complete(n.title));
+            else if (d.gap) { n.sub = clip(d.gap, 90); say("research", W.say.gap(n.title, clip(d.gap, 120))); }
+            break;
+          }
+          case "tasks": {
+            const n = laneNode(lane);
+            const qs = d.queries || [];
+            qs.forEach((q) => {
+              S.toolSeq += 1; S.searches += 1;
+              node("tool:" + S.toolSeq, n.id, "tool", clip(q.query, 48), (q.agent === "crawl" ? W.crawl : W.search) + (q.site ? " · " + q.site : ""));
+              intake("query", clip(q.query, 120), (q.agent === "crawl" ? W.crawl : W.search) + (q.site ? " · " + q.site : ""), "--lime");
+            });
+            if (qs.length) say("tool", W.say.tasks(n.title, qs.length));
+            break;
+          }
+          case "found": {
+            const n = laneNode(lane);
+            kids(n.id).forEach((k) => { const c = S.nodes.get(k); if (c.kind === "tool") c.state = "done"; });
+            say("tool", W.say.found(n.title, d.sources || 0));
+            break;
+          }
+          case "write": {
+            const n = laneNode(lane);
+            n.state = "done"; n.badge = n.round ? W.round(n.round, n.max) : "";
+            node("write:" + lane, S.nodes.has("planner") ? n.id : "lead", "write", W.writer, n.title);
+            intake("write", n.title, "", "--write");
+            say("write", W.say.write(n.title));
+            break;
+          }
+          case "compose": {
+            S.nodes.forEach((x) => { if (x.id.startsWith("write:")) x.state = "done"; });
+            node("compose", S.nodes.has("planner") ? "planner" : "lead", "write", W.compose, "");
+            say("write", W.say.compose);
+            break;
+          }
+        }
+        return;
+      }
+    }
+  }
+
+  function settle(run) {
+    if (!FINAL.has(run.status) || S.settled) return;
+    S.settled = true;
+    const ok = run.status === "succeeded";
+    S.nodes.forEach((n) => { if (n.state === "active") n.state = ok ? "done" : "fail"; });
+    setState("lead", ok ? "done" : "fail");
+    say("lead", ok ? W.say.done : W.say.failed(run.message || run.reason || run.status));
+  }
+
+  // ---------------------------------------------------------------- helpers
+  function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return clip(u, 40); } }
+  function readable(u) { try { return decodeURI(u); } catch { return u; } }
+  function stamp() {
+    if (S.t0 == null || S.now == null) return "T+00:00";
+    const s = Math.max(0, Math.round((S.now - S.t0) / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return "T+" + (h ? h + ":" : "") + String(m).padStart(2, "0") + ":" + String(x).padStart(2, "0");
+  }
+  const COLORS = { lead: "--lead", plan: "--plan", persona: "--persona", research: "--research", tool: "--tool", write: "--write", ground: "--lime", match: "--magenta" };
+  let logCount = 0;
+  function say(kind, text) {
+    const li = document.createElement("li");
+    li.className = "k-" + kind;
+    li.style.setProperty("--c", `var(${COLORS[kind] || "--lead"})`);
+    const tm = document.createElement("time"); tm.textContent = stamp().replace("T+", "");
+    const dot = document.createElement("i");
+    const sp = document.createElement("span"); sp.textContent = text;
+    li.append(tm, dot, sp);
+    const log = $("log");
+    const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+    log.append(li);
+    while (log.children.length > 400) log.firstChild.remove();
+    logCount += 1; $("hLogN").textContent = String(logCount);
+    if (stick) log.scrollTop = log.scrollHeight;
+  }
+  let intakeCount = 0;
+  function intake(k, title, sub, color) {
+    if (S.phase !== "research") return;
+    intakeCount += 1; $("hCenterN").textContent = String(intakeCount);
+    if (S.fast && intakeCount % 4) return; // a fast catch-up shows a sample, not every card
+    const box = $("intake");
+    const empty = box.querySelector(".empty"); if (empty) empty.remove();
+    const c = document.createElement("div"); c.className = "card"; c.style.setProperty("--c", `var(${color})`);
+    const a = document.createElement("div"); a.className = "k"; a.textContent = W.k[k] || k;
+    const b = document.createElement("div"); b.className = "t"; b.textContent = title;
+    c.append(a, b);
+    if (sub) { const u = document.createElement("div"); u.className = "u"; u.textContent = sub; c.append(u); }
+    box.prepend(c);
+    while (box.children.length > 40) box.lastChild.remove();
+  }
+
+  // ---------------------------------------------------------------- header + meters
+  function header() {
+    $("topic").textContent = S.run.topic || "";
+    $("topic").title = S.run.topic || "";
+    const chips = $("chips"); chips.textContent = "";
+    [S.run.engine_label, S.run.depth, (S.run.language || "").toUpperCase(), S.run.model_label].filter(Boolean).forEach((x) => {
+      const c = document.createElement("span"); c.className = "chip"; c.textContent = x; chips.append(c);
+    });
+    const st = $("status");
+    if (MODE === "live" && !FINAL.has(S.run.status)) { st.className = "status live"; st.textContent = "● " + (S.run.status === "queued" ? W.queued : W.live); }
+    else if (S.phase === "grounding") { st.className = "status replay"; st.textContent = W.grounding; }
+    else if (S.phase === "done" || (MODE === "live" && FINAL.has(S.run.status))) { st.className = "status " + (S.run.status === "succeeded" ? "done" : "fail"); st.textContent = S.run.status === "succeeded" ? W.done : W.fail; }
+    else { st.className = "status replay"; st.textContent = W.replay; }
+    $("clock").textContent = stamp();
+    $("mAgents").textContent = S.spawned; $("mSearch").textContent = S.searches; $("mPages").textContent = S.pages;
+    $("mTokens").textContent = S.tokens >= 1e6 ? (S.tokens / 1e6).toFixed(2) + "M" : S.tokens >= 1e4 ? Math.round(S.tokens / 1e3) + "k" : S.tokens;
+    $("mClaims").textContent = S.claims.length ? `${S.grounded}/${S.claims.length}` : "—";
+    $("hAgentsN").textContent = String(S.spawned);
+    const stages = (STAGES[S.engine] || ["research", "report"]).concat(["grounding"]);
+    const pipe = $("pipeline"); pipe.textContent = "";
+    const at = S.phase !== "research" ? stages.length - 1 : Math.max(0, stages.indexOf(S.stage));
+    stages.forEach((s, i) => {
+      const el = document.createElement("i"); el.textContent = W.stages[s] || s;
+      el.className = i < at ? "past" : i === at && (S.stage || S.phase !== "research") ? "now" : "";
+      pipe.append(el);
+    });
+  }
+
+  // ---------------------------------------------------------------- the constellation (SVG, kept per node so moves glide)
+  const NW = 168, NH = 50, GX = 16, GY = 46, LX = 40, LY = 10, PAD = 18;
+  const els = new Map(), edges = new Map();
+  function layout(across) {
+    const pos = new Map(); let cursor = 0;
+    const place = (id, depth) => {
+      const ks = kids(id); let at;
+      if (!ks.length) { at = cursor; cursor += across ? NH + LY : NW + GX; }
+      else { const all = ks.map((k) => place(k, depth + 1)); at = (all[0] + all[all.length - 1]) / 2; }
+      pos.set(id, across ? { x: depth * (NW + LX), y: at } : { x: at, y: depth * (NH + GY) });
+      return at;
+    };
+    S.order.filter((k) => !S.nodes.get(k).parent).forEach((r) => place(r, 0));
+    return pos;
+  }
+  function box(pos) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    pos.forEach((p) => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + NW); y1 = Math.max(y1, p.y + NH); });
+    if (!pos.size) { x0 = y0 = 0; x1 = NW; y1 = NH; }
+    return { x0: x0 - PAD, y0: y0 - PAD, w: x1 - x0 + PAD * 2, h: y1 - y0 + PAD * 2 };
+  }
+  function txt(cls, x, y, s) { const e = document.createElementNS(NS, "text"); e.setAttribute("class", cls); e.setAttribute("x", x); e.setAttribute("y", y); e.textContent = s; return e; }
+  const fit = (s, px) => clip(s, Math.max(4, Math.floor(px / 6.4)));
+  let drawQueued = false;
+  function draw() { if (drawQueued) return; drawQueued = true; requestAnimationFrame(() => { drawQueued = false; drawNow(); header(); }); }
+  function drawNow() {
+    const g = $("graph"), W0 = g.clientWidth || 400, H0 = g.clientHeight || 400;
+    const down = layout(false), across = layout(true);
+    const bd = box(down), ba = box(across);
+    const scale = (b) => Math.min(W0 / b.w, H0 / b.h);
+    const useAcross = scale(ba) > scale(bd) * 1.15;
+    const pos = useAcross ? across : down, b = useAcross ? ba : bd;
+    const svg = $("svg");
+    svg.setAttribute("viewBox", `${b.x0} ${b.y0} ${Math.max(b.w, NW + PAD * 2)} ${Math.max(b.h, NH + PAD * 2)}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMin meet");
+    // Below this scale the names cannot be read: draw it larger and let the panel scroll instead.
+    const MIN = 0.72, sc = scale(b);
+    if (sc < MIN) { svg.style.width = `${Math.ceil(b.w * MIN)}px`; svg.style.height = `${Math.ceil(b.h * MIN)}px`; }
+    else { svg.style.width = ""; svg.style.height = ""; }
+    // nodes
+    [...els.keys()].forEach((id) => { if (!S.nodes.has(id)) { els.get(id).remove(); els.delete(id); } });
+    [...edges.keys()].forEach((id) => { if (!S.nodes.has(id)) { edges.get(id).remove(); edges.delete(id); } });
+    S.order.forEach((id) => {
+      const n = S.nodes.get(id), p = pos.get(id);
+      if (!p) return;
+      let e = els.get(id);
+      if (!e) {
+        e = document.createElementNS(NS, "g");
+        const r = document.createElementNS(NS, "rect"); r.setAttribute("class", "box"); r.setAttribute("width", NW); r.setAttribute("height", NH);
+        const dot = document.createElementNS(NS, "circle"); dot.setAttribute("class", "dot"); dot.setAttribute("cx", 11); dot.setAttribute("cy", 14); dot.setAttribute("r", 3.2);
+        e.append(r, dot, txt("title", 21, 18, ""), txt("sub", 10, 33, ""), txt("badge", 10, 45, ""));
+        const tip = document.createElementNS(NS, "title"); e.append(tip);
+        $("gNodes").append(e); els.set(id, e);
+      }
+      const to = `translate(${p.x}px, ${p.y}px)`;
+      e.style.transform = to; e.style.setProperty("--to", to);
+      e.style.setProperty("--c", `var(--${n.kind})`);
+      e.setAttribute("class", `node k-${n.kind} s-${n.state}` + (n.born ? " born" : "") + (n.ping ? " ping" : ""));
+      const [ti, su, ba] = e.querySelectorAll("text");
+      ti.textContent = fit(n.title, NW - 28); su.textContent = fit(n.sub, NW - 16); ba.textContent = fit(n.badge, NW - 16);
+      e.querySelector("title").textContent = [n.title, n.sub, n.badge].filter(Boolean).join("\n");
+      if (n.born) { n.born = false; }
+      if (n.ping) { n.ping = false; setTimeout(() => e.classList.remove("ping"), 700); }
+      if (n.parent && pos.get(n.parent)) {
+        const q = pos.get(n.parent);
+        let path = edges.get(id);
+        if (!path) { path = document.createElementNS(NS, "path"); $("gEdges").append(path); edges.set(id, path); }
+        const d = useAcross
+          ? `M${q.x + NW},${q.y + NH / 2} C${q.x + NW + LX / 2},${q.y + NH / 2} ${p.x - LX / 2},${p.y + NH / 2} ${p.x},${p.y + NH / 2}`
+          : `M${q.x + NW / 2},${q.y + NH} C${q.x + NW / 2},${q.y + NH + GY / 2} ${p.x + NW / 2},${p.y - GY / 2} ${p.x + NW / 2},${p.y}`;
+        path.setAttribute("d", d);
+        path.setAttribute("class", "edge" + (n.state === "active" ? " on" : ""));
+        path.style.setProperty("--c", `var(--${n.kind})`);
+      }
+    });
+    // a ring where an agent was just spawned
+    S.fx.splice(0).forEach((pid) => {
+      const p = pos.get(pid); if (!p) return;
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("class", "shock"); c.setAttribute("cx", p.x + NW / 2); c.setAttribute("cy", p.y + NH / 2); c.setAttribute("r", 6);
+      c.style.setProperty("--c", `var(--${S.nodes.get(pid) ? S.nodes.get(pid).kind : "lead"})`);
+      $("gFx").append(c); setTimeout(() => c.remove(), 950);
+    });
+  }
+
+  // ---------------------------------------------------------------- the report and its citation map
+  function plain(s) { return String(s || "").replace(/\*\*|__|`/g, "").replace(/^\s{0,3}(#{1,6}|[-*+]|\d+\.)\s+/gm, ""); }
+  function buildDoc(report) {
+    const doc = $("doc"); doc.textContent = "";
+    const h1 = document.createElement("h1"); h1.textContent = report.title || S.run.topic || ""; doc.append(h1);
+    S.claims = [];
+    const para = (text, cls, section) => {
+      plain(text).split(/\n+/).forEach((chunk) => {
+        if (!chunk.trim()) return;
+        const p = document.createElement("p"); if (cls) p.className = cls;
+        // segments between citation groups: each segment is one text node, so its claim is found whole
+        const parts = chunk.split(/((?:\[\d+\])+)/);
+        let seg = "";
+        parts.forEach((part) => {
+          if (!part) return;
+          if (/^(\[\d+\])+$/.test(part)) {
+            const all = [...part.matchAll(/\[(\d+)\]/g)].map((m) => +m[1]);
+            const cites = [...new Set(all)];
+            const sups = all.map((n) => { const s = document.createElement("sup"); s.className = "cite"; s.textContent = `[${n}]`; s.dataset.n = n; p.append(s); return s; });
+            const claim = lastSentence(seg);
+            if (claim.length > 8) S.claims.push({ p, text: claim, cites, sups, section });
+            seg = "";
+          } else {
+            p.append(document.createTextNode(part));
+            seg = part;
+          }
+        });
+        doc.append(p);
+      });
+    };
+    para(report.lead, "lead", W.doc);
+    const walk = (list, level) => (list || []).forEach((s) => {
+      const h = document.createElement(level ? "h3" : "h2"); h.textContent = s.heading || ""; doc.append(h);
+      para(s.body, "", s.heading || "");
+      walk(s.children, level + 1);
+    });
+    walk(report.sections, 0);
+  }
+  function lastSentence(seg) {
+    let s = seg.trim();
+    if (s.length > 260) {
+      const tail = s.slice(-260);
+      const cut = Math.max(tail.lastIndexOf(". "), tail.lastIndexOf("。"), tail.indexOf(" ") );
+      s = cut > 0 && cut < 200 ? tail.slice(cut + 1).trim() : tail.trim();
+    } else {
+      const k = Math.max(s.lastIndexOf(". "), s.lastIndexOf("? "), s.lastIndexOf("! "));
+      if (k > 0 && s.length - k > 24) s = s.slice(k + 2).trim();
+    }
+    return s;
+  }
+
+  /**
+   * highlightRAGChunk(textToFind, actionLabel, color[, scope]): find `textToFind` in the document,
+   * measure where it sits on screen (Range.getClientRects, one rectangle per line), and draw a
+   * glowing box over each line with a pop-up label naming the agent's action. Returns a handle:
+   * .set(label, color) relabels it, .remove() fades it out. Boxes live in the scrolling document's
+   * own coordinates, so they stay on their text while it scrolls; a resize measures again.
+   */
+  const live = new Set();
+  function highlightRAGChunk(textToFind, actionLabel, color, scope) {
+    const root = scope || $("doc");
+    const needle = String(textToFind || "").trim();
+    if (!needle) return null;
+    const nodes = []; let full = "";
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) { nodes.push([n, full.length]); full += n.data; }
+    const at = full.indexOf(needle);
+    if (at < 0) return null;
+    const locate = (k) => { for (let i = nodes.length - 1; i >= 0; i--) if (nodes[i][1] <= k) return [nodes[i][0], k - nodes[i][1]]; return [nodes[0][0], 0]; };
+    const range = document.createRange();
+    range.setStart(...locate(at)); range.setEnd(...locate(at + needle.length));
+    const h = { range, boxes: [], label: document.createElement("div"), color: color || "var(--cyan)" };
+    h.label.className = "hl-label"; h.label.textContent = actionLabel || "";
+    h.place = () => {
+      const wrap = $("docWrap"), wr = wrap.getBoundingClientRect();
+      const lines = [];
+      [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1).forEach((r) => {
+        const same = lines.find((l) => Math.abs(l.top - r.top) < 4);
+        if (same) { same.left = Math.min(same.left, r.left); same.right = Math.max(same.right, r.right); same.bottom = Math.max(same.bottom, r.bottom); }
+        else lines.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
+      });
+      h.boxes.forEach((b) => b.remove()); h.boxes = [];
+      lines.forEach((l) => {
+        const b = document.createElement("div"); b.className = "hl";
+        b.style.cssText = `left:${l.left - wr.left + wrap.scrollLeft - 4}px;top:${l.top - wr.top + wrap.scrollTop - 2}px;width:${l.right - l.left + 8}px;height:${l.bottom - l.top + 4}px`;
+        b.style.setProperty("--c", h.color);
+        $("overlay").append(b); h.boxes.push(b);
+      });
+      if (lines.length) {
+        h.label.style.left = `${lines[0].left - wr.left + wrap.scrollLeft - 4}px`;
+        h.label.style.top = `${lines[0].top - wr.top + wrap.scrollTop - 24}px`;
+        h.label.style.setProperty("--c", h.color);
+        $("overlay").append(h.label);
+      }
+      h.top = lines.length ? lines[0].top - wr.top + wrap.scrollTop : 0;
+    };
+    h.set = (label, c) => {
+      h.label.textContent = label; if (c) h.color = c;
+      [h.label, ...h.boxes].forEach((e) => e.style.setProperty("--c", h.color));
+      h.label.style.animation = "none"; void h.label.offsetWidth; h.label.style.animation = "";
+    };
+    h.remove = () => { live.delete(h); [h.label, ...h.boxes].forEach((e) => e.classList.add("fade")); setTimeout(() => [h.label, ...h.boxes].forEach((e) => e.remove()), 450); };
+    h.place(); live.add(h);
+    return h;
+  }
+  window.highlightRAGChunk = highlightRAGChunk;
+  window.addEventListener("resize", () => { live.forEach((h) => h.place()); draw(); });
+
+  function tokens(s) {
+    const out = new Set(); s = String(s || "").toLowerCase();
+    (s.match(/[a-z][a-z0-9-]{2,}|\d+(?:[.,]\d+)?/g) || []).forEach((w) => out.add(w));
+    (s.match(/[฀-๿]+/g) || []).forEach((w) => { for (let i = 0; i + 3 <= w.length; i++) out.add(w.slice(i, i + 3)); });
+    return out;
+  }
+  function overlap(a, b) {
+    const A = tokens(a), B = tokens(b);
+    if (!A.size || !B.size) return 0;
+    let n = 0; A.forEach((x) => { if (B.has(x)) n += 1; });
+    return Math.round((100 * n) / Math.min(A.size, B.size));
+  }
+  function showEvidence(src, n, claim, pct) {
+    const box = $("evidence"); box.hidden = false; box.textContent = "";
+    const k = document.createElement("div"); k.className = "k";
+    const a = document.createElement("span"); a.textContent = `${W.evidence} [${n}] · ${src ? host(src.url) : "?"}`;
+    const b = document.createElement("span"); b.textContent = pct == null ? "" : `${W.overlap} ${pct}%`;
+    k.append(a, b);
+    const s = document.createElement("div"); s.className = "src";
+    if (src && /^https?:/i.test(src.url || "")) {
+      const l = document.createElement("a"); l.href = src.url; l.target = "_blank"; l.rel = "noopener noreferrer"; l.textContent = src.title || readable(src.url); s.append(l);
+    } else s.textContent = src ? src.title || "" : "";
+    const sn = document.createElement("div"); sn.className = "snip";
+    const ev = src ? (src.evidence || []).join(" … ") || src.description || "" : "";
+    const want = tokens(claim);
+    ev.split(/([A-Za-z][A-Za-z0-9-]{2,}|\d+(?:[.,]\d+)?|[฀-๿]{4,})/).forEach((part) => {
+      if (!part) return;
+      const lower = part.toLowerCase();
+      const hit = /^[a-z0-9]/.test(lower) ? want.has(lower) : /^[฀-๿]{4,}$/.test(part) && [...tokens(part)].filter((x) => want.has(x)).length >= Math.max(2, part.length - 4);
+      if (hit) { const m = document.createElement("mark"); m.textContent = part; sn.append(m); } else sn.append(document.createTextNode(part));
+    });
+    const bar = document.createElement("div"); bar.className = "bar"; const fill = document.createElement("i"); bar.append(fill);
+    box.append(k, s, sn, bar);
+    requestAnimationFrame(() => { fill.style.width = `${pct || 0}%`; });
+  }
+
+  // ---------------------------------------------------------------- the clock: replay, pause, speed
+  let speed = 1, playing = true, epoch = 0;
+  const sleep = (ms) => new Promise((ok) => {
+    const mine = epoch; let left = ms / speed, last = performance.now();
+    const tick = (now) => {
+      if (mine !== epoch) return ok(false);
+      if (playing) left -= (now - last) * 1;
+      last = now;
+      if (left <= 0) return ok(true);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  async function ground(report) {
+    const mine = epoch;
+    S.phase = "grounding";
+    $("intake").hidden = true; $("docWrap").hidden = false;
+    $("hCenter").textContent = W.doc;
+    buildDoc(report);
+    const sources = new Map((report.sources || []).map((s) => [s.id, s]));
+    $("hCenterN").textContent = `${S.claims.length} ↔ ${sources.size}`;
+    say("lead", W.say.report(S.claims.length, sources.size));
+    draw();
+    for (const c of S.claims) {
+      if (mine !== epoch) return;
+      const wrap = $("docWrap");
+      const r = c.p.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+      wrap.scrollTop = Math.max(0, r.top - wr.top + wrap.scrollTop - wrap.clientHeight * 0.3);
+      if (!(await sleep(220))) return;
+      const h = highlightRAGChunk(c.text, W.label.extract, "var(--cyan)", c.p);
+      say("research", W.say.extract(clip(c.section, 40)));
+      if (!(await sleep(520))) return;
+      const n = c.cites[0], src = sources.get(n);
+      c.sups.forEach((s) => s.classList.add("hot"));
+      h && h.set(W.label.match(c.cites.join("][")), "var(--magenta)");
+      say("match", W.say.match(c.cites.join("]["), src ? host(src.url) : "?"));
+      const pct = Math.max(...c.cites.map((k) => { const s = sources.get(k); return s ? overlap(c.text, (s.evidence || []).join(" ") || s.description || "") : 0; }));
+      showEvidence(src, n, c.text, pct);
+      if (!(await sleep(700))) return;
+      h && h.set(W.label.grounded(pct), "var(--lime)");
+      c.sups.forEach((s) => { s.classList.remove("hot"); s.classList.add("ok"); });
+      S.grounded += 1;
+      say("ground", W.say.grounded(c.cites.join("]["), pct));
+      header();
+      if (!(await sleep(420))) return;
+      h && h.remove();
+    }
+    S.phase = "done";
+    say("ground", W.say.mapped(S.claims.length, sources.size));
+    header();
+  }
+
+  // ---------------------------------------------------------------- replay (an exported file, or a finished Run)
+  const MODE = DATA.live && !FINAL.has(DATA.run.status) ? "live" : "replay";
+  function reset() {
+    epoch += 1; fresh();
+    els.forEach((e) => e.remove()); els.clear(); edges.forEach((e) => e.remove()); edges.clear();
+    $("gFx").textContent = ""; $("log").textContent = ""; logCount = 0; intakeCount = 0;
+    $("intake").textContent = ""; $("intake").hidden = false; $("docWrap").hidden = true; $("evidence").hidden = true;
+    $("doc").textContent = ""; $("overlay").textContent = ""; live.clear();
+    const e = document.createElement("div"); e.className = "empty"; e.textContent = W.waiting; $("intake").append(e);
+    $("hCenter").textContent = W.intake; $("hCenterN").textContent = "";
+    lead();
+    say("lead", W.say.start(clip(S.run.topic, 90)));
+    draw();
+  }
+  async function replay(skipTo) {
+    reset();
+    const mine = epoch;
+    const evs = DATA.events || [];
+    const times = evs.map((e) => t(e.at)).filter((x) => !isNaN(x));
+    const span = times.length > 1 ? times[times.length - 1] - times[0] : 1;
+    const TARGET = 42000; // the research part of a replay at 1×, whatever the Run's real length
+    const k = TARGET / Math.max(span, 1);
+    if (skipTo) S.fast = true;
+    for (let i = 0; i < evs.length; i++) {
+      if (mine !== epoch) return;
+      apply(evs[i]);
+      if (!S.fast) {
+        draw();
+        const gap = i + 1 < evs.length ? (t(evs[i + 1].at) - t(evs[i].at)) * k : 0;
+        if (!(await sleep(Math.min(1400, Math.max(18, isNaN(gap) ? 60 : gap))))) return;
+      }
+    }
+    S.fast = false;
+    S.run.status = DATA.run.status;
+    if (DATA.run.finished_at) S.now = t(DATA.run.finished_at);
+    settle(S.run); draw();
+    if (DATA.report) { if (await sleep(900)) ground(DATA.report); }
+    else { say("lead", W.say.noReport); S.phase = "done"; header(); }
+  }
+
+  // ---------------------------------------------------------------- live (the web app, signed in, same origin)
+  async function follow() {
+    reset();
+    const mine = epoch;
+    S.fast = true; (DATA.events || []).forEach(apply); S.fast = false; draw();
+    const runUrl = new URL(DATA.live.run, location.href), reportUrl = new URL(DATA.live.report, location.href);
+    let misses = 0;
+    for (;;) {
+      if (mine !== epoch) return;
+      try {
+        const url = new URL(runUrl); url.searchParams.set("after", String(S.cursor));
+        const r = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
+        if (!r.ok) throw new Error(String(r.status));
+        const d = await r.json(); misses = 0;
+        Object.assign(S.run, { status: d.status, stage: d.stage, reason: d.reason, message: d.message, finished_at: d.finished_at });
+        (d.events || []).forEach(apply);
+        if (!(d.events || []).length && !FINAL.has(d.status)) S.now = Date.now();
+        draw();
+        if (FINAL.has(d.status) && !(d.events || []).length) {
+          settle(S.run); draw();
+          if (d.status === "succeeded") {
+            const rr = await fetch(reportUrl, { credentials: "same-origin", headers: { Accept: "application/json" } });
+            if (rr.ok) { ground(await rr.json()); return; }
+          }
+          say("lead", W.say.noReport); S.phase = "done"; header();
+          return;
+        }
+      } catch (e) {
+        misses += 1; if (misses === 2) say("lead", W.say.offline);
+      }
+      await new Promise((ok) => setTimeout(ok, 2500));
+    }
+  }
+
+  // ---------------------------------------------------------------- start
+  $("hAgents").textContent = W.agents; $("hLog").textContent = W.log; $("hCenter").textContent = W.intake;
+  $("mAgentsL").textContent = W.mAgents; $("mSearchL").textContent = W.mSearch; $("mPagesL").textContent = W.mPages;
+  $("mTokensL").textContent = W.mTokens; $("mClaimsL").textContent = W.mClaims;
+  fresh();
+  if (MODE === "live") { follow(); }
+  else {
+    $("controls").hidden = false;
+    const play = $("play");
+    const paint = () => {
+      play.textContent = playing ? W.pause : W.play;
+      document.querySelectorAll("[data-speed]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.speed === speed)));
+    };
+    play.onclick = () => { playing = !playing; paint(); };
+    $("restart").onclick = () => { playing = true; paint(); replay(false); };
+    $("skip").textContent = W.skip;
+    $("skip").onclick = () => { playing = true; paint(); replay(true); };
+    document.querySelectorAll("[data-speed]").forEach((b) => { b.onclick = () => { speed = +b.dataset.speed; paint(); }; });
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) speed = 8;
+    paint();
+    replay(false);
+  }
+})();
+</script>
+</body>
+</html>

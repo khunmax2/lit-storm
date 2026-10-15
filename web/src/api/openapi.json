@@ -2605,6 +2605,48 @@
     }
    }
   },
+  "/api/runs/{run_id}/observatory": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "View Observatory",
+    "description": "The Run's agents at work, then its report's citations against their\nSources (litstorm.render.observatory): live while it runs, a replay once\nit has ended. Opened in a tab of its own, signed in.",
+    "operationId": "view_observatory_api_runs__run_id__observatory_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}/export": {
    "get": {
     "tags": [
@@ -2629,7 +2671,7 @@
       "required": true,
       "schema": {
        "type": "string",
-       "pattern": "^(html|md|pdf|interactive)$",
+       "pattern": "^(html|md|pdf|interactive|observatory)$",
        "title": "Format"
       }
      },
@@ -2652,6 +2694,47 @@
        "pattern": "^(static|full)$",
        "default": "static",
        "title": "Charts"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/exports/{token}": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "Export By Link",
+    "description": "A report's file through a link research_export made (litstorm.exports):\nno sign-in, the link is the permission, for its one Run and format, until\nit expires. The Run must still be its owner's and have its report.",
+    "operationId": "export_by_link_api_exports__token__get",
+    "parameters": [
+     {
+      "name": "token",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Token"
       }
      }
     ],
@@ -3695,6 +3778,13 @@
       "type": "string",
       "title": "Url"
      },
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/EndpointOut"
+      },
+      "type": "array",
+      "title": "Endpoints"
+     },
      "enabled": {
       "type": "boolean",
       "title": "Enabled"
@@ -3721,6 +3811,7 @@
     "type": "object",
     "required": [
      "url",
+     "endpoints",
      "enabled",
      "may_create",
      "scopes",
@@ -4099,6 +4190,45 @@
     },
     "type": "object",
     "title": "EmbeddingOut"
+   },
+   "EndpointOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "path": {
+      "type": "string",
+      "title": "Path"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "tool_prefix": {
+      "type": "string",
+      "title": "Tool Prefix"
+     },
+     "allowed": {
+      "type": "boolean",
+      "title": "Allowed"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "path",
+     "url",
+     "tool_prefix",
+     "allowed"
+    ],
+    "title": "EndpointOut",
+    "description": "One MCP server: the combined one (\"all\") or one mode's (docs/adr/0009)."
    },
    "EngineChoice": {
     "properties": {
@@ -4543,6 +4673,14 @@
       },
       "type": "array",
       "title": "Recent",
+      "default": []
+     },
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/EndpointOut"
+      },
+      "type": "array",
+      "title": "Endpoints",
       "default": []
      }
     },

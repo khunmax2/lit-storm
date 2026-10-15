@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepLit research canvas</title>
+<!--
+  DeepLit's MCP App (docs/adr/0010): a research Run as a live canvas of its
+  agents at work. A host that speaks MCP Apps renders this ui:// resource
+  beside the start and status tools; the page asks the host for the Run's
+  events (tools/call on the server's events tool) every 2.5 s.
+
+  This is the shell every canvas shares: the host bridge, the header, the
+  steps, the log and the drawing kit. Each mode draws its own scene
+  (mcp_canvas/<mode>.js, inserted below by api/mcp.py): one mode's server
+  serves its scene alone, the combined server all of them, picking by the
+  Run's mode.
+  Self-contained: no network, no libraries (the host's CSP allows none).
+  Opened outside a host, or with #demo, it plays a built-in sample.
+-->
+<style>
+:root {
+  --bg: var(--color-background-primary, #ffffff);
+  --bg2: var(--color-background-secondary, #f5f6f8);
+  --bg3: var(--color-background-tertiary, #eceef2);
+  --fg: var(--color-text-primary, #16181d);
+  --fg2: var(--color-text-secondary, #5b6170);
+  --fg3: var(--color-text-tertiary, #8b91a0);
+  --line: var(--color-border-primary, #d9dce3);
+  --line2: var(--color-border-secondary, #e7e9ee);
+  --node: #ffffff; --node-line: #d3d7df;
+  --ok: var(--color-text-success, #1f8a4c);
+  --bad: var(--color-text-danger, #c43c3c);
+  --font: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", sans-serif);
+  --lead: #6d5ce8; --plan: #2f7fd8; --persona: #c2569b; --research: #0f9488; --tool: #d98a1c; --write: #4f8a2b;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: var(--color-background-primary, #17191e);
+  --bg2: var(--color-background-secondary, #1f2228);
+  --bg3: var(--color-background-tertiary, #2a2e36);
+  --fg: var(--color-text-primary, #eceef2);
+  --fg2: var(--color-text-secondary, #a9afbd);
+  --fg3: var(--color-text-tertiary, #7c8394);
+  --line: var(--color-border-primary, #353a44);
+  --line2: var(--color-border-secondary, #2b2f37);
+  --node: #272b33; --node-line: #424854;
+  --ok: var(--color-text-success, #4cc27e);
+  --bad: var(--color-text-danger, #ef6b6b);
+  --lead: #9488ff; --plan: #5aa5f5; --persona: #e47dbd; --research: #2cc2b3; --tool: #f0a840; --write: #7fbf55;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 var(--font); }
+html { scrollbar-gutter: stable; } /* a scrollbar coming and going would change the width, the height, and so on */
+body { padding: 12px 14px 14px; }
+header { display: flex; gap: 10px; align-items: flex-start; }
+.mark { width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
+  background: var(--lead); color: #fff; font-weight: 700; font-size: 14px; letter-spacing: -.5px; }
+.head { min-width: 0; flex: 1; }
+.topic { font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--bg2); color: var(--fg2); border: 1px solid var(--line2); }
+.chip.live { color: var(--research); border-color: currentColor; }
+.chip.live::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  margin-right: 5px; vertical-align: 1px; animation: blink 1.2s infinite; }
+.chip.done { color: var(--ok); border-color: currentColor; }
+.chip.fail { color: var(--bad); border-color: currentColor; }
+.steps { display: flex; gap: 4px; margin: 12px 0 6px; }
+.step { flex: 1; min-width: 0; }
+.step i { display: block; height: 4px; border-radius: 4px; background: var(--bg3); overflow: hidden; position: relative; }
+.step.done i { background: var(--research); }
+.step.now i::after { content: ""; position: absolute; inset: 0; width: 40%; background: var(--research); border-radius: 4px;
+  animation: slide 1.4s ease-in-out infinite; }
+.step span { display: block; font-size: 10.5px; color: var(--fg3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step.now span { color: var(--fg); font-weight: 600; }
+.stage { position: relative; border: 1px solid var(--line2); border-radius: 12px; background:
+  radial-gradient(circle at 1px 1px, var(--line2) 1px, transparent 0) 0 0 / 18px 18px, var(--bg2); overflow: hidden; }
+svg { display: block; width: 100%; }
+svg text { font-family: var(--font); fill: var(--fg); }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.6; transition: stroke .3s; }
+.edge.new { stroke-dasharray: 600; stroke-dashoffset: 600; animation: draw .7s ease-out forwards; }
+.edge.flow { stroke: var(--c); stroke-dasharray: 5 6; animation: flow .8s linear infinite; }
+.edge.done { stroke: var(--c); opacity: .45; }
+.node { transition: transform .6s cubic-bezier(.2,.8,.2,1.15), opacity .45s; }
+.node.born { opacity: 0; }
+.node rect.box { fill: var(--node); stroke: var(--node-line); stroke-width: 1.2; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.12)); }
+.node.active rect.box { stroke: var(--c); stroke-width: 1.8; }
+.node.fail rect.box { stroke: var(--bad); }
+.node.muted { opacity: .5; }
+.node.idle { opacity: .55; }
+.node rect.bar { fill: var(--c); }
+.node .ring { fill: none; stroke: var(--c); stroke-width: 2; opacity: 0; }
+.node.active .ring { animation: ring 1.6s ease-out infinite; }
+.node .t { font-size: 12px; font-weight: 600; }
+.node .s { font-size: 10.5px; fill: var(--fg2); }
+.node .k { font-size: 9.5px; fill: var(--c); font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+.node .badge { font-size: 10px; fill: var(--fg3); }
+.node .tick { fill: var(--ok); font-size: 12px; font-weight: 700; }
+.node .x { fill: var(--bad); font-size: 12px; font-weight: 700; }
+.burst { fill: none; stroke: var(--c); stroke-width: 2; animation: burst .7s ease-out forwards; }
+.label { font-size: 10.5px; fill: var(--fg3); font-weight: 600; letter-spacing: .3px; }
+.track { fill: none; stroke: var(--line); stroke-width: 2; }
+.track.live { stroke: var(--c); stroke-dasharray: 3 8; stroke-linecap: round; animation: flow 1.1s linear infinite; opacity: .7; }
+.spin { fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; transform-box: fill-box; transform-origin: center;
+  animation: spin 1.6s linear infinite; }
+.orbit { transition: transform .9s cubic-bezier(.4,.1,.2,1); }
+.orbit circle { fill: var(--c); filter: drop-shadow(0 0 4px var(--c)); }
+.dot { stroke: var(--bg2); stroke-width: 2; fill: var(--line); transition: fill .3s; }
+.dot.done { fill: var(--c); opacity: .5; }
+.dot.now { fill: var(--c); }
+.hub-n { font-size: 15px; font-weight: 700; text-anchor: middle; }
+.hub-s { font-size: 10px; fill: var(--fg2); text-anchor: middle; }
+.empty { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; color: var(--fg3); font-size: 12px; pointer-events: none; }
+.stats { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 2px 0; color: var(--fg2); font-size: 12px; }
+.stats b { color: var(--fg); font-size: 15px; margin-right: 3px; font-variant-numeric: tabular-nums; }
+.log { margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line2); max-height: 156px; overflow: auto; }
+.log li { display: flex; gap: 8px; padding: 5px 2px; border-bottom: 1px solid var(--line2); font-size: 12px; color: var(--fg2);
+  animation: rise .35s ease-out; }
+.log li time { color: var(--fg3); font-variant-numeric: tabular-nums; flex: none; }
+.log li .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; margin-top: 6px; }
+.log li span { overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+button { font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+  color: var(--fg); cursor: pointer; }
+button:hover { background: var(--bg2); }
+button.primary { background: var(--lead); border-color: var(--lead); color: #fff; }
+button[hidden] { display: none; }
+.note { color: var(--fg3); font-size: 11.5px; margin-top: 8px; }
+@keyframes blink { 50% { opacity: .25; } }
+@keyframes slide { 0% { left: -40%; } 100% { left: 100%; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes flow { to { stroke-dashoffset: -22; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes ring { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes burst { 0% { r: 6; opacity: .9; } 100% { r: 46; opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="mark">DL</div>
+  <div class="head">
+    <div class="topic" id="topic">DeepLit</div>
+    <div class="chips" id="chips"></div>
+  </div>
+</header>
+<div class="steps" id="steps"></div>
+<div class="stage" id="stage">
+  <svg id="svg" role="img" aria-label="Research agents"><g id="edges"></g><g id="nodes"></g><g id="fx"></g></svg>
+  <div class="empty" id="empty"></div>
+</div>
+<div class="stats" id="stats"></div>
+<ul class="log" id="log"></ul>
+<div class="actions">
+  <button class="primary" id="read" hidden></button>
+  <button id="open" hidden></button>
+  <button id="full" hidden></button>
+</div>
+<div class="note" id="note" hidden></div>
+<script>
+"use strict";
+// ------------------------------------------------------------------ the kit every scene draws with
+window.DL = (() => {
+  // Which server serves this page: its mode (null: every mode) and its tools' names.
+  const CONFIG = /*CONFIG*/{ "mode": null, "events": "research_events", "status": "research_status", "report": "research_report" }/*END*/;
+  const WORDS = {
+    en: {
+      waiting: "Starting the research…", agents: "agents", sources: "sources", rounds: "rounds", searches: "searches",
+      lead: "DeepLit", orchestrator: "Orchestrator", planner: "Planner", perspective: "Perspective finder", persona: "Perspective",
+      researcher: "Researcher", search: "Search agent", crawl: "Crawl agent", writer: "Writer", outline: "Outline writer",
+      article: "Section writers", polish: "Polisher", compose: "Long writer", experts: "Topic expert",
+      read: "Read the report", open: "Open in DeepLit", full: "Full screen",
+      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish" },
+      status: { queued: "Queued", running: "Running", succeeded: "Done", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted", needs_selection: "Needs a choice" },
+      phase: { observe: "observing", gap: "finding the gap", select: "choosing searches", search: "searching", write: "writing" },
+      steps: { observe: "Observe", gap: "Knowledge gap", select: "Choose tools", search: "Search & read" },
+      captions: { observe: "Observations", gap: "Knowledge gap agent", select: "Tool selector agent", search: "Web search · Crawler", write: "Writer agent" },
+      tree: { generating_query: "writing a query", generated_query: "query ready", searching: "searching", search_complete: "search done",
+        processing_search_result: "reading results", node_complete: "done", no_evidence: "no evidence", error: "error" },
+      round: (r, m) => `round ${r}/${m}`, roundShort: "round", level: (n) => `Level ${n}`, plan: "Search plan",
+      learnings: (n) => `${n} findings`, queries: (n) => `${n} searches`, found: (n) => `${n} sources`, complete: "enough known",
+      interview: "Interviews: each perspective asks, the expert searches and answers", pages: (n) => `${n} pages read`,
+      report: "Report", sections: "sections", levels: "levels", findings: "findings", perspectives: "perspectives",
+      log: {
+        stage: (s) => `Stage: ${s}`, perspectives: (n) => `Found ${n} perspectives; each interviews a topic expert`,
+        plan: (n) => `Planned ${n} sections, one researcher each`,
+        gap: (l, g) => `${l}: gap — ${g}`, complete: (l) => `${l}: research complete`,
+        found: (l, n) => `${l}: found ${n} sources`, write: (l) => `${l}: writing`, compose: "Composing the sections into one report",
+        tasks: (l, n) => `${l}: sent ${n} search agents`,
+        node: (q) => `New researcher: ${q}`, done: "Finished", failed: (m) => `Ended: ${m}`,
+      },
+      noTools: "This client does not let the canvas fetch updates; ask for {status} to see more.",
+      readAsk: (id) => `Read the DeepLit report of research ${id} with ${CONFIG.report} (outline first if it is long) and summarise it.`,
+    },
+    th: {
+      waiting: "กำลังเริ่มค้นคว้า…", agents: "เอเจนต์", sources: "แหล่งข้อมูล", rounds: "รอบ", searches: "การค้น",
+      lead: "DeepLit", orchestrator: "ผู้ประสานงาน", planner: "ผู้วางแผน", perspective: "ผู้หามุมมอง", persona: "มุมมอง",
+      researcher: "นักค้นคว้า", search: "เอเจนต์ค้นหา", crawl: "เอเจนต์อ่านเว็บ", writer: "ผู้เขียน", outline: "ผู้วางโครงเรื่อง",
+      article: "ผู้เขียนแต่ละหัวข้อ", polish: "ผู้เกลาเนื้อหา", compose: "ผู้รวมรายงาน", experts: "ผู้เชี่ยวชาญหัวข้อ",
+      read: "อ่านรายงาน", open: "เปิดใน DeepLit", full: "เต็มจอ",
+      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน" },
+      status: { queued: "รอคิว", running: "กำลังทำงาน", succeeded: "เสร็จแล้ว", failed: "ไม่สำเร็จ", cancelled: "ยกเลิกแล้ว", interrupted: "ถูกขัดจังหวะ", needs_selection: "ต้องเลือกใหม่" },
+      phase: { observe: "สังเกต", gap: "หาช่องว่างความรู้", select: "เลือกคำค้น", search: "กำลังค้น", write: "กำลังเขียน" },
+      steps: { observe: "สังเกต", gap: "หาช่องว่าง", select: "เลือกเครื่องมือ", search: "ค้นและอ่านเว็บ" },
+      captions: { observe: "Observations", gap: "Knowledge gap agent", select: "Tool selector agent", search: "Web search · Crawler", write: "Writer agent" },
+      tree: { generating_query: "กำลังคิดคำค้น", generated_query: "ได้คำค้นแล้ว", searching: "กำลังค้น", search_complete: "ค้นเสร็จ",
+        processing_search_result: "กำลังอ่านผล", node_complete: "เสร็จ", no_evidence: "ไม่พบหลักฐาน", error: "ผิดพลาด" },
+      round: (r, m) => `รอบ ${r}/${m}`, roundShort: "รอบ", level: (n) => `ชั้น ${n}`, plan: "แผนการค้น",
+      learnings: (n) => `ข้อค้นพบ ${n}`, queries: (n) => `${n} คำค้น`, found: (n) => `${n} แหล่ง`, complete: "รู้พอแล้ว",
+      interview: "สัมภาษณ์: แต่ละมุมมองถาม ผู้เชี่ยวชาญค้นแล้วตอบ", pages: (n) => `อ่าน ${n} หน้า`,
+      report: "รายงาน", sections: "หัวข้อ", levels: "ชั้น", findings: "ข้อค้นพบ", perspectives: "มุมมอง",
+      log: {
+        stage: (s) => `ขั้นตอน: ${s}`, perspectives: (n) => `พบ ${n} มุมมอง แต่ละมุมมองสัมภาษณ์ผู้เชี่ยวชาญหัวข้อ`,
+        plan: (n) => `วางแผน ${n} หัวข้อ แยกนักค้นคว้าหัวข้อละคน`,
+        gap: (l, g) => `${l}: ช่องว่าง — ${g}`, complete: (l) => `${l}: ค้นคว้าครบแล้ว`,
+        found: (l, n) => `${l}: ได้ ${n} แหล่ง`, write: (l) => `${l}: กำลังเขียน`, compose: "กำลังรวมทุกหัวข้อเป็นรายงานเดียว",
+        tasks: (l, n) => `${l}: ส่งเอเจนต์ค้นหา ${n} ตัว`,
+        node: (q) => `นักค้นคว้าใหม่: ${q}`, done: "เสร็จสิ้น", failed: (m) => `จบลง: ${m}`,
+      },
+      noTools: "client นี้ไม่ให้ canvas ดึงข้อมูลเพิ่ม ให้ถาม {status} เพื่อดูความคืบหน้า",
+      readAsk: (id) => `อ่านรายงาน DeepLit ของงานวิจัย ${id} ด้วย ${CONFIG.report} (ถ้ายาวให้ดู outline ก่อน) แล้วสรุปให้ฟัง`,
+    },
+  };
+  const NS = "http://www.w3.org/2000/svg";
+  const COLORS = { lead: "--lead", plan: "--plan", persona: "--persona", research: "--research", tool: "--tool", write: "--write" };
+  const $ = (id) => document.getElementById(id);
+  const clip = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  const fit = (s, px, size = 12) => clip(s, Math.max(4, Math.floor(px / (size * 0.55))));
+  const kit = { CONFIG, WORDS, W: WORDS.en, NS, COLORS, $, clip, fit, scenes: {}, fast: false };
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => { if (v != null) e.setAttribute(k, v); });
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  kit.el = el;
+  kit.text = (parent, cls, x, y, s, extra) => { const t = el("text", { class: cls, x, y, ...(extra || {}) }, parent); t.textContent = s; return t; };
+
+  // Children by key, kept from one draw to the next, so what moves glides and what is new is born.
+  kit.layer = (parent) => {
+    const map = new Map();
+    let seen = new Set();
+    return {
+      get(key, tag) {
+        let e = map.get(key), born = false;
+        if (!e) { e = el(tag); e.dataset.k = key; parent.appendChild(e); map.set(key, e); born = true; }
+        seen.add(key);
+        return [e, born];
+      },
+      sweep() { map.forEach((e, k) => { if (!seen.has(k)) { e.remove(); map.delete(k); } }); seen = new Set(); },
+    };
+  };
+
+  // A spawn's ripple where the new agent came from.
+  kit.burst = (x, y, kind) => {
+    if (kit.fast) return;
+    const c = el("circle", { class: "burst", cx: x, cy: y, r: 6 }, $("fx"));
+    c.style.setProperty("--c", `var(${COLORS[kind] || "--lead"})`);
+    setTimeout(() => c.remove(), 800);
+  };
+
+  // An agent's card: kind on top, title, a line under; its state in the frame (active rings, done ticks).
+  // `from` is where a new card grows from (its parent), with a ripple there.
+  kit.card = (layer, key, box, o) => {
+    const [g, born] = layer.get(key, "g");
+    const to = `translate(${box.x}px, ${box.y}px)`;
+    if (born) {
+      const f = o.from || box;
+      g.setAttribute("class", "node born");
+      g.style.transition = kit.fast ? "none" : "";
+      g.style.transform = `translate(${f.x}px, ${f.y}px) scale(.4)`;
+      const grow = () => {
+        if (!g.classList.contains("born")) return;
+        g.style.transition = "";
+        g.classList.remove("born");
+        g.style.transform = g.dataset.to;
+      };
+      requestAnimationFrame(() => requestAnimationFrame(grow));
+      setTimeout(grow, 60);
+      if (o.from) kit.burst(o.from.x + (o.from.w || 0) / 2, o.from.y + (o.from.h || 0) / 2, o.kind);
+    } else if (!g.classList.contains("born")) {
+      g.style.transform = to;
+    }
+    g.dataset.to = to;
+    g.style.setProperty("--c", `var(${COLORS[o.kind] || "--lead"})`);
+    ["active", "done", "fail", "muted", "idle"].forEach((s) => g.classList.toggle(s, o.state === s));
+    g.textContent = "";
+    const w = box.w, h = box.h;
+    el("rect", { class: "ring", x: -3, y: -3, width: w + 6, height: h + 6, rx: 12, style: `transform-origin:${w / 2}px ${h / 2}px` }, g);
+    el("rect", { class: "box", width: w, height: h, rx: 10 }, g);
+    el("rect", { class: "bar", x: 0, y: 8, width: 3, height: Math.max(4, h - 16), rx: 1.5 }, g);
+    // the lines, centred in the card: kind, title, the line under
+    const lines = (o.k ? 1 : 0) + 1 + (o.sub ? 1 : 0);
+    let y = Math.round((h - lines * 15) / 2) + 11;
+    if (o.k) { kit.text(g, "k", 12, y, fit(o.k, w - 40, 9.5)); y += 15; }
+    kit.text(g, "t", 12, y, fit(o.title, w - 22));
+    if (o.sub) kit.text(g, o.subBadge ? "badge" : "s", 12, y + 15, fit(o.sub, w - 22, 10.5));
+    if (o.state === "done") kit.text(g, "tick", w - 18, 16, "✓");
+    if (o.state === "fail") kit.text(g, "x", w - 18, 16, "!");
+    const tip = el("title", {}, g);
+    tip.textContent = [o.title, o.sub, o.tip].filter(Boolean).join("\n");
+    return g;
+  };
+
+  // A line from one box to another, flowing while the work runs along it.
+  kit.edge = (layer, key, d, kind, how) => {
+    const [p, born] = layer.get(key, "path");
+    p.setAttribute("d", d);
+    let cls = "edge";
+    if (born && !kit.fast) cls += " new";
+    else if (how === "flow") cls += " flow";
+    else if (how === "done") cls += " done";
+    p.setAttribute("class", cls);
+    p.style.setProperty("--c", `var(${COLORS[kind] || "--lead"})`);
+    return p;
+  };
+  kit.curve = (x1, y1, x2, y2, across = true) => {
+    if (across) { const mx = (x1 + x2) / 2; return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }
+    const my = (y1 + y2) / 2;
+    return `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+  };
+
+  // The frame: a viewBox of w x h, drawn at the stage's width (never larger than life).
+  kit.view = (w, h, maxH = 760) => {
+    const width = $("stage").clientWidth || 600;
+    const svg = $("svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const scale = Math.min(1, width / w);
+    svg.style.height = Math.max(150, Math.min(h * scale, maxH)) + "px";
+  };
+
+  function say(kind, text, at) {
+    const li = document.createElement("li");
+    li.style.setProperty("--c", `var(${COLORS[kind] || "--lead"})`);
+    const t = at ? new Date(at) : new Date();
+    li.innerHTML = `<i class="dot"></i><time></time><span></span>`;
+    li.querySelector("time").textContent = t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    li.querySelector("span").textContent = text;
+    const log = $("log");
+    log.prepend(li);
+    while (log.children.length > 60) log.lastChild.remove();
+  }
+  kit.say = say;
+  return kit;
+})();
+</script>
+<!--SCENES-->
+<script>
+"use strict";
+(() => {
+  const K = window.DL, $ = K.$, CONFIG = K.CONFIG;
+  const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
+  const state = { run: null, engine: CONFIG.mode, scene: null, after: 0, final: false, polling: false, stage: null, settled: false };
+  const layers = { nodes: K.layer($("nodes")), edges: K.layer($("edges")) };
+
+  function scene() {
+    if (state.scene || !state.engine || !K.scenes[state.engine]) return state.scene;
+    state.scene = K.scenes[state.engine].create(K, layers, () => state);
+    return state.scene;
+  }
+
+  function apply(ev) {
+    const d = ev.data || {};
+    if (ev.type === "stage") {
+      state.stage = d.stage;
+      K.say("lead", K.W.log.stage(K.W.stages[d.stage] || d.stage), ev.at);
+    }
+    const s = scene();
+    if (s) s.apply(ev);
+  }
+
+  function settle(run) {
+    if (!FINAL.has(run.status)) return;
+    const s = scene();
+    if (s && s.settle) s.settle(run);
+    if (!state.settled) {
+      state.settled = true;
+      K.say("lead", run.status === "succeeded" ? K.W.log.done : K.W.log.failed(run.message || run.reason || run.status));
+    }
+  }
+
+  function draw() {
+    const s = scene();
+    if (s) s.draw();
+    else K.view(720, 160);
+    layers.nodes.sweep();
+    layers.edges.sweep();
+    $("empty").textContent = s && !s.empty() ? "" : K.W.waiting;
+    header();
+  }
+
+  function header() {
+    const r = state.run || {};
+    const s = scene();
+    $("topic").textContent = r.title || r.topic || "DeepLit";
+    const chips = $("chips");
+    chips.textContent = "";
+    const add = (text, cls) => { const c = document.createElement("span"); c.className = "chip" + (cls ? " " + cls : ""); c.textContent = text; chips.append(c); };
+    if (r.status) add(K.W.status[r.status] || r.status, r.status === "succeeded" ? "done" : FINAL.has(r.status) ? "fail" : "live");
+    if (r.mode) add(r.mode);
+    if (r.depth) add(r.depth);
+    if (r.language) add(r.language.toUpperCase());
+    const steps = $("steps");
+    steps.textContent = "";
+    const list = (state.engine && K.scenes[state.engine] && K.scenes[state.engine].stages) || [];
+    const at = list.indexOf(state.stage);
+    list.forEach((st, i) => {
+      const d = document.createElement("div");
+      const done = FINAL.has(r.status) ? r.status === "succeeded" || i < at : i < at;
+      d.className = "step" + (done ? " done" : i === at && !FINAL.has(r.status) ? " now" : "");
+      d.innerHTML = "<i></i><span></span>";
+      d.querySelector("span").textContent = K.W.stages[st] || st;
+      steps.append(d);
+    });
+    const stats = s ? s.stats() : [];
+    $("stats").innerHTML = stats.map(([n, w]) => `<span><b>${n}</b>${w}</span>`).join("");
+    const read = $("read"), open = $("open");
+    read.hidden = !(r.status === "succeeded" && bridge.connected);
+    read.textContent = K.W.read;
+    open.hidden = !(r.web_url && bridge.connected);
+    open.textContent = K.W.open;
+    $("full").textContent = K.W.full;
+    $("full").hidden = !(bridge.modes || []).includes("fullscreen");
+  }
+
+  // ---------------------------------------------------------------- feeding events
+  async function feed(events, replay) {
+    if (!events.length) return;
+    if (replay && events.length > 3) {
+      // A Run already under way: play what came before quickly, so its agents still spawn in order.
+      K.fast = events.length > 160;
+      const step = Math.max(12, Math.min(90, 5000 / events.length));
+      for (const ev of events) {
+        apply(ev);
+        draw();
+        await new Promise((r) => setTimeout(r, K.fast ? 0 : step));
+      }
+      K.fast = false;
+    } else {
+      events.forEach(apply);
+    }
+  }
+
+  const ENGINE_OF = { "STORM": "storm", "Deep Research": "deep", "Agent Research": "agent" };
+  function takeRun(run) {
+    state.run = { ...(state.run || {}), ...run };
+    if (!state.engine) state.engine = run.engine || ENGINE_OF[run.mode] || null;
+  }
+
+  async function pull() {
+    if (state.polling || !state.run || !state.run.id) return;
+    state.polling = true;
+    let replay = state.after === 0;
+    while (!state.final && !bridge.closed) {
+      let out;
+      try {
+        out = await bridge.callTool(CONFIG.events, { id: state.run.id, after: state.after });
+      } catch (e) {
+        await new Promise((r) => setTimeout(r, 5000));
+        continue;
+      }
+      if (!out) break;
+      takeRun(out.run || {});
+      await feed(out.events || [], replay);
+      replay = false;
+      state.after = out.after || state.after;
+      settle(state.run);
+      draw();
+      if (out.final) { state.final = true; break; }
+      if (!out.more) await new Promise((r) => setTimeout(r, 2500));
+    }
+    state.polling = false;
+  }
+
+  function fromResult(result) {
+    if (!result) return null;
+    if (result.structuredContent) return result.structuredContent.result || result.structuredContent;
+    const text = (result.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
+    try { return JSON.parse(text); } catch { return null; }
+  }
+
+  // ---------------------------------------------------------------- the host (MCP Apps, JSON-RPC over postMessage)
+  const bridge = {
+    connected: false, closed: false, tools: false, modes: [], seq: 0, waiting: new Map(),
+    send(msg) { window.parent.postMessage(msg, "*"); },
+    request(method, params, timeout = 60000) {
+      const id = ++this.seq;
+      this.send({ jsonrpc: "2.0", id, method, params });
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => { this.waiting.delete(id); reject(new Error("timeout " + method)); }, timeout);
+        this.waiting.set(id, { resolve: (v) => { clearTimeout(t); resolve(v); }, reject: (e) => { clearTimeout(t); reject(e); } });
+      });
+    },
+    notify(method, params) { this.send({ jsonrpc: "2.0", method, params: params || {} }); },
+    async callTool(name, args) {
+      if (!this.tools) return null;
+      const result = await this.request("tools/call", { name, arguments: args });
+      if (result && result.isError) throw new Error("tool error");
+      return fromResult(result);
+    },
+  };
+
+  function theme(ctx) {
+    if (!ctx) return;
+    if (ctx.theme) document.documentElement.dataset.theme = ctx.theme;
+    const vars = ctx.styles && ctx.styles.variables;
+    if (vars) Object.entries(vars).forEach(([k, v]) => { if (v) document.documentElement.style.setProperty(k, v); });
+    if (ctx.locale) { K.W = String(ctx.locale).toLowerCase().startsWith("th") ? K.WORDS.th : K.WORDS.en; document.documentElement.lang = ctx.locale; }
+    if (ctx.availableDisplayModes) bridge.modes = ctx.availableDisplayModes;
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent) return;
+    const m = event.data;
+    if (!m || m.jsonrpc !== "2.0") return;
+    if (m.id != null && !m.method) {
+      const w = bridge.waiting.get(m.id);
+      if (!w) return;
+      bridge.waiting.delete(m.id);
+      m.error ? w.reject(m.error) : w.resolve(m.result);
+      return;
+    }
+    if (m.method === "ui/resource-teardown") { bridge.closed = true; if (m.id != null) bridge.send({ jsonrpc: "2.0", id: m.id, result: {} }); return; }
+    if (m.id != null) { bridge.send({ jsonrpc: "2.0", id: m.id, result: {} }); }
+    if (m.method === "ui/notifications/host-context-changed") { theme(m.params); draw(); }
+    if (m.method === "ui/notifications/tool-input") {
+      const a = (m.params && m.params.arguments) || {};
+      if (a.topic && !state.run) { takeRun({ topic: a.topic, language: a.language, depth: a.depth, engine: CONFIG.mode || a.mode || "storm" }); draw(); }
+      if (a.id) { takeRun({ id: a.id }); pull(); }
+    }
+    if (m.method === "ui/notifications/tool-result") {
+      const facts = fromResult(m.params);
+      if (facts && facts.id) { takeRun(facts); settle(state.run); draw(); pull(); }
+      else if (facts && facts.run) { takeRun(facts.run); pull(); }
+    }
+  });
+
+  async function connect() {
+    try {
+      const init = await bridge.request("ui/initialize", {
+        appInfo: { name: "deeplit-research-canvas", version: "2.0.0" },
+        appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
+        protocolVersion: "2026-01-26",
+      }, 8000);
+      bridge.connected = true;
+      bridge.tools = !!(init && init.hostCapabilities && init.hostCapabilities.serverTools);
+      theme(init && init.hostContext);
+      bridge.notify("ui/notifications/initialized", {});
+      if (!bridge.tools) { $("note").hidden = false; $("note").textContent = K.W.noTools.replace("{status}", CONFIG.status); }
+      draw();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // size for the host
+  let lastH = 0, resizing = false;
+  new ResizeObserver(() => {
+    const h = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    if (bridge.connected && Math.abs(h - lastH) > 2) { lastH = h; bridge.notify("ui/notifications/size-changed", { height: h }); }
+    if (!resizing) { resizing = true; requestAnimationFrame(() => { resizing = false; draw(); }); }
+  }).observe(document.body);
+
+  $("read").onclick = () => bridge.request("ui/message", { role: "user", content: [{ type: "text", text: K.W.readAsk(state.run.id) }] }).catch(() => {});
+  $("open").onclick = () => bridge.request("ui/open-link", { url: state.run.web_url }).catch(() => {});
+  $("full").onclick = () => bridge.request("ui/request-display-mode", { mode: "fullscreen" }).catch(() => {});
+
+  // ---------------------------------------------------------------- demo (opened on its own)
+  function demo(kind) {
+    K.W = (navigator.language || "").toLowerCase().startsWith("th") ? K.WORDS.th : K.WORDS.en;
+    const [name, variant] = kind.split("-");
+    const sample = K.scenes[name] || K.scenes[Object.keys(K.scenes)[0]];
+    if (!state.engine) state.engine = K.scenes[name] ? name : Object.keys(K.scenes)[0];
+    const { run, events } = sample.demo(variant);
+    const now = Date.now();
+    events.forEach((ev, i) => { ev.id = i + 1; ev.at = new Date(now + i * 900).toISOString(); });
+    takeRun(run);
+    draw();
+    let i = 0;
+    const tick = () => {
+      if (i < events.length) { apply(events[i]); i += 1; draw(); setTimeout(tick, 650); }
+      else { state.run.status = "succeeded"; settle(state.run); draw(); }
+    };
+    setTimeout(tick, 600);
+  }
+
+  (async () => {
+    draw();
+    const inHost = window.parent !== window && !location.hash.startsWith("#demo");
+    if (inHost && (await connect())) return;
+    demo((location.hash.split("=")[1] || CONFIG.mode || "agent").toLowerCase());
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,16 +1,18 @@
-// How to point an AI tool or a program at DeepLit's MCP server: one snippet per client, ready to copy,
-// with the token filled in when there is one to fill in (docs/adr/0009).
+// How to point an AI tool or a program at DeepLit's MCP servers: the combined one or one mode's, then one
+// snippet per client, ready to copy, with the token filled in when there is one to fill in (docs/adr/0009).
 import { Check, Copy, Loader2, PlugZap } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { BASE } from "@/api/client";
+import { BASE, type Schemas } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { useT } from "@/i18n";
+import { useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const CLIENTS = ["claude-code", "claude-desktop", "cursor", "vscode", "curl", "python"] as const;
 type Client = (typeof CLIENTS)[number];
+
+type Endpoint = Schemas["EndpointOut"];
 
 const LABEL: Record<Client, string> = {
   "claude-code": "Claude Code",
@@ -21,18 +23,19 @@ const LABEL: Record<Client, string> = {
   python: "Python",
 };
 
-export function snippet(client: Client, url: string, token: string) {
+export function snippet(client: Client, endpoint: Pick<Endpoint, "name" | "url" | "tool_prefix">, token: string) {
+  const { name, url } = endpoint;
   const auth = `Bearer ${token}`;
   switch (client) {
     case "claude-code":
-      return `claude mcp add --transport http deeplit ${url} \\\n  --header "Authorization: ${auth}"`;
+      return `claude mcp add --transport http ${name} ${url} \\\n  --header "Authorization: ${auth}"`;
     case "claude-desktop":
       // Its config file runs local programs; mcp-remote is the bridge to a server on the web. The header
       // goes through the environment: Claude Desktop on Windows splits arguments that hold a space.
       return JSON.stringify(
         {
           mcpServers: {
-            deeplit: {
+            [name]: {
               command: "npx",
               args: ["-y", "mcp-remote", url, "--header", "Authorization:${AUTH_HEADER}"],
               env: { AUTH_HEADER: auth },
@@ -43,9 +46,9 @@ export function snippet(client: Client, url: string, token: string) {
         2,
       );
     case "cursor":
-      return JSON.stringify({ mcpServers: { deeplit: { url, headers: { Authorization: auth } } } }, null, 2);
+      return JSON.stringify({ mcpServers: { [name]: { url, headers: { Authorization: auth } } } }, null, 2);
     case "vscode":
-      return JSON.stringify({ servers: { deeplit: { type: "http", url, headers: { Authorization: auth } } } }, null, 2);
+      return JSON.stringify({ servers: { [name]: { type: "http", url, headers: { Authorization: auth } } } }, null, 2);
     case "curl":
       return [
         `curl -s ${url} \\`,
@@ -70,7 +73,7 @@ export function snippet(client: Client, url: string, token: string) {
         "        async with streamable_http_client(URL, http_client=http) as (read, write, _):",
         "            async with ClientSession(read, write) as session:",
         "                await session.initialize()",
-        '                started = await session.call_tool("research_start", {"topic": "Sodium-ion batteries", "language": "en"})',
+        `                started = await session.call_tool("${endpoint.tool_prefix}_start", {"topic": "Sodium-ion batteries", "language": "en"})`,
         "                print(started.content[0].text)",
         "",
         "asyncio.run(main())",
@@ -78,12 +81,17 @@ export function snippet(client: Client, url: string, token: string) {
   }
 }
 
-/** Call research_options with the token, as a client would, and say what came back. */
-async function tryToken(token: string) {
-  const r = await fetch(`${BASE}/api/mcp`, {
+/** Call the endpoint's options tool with the token, as a client would, and say what came back. */
+async function tryToken(token: string, endpoint: Endpoint) {
+  const r = await fetch(`${BASE}${endpoint.path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "research_options", arguments: {} } }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: `${endpoint.tool_prefix}_options`, arguments: {} },
+    }),
   });
   const text = await r.text();
   if (!r.ok) {
@@ -105,47 +113,102 @@ async function tryToken(token: string) {
   return { modes: options.engines.length as number, left: options.quota.remaining as number };
 }
 
-function TestConnection({ token }: { token: string }) {
+function TestConnection({ token, endpoint }: { token: string; endpoint: Endpoint }) {
   const { t } = useT();
-  const [state, setState] = useState<{ busy?: boolean; ok?: boolean; text?: string }>({});
+  const [state, setState] = useState<{ busy?: boolean; ok?: boolean; text?: string; on?: string }>({});
+  const shown = state.on === endpoint.id ? state : {};
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button
         type="button"
         variant="outline"
         size="sm"
-        disabled={state.busy}
+        disabled={shown.busy}
         onClick={async () => {
-          setState({ busy: true });
+          const on = endpoint.id;
+          setState({ busy: true, on });
           try {
-            setState({ ok: true, text: t("connections.testOk", await tryToken(token)) });
+            const got = await tryToken(token, endpoint);
+            const text =
+              on === "all"
+                ? t("connections.testOk", got)
+                : t("connections.testOkMode", { mode: t(`connections.ep.${on}` as Key), left: got.left });
+            setState({ ok: true, text, on });
           } catch (error) {
-            setState({ ok: false, text: t("connections.testFail", { why: (error as Error).message }) });
+            setState({ ok: false, text: t("connections.testFail", { why: (error as Error).message }), on });
           }
         }}
       >
-        {state.busy ? <Loader2 className="animate-spin" /> : <PlugZap />}
-        {state.busy ? t("connections.testing") : t("connections.test")}
+        {shown.busy ? <Loader2 className="animate-spin" /> : <PlugZap />}
+        {shown.busy ? t("connections.testing") : t("connections.test")}
       </Button>
-      {state.text && <span className={cn("text-xs", state.ok ? "text-success" : "text-destructive")}>{state.text}</span>}
+      {shown.text && <span className={cn("text-xs", shown.ok ? "text-success" : "text-destructive")}>{shown.text}</span>}
     </div>
   );
 }
 
-export function McpSetup({ url, token, compact = false }: { url: string; token?: string; compact?: boolean }) {
+/** Which server: the combined one, or one mode's, each with what it is good for. */
+function EndpointPicker({
+  endpoints,
+  value,
+  onChange,
+  narrow,
+}: {
+  endpoints: Endpoint[];
+  value: string;
+  onChange: (id: string) => void;
+  narrow: boolean;
+}) {
+  const { t } = useT();
+  return (
+    <div className="grid gap-1.5">
+      <p className="text-xs font-medium">{t("connections.endpoint")}</p>
+      <div className={cn("grid grid-cols-2 gap-2", !narrow && "lg:grid-cols-4")}>
+        {endpoints.map((e) => (
+          <button
+            key={e.id}
+            type="button"
+            disabled={!e.allowed}
+            title={e.allowed ? undefined : t("connections.epNotAllowed")}
+            onClick={() => onChange(e.id)}
+            className={cn(
+              "grid content-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+              e.id === value ? "border-brand/50 bg-brand-soft" : "hover:bg-muted/60",
+            )}
+          >
+            <span className={cn("text-xs font-medium", e.id === value && "text-brand")}>{t(`connections.ep.${e.id}` as Key)}</span>
+            <span className="text-[11px] leading-snug text-muted-foreground">
+              {e.allowed ? t(`connections.epAbout.${e.id}` as Key) : t("connections.epNotAllowed")}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function McpSetup({ endpoints, token, compact = false }: { endpoints: Endpoint[]; token?: string; compact?: boolean }) {
   const { t } = useT();
   const [client, setClient] = useState<Client>("claude-code");
+  const [picked, setPicked] = useState("all");
   const [copied, setCopied] = useState(false);
-  const text = snippet(client, url, token ?? "<YOUR_TOKEN>");
+  const endpoint = endpoints.find((e) => e.id === picked && e.allowed) ?? endpoints[0];
+  const text = snippet(client, endpoint, token ?? "<YOUR_TOKEN>");
   return (
-    <section className={cn("grid min-w-0 gap-3", !compact && "rounded-xl border p-4")}>
+    <section className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3", !compact && "rounded-xl border p-4")}>
       {!compact && (
         <div className="grid gap-1">
           <h2 className="text-sm font-medium">{t("connections.setup")}</h2>
           <p className="text-xs text-muted-foreground">{t("connections.setupLead")}</p>
-          <code className="w-fit rounded bg-muted px-2 py-0.5 text-xs">{url}</code>
         </div>
       )}
+      <EndpointPicker
+        endpoints={endpoints}
+        value={endpoint.id}
+        onChange={(id) => (setPicked(id), setCopied(false))}
+        narrow={compact}
+      />
+      <code className="w-fit max-w-full truncate rounded bg-muted px-2 py-0.5 text-xs">{endpoint.url}</code>
       <div className="flex flex-wrap gap-1.5">
         {CLIENTS.map((c) => (
           <button
@@ -179,7 +242,7 @@ export function McpSetup({ url, token, compact = false }: { url: string; token?:
           {copied ? t("copied") : t("copy")}
         </Button>
       </div>
-      {token ? <TestConnection token={token} /> : <p className="text-xs text-muted-foreground">{t("connections.placeholder")}</p>}
+      {token ? <TestConnection token={token} endpoint={endpoint} /> : <p className="text-xs text-muted-foreground">{t("connections.placeholder")}</p>}
     </section>
   );
 }

@@ -500,3 +500,15 @@ def test_a_mode_server_is_closed_to_who_may_not_use_the_mode(admin, browser):
     refused = post("/api/mcp/agent", person)
     assert refused.status_code == 403 and refused.json()["error"] == "mode_disabled"
     assert post("/api/mcp", person).status_code == 200  # the combined server stays open
+
+
+def test_each_mode_draws_its_own_canvas():
+    from litstorm.api import mcp
+
+    pages = {m: mcp._canvas_html.__wrapped__(m) for m in (None, *mcp.MODES)}
+    for mode, html in pages.items():
+        drawn = {m for m in mcp.MODES if f"window.DL.scenes.{m} =" in html}
+        assert drawn == ({mode} if mode else set(mcp.MODES))  # a mode's page carries its scene alone
+        assert "/*CONFIG*/" not in html and "<!--SCENES-->" not in html
+        assert f'"events": "{mode + "_research" if mode else "research"}_events"' in html
+        assert "http://" not in html.replace("http://www.w3.org/2000/svg", "") and "https://" not in html

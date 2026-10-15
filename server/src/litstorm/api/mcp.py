@@ -17,6 +17,7 @@ they go, and then hand back its id to ask again.
 """
 
 import asyncio
+import json
 import re
 import time
 import uuid
@@ -402,13 +403,18 @@ def _section(report, wanted):
 
 @cache
 def _canvas_html(mode=None):
-    # One page draws every mode for now (docs/adr/0010); each mode's server
-    # serves it at its own URI, calling that server's own tools.
-    html = (Path(__file__).parent / "mcp_canvas.html").read_text(encoding="utf-8")
-    if mode is None:
-        return html
-    p = f"{mode}_research"
-    return html.replace('"research_events"', f'"{p}_events"').replace("research_status", f"{p}_status")
+    """The canvas page for one mode's server, or for the combined one: the
+    shared shell (mcp_canvas/base.html) with that mode's scene, or every
+    scene, and the names of the server's own tools (docs/adr/0010)."""
+    folder = Path(__file__).parent / "mcp_canvas"
+    html = (folder / "base.html").read_text(encoding="utf-8")
+    p = "research" if mode is None else f"{mode}_research"
+    config = {"mode": mode, "events": f"{p}_events", "status": f"{p}_status", "report": f"{p}_report"}
+    html = re.sub(r"/\*CONFIG\*/.*?/\*END\*/", lambda _: json.dumps(config), html, count=1)
+    scenes = "\n".join(
+        f"<script>\n{(folder / f'{m}.js').read_text(encoding='utf-8')}</script>" for m in ((mode,) if mode else MODES)
+    )
+    return html.replace("<!--SCENES-->", scenes, 1)
 
 
 def _events(session, user, run_id, after, mode=None, p="research"):

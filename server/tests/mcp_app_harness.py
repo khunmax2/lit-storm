@@ -1,4 +1,4 @@
-"""A stand-in MCP Apps host for the research canvas (api/mcp_canvas.html), to
+"""A stand-in MCP Apps host for the research canvas (api/mcp_canvas/), to
 see and test it without Claude: a page that frames the app the way a host does
 (sandboxed iframe, JSON-RPC over postMessage), answers ui/initialize, hands it
 a tool result, and passes its tools/call on to a real DeepLit MCP server.
@@ -9,8 +9,9 @@ a tool result, and passes its tools/call on to a real DeepLit MCP server.
 (a settings file, if given, holds the LITSTORM_MCP_URL= and LITSTORM_MCP_TOKEN=
 lines, as tests/canvas_demo_server.py prints them)
 
-then open http://127.0.0.1:8897/?run=<research id>&theme=dark&locale=th
-(no run: the app plays its demo; /app#demo=deep plays one kind).
+then open http://127.0.0.1:8897/?run=<research id>&theme=dark&locale=th&mode=deep
+(mode: one mode's server and its canvas, else the combined one; no run: the
+app plays its demo; /app?mode=deep#demo plays one mode's).
 Every message both ways is listed under the frame, for checking the wire.
 """
 
@@ -19,10 +20,11 @@ import os
 import pathlib
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-APP = pathlib.Path(__file__).resolve().parents[1] / "src" / "litstorm" / "api" / "mcp_canvas.html"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 MCP_URL = os.environ.get("LITSTORM_MCP_URL", "http://127.0.0.1:8095/api/mcp")
 TOKEN = os.environ.get("LITSTORM_MCP_TOKEN", "")
 
@@ -33,7 +35,9 @@ background:#fff;display:block;height:300px}pre{font-size:11px;max-height:260px;o
 <script>
 const q = new URLSearchParams(location.search), frame = document.getElementById("app"), wire = document.getElementById("wire");
 // srcdoc, as a host's sandbox does: an opaque origin, and the CSP of an app that declares no domains.
-fetch("/app").then((r) => r.text()).then((html) => {
+const mode = q.get("mode") || "";
+const prefix = mode ? mode + "_research" : "research";
+fetch("/app?mode=" + mode).then((r) => r.text()).then((html) => {
   frame.srcdoc = html.replace("<head>", '<head><meta http-equiv="Content-Security-Policy" content="' +
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:" + '">');
 });
@@ -41,7 +45,7 @@ const log = (dir, m) => { wire.textContent = dir + " " + JSON.stringify(m).slice
 const toApp = (m) => { log("host->app", m); frame.contentWindow.postMessage(m, "*"); };
 let rpcId = 0;
 async function mcp(method, params) {
-  const r = await fetch("/mcp", {method: "POST", headers: {"Content-Type": "application/json"},
+  const r = await fetch("/mcp?mode=" + mode, {method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({jsonrpc: "2.0", id: ++rpcId, method, params})});
   return (await r.json());
 }
@@ -57,7 +61,7 @@ window.addEventListener("message", async (e) => {
     const run = q.get("run");
     if (!run) return;
     toApp({jsonrpc: "2.0", method: "ui/notifications/tool-input", params: {arguments: {id: run, wait_seconds: 0}}});
-    const out = await mcp("tools/call", {name: "research_status", arguments: {id: run, wait_seconds: 0}});
+    const out = await mcp("tools/call", {name: prefix + "_status", arguments: {id: run, wait_seconds: 0}});
     toApp({jsonrpc: "2.0", method: "ui/notifications/tool-result", params: out.result});
   } else if (m.method === "tools/call") {
     const out = await mcp("tools/call", m.params);
@@ -80,13 +84,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _mode(self):
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        mode = (query.get("mode") or [""])[0]
+        return mode or None
+
     def do_GET(self):
+        from litstorm.api import mcp
+
         path = self.path.split("?", 1)[0].split("#", 1)[0]
         if path == "/":
             return self._send(200, HOST_PAGE, "text/html; charset=utf-8")
         if path == "/app":
             # The CSP a host gives an app with no declared domains: nothing from the network.
-            html = APP.read_text(encoding="utf-8")
+            html = mcp._canvas_html.__wrapped__(self._mode())  # as that server serves it, read afresh
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Security-Policy",
@@ -98,10 +109,11 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, "not found", "text/plain")
 
     def do_POST(self):
-        if self.path != "/mcp":
+        if self.path.split("?", 1)[0] != "/mcp":
             return self._send(404, "not found", "text/plain")
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
-        req = urllib.request.Request(MCP_URL, data=body, method="POST", headers={
+        url = MCP_URL + (f"/{self._mode()}" if self._mode() else "")
+        req = urllib.request.Request(url, data=body, method="POST", headers={
             "Content-Type": "application/json", "Accept": "application/json, text/event-stream",
             "Authorization": f"Bearer {TOKEN}",
         })

@@ -274,3 +274,17 @@ def test_the_owner_and_mcp_see_what_the_topic_was_read_as(admin, browser, config
 
     _, facts = mcp._run_facts(db, db.get(User, stored.owner_id), run["id"])
     assert facts["interpreted_as"] == READING["question"]
+
+
+@pytest.mark.db
+def test_the_reading_reaches_the_canvases_as_it_happens(admin, browser, configured, db):  # noqa: F811
+    from litstorm.db.models import RunEvent
+
+    user = make_user(admin, browser)
+    run = _start(user)
+    db.add_all([RunEvent(run_id=run["id"], type="stage", data={"stage": "interpret"}),
+                RunEvent(run_id=run["id"], type="note", data={"kind": "interpretation", **READING}),
+                RunEvent(run_id=run["id"], type="note", data={"kind": "traceback", "text": "kept from the owner"})])
+    db.commit()
+    events = user.get(f"/api/runs/{run['id']}").json()["events"]
+    assert [e["data"].get("kind", e["data"].get("stage")) for e in events] == ["interpret", "interpretation"]

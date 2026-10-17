@@ -172,7 +172,7 @@ window.DL = (() => {
       researcher: "Researcher", search: "Search agent", crawl: "Crawl agent", writer: "Writer", outline: "Outline writer",
       article: "Section writers", polish: "Polisher", compose: "Long writer", experts: "Topic expert",
       read: "Read the report", open: "Open in DeepLit", full: "Full screen",
-      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish",
+      stages: { interpret: "Read the topic", research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish",
         refine: "Question", search: "Search", screen: "Screen", read: "Read", synthesize: "Synthesize" },
       status: { queued: "Queued", running: "Running", succeeded: "Done", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted", needs_selection: "Needs a choice" },
       phase: { observe: "observing", gap: "finding the gap", select: "choosing searches", search: "searching", write: "writing" },
@@ -205,7 +205,7 @@ window.DL = (() => {
       researcher: "นักค้นคว้า", search: "เอเจนต์ค้นหา", crawl: "เอเจนต์อ่านเว็บ", writer: "ผู้เขียน", outline: "ผู้วางโครงเรื่อง",
       article: "ผู้เขียนแต่ละหัวข้อ", polish: "ผู้เกลาเนื้อหา", compose: "ผู้รวมรายงาน", experts: "ผู้เชี่ยวชาญหัวข้อ",
       read: "อ่านรายงาน", open: "เปิดใน DeepLit", full: "เต็มจอ",
-      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน",
+      stages: { interpret: "ตีความหัวเรื่อง", research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน",
         refine: "ตั้งคำถาม", search: "ค้น", screen: "คัดกรอง", read: "อ่าน", synthesize: "สังเคราะห์" },
       status: { queued: "รอคิว", running: "กำลังทำงาน", succeeded: "เสร็จแล้ว", failed: "ไม่สำเร็จ", cancelled: "ยกเลิกแล้ว", interrupted: "ถูกขัดจังหวะ", needs_selection: "ต้องเลือกใหม่" },
       phase: { observe: "สังเกต", gap: "หาช่องว่างความรู้", select: "เลือกคำค้น", search: "กำลังค้น", write: "กำลังเขียน" },
@@ -363,7 +363,7 @@ window.DL = (() => {
 (() => {
   const K = window.DL, $ = K.$, CONFIG = K.CONFIG;
   const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
-  const state = { run: null, engine: CONFIG.mode, scene: null, after: 0, final: false, polling: false, stage: null, settled: false };
+  const state = { run: null, engine: CONFIG.mode, scene: null, after: 0, final: false, polling: false, stage: null, settled: false, interpreted: false };
   const layers = { nodes: K.layer($("nodes")), edges: K.layer($("edges")) };
 
   function scene() {
@@ -376,8 +376,10 @@ window.DL = (() => {
     const d = ev.data || {};
     if (ev.type === "stage") {
       state.stage = d.stage;
+      if (d.stage === "interpret") state.interpreted = true; // its topic read first (litstorm.interpret)
       K.say("lead", K.W.log.stage(K.W.stages[d.stage] || d.stage), ev.at);
     }
+    if (ev.type === "note" && d.kind === "interpretation" && d.question) K.say("lead", d.question, ev.at);
     const s = scene();
     if (s) s.apply(ev);
   }
@@ -415,7 +417,8 @@ window.DL = (() => {
     if (r.language) add(r.language.toUpperCase());
     const steps = $("steps");
     steps.textContent = "";
-    const list = (state.engine && K.scenes[state.engine] && K.scenes[state.engine].stages) || [];
+    const own = (state.engine && K.scenes[state.engine] && K.scenes[state.engine].stages) || [];
+    const list = state.interpreted ? ["interpret", ...own] : own;
     const at = list.indexOf(state.stage);
     list.forEach((st, i) => {
       const d = document.createElement("div");

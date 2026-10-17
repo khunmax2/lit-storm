@@ -885,8 +885,9 @@ class RunDetail(RunOut):
 
 # Notes an owner sees while waiting. Tracebacks and the like stay in the
 # database for whoever debugs; they are not the owner's reading.
-# MRA's own events, for Medical Review's canvas (engines/medical) too.
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical"}
+# MRA's own events, for Medical Review's canvas (engines/medical) too, and
+# what the Run read its topic as (litstorm.interpret).
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical", "interpretation"}
 
 
 EVENTS_PER_READ = 500

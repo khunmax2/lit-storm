@@ -14,6 +14,9 @@ EMPTY_REPORT = "empty_report"  # finished, with nothing to read
 TRUNCATED_REPORT = "truncated_report"  # the model stopped writing part-way, twice (litstorm.completeness)
 REFUSED = "refused"  # the model declined the topic
 ENGINE_ERROR = "engine_error"  # a fault in our code or the engine's
+# A remote Engine's service (catalog.remote, docs/adr/0013):
+SERVICE_UNAVAILABLE = "service_unavailable"  # unreachable, or busy past the Run's time
+SERVICE_DECLINED = "service_declined"  # it would not take the question, e.g. a medical emergency
 
 REFUNDED = {
     RETRIES_EXHAUSTED,
@@ -23,6 +26,8 @@ REFUNDED = {
     EMPTY_REPORT,
     TRUNCATED_REPORT,
     ENGINE_ERROR,
+    SERVICE_UNAVAILABLE,
+    SERVICE_DECLINED,  # nothing was spent
 }
 
 

@@ -574,7 +574,7 @@ def switch_engine(engine: str, body: EngineSwitch, session=Depends(deps.database
         off.discard(engine)
     else:
         off.add(engine)
-    if not any(e["ready"] and name not in off for name, e in ENGINES.items()):
+    if not modes.offered(session, off):
         raise HTTPException(409, "last_engine")
     modes.save(session, modes.EngineSettings(disabled=sorted(off)))
     session.commit()

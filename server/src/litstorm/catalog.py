@@ -60,7 +60,26 @@ ENGINES = {
         "ready": True,
         "max_sources": 3,
     },
+    # A remote Engine: MedicalReviewerAgent, a service of its own that this
+    # Engine asks over HTTP (engines/medical, docs/adr/0013). It searches
+    # its own academic sources with its own models, so a Run's Search
+    # Provider and model are not its to use; it is offered only once an
+    # Administrator has given its address and key (litstorm.medical).
+    "medical": {
+        "label": "Medical Review",
+        "search": (),
+        "stages": ("refine", "search", "screen", "read", "synthesize"),
+        "needs_tools": False,
+        "ready": True,
+        "max_sources": 0,
+        "remote": True,
+    },
 }
+
+
+def remote(engine):
+    """Whether an Engine is a service elsewhere, not code run here."""
+    return bool(ENGINES.get(engine, {}).get("remote"))
 
 
 def reasoning_kwargs(value, provider):

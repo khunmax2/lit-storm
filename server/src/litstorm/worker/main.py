@@ -16,7 +16,7 @@ import signal
 import threading
 import time
 
-from litstorm import db, notify, search_cache, settings, trash
+from litstorm import catalog, db, medical, notify, search_cache, settings, trash
 from litstorm import report as report_mod
 from litstorm.db.models import RunEvent
 from litstorm.runner.supervisor import Spare, supervise
@@ -91,6 +91,10 @@ def run_one(claim, spare=None):
         from litstorm.runner.supervisor import Outcome
 
         outcome = Outcome("failed", "engine_error", f"{type(error).__name__}: {error}")
+
+    if outcome.status == "cancelled" and catalog.remote(claim.config.engine):
+        url = (claim.config.service or {}).get("url", "")
+        with_session(lambda s: medical.release(s, claim.run_id, url, claim.secrets.service_api_key))
 
     title = sources = None
     if outcome.report_path:

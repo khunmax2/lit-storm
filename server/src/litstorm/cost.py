@@ -28,6 +28,12 @@ def totals(usage_events):
     return tokens_in, tokens_out, search, by_model
 
 
+def paid(usage_events):
+    """US dollars a remote service reported for its own work (the `usd` of a
+    usage event, catalog.remote), already priced there."""
+    return sum((Decimal(str(e["usd"])) for e in usage_events if e.get("usd") is not None), Decimal(0))
+
+
 # A router resells other vendors' models under a prefix of its own, at the
 # vendor's price. LiteLLM's table may know such a model only by the vendor's
 # name: on 2026-10-09 it dropped every openrouter/ row (newer LiteLLM bills

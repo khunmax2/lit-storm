@@ -30,10 +30,17 @@ def save(session, value):
     session.add(row)
 
 
-def offered(session):
-    """The Engines an owner can start, in the tabs' order."""
-    off = set(load(session).disabled)
-    return [name for name, e in ENGINES.items() if e["ready"] and name not in off]
+def offered(session, off=None):
+    """The Engines an owner can start, in the tabs' order. A remote one
+    also needs its service's address and key (litstorm.medical). `off`:
+    the modes switched off, when asking about a change not yet saved."""
+    from litstorm import medical
+
+    off = set(load(session).disabled) if off is None else set(off)
+    return [
+        name for name, e in ENGINES.items()
+        if e["ready"] and name not in off and (not e.get("remote") or medical.configured(session))
+    ]
 
 
 def search_fits(engine, provider):

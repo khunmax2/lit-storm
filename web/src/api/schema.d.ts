@@ -1274,6 +1274,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/medical/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status
+         * @description Whether Medical Review can take a question now, for the tab's notice.
+         *     Looked up at most every STATUS_TTL seconds, and never with the key.
+         */
+        get: operations["status_api_medical_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/medical": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_admin_medical_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_admin_medical_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/medical/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Settings
+         * @description Ask MRA now, with the stored address and key.
+         */
+        post: operations["check_settings_api_admin_medical_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1600,6 +1659,11 @@ export interface components {
              * @default []
              */
             sections_at: string[];
+            /**
+             * Remote
+             * @default false
+             */
+            remote: boolean;
         };
         /** EngineOut */
         EngineOut: {
@@ -1615,6 +1679,11 @@ export interface components {
             search_kinds: string[];
             /** Needs Tools */
             needs_tools: boolean;
+            /**
+             * Remote
+             * @default false
+             */
+            remote: boolean;
         };
         /** EngineSwitch */
         EngineSwitch: {
@@ -1859,6 +1928,70 @@ export interface components {
             /** Ui Language */
             ui_language: string;
         };
+        /** MedicalCheck */
+        MedicalCheck: {
+            /** Reachable */
+            reachable: boolean;
+            /** Accepting */
+            accepting: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Key Ok */
+            key_ok?: boolean | null;
+            /**
+             * Sources
+             * @default []
+             */
+            sources: string[];
+        };
+        /**
+         * MedicalIn
+         * @description What Medical Review asks MedicalReviewerAgent for (litstorm.medical):
+         *     a quick answer or a full review, of which kind, from which designs and year.
+         */
+        MedicalIn: {
+            /**
+             * Mode
+             * @default quick
+             * @enum {string}
+             */
+            mode: "quick" | "full";
+            /**
+             * Review Type
+             * @default slr
+             * @enum {string}
+             */
+            review_type: "slr" | "meta_analysis" | "scoping" | "narrative";
+            /** Study Types */
+            study_types?: string[];
+            /** Year From */
+            year_from?: number | null;
+        };
+        /** MedicalSettingsIn */
+        MedicalSettingsIn: {
+            /** Url */
+            url: string;
+            /**
+             * Web Url
+             * @default
+             */
+            web_url: string;
+            /** Api Key */
+            api_key?: string | null;
+        };
+        /** MedicalSettingsOut */
+        MedicalSettingsOut: {
+            /** Url */
+            url: string;
+            /** Web Url */
+            web_url: string;
+            /** Console Url */
+            console_url: string;
+            /** Has Key */
+            has_key: boolean;
+            /** Configured */
+            configured: boolean;
+        };
         /** ModelCheckOut */
         ModelCheckOut: {
             /** Ok */
@@ -2016,6 +2149,7 @@ export interface components {
             refinement?: components["schemas"]["QuestionAnswer"][];
             /** Request Key */
             request_key?: string | null;
+            medical?: components["schemas"]["MedicalIn"] | null;
             /** Project Id */
             project_id?: string | null;
         };
@@ -2331,6 +2465,7 @@ export interface components {
             refinement?: components["schemas"]["QuestionAnswer"][];
             /** Request Key */
             request_key?: string | null;
+            medical?: components["schemas"]["MedicalIn"] | null;
         };
         /** RunOut */
         RunOut: {
@@ -2528,6 +2663,7 @@ export interface components {
             refinement?: components["schemas"]["QuestionAnswer"][];
             /** Request Key */
             request_key?: string | null;
+            medical?: components["schemas"]["MedicalIn"] | null;
         };
         /** SessionOut */
         SessionOut: {
@@ -5474,6 +5610,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_medical_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalCheck"];
+                };
+            };
+        };
+    };
+    get_settings_api_admin_medical_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalSettingsOut"];
+                };
+            };
+        };
+    };
+    put_settings_api_admin_medical_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MedicalSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_settings_api_admin_medical_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MedicalCheck"];
                 };
             };
         };

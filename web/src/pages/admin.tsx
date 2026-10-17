@@ -40,6 +40,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { McpSettings } from "@/components/mcp-admin";
+import { MedicalSettings } from "@/components/medical-admin";
 
 import { api, call, type Schemas } from "@/api/client";
 import { ErrorText, LoadingRows, PageHeader, PortalTo, StatusBadge, Toolbar, errorMessage, formatDate } from "@/components/common";
@@ -1649,6 +1650,7 @@ function Modes() {
     onError,
   });
   return (
+    <div className="grid gap-4">
     <Card>
       <CardContent>
         {engines.isLoading && <LoadingRows />}
@@ -1665,9 +1667,11 @@ function Modes() {
             {engines.data?.map((e) => (
               <TableRow key={e.id}>
                 <TableCell className="font-medium">{e.label}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{e.search_kinds.join(", ")}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {e.needs_tools ? t("modes.needsTools") : t("modes.anyModel")}
+                  {e.remote ? t("modes.remoteSearch") : e.search_kinds.join(", ")}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {e.remote ? t("modes.remoteModel") : e.needs_tools ? t("modes.needsTools") : t("modes.anyModel")}
                 </TableCell>
                 <TableCell className="text-right">
                   {e.ready ? (
@@ -1687,6 +1691,8 @@ function Modes() {
         </Table>
       </CardContent>
     </Card>
+    <MedicalSettings />
+    </div>
   );
 }
 

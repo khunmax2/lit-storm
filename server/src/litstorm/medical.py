@@ -24,7 +24,8 @@ STUDY_TYPES = (
 
 
 class Stored(BaseModel):
-    url: str = ""
+    url: str = ""  # where this system's Worker and API reach MRA
+    web_url: str = ""  # where people open it, when that differs (links to its console); empty: `url`
     api_key_ciphertext: str = ""
 
 
@@ -33,11 +34,13 @@ def load(session):
     return Stored(**(row.value if row else {}))
 
 
-def save(session, url=None, api_key=None):
-    """Change the address, the key, or both; an empty key leaves the stored one."""
+def save(session, url=None, api_key=None, web_url=None):
+    """Change the addresses, the key, or all; an empty key leaves the stored one."""
     value = load(session)
     if url is not None:
         value.url = url.strip().rstrip("/")
+    if web_url is not None:
+        value.web_url = web_url.strip().rstrip("/")
     if api_key:
         value.api_key_ciphertext = security.encrypt(api_key.strip())
     row = session.get(SystemSetting, KEY) or SystemSetting(key=KEY)
@@ -82,3 +85,36 @@ def release(session, run_id, url, api_key):
     except httpx.HTTPError:
         return False
     return True
+
+
+NO_REVIEW = "00000000-0000-0000-0000-000000000000"
+
+
+def check(url, api_key, timeout=5.0):
+    """Whether MRA answers at `url`, takes reviews now, and takes this key:
+    {reachable, accepting, reason, key_ok, sources}. Asking for a review
+    that does not exist with the key costs nothing: MRA answers 401 to a key
+    it does not know and 404 otherwise."""
+    import httpx
+
+    out = {"reachable": False, "accepting": False, "reason": None, "key_ok": None, "sources": []}
+    if not url:
+        out["reason"] = "not_configured"
+        return out
+    try:
+        status = httpx.get(f"{url.rstrip('/')}{API}/status", timeout=timeout)
+        status.raise_for_status()
+        body = status.json()
+    except (httpx.HTTPError, ValueError) as error:
+        out["reason"] = f"unreachable: {str(error)[:200]}"
+        return out
+    out.update(reachable=True, accepting=bool(body.get("accepting")), reason=body.get("reason"),
+               sources=[s.get("label") or s.get("id") for s in body.get("sources") or []])
+    if api_key:
+        try:
+            probe = httpx.get(f"{url.rstrip('/')}{API}/reviews/{NO_REVIEW}", headers={"X-API-Key": api_key},
+                              timeout=timeout)
+            out["key_ok"] = probe.status_code != 401
+        except httpx.HTTPError:
+            out["key_ok"] = None
+    return out

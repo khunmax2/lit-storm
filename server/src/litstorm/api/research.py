@@ -75,6 +75,8 @@ class EngineChoice(BaseModel):
     max_sources: int = 1
     # The depth levels at which the owner may set the report's sections.
     sections_at: list[str] = []
+    # A service elsewhere (catalog.remote): it brings its own sources and models.
+    remote: bool = False
 
 
 class Options(BaseModel):
@@ -91,6 +93,7 @@ def engine_choice(name, configured):
         id=name, label=e["label"], search_kinds=list(e["search"]), stages=list(e["stages"]),
         needs_tools=e["needs_tools"], max_sources=e.get("max_sources", 1),
         sections_at=[d for d in limits.DEPTHS if takes_sections(configured, name, d)],
+        remote=catalog.remote(name),
     )
 
 

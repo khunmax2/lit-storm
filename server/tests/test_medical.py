@@ -360,3 +360,17 @@ def test_mra_is_told_to_stop_only_when_no_other_run_follows_the_review(admin, br
     db.commit()
     assert medical.release(db, uuid.UUID(ids[0]), medical_on.url, "mra_key") is True
     assert medical_on.deleted == [f"/api/v1/reviews/{REVIEW_ID}"]
+
+
+@pytest.mark.db
+def test_an_administrator_sets_mra_up_and_checks_it(admin, browser, mra):
+    saved = admin.put("/api/admin/medical", json={"url": mra.url + "/", "api_key": "mra_key",
+                                                  "web_url": "https://mra.example.org"}).json()
+    assert saved == {"url": mra.url, "web_url": "https://mra.example.org", "console_url": "https://mra.example.org/admin",
+                     "has_key": True, "configured": True}
+    kept = admin.put("/api/admin/medical", json={"url": mra.url, "web_url": ""}).json()  # no key: the stored one stays
+    assert kept["has_key"] is True and kept["console_url"] == f"{mra.url}/admin"
+    assert "mra_key" not in json.dumps(admin.get("/api/admin/medical").json())  # never shown again
+    user = make_user(admin, browser)
+    assert user.get("/api/admin/medical").status_code == 403
+    assert user.get("/api/medical/status").json()["reachable"] is False  # the stand-in has no /status

@@ -811,11 +811,15 @@ const en = {
   "stage.read": "Reading and checking numbers",
   "stage.synthesize": "Synthesizing",
   "medicalCanvas.noNumbers": "no numbers to check",
+  "connections.ep.medical": "Medical Review",
+  "connections.epAbout.medical": "Medical literature reviews of studies, graded; quick or full.",
 };
 
 export type Key = keyof typeof en;
 
 const th: Record<Key, string> = {
+  "connections.ep.medical": "Medical Review",
+  "connections.epAbout.medical": "ทบทวนงานวิจัยทางการแพทย์พร้อมระดับหลักฐาน แบบถามเร็วหรือรีวิวเต็ม",
   "medicalCanvas.noNumbers": "ไม่มีตัวเลขให้ตรวจ",
   "stage.refine": "ตั้งคำถาม",
   "stage.search": "ค้นงานวิจัย",

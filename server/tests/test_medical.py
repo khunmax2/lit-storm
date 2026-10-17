@@ -397,3 +397,51 @@ def test_the_owner_sees_mras_steps_for_the_canvas(admin, browser, configured, me
     assert steps[0] == "queued" and steps[-1] == "done" and "extracted" in steps
     run = detail.get("run", detail)
     assert run["service"] == {"mode": "full", "review_type": "slr", "study_types": [], "year_from": None}
+
+
+# --- through MCP ------------------------------------------------------------------------------------
+
+
+@pytest.mark.db
+def test_medical_review_has_an_mcp_server_of_its_own(admin, browser, configured, medical_on, db):  # noqa: F811
+    from test_mcp import URL, _call, _data, _token
+
+    from litstorm.db.models import Run
+
+    token = _token(make_user(admin, browser))
+
+    async def steps(session):
+        tools = {t.name: t for t in (await session.list_tools()).tools}
+        options = _data(await session.call_tool("medical_research_options", {}))
+        full = _data(await session.call_tool("medical_research_start", {
+            "topic": "drug X and Z", "review": "full", "review_type": "meta_analysis", "wait_seconds": 0}))
+        again = _data(await session.call_tool("medical_research_start", {
+            "topic": "drug X and Z", "review": "full", "review_type": "meta_analysis", "wait_seconds": 0}))
+        quick = _data(await session.call_tool("medical_research_start", {"topic": "drug X and Z", "wait_seconds": 0}))
+        return tools, options, full, again, quick
+
+    tools, options, full, again, quick = _call(token, steps, url=URL + "/medical")
+    start = tools["medical_research_start"].inputSchema["properties"]
+    assert "review" in start and "depth" not in start and "sources" not in start and "mode" not in start
+    assert options["review_types"] == ["slr", "meta_analysis", "scoping", "narrative"] and "RCT" in options["study_types"]
+    assert again["id"] == full["id"] and "repeated" in again  # the same request: that Run again
+    assert quick["id"] != full["id"]  # a quick answer is not the full review
+    service = db.get(Run, uuid.UUID(full["id"])).config["service"]
+    assert service["mode"] == "full" and service["review_type"] == "meta_analysis"
+
+
+@pytest.mark.db
+def test_the_combined_server_starts_medical_review_too(admin, browser, configured, medical_on, db):  # noqa: F811
+    from test_mcp import _call, _data, _token
+
+    from litstorm.db.models import Run
+
+    token = _token(make_user(admin, browser))
+
+    async def steps(session):
+        return _data(await session.call_tool("research_start", {
+            "topic": "drug X and Z", "mode": "medical", "review": "full", "year_from": 2015, "wait_seconds": 0}))
+
+    started = _call(token, steps)
+    service = db.get(Run, uuid.UUID(started["id"])).config["service"]
+    assert service["mode"] == "full" and service["year_from"] == 2015 and service["review_type"] == "slr"

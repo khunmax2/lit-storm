@@ -163,7 +163,7 @@ function EndpointPicker({
   return (
     <div className="grid gap-1.5">
       <p className="text-xs font-medium">{t("connections.endpoint")}</p>
-      <div className={cn("grid grid-cols-2 gap-2", !narrow && "lg:grid-cols-4")}>
+      <div className={cn("grid grid-cols-2 gap-2", !narrow && "lg:grid-cols-3")}>
         {endpoints.map((e) => (
           <button
             key={e.id}

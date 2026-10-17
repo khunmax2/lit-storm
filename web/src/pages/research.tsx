@@ -37,6 +37,7 @@ import {
 import { MoveSessionDialog } from "@/components/move-session";
 import { ProjectSettingsDialog } from "@/components/project-settings";
 import { AgentFlowCanvas } from "@/components/agent-flow-canvas";
+import { MedicalCanvas } from "@/components/medical-canvas";
 import { ResearchCanvas } from "@/components/research-canvas";
 
 // three.js comes only with the 3D view, when someone opens it.
@@ -86,7 +87,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { has, useT } from "@/i18n";
+import { has, useT, type Key } from "@/i18n";
 
 type Run = Schemas["RunOut"];
 
@@ -675,7 +676,17 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
               <span>{run.search_label}</span>
               <span className="flex items-center gap-1">
                 <Gauge className="size-3" />
-                {t(`depth.${run.depth as Depth}`)}
+                {run.service
+                  ? // Medical Review: a quick answer or a full review, and of which kind.
+                    [
+                      t(run.service.mode === "full" ? "medical.full" : "medical.quick"),
+                      run.service.mode === "full" && run.service.review_type
+                        ? t(`medical.type.${run.service.review_type}` as Key)
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : t(`depth.${run.depth as Depth}`)}
               </span>
               {run.source_count != null && (
                 <span className="flex items-center gap-1">
@@ -716,7 +727,8 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {run.status !== "queued" && run.status !== "needs_selection" && (
+            {/* The observatory replays an Engine of ours; Medical Review has its canvas below. */}
+            {run.status !== "queued" && run.status !== "needs_selection" && run.engine !== "medical" && (
               <Button variant="outline" asChild title={t("run.observatoryHint")}>
                 <a href={`${BASE}/api/runs/${run.id}/observatory`} target="_blank" rel="noopener">
                   <Radar />
@@ -785,13 +797,15 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         {run.status !== "succeeded" && run.reason && run.reason !== "cancelled" && (
           <p className="rounded-lg bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {has(reasonKey) ? t(reasonKey as "reason.timed_out") : run.reason}
+            {/* What the service said, e.g. MRA's message and its hotlines for an emergency. */}
+            {run.reason === "service_declined" && run.message && <span className="mt-1 block">{run.message}</span>}
             {run.quota_refunded && <span className="ml-2 text-xs text-muted-foreground">· {t("run.refunded")}</span>}
           </p>
         )}
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />
-        {(run.engine === "deep" || run.engine === "agent" || run.engine === "storm") && run.status !== "queued" && run.status !== "needs_selection" && (
+        {(run.engine === "deep" || run.engine === "agent" || run.engine === "storm" || run.engine === "medical") && run.status !== "queued" && run.status !== "needs_selection" && (
           <details
             className="group"
             open={mapOpen}
@@ -799,7 +813,13 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
           >
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
               <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
-              {run.engine === "agent" ? t("flow.title") : run.engine === "storm" ? t("obs3d.open") : t("canvas.title")}
+              {run.engine === "agent"
+                ? t("flow.title")
+                : run.engine === "storm"
+                  ? t("obs3d.open")
+                  : run.engine === "medical"
+                    ? t("medicalCanvas.title")
+                    : t("canvas.title")}
             </summary>
             {/* Drawn only when open: a canvas laid out while folded has no size to fit. */}
             {mapOpen && (
@@ -810,6 +830,8 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                   </Suspense>
                 ) : run.engine === "agent" ? (
                   <AgentFlowCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
+                ) : run.engine === "medical" ? (
+                  <MedicalCanvas runId={run.id} live={!FINAL.has(run.status)} />
                 ) : (
                   <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
                 )}

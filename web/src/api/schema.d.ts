@@ -923,6 +923,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/service-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * View Service Page
+         * @description A remote Engine's own report page, kept with the Run when it ended
+         *     (Medical Review: MRA's offline report, docs/adr/0013), for the reader's
+         *     "full report" view. Sandboxed like the interactive page: its script runs
+         *     in an origin of its own, with no reach into the app.
+         */
+        get: operations["view_service_page_api_runs__run_id__service_page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/observatory": {
         parameters: {
             query?: never;
@@ -2402,6 +2425,10 @@ export interface components {
             };
             /** Via Token */
             via_token?: string | null;
+            /** Service */
+            service?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Refinement
              * @default []
@@ -2523,6 +2550,10 @@ export interface components {
             };
             /** Via Token */
             via_token?: string | null;
+            /** Service */
+            service?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Refinement
              * @default []
@@ -4927,6 +4958,37 @@ export interface operations {
                 charts?: string;
                 theme?: string | null;
             };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_service_page_api_runs__run_id__service_page_get: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 run_id: string;

@@ -229,6 +229,35 @@ type Visuals = {
   outdated: boolean;
 };
 
+/** A remote Engine's own report page, as it made it (Medical Review: MRA's
+ *  comparison table, PRISMA flow, forest plots), kept with the Run so it
+ *  opens even when the service is down. Sandboxed like the visual view. */
+function ServicePage({ runId }: { runId: string }) {
+  const { t } = useT();
+  const [loading, setLoading] = useState(true);
+  return (
+    <div className="grid gap-3">
+      <p className="text-sm text-muted-foreground">{t("report.view.serviceLead")}</p>
+      <div className="relative overflow-hidden rounded-xl border bg-background">
+        {loading && (
+          <div className="absolute inset-0 grid place-items-center">
+            <LoadingRows rows={4} />
+          </div>
+        )}
+        <iframe
+          title={t("report.view.service")}
+          src={`${BASE}/api/runs/${runId}/service-page`}
+          // Its own origin: scripts run, links open, nothing else.
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoading(false)}
+          className="block h-[calc(100svh-11rem)] min-h-[32rem] w-full"
+        />
+      </div>
+    </div>
+  );
+}
+
 /** The report with its figures (litstorm.render.interactive), shown as the
  *  server draws it, in a frame of its own: the page runs a script, so it is
  *  sandboxed — no reach into this app, its cookies or its API. It scrolls
@@ -512,7 +541,7 @@ export function ReportPage() {
     queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: runId } } })),
   });
   const [open, setOpen] = useState<number | null>(null);
-  const [view, setView] = useState<"read" | "visual">("read");
+  const [view, setView] = useState<"read" | "visual" | "service">("read");
   const [hover, setHover] = useState<{ id: number; at: DOMRect } | null>(null);
   const byId = useMemo(() => new Map((report.data?.sources ?? []).map((s) => [s.id, s])), [report.data]);
   const sections = useMemo(() => numbered(report.data?.sections ?? []), [report.data]);
@@ -597,6 +626,8 @@ export function ReportPage() {
       })
     : null;
   const hovered = hover && byId.get(hover.id);
+  // A remote Engine's own page, kept with the Run (Medical Review: MRA's full report).
+  const servicePage = !!(summary?.notes as { service_page?: { kept?: boolean } } | undefined)?.service_page?.kept;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
@@ -625,13 +656,16 @@ export function ReportPage() {
             options={[
               { value: "read", label: t("report.view.read") },
               { value: "visual", label: t("report.view.visual") },
+              ...(servicePage ? [{ value: "service" as const, label: t("report.view.service") }] : []),
             ]}
           />
           <ExportMenu runId={runId} />
         </div>
       </Toolbar>
 
-      {view === "visual" ? (
+      {view === "service" && servicePage ? (
+        <ServicePage runId={runId} />
+      ) : view === "visual" ? (
         <VisualView runId={runId} />
       ) : (
 

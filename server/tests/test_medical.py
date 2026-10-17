@@ -374,3 +374,26 @@ def test_an_administrator_sets_mra_up_and_checks_it(admin, browser, mra):
     user = make_user(admin, browser)
     assert user.get("/api/admin/medical").status_code == 403
     assert user.get("/api/medical/status").json()["reachable"] is False  # the stand-in has no /status
+
+
+@pytest.mark.db
+def test_mras_own_page_is_kept_and_shown_sandboxed(admin, browser, configured, medical_on, db):  # noqa: F811
+    user = make_user(admin, browser)
+    stored = _run_through_worker(db, user, mode="full")
+    assert stored.notes["service_page"]["kept"] is True
+    page = user.get(f"/api/runs/{stored.id}/service-page")
+    assert page.status_code == 200 and page.content == medical_on.page
+    assert page.headers["content-security-policy"].startswith("sandbox allow-scripts")
+    other = make_user(admin, browser, email="other@example.org")
+    assert other.get(f"/api/runs/{stored.id}/service-page").status_code == 404  # not theirs
+
+
+@pytest.mark.db
+def test_the_owner_sees_mras_steps_for_the_canvas(admin, browser, configured, medical_on, db):  # noqa: F811
+    user = make_user(admin, browser)
+    stored = _run_through_worker(db, user, mode="full")
+    detail = user.get(f"/api/runs/{stored.id}").json()
+    steps = [e["data"]["event"] for e in detail["events"] if e["type"] == "note" and e["data"].get("kind") == "medical"]
+    assert steps[0] == "queued" and steps[-1] == "done" and "extracted" in steps
+    run = detail.get("run", detail)
+    assert run["service"] == {"mode": "full", "review_type": "slr", "study_types": [], "year_from": None}

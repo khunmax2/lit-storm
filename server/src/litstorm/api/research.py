@@ -355,6 +355,9 @@ class RunOut(BaseModel):
     notes: dict = {}
     # The API token's name when it was started through the MCP server.
     via_token: str | None = None
+    # What a remote Engine was asked (Medical Review: its mode and kind of
+    # review); never its address. None for the other modes.
+    service: dict | None = None
     # The clarifying questions the owner answered before it started.
     refinement: list[QuestionAnswer] = []
     # The report's sections, as the owner set them.
@@ -400,6 +403,7 @@ def run_out(run):
         turn=run.turn,
         quota_units=run.quota_units if run.quota_units is not None else 1,
         via_token=run.via_token.name if run.via_token_id and run.via_token else None,
+        service={k: v for k, v in run.config["service"].items() if k != "url"} if run.config.get("service") else None,
     )
 
 
@@ -876,7 +880,8 @@ class RunDetail(RunOut):
 
 # Notes an owner sees while waiting. Tracebacks and the like stay in the
 # database for whoever debugs; they are not the owner's reading.
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow"}
+# MRA's own events, for Medical Review's canvas (engines/medical) too.
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical"}
 
 
 EVENTS_PER_READ = 500
@@ -1265,6 +1270,26 @@ def view_interactive(
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "private, no-store",
         },
+    )
+
+
+@router.get("/runs/{run_id}/service-page")
+def view_service_page(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """A remote Engine's own report page, kept with the Run when it ended
+    (Medical Review: MRA's offline report, docs/adr/0013), for the reader's
+    "full report" view. Sandboxed like the interactive page: its script runs
+    in an origin of its own, with no reach into the app."""
+    run = deps.readable(session, Run, run_id, user, "report")
+    path = os.path.join(settings.get().runs_dir, str(run.id), "work", "mra_report.html")
+    if not catalog.remote(run.engine) or not os.path.exists(path):
+        raise HTTPException(404, "no_service_page")
+    with open(path, "rb") as f:
+        page = f.read()
+    return Response(
+        page,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Security-Policy": INTERACTIVE_SANDBOX, "X-Content-Type-Options": "nosniff",
+                 "Cache-Control": "private, no-store"},
     )
 
 

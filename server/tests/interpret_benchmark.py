@@ -1,6 +1,6 @@
 """Does reading the topic first help? (litstorm.interpret, docs/adr/0014)
 
-    uv run python tests/interpret_benchmark.py <session.json> <output.json> [--engines storm,deep] [--topics 6] < judge key
+    uv run python tests/interpret_benchmark.py <session.json> <output.json> [--engines storm,deep] [--topics 6 | --pick 1,3,6] < judge key
 
 For each topic and mode, two Runs at the fast level, made one after the
 other so they meet the same search engines and the same queue: one with its
@@ -110,6 +110,7 @@ def main():
     parser.add_argument("output")
     parser.add_argument("--engines", default="storm,deep")
     parser.add_argument("--topics", type=int, default=len(TOPICS))
+    parser.add_argument("--pick", default="", help="topics by number, from 1: 1,3,6")
     args = parser.parse_args()
     key = sys.stdin.readline().strip()
     with open(args.session, encoding="utf-8") as f:
@@ -121,7 +122,8 @@ def main():
             results = json.load(f)  # carry on from where it stopped
     done = {(r["topic"], r["engine"], r["interpret"]) for r in results}
     try:
-        for topic, language in TOPICS[: args.topics]:
+        picked = [TOPICS[int(n) - 1] for n in args.pick.split(",")] if args.pick else TOPICS[: args.topics]
+        for topic, language in picked:
             for engine in engines:
                 made = {}
                 for interpret in (True, False):

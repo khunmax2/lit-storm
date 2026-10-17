@@ -45,13 +45,20 @@ Infer only what the topic and the notes support. Do not add a period, place, pop
 angle they do not imply; where the topic is open, keep the broad reading and say so as an \
 assumption.
 
+"exclude" lists only matter that shares words with the topic but is about something else (for \
+"remote work": remote sensing, remote controls), or what the notes say to leave out. Never list \
+the topic's own subject in another place, period, group or level (for "flood risk in Hat Yai": \
+not "floods in other provinces"; for "tablets in Thai high schools": not "tablets in primary \
+schools"): research from there still informs the topic, and the scope already says where the \
+focus is. When unsure, leave it out; most topics need [].
+
 Answer with one JSON object and nothing else:
 {{
   "question": "the topic as one clear research question, in {language}",
   "scope": ["each period, place, population or field the topic implies, in {language}"],
   "assumptions": ["each thing you assumed where the topic was open, in {language}"],
   "keywords": {{"en": ["3 to 6 English search phrases"], "th": ["3 to 6 Thai search phrases"]}},
-  "exclude": ["each thing searching should leave out, if the topic or notes imply it"]
+  "exclude": ["unrelated matter searching would wrongly pull in, in {language}"]
 }}
 Use [] for a list with nothing in it."""
 

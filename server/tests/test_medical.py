@@ -445,3 +445,12 @@ def test_the_combined_server_starts_medical_review_too(admin, browser, configure
     started = _call(token, steps)
     service = db.get(Run, uuid.UUID(started["id"])).config["service"]
     assert service["mode"] == "full" and service["year_from"] == 2015 and service["review_type"] == "slr"
+
+
+def test_a_hotline_already_in_mras_message_is_not_repeated(mra, tmp_path):
+    from litstorm.engines.base import EngineFailure
+
+    mra.submit = [(422, {"code": "emergency", "message": "Call 1669 now.", "hotlines": ["1669"]}, {})]
+    with pytest.raises(EngineFailure) as failed:
+        _run(mra, tmp_path)
+    assert str(failed.value) == "Call 1669 now."

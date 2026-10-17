@@ -73,9 +73,10 @@ def _declined(response, language):
         body = {}
     text = (body.get("message_th") if language == "th" else None) or body.get("message") or _message(response)
     hotlines = body.get("hotlines") or []
-    if hotlines:
-        lines = [h if isinstance(h, str) else " ".join(str(v) for v in h.values() if v) for h in hotlines]
-        text += " " + " · ".join(lines)
+    lines = [h if isinstance(h, str) else " ".join(str(v) for v in h.values() if v) for h in hotlines]
+    extra = [line for line in lines if line and line not in text]  # MRA's message often names them already
+    if extra:
+        text += " " + " · ".join(extra)
     return EngineFailure(outcomes.SERVICE_DECLINED, text)
 
 

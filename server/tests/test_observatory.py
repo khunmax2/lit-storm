@@ -61,8 +61,9 @@ def test_only_the_notes_the_owner_sees_are_drawn():
     def ev(i, kind):
         return SimpleNamespace(id=i, at=None, type="note", data={"kind": kind})
 
-    out = observatory.events_out([ev(1, "browsed"), ev(2, "traceback"), ev(3, "tree"), SimpleNamespace(id=4, at=None, type="usage", data={})])
-    assert [e["id"] for e in out] == [1, 3, 4]
+    out = observatory.events_out([ev(1, "browsed"), ev(2, "traceback"), ev(3, "tree"), SimpleNamespace(id=4, at=None, type="usage", data={}),
+                                  ev(5, "interpretation")])
+    assert [e["id"] for e in out] == [1, 3, 4, 5]
 
 
 @pytest.mark.db

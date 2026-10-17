@@ -278,6 +278,7 @@ nav.toc.inline .inner { position: static; max-height: none; background: var(--so
   /* Keep a source's name with its link, but let long evidence flow on:
      keeping the whole entry together left most of each page blank. */
   .src-head, .src-title, .src-url, .note { break-after: avoid; break-inside: avoid; }
+  section.method { break-inside: avoid; }  /* the reading on one page, not split across two */
 }
 """
 

@@ -37,7 +37,7 @@ CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'
 LIVE_CSP = CSP + "; connect-src 'self'"
 
 # The notes a Run's owner sees (api/research.py, _SHOWN_NOTES) that the page draws.
-NOTES = {"perspectives", "browsed", "tree", "flow"}
+NOTES = {"perspectives", "browsed", "tree", "flow", "interpretation"}
 EVIDENCE_CHARS = 700  # per passage: enough to read the match, not the whole page
 
 

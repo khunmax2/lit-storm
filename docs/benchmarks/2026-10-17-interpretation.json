@@ -856,5 +856,201 @@
   "thai_sources": 0,
   "judge_usd": 8.925e-05,
   "reading": null
+ },
+ {
+  "topic": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพเด็กในเชียงใหม่",
+  "language": "th",
+  "engine": "agent",
+  "interpret": true,
+  "run_id": "33790cc1-0c46-4ac6-9bac-268577984d6b",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 66,
+  "cost_usd": 0.047206,
+  "sources": 7,
+  "on_topic": 6,
+  "judged": 7,
+  "thai_sources": 5,
+  "judge_usd": 0.00015325,
+  "reading": {
+   "scope": [
+    "ช่วงเวลา: ไม่จำกัด",
+    "สถานที่: จังหวัดเชียงใหม่",
+    "ประชากร: เด็ก",
+    "ประเด็น: ผลกระทบทางสุขภาพจากฝุ่น PM2.5"
+   ],
+   "exclude": [],
+   "keywords": {
+    "en": [
+     "PM2.5 health effects children Chiang Mai",
+     "impact of air pollution on children's health Chiang Mai",
+     "pediatric health issues PM2.5 Chiang Mai"
+    ],
+    "th": [
+     "ผลกระทบ PM2.5 สุขภาพเด็ก เชียงใหม่",
+     "ฝุ่นละอองขนาดเล็ก สุขภาพเด็ก เชียงใหม่",
+     "ปัญหาสุขภาพเด็กจากฝุ่นควัน เชียงใหม่"
+    ]
+   },
+   "question": "ฝุ่นละอองขนาดเล็ก PM2.5 ส่งผลกระทบต่อสุขภาพของเด็กในจังหวัดเชียงใหม่อย่างไร",
+   "searched": [
+    "en",
+    "th"
+   ],
+   "assumptions": [
+    "คำว่า 'เด็ก' ครอบคลุมตั้งแต่วัยทารกจนถึงวัยรุ่นอายุไม่เกิน 18 ปี",
+    "ครอบคลุมทั้งผลกระทบทางร่างกายและทางเดินหายใจ โดยไม่จำกัดเฉพาะโรคใดโรคหนึ่ง"
+   ]
+  },
+  "prompt": "2026-10-18"
+ },
+ {
+  "topic": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพเด็กในเชียงใหม่",
+  "language": "th",
+  "engine": "agent",
+  "interpret": false,
+  "run_id": "f40e9a19-cd4e-4727-94ac-b48b1801ebef",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 69,
+  "cost_usd": 0.031408,
+  "sources": 8,
+  "on_topic": 8,
+  "judged": 8,
+  "thai_sources": 0,
+  "judge_usd": 0.000155,
+  "reading": null,
+  "prompt": "2026-10-18"
+ },
+ {
+  "topic": "ภาษีคาร์บอน",
+  "language": "th",
+  "engine": "agent",
+  "interpret": true,
+  "run_id": "75895cbe-3d62-4d7e-93c6-5ff8e5bb5ca6",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 45,
+  "cost_usd": 0.028783,
+  "sources": 7,
+  "on_topic": 7,
+  "judged": 7,
+  "thai_sources": 7,
+  "judge_usd": 0.00015925,
+  "reading": {
+   "scope": [],
+   "exclude": [
+    "ภาษีเงินได้บุคคลธรรมดา",
+    "ภาษีมูลค่าเพิ่ม",
+    "Carbon credit trading (ในกรณีที่ไม่เกี่ยวข้องกับภาษีโดยตรง)"
+   ],
+   "keywords": {
+    "en": [
+     "carbon tax",
+     "carbon pricing mechanisms",
+     "environmental taxation",
+     "carbon emission policy"
+    ],
+    "th": [
+     "ภาษีคาร์บอน",
+     "กลไกราคาคาร์บอน",
+     "ภาษีสิ่งแวดล้อม",
+     "นโยบายการลดก๊าซเรือนกระจก"
+    ]
+   },
+   "question": "ภาษีคาร์บอนมีหลักการ กลไกการดำเนินงาน และผลกระทบต่อเศรษฐกิจและสิ่งแวดล้อมอย่างไร",
+   "searched": [
+    "en",
+    "th"
+   ],
+   "assumptions": [
+    "หัวข้อมีความกว้าง โดยครอบคลุมทั้งนิยามทางทฤษฎี รูปแบบการจัดเก็บ และการประยุกต์ใช้ในบริบทสากลและระดับประเทศ"
+   ]
+  },
+  "prompt": "2026-10-18"
+ },
+ {
+  "topic": "ภาษีคาร์บอน",
+  "language": "th",
+  "engine": "agent",
+  "interpret": false,
+  "run_id": "3af82eaa-5b03-48a0-8bdd-e32fc3180c60",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 51,
+  "cost_usd": 0.030068,
+  "sources": 6,
+  "on_topic": 4,
+  "judged": 6,
+  "thai_sources": 0,
+  "judge_usd": 0.0001205,
+  "reading": null,
+  "prompt": "2026-10-18"
+ },
+ {
+  "topic": "Remote work",
+  "language": "en",
+  "engine": "agent",
+  "interpret": true,
+  "run_id": "4dffa424-082f-4759-a6e0-f68250e15d8c",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 48,
+  "cost_usd": 0.026072,
+  "sources": 4,
+  "on_topic": 4,
+  "judged": 4,
+  "thai_sources": 0,
+  "judge_usd": 8.775e-05,
+  "reading": {
+   "scope": [],
+   "exclude": [
+    "remote sensing",
+    "remote controls",
+    "remote access software",
+    "remote desktop support"
+   ],
+   "keywords": {
+    "en": [
+     "remote work",
+     "telecommuting",
+     "hybrid work model",
+     "work from home",
+     "distributed workforce"
+    ],
+    "th": [
+     "การทำงานทางไกล",
+     "การทำงานจากที่บ้าน",
+     "การทำงานแบบไฮบริด",
+     "telecommuting"
+    ]
+   },
+   "question": "What are the impacts, challenges, and benefits of remote work arrangements?",
+   "searched": [
+    "en"
+   ],
+   "assumptions": [
+    "The topic is broad and covers all industries, geographical regions, and types of remote or hybrid work arrangements as the prompt does not specify a limitation."
+   ]
+  },
+  "prompt": "2026-10-18"
+ },
+ {
+  "topic": "Remote work",
+  "language": "en",
+  "engine": "agent",
+  "interpret": false,
+  "run_id": "08957032-ab03-42b7-8208-7bd1ddcb1c07",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 53,
+  "cost_usd": 0.03402,
+  "sources": 6,
+  "on_topic": 6,
+  "judged": 6,
+  "thai_sources": 0,
+  "judge_usd": 0.0001065,
+  "reading": null,
+  "prompt": "2026-10-18"
  }
 ]

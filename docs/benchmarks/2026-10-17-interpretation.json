@@ -790,5 +790,71 @@
   "thai_sources": 0,
   "judge_usd": 7.075e-05,
   "reading": null
+ },
+ {
+  "topic": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพเด็กในเชียงใหม่",
+  "language": "th",
+  "engine": "agent",
+  "interpret": true,
+  "run_id": "1580c440-b592-4842-ad59-b40fd763eba3",
+  "status": "failed",
+  "reason": "empty_report",
+  "seconds": 83,
+  "cost_usd": 0.035863,
+  "sources": 0,
+  "on_topic": 0,
+  "judged": 0,
+  "thai_sources": 0,
+  "judge_usd": null,
+  "reading": {
+   "scope": [
+    "ฝุ่นละอองขนาดไม่เกิน 2.5 ไมครอน (PM2.5)",
+    "สุขภาพเด็ก",
+    "จังหวัดเชียงใหม่"
+   ],
+   "exclude": [
+    "ผลกระทบในพื้นที่อื่นที่ไม่ใช่จังหวัดเชียงใหม่",
+    "ผลกระทบต่อประชากรกลุ่มอื่นที่ไม่ใช่เด็ก"
+   ],
+   "keywords": {
+    "en": [
+     "PM2.5 health effects children Chiang Mai",
+     "impact of air pollution on children in Chiang Mai",
+     "particulate matter exposure children Chiang Mai"
+    ],
+    "th": [
+     "ผลกระทบ PM2.5 สุขภาพเด็ก เชียงใหม่",
+     "ฝุ่นละอองขนาดเล็ก สุขภาพเด็ก เชียงใหม่",
+     "มลพิษทางอากาศ เด็ก เชียงใหม่"
+    ]
+   },
+   "question": "ผลกระทบของฝุ่นละอองขนาดไม่เกิน 2.5 ไมครอน (PM2.5) ต่อสุขภาพของเด็กในจังหวัดเชียงใหม่เป็นอย่างไร",
+   "searched": [
+    "en",
+    "th"
+   ],
+   "assumptions": [
+    "คำว่า 'เด็ก' ครอบคลุมช่วงอายุตั้งแต่แรกเกิดจนถึง 18 ปี",
+    "คำว่า 'ผลกระทบต่อสุขภาพ' ครอบคลุมทั้งผลกระทบเฉียบพลันและระยะยาว ทั้งทางร่างกายและระบบทางเดินหายใจ",
+    "ไม่ได้จำกัดช่วงเวลาของการศึกษา (ครอบคลุมข้อมูลทุกช่วงเวลาที่เกี่ยวข้อง)"
+   ]
+  }
+ },
+ {
+  "topic": "ผลกระทบของฝุ่น PM2.5 ต่อสุขภาพเด็กในเชียงใหม่",
+  "language": "th",
+  "engine": "agent",
+  "interpret": false,
+  "run_id": "8ab9a4ea-c0c4-4636-ade5-431eb765970e",
+  "status": "succeeded",
+  "reason": "succeeded",
+  "seconds": 92,
+  "cost_usd": 0.045473,
+  "sources": 4,
+  "on_topic": 4,
+  "judged": 4,
+  "thai_sources": 0,
+  "judge_usd": 8.925e-05,
+  "reading": null
  }
 ]

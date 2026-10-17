@@ -50,9 +50,21 @@ export function useConfirm() {
   return { confirm: (text: string, action: () => void) => setState({ text, action }), dialog };
 }
 
-export function Stepper({ stage, status, engine }: { stage: string | null; status: string; engine: string }) {
+export function Stepper({
+  stage,
+  status,
+  engine,
+  interpret = false,
+}: {
+  stage: string | null;
+  status: string;
+  engine: string;
+  // It reads its topic first (server: litstorm.interpret).
+  interpret?: boolean;
+}) {
   const { t } = useT();
-  const STAGES = useRunOptions().data?.engines.find((e) => e.id === engine)?.stages ?? DEFAULT_STAGES;
+  const own = useRunOptions().data?.engines.find((e) => e.id === engine)?.stages ?? DEFAULT_STAGES;
+  const STAGES = interpret ? ["interpret", ...own] : own;
   const current = STAGES.indexOf(stage ?? "");
   const done = status === "succeeded";
   return (

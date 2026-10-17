@@ -14,7 +14,7 @@ moving the topic out, does not change a Run already made. Research started
 outside any Project has none.
 """
 
-from litstorm import refine
+from litstorm import interpret, refine
 
 MAX_LENGTH = 2000
 
@@ -31,8 +31,13 @@ def snapshot(project):
 
 
 def focus(config):
-    """What steers research: the clarifying answers, then the search scope."""
-    parts = [refine.focus(config.refinement), (config.instructions or {}).get("search_scope", "")]
+    """What steers research: the clarifying answers, the search scope, then
+    what the Run made of its topic (litstorm.interpret)."""
+    parts = [
+        refine.focus(config.refinement),
+        (config.instructions or {}).get("search_scope", ""),
+        interpret.focus(config),
+    ]
     return "; ".join(p for p in parts if p)
 
 

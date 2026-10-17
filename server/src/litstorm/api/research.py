@@ -360,6 +360,8 @@ class RunOut(BaseModel):
     service: dict | None = None
     # The clarifying questions the owner answered before it started.
     refinement: list[QuestionAnswer] = []
+    # Whether it reads its topic first; what it made of it is notes.interpretation.
+    interpret: bool = False
     # The report's sections, as the owner set them.
     sections: list[str] = []
     # The Project instructions it was started with.
@@ -398,6 +400,7 @@ def run_out(run):
         # What it cost is the Administrator's to know (admin.recent_runs).
         notes={k: v for k, v in (run.notes or {}).items() if k != "cost"},
         refinement=run.config.get("refinement", []),
+        interpret=bool(run.config.get("interpret")),
         sections=run.config.get("sections", []),
         instructions=run.config.get("instructions", {}),
         turn=run.turn,
@@ -462,6 +465,8 @@ def _snapshot(session, model, provider, depth="standard", engine="storm"):
         "depth": depth,
         "target_minutes": level.target_minutes,
         "deadline_minutes": configured.run_deadline_minutes,
+        # Its topic read first, as its mode is set now (litstorm.interpret).
+        **({"interpret": True} if modes.interprets(session, engine) else {}),
     }
 
 

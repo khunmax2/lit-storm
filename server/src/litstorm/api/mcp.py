@@ -35,7 +35,7 @@ from pydantic import Field
 from sqlalchemy import select
 from starlette.responses import JSONResponse
 
-from litstorm import modes, notify, quota, settings, tokens
+from litstorm import interpret, modes, notify, quota, settings, tokens
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
 from litstorm.db.models import FINAL, INTEGRATION, ApiToken, LlmModel, Run, SearchProvider, User
@@ -258,6 +258,8 @@ def _web_url(user, run_id):
 
 def _progress(run):
     stages = ENGINES.get(run.engine, {}).get("stages", ())
+    if run.config.get("interpret"):
+        stages = (interpret.STAGE, *stages)  # its topic read first (litstorm.interpret)
     if run.status in FINAL:
         return len(stages) + 1, len(stages) + 1
     if run.stage in stages:
@@ -296,6 +298,9 @@ def _run_facts(session, user, run_id, mode=None, p="research"):
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
     }
+    reading = (run.notes or {}).get("interpretation") or {}
+    if reading.get("question"):
+        facts["interpreted_as"] = reading["question"]  # what it researches the topic as (litstorm.interpret)
     if run.reason and run.status != "succeeded":
         facts["reason"] = run.reason
         facts["message"] = run.message

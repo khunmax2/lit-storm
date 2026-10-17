@@ -19,7 +19,9 @@ Shape, schema 1:
       "sources": [
         {"id": 1, "url": "...", "title": "...", "description": "...",
          "evidence": ["passage the Engine used", ...]}
-      ]
+      ],
+      "interpretation": {...}   optional: how the Run read its topic,
+                                its method (litstorm.interpret)
     }
 
 Citations are the inline markers ``[n]`` in ``lead`` and ``body``; ``n`` is a
@@ -98,6 +100,9 @@ def validate(report):
     uncited = source_ids - cited
     if uncited:
         raise ReportError(f"sources never cited: {sorted(uncited)}")
+    reading = report.get("interpretation")
+    if reading is not None and not (isinstance(reading, dict) and isinstance(reading.get("question"), str)):
+        raise ReportError("interpretation is not a reading of the topic")
 
 
 def is_empty(report):

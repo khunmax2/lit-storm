@@ -548,6 +548,9 @@ class EngineOut(BaseModel):
     search_kinds: list[str]
     needs_tools: bool
     remote: bool = False  # a service elsewhere, set up under Medical Review (api/medical.py)
+    # Whether its Runs can read their topic first, and whether they do (litstorm.interpret).
+    interprets: bool = False
+    interpret: bool = False
 
 
 @router.get("/engines", response_model=list[EngineOut])
@@ -555,29 +558,35 @@ def list_engines(session=Depends(deps.database)):
     off = set(modes.load(session).disabled)
     return [
         EngineOut(id=name, label=e["label"], ready=e["ready"], enabled=name not in off,
-                  search_kinds=list(e["search"]), needs_tools=e["needs_tools"], remote=bool(e.get("remote")))
+                  search_kinds=list(e["search"]), needs_tools=e["needs_tools"], remote=bool(e.get("remote")),
+                  interprets=bool(e.get("interprets")), interpret=modes.interprets(session, name))
         for name, e in ENGINES.items()
     ]
 
 
 class EngineSwitch(BaseModel):
-    enabled: bool
+    # Either or both; what is left out stays as it is.
+    enabled: bool | None = None
+    interpret: bool | None = None
 
 
 @router.put("/engines/{engine}", response_model=list[EngineOut])
 def switch_engine(engine: str, body: EngineSwitch, session=Depends(deps.database)):
-    """Offer a mode or stop offering it. Runs already queued keep going."""
+    """Offer a mode or stop offering it; have its new Runs read their topic
+    first or not. Runs already made keep what they were made with."""
     if engine not in ENGINES:
         raise HTTPException(404, "not_found")
     value = modes.load(session)
-    off = set(value.disabled)
-    if body.enabled:
-        off.discard(engine)
-    else:
-        off.add(engine)
-    if not modes.offered(session, off):
-        raise HTTPException(409, "last_engine")
-    modes.save(session, modes.EngineSettings(disabled=sorted(off)))
+    off, plain = set(value.disabled), set(value.uninterpreted)
+    if body.enabled is not None:
+        (off.discard if body.enabled else off.add)(engine)
+        if not modes.offered(session, off):
+            raise HTTPException(409, "last_engine")
+    if body.interpret is not None:
+        if not ENGINES[engine].get("interprets"):
+            raise HTTPException(422, "cannot_interpret")
+        (plain.discard if body.interpret else plain.add)(engine)
+    modes.save(session, modes.EngineSettings(disabled=sorted(off), uninterpreted=sorted(plain)))
     session.commit()
     return list_engines(session)
 

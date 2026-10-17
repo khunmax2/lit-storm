@@ -13,7 +13,7 @@ import threading
 import time
 import traceback
 
-from litstorm import engines, outcomes
+from litstorm import engines, interpret, outcomes
 from litstorm import report as report_mod
 from litstorm.engines.base import Cancelled, EngineFailure, RunConfig, Secrets
 from litstorm.runner import files
@@ -74,6 +74,8 @@ def run(run_dir, secrets):
     cancel = FileCancelToken(run_dir)
 
     try:
+        if config.interpret:
+            config = interpret.run(config, secrets, workspace, progress, cancel)
         report = engines.get(config.engine).run(config, secrets, workspace, progress, cancel)
     except Cancelled:
         _write_outcome(run_dir, "cancelled", outcomes.CANCELLED)
@@ -94,6 +96,8 @@ def run(run_dir, secrets):
     if report_mod.is_empty(report):
         _write_outcome(run_dir, "failed", outcomes.EMPTY_REPORT, "the engine produced nothing to read")
         return
+    if config.interpretation:
+        report["interpretation"] = config.interpretation  # the report's method (litstorm.report)
     report_mod.write(report, files.path(run_dir, files.REPORT))
     _write_outcome(run_dir, "succeeded", outcomes.SUCCEEDED)
 

@@ -1133,7 +1133,7 @@
      "admin"
     ],
     "summary": "Switch Engine",
-    "description": "Offer a mode or stop offering it. Runs already queued keep going.",
+    "description": "Offer a mode or stop offering it; have its new Runs read their topic\nfirst or not. Runs already made keep what they were made with.",
     "operationId": "switch_engine_api_admin_engines__engine__put",
     "parameters": [
      {
@@ -4483,6 +4483,16 @@
       "type": "boolean",
       "title": "Remote",
       "default": false
+     },
+     "interprets": {
+      "type": "boolean",
+      "title": "Interprets",
+      "default": false
+     },
+     "interpret": {
+      "type": "boolean",
+      "title": "Interpret",
+      "default": false
      }
     },
     "type": "object",
@@ -4499,14 +4509,29 @@
    "EngineSwitch": {
     "properties": {
      "enabled": {
-      "type": "boolean",
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Enabled"
+     },
+     "interpret": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Interpret"
      }
     },
     "type": "object",
-    "required": [
-     "enabled"
-    ],
     "title": "EngineSwitch"
    },
    "EventOut": {
@@ -6532,6 +6557,11 @@
       "title": "Refinement",
       "default": []
      },
+     "interpret": {
+      "type": "boolean",
+      "title": "Interpret",
+      "default": false
+     },
      "sections": {
       "items": {
        "type": "string"
@@ -6891,6 +6921,11 @@
       "type": "array",
       "title": "Refinement",
       "default": []
+     },
+     "interpret": {
+      "type": "boolean",
+      "title": "Interpret",
+      "default": false
      },
      "sections": {
       "items": {

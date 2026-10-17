@@ -1,6 +1,6 @@
 """report.json as Markdown: the text, then the numbered sources."""
 
-from litstorm.render.html import LABELS
+from litstorm.render.html import LABELS, method_rows
 
 
 def _sections(sections, level, out):
@@ -17,6 +17,12 @@ def render(report, with_evidence=False):
     if report["lead"]:
         out.append(report["lead"])
     _sections(report["sections"], 2, out)
+
+    method = method_rows(report, labels)
+    if method:
+        out.append(f"## {labels['method']}")
+        out.append("\n".join(f"- **{k}:** {v}" for k, v in method))
+        out.append(f"*{labels['method_note']}*")
 
     out.append(f"## {labels['sources']}")
     for s in report["sources"]:

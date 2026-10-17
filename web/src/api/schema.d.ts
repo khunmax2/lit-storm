@@ -448,7 +448,8 @@ export interface paths {
         get?: never;
         /**
          * Switch Engine
-         * @description Offer a mode or stop offering it. Runs already queued keep going.
+         * @description Offer a mode or stop offering it; have its new Runs read their topic
+         *     first or not. Runs already made keep what they were made with.
          */
         put: operations["switch_engine_api_admin_engines__engine__put"];
         post?: never;
@@ -1707,11 +1708,23 @@ export interface components {
              * @default false
              */
             remote: boolean;
+            /**
+             * Interprets
+             * @default false
+             */
+            interprets: boolean;
+            /**
+             * Interpret
+             * @default false
+             */
+            interpret: boolean;
         };
         /** EngineSwitch */
         EngineSwitch: {
             /** Enabled */
-            enabled: boolean;
+            enabled?: boolean | null;
+            /** Interpret */
+            interpret?: boolean | null;
         };
         /** EventOut */
         EventOut: {
@@ -2435,6 +2448,11 @@ export interface components {
              */
             refinement: components["schemas"]["QuestionAnswer"][];
             /**
+             * Interpret
+             * @default false
+             */
+            interpret: boolean;
+            /**
              * Sections
              * @default []
              */
@@ -2559,6 +2577,11 @@ export interface components {
              * @default []
              */
             refinement: components["schemas"]["QuestionAnswer"][];
+            /**
+             * Interpret
+             * @default false
+             */
+            interpret: boolean;
             /**
              * Sections
              * @default []

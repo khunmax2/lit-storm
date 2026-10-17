@@ -16,10 +16,11 @@ def test_the_search_scope_joins_the_clarifying_answers():
     config = SimpleNamespace(
         refinement=[{"question": "Where?", "answer": "Chiang Mai"}],
         instructions={"search_scope": "Peer-reviewed sources after 2020", "writing_style": "Short paragraphs"},
+        interpretation={},
     )
     assert instructions.focus(config) == "Where? Chiang Mai; Peer-reviewed sources after 2020"
     assert instructions.style(config) == "Short paragraphs"
-    assert instructions.focus(SimpleNamespace(refinement=[], instructions={})) == ""
+    assert instructions.focus(SimpleNamespace(refinement=[], instructions={}, interpretation={})) == ""
 
 
 @pytest.mark.slow

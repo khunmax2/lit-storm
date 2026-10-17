@@ -42,6 +42,11 @@ class RunConfig:
     search_cache_dir: str | None = None
     # The owner's answers to the clarifying questions: [{"question", "answer"}].
     refinement: list[dict[str, Any]] = field(default_factory=list)
+    # Whether the Run reads its topic first (litstorm.interpret), and what it
+    # made of it: {"question", "scope", "assumptions", "keywords", "exclude"},
+    # set by that stage for the Engine, never by the config snapshot.
+    interpret: bool = False
+    interpretation: dict[str, Any] = field(default_factory=dict)
     # The Project instructions the Run was started with: {"search_scope",
     # "writing_style"} (litstorm.instructions); empty outside a Project.
     instructions: dict[str, Any] = field(default_factory=dict)

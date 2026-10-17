@@ -63,7 +63,7 @@ def test_the_run_card_says_how_the_run_went(admin, browser, configured, db):
     run = user.post("/api/sessions", json={"topic": "Songkran", "language": "th"}).json()["runs"][0]
     stored = db.get(Run, run["id"])
     stored.engine = "fake"
-    stored.config = {**stored.config, "params": {"script": [
+    stored.config = {**{k: v for k, v in stored.config.items() if k != "interpret"}, "params": {"script": [
         {"stage": "research"},
         {"note": "research_cut_short", "data": {"conversations": 2, "seconds": 240}},
         {"note": "search_cache", "data": {"hits": 5, "misses": 30}},

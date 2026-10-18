@@ -39,6 +39,15 @@ LABELS = {
         "no_evidence": "ระบบไม่ได้บันทึกข้อความหลักฐานของแหล่งนี้",
         "open": "เปิดเว็บไซต์ต้นทาง",
         "top": "กลับขึ้นด้านบน",
+        "method": "วิธีการ",
+        "read_as": "ระบบตีความหัวเรื่องนี้ว่า",
+        "scope": "ขอบเขต",
+        "assumptions": "ข้อสมมติ",
+        "keywords": "คำค้น",
+        "exclude": "ไม่รวม",
+        "lang_en": "อังกฤษ",
+        "lang_th": "ไทย",
+        "method_note": "การตีความนี้กำหนดทิศทางของการค้นและการเขียน ส่วนชื่อรายงานยังเป็นหัวเรื่องตามที่พิมพ์มา",
     },
     "en": {
         "contents": "Contents",
@@ -51,6 +60,15 @@ LABELS = {
         "no_evidence": "No evidence was recorded for this source",
         "open": "Open the original",
         "top": "Back to top",
+        "method": "Method",
+        "read_as": "The topic was read as",
+        "scope": "Scope",
+        "assumptions": "Assumptions",
+        "keywords": "Search terms",
+        "exclude": "Left out",
+        "lang_en": "English",
+        "lang_th": "Thai",
+        "method_note": "This reading steered the searching and the writing; the title is the topic as it was given.",
     },
 }
 
@@ -183,6 +201,13 @@ a.cite:hover { background: var(--brand); color: #fff; transform: translateY(-1px
 a.cite .b { font-size: 0; }
 
 /* The Sources. */
+/* How the Run read its topic (litstorm.interpret): quiet, after the text. */
+section.method { margin-top: 3.5rem; padding: 1.1rem 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+section.method h2 { border: 0; margin: 0 0 .8rem; padding: 0; font-size: 1.15rem; }
+section.method dl { display: grid; gap: .55rem; margin: 0; font-size: .9rem; }
+section.method dt { font-size: .75rem; color: var(--muted); }
+section.method dd { margin: 0; color: var(--ink); }
+section.method .method-note { margin: .9rem 0 0; font-size: .75rem; color: var(--muted); }
 section.sources { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--line); }
 section.sources h2 { border: 0; margin: 0 0 1.2rem; padding: 0; font-size: 1.6rem; }
 section.sources h2 .count { font-family: var(--sans); font-size: .85rem; color: var(--muted); }
@@ -253,6 +278,7 @@ nav.toc.inline .inner { position: static; max-height: none; background: var(--so
   /* Keep a source's name with its link, but let long evidence flow on:
      keeping the whole entry together left most of each page blank. */
   .src-head, .src-title, .src-url, .note { break-after: avoid; break-inside: avoid; }
+  section.method { break-inside: avoid; }  /* the reading on one page, not split across two */
 }
 """
 
@@ -277,6 +303,36 @@ def _numbered(sections, prefix=""):
         n = f"{prefix}.{i}" if prefix else str(i)
         out.append({**s, "n": n, "children": _numbered(s["children"], n)})
     return out
+
+
+def method_rows(report, labels):
+    """The report's method as (label, text) rows: how the Run read its topic
+    (litstorm.interpret); none for a report made without reading it."""
+    from litstorm import interpret
+
+    found = report.get("interpretation") or {}
+    if not found.get("question"):
+        return []
+    rows = [(labels["read_as"], found["question"])]
+    for key in ("scope", "assumptions"):
+        if found.get(key):
+            rows.append((labels[key], "; ".join(found[key])))
+    terms = interpret.searched_terms(found)
+    if terms:
+        rows.append((labels["keywords"],
+                     " · ".join(f"{labels['lang_' + lang]}: {', '.join(words)}" for lang, words in terms.items())))
+    if found.get("exclude"):
+        rows.append((labels["exclude"], "; ".join(found["exclude"])))
+    return rows
+
+
+def _method(report, labels):
+    rows = method_rows(report, labels)
+    if not rows:
+        return ""
+    items = "".join(f"<div><dt>{html.escape(k)}</dt><dd>{html.escape(v)}</dd></div>" for k, v in rows)
+    return (f'<section class="method" id="method"><h2>{labels["method"]}</h2><dl>{items}</dl>'
+            f'<p class="method-note">{labels["method_note"]}</p></section>')
 
 
 def _toc(sections):
@@ -459,6 +515,7 @@ def page(
 {after_lead}
 {_sections(sections, after=after_section)}
 </div>
+{_method(report, labels)}
 <section class="sources" id="sources">
 <h2>{labels['sources']} <span class="count">{len(report['sources'])}</span></h2>
 <ol class="sources">{sources}</ol>

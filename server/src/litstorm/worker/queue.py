@@ -144,6 +144,7 @@ def claim(session):
         search_cache_dir=settings.get().search_cache_dir,
         service=run.config.get("service", {}),
         refinement=run.config.get("refinement", []),
+        interpret=bool(run.config.get("interpret")),
         sections=run.config.get("sections", []),
         instructions=run.config.get("instructions", {}),
         discussion={**run.turn, "state_from": discussion.state_from(session, run)} if run.turn else {},
@@ -251,6 +252,7 @@ def set_stage(session, claim, stage):
 
 # The engine's notes an owner is shown on the Run, not only in its log.
 NOTE_KINDS = ("research_cut_short", "embedding", "search_cache", "sources_skipped", "rewritten",
+              "interpretation",  # what the Run made of its topic (litstorm.interpret)
               # a remote Engine's: its job there, a result it gave back for free, its own page kept
               "service", "service_cache", "service_page")
 

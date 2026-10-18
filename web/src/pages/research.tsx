@@ -43,6 +43,7 @@ import { ResearchCanvas } from "@/components/research-canvas";
 // three.js comes only with the 3D view, when someone opens it.
 const StormObservatory3D = lazy(() => import("@/components/agent-observatory-3d").then((m) => ({ default: m.StormObservatory3D })));
 import { SupportDialog } from "@/components/support-dialog";
+import { RunReading, type Reading } from "@/components/interpretation";
 import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
 import { useRunLive } from "@/hooks/use-run-live";
@@ -537,7 +538,7 @@ function LiveProgress({ run }: { run: Run }) {
   if (!live) return null;
   return (
     <div className="space-y-3 rounded-xl bg-muted/50 p-4">
-      <Stepper stage={run.stage} status={run.status} engine={run.engine} />
+      <Stepper stage={run.stage} status={run.status} engine={run.engine} interpret={run.interpret} />
       {browsed.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <Globe className="size-3.5" />
@@ -702,6 +703,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
               )}
             </div>
             <RunNotes notes={run.notes ?? {}} />
+            <RunReading reading={run.notes?.interpretation as Reading | undefined} />
             {!!run.sections?.length && (
               <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">{t("sections.set", { n: run.sections.length })}</summary>

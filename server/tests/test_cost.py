@@ -117,7 +117,7 @@ def run_fake(db, user):
     run = user.post("/api/sessions", json={"topic": "Songkran", "language": "th"}).json()["runs"][0]
     row = db.get(Run, uuid.UUID(run["id"]))
     row.engine = "fake"
-    row.config = {**row.config, "params": {"script": [{"stage": "research"}]}}
+    row.config = {**{k: v for k, v in row.config.items() if k != "interpret"}, "params": {"script": [{"stage": "research"}]}}
     db.commit()
     with db_mod.sessions()() as s:
         claim = queue.claim(s)

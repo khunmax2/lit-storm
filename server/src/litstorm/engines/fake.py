@@ -14,6 +14,7 @@
     {"import": "module"}               load a module, as a real Engine would
                                        (weight without the calls: tests/load_test.py)
     {"embed": true}                    load the built-in embedding model and use it
+    {"focus_probe": true}              note what steers its research (instructions.focus)
 
 and then it returns a one-section report citing one source.
 """
@@ -85,6 +86,10 @@ class FakeEngine:
                 from litstorm import embedding
 
                 SentenceTransformer(embedding.BUILTIN_MODEL).encode(["snippet"] * 64)
+            elif step.get("focus_probe"):
+                from litstorm import instructions
+
+                progress.note("focus", text=instructions.focus(config))
             elif step.get("language_probe"):
                 from litstorm.engines.storm import language
 

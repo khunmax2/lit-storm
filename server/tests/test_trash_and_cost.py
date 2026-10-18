@@ -42,7 +42,8 @@ def run_fake(db, run_id, script=None):
 
     run = db.get(Run, uuid.UUID(run_id))
     run.engine = "fake"
-    run.config = {**run.config, "params": {"script": script or [{"stage": "research"}, {"stage": "polish"}]}}
+    run.config = {**{k: v for k, v in run.config.items() if k != "interpret"},
+                  "params": {"script": script or [{"stage": "research"}, {"stage": "polish"}]}}
     db.commit()
     with db_mod.sessions()() as s:
         claim = queue.claim(s)

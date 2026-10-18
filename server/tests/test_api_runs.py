@@ -83,7 +83,8 @@ def _fake(db, run_id, script):
 
     run = db.get(Run, run_id)
     run.engine = "fake"
-    run.config = {**run.config, "params": {"script": script}}
+    # It reads no topic first: that would ask a real model (litstorm.interpret).
+    run.config = {**{k: v for k, v in run.config.items() if k != "interpret"}, "params": {"script": script}}
     db.commit()
 
 

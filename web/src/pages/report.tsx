@@ -32,6 +32,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { api, BASE, call } from "@/api/client";
 import { ErrorText, Favicon, LoadingRows, Toolbar, domainOf } from "@/components/common";
+import { ReportMethod, type Reading } from "@/components/interpretation";
 import { Segmented } from "@/components/segmented";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,7 +51,14 @@ import { cn } from "@/lib/utils";
 
 type Source = { id: number; url: string; title: string; description?: string; evidence: string[] };
 type Section = { id: string; heading: string; body: string; children: Section[] };
-type Report = { title: string; language: string; lead: string; sections: Section[]; sources: Source[] };
+type Report = {
+  title: string;
+  language: string;
+  lead: string;
+  sections: Section[];
+  sources: Source[];
+  interpretation?: Reading; // its method: how the topic was read
+};
 
 // Model output is untrusted: raw HTML stays text, and markdown-it refuses
 // javascript: links by itself.
@@ -751,6 +759,8 @@ export function ReportPage() {
             )}
             <Body sections={sections} />
           </div>
+
+          <ReportMethod reading={r.interpretation} />
 
           <section id="sources" className="mt-16 scroll-mt-24 border-t pt-8">
             <h2 className="mb-5 flex items-baseline gap-3 font-display text-2xl tracking-tight">

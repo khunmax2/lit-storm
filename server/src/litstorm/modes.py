@@ -17,6 +17,9 @@ KEY = "engines"
 
 class EngineSettings(BaseModel):
     disabled: list[str] = []
+    # Modes whose new Runs research the topic as typed, without reading it
+    # first (litstorm.interpret); every mode that can reads it by default.
+    uninterpreted: list[str] = []
 
 
 def load(session):
@@ -41,6 +44,11 @@ def offered(session, off=None):
         name for name, e in ENGINES.items()
         if e["ready"] and name not in off and (not e.get("remote") or medical.configured(session))
     ]
+
+
+def interprets(session, engine):
+    """Whether a new Run of this mode reads its topic first (litstorm.interpret)."""
+    return bool(ENGINES.get(engine, {}).get("interprets")) and engine not in load(session).uninterpreted
 
 
 def search_fits(engine, provider):

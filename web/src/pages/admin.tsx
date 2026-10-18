@@ -1641,8 +1641,9 @@ function Modes() {
   const onError = useToastError();
   const engines = useQuery({ queryKey: ["admin-engines"], queryFn: () => call(api.GET("/api/admin/engines")) });
   const flip = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      call(api.PUT("/api/admin/engines/{engine}", { params: { path: { engine: id } }, body: { enabled } })),
+    // Offered or not, and whether its Runs read their topic first.
+    mutationFn: ({ id, ...body }: { id: string; enabled?: boolean; interpret?: boolean }) =>
+      call(api.PUT("/api/admin/engines/{engine}", { params: { path: { engine: id } }, body })),
     onSuccess: (data) => {
       queryClient.setQueryData(["admin-engines"], data);
       queryClient.invalidateQueries({ queryKey: ["options"] });
@@ -1660,6 +1661,7 @@ function Modes() {
               <TableHead>{t("modes.mode")}</TableHead>
               <TableHead>{t("modes.search")}</TableHead>
               <TableHead>{t("modes.model")}</TableHead>
+              <TableHead title={t("modes.interpretHint")}>{t("modes.interpret")}</TableHead>
               <TableHead className="text-right">{t("modes.offered")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -1672,6 +1674,19 @@ function Modes() {
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {e.remote ? t("modes.remoteModel") : e.needs_tools ? t("modes.needsTools") : t("modes.anyModel")}
+                </TableCell>
+                <TableCell>
+                  {e.interprets ? (
+                    <Switch
+                      aria-label={`${t("modes.interpret")}: ${e.label}`}
+                      title={t("modes.interpretHint")}
+                      checked={e.interpret}
+                      disabled={flip.isPending}
+                      onCheckedChange={(interpret) => flip.mutate({ id: e.id, interpret })}
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t("modes.interpretOwn")}</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   {e.ready ? (

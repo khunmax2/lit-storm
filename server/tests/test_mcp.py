@@ -320,7 +320,7 @@ def test_progress_only_goes_forward():
 
     from litstorm.api.mcp import _progress
 
-    steps = [_progress(SimpleNamespace(engine="deep", status=status, stage=stage))
+    steps = [_progress(SimpleNamespace(engine="deep", status=status, stage=stage, config={}))
              for status, stage in [("queued", None), ("running", "research"), ("running", "report"),
                                    ("running", "normalize"), ("succeeded", "normalize")]]
     assert [s for s, _ in steps] == [0, 1, 2, 2, 3] and {t for _, t in steps} == {3}

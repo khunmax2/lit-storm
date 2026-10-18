@@ -212,7 +212,7 @@
       lead: "DeepLit", planner: "Planner", perspective: "Perspective finder", researcher: "Researcher",
       search: "Search agent", crawl: "Crawl agent", writer: "Writer", outline: "Outline writer", article: "Section writers",
       polish: "Polisher", compose: "Long writer", experts: "Topic experts",
-      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish", grounding: "Citation map" },
+      stages: { interpret: "Read the topic", research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish", grounding: "Citation map" },
       tree: { generating_query: "writing a query", generated_query: "query ready", searching: "searching", search_complete: "search done",
         processing_search_result: "reading results", node_complete: "done", no_evidence: "no evidence", error: "error" },
       phase: { observe: "observing", gap: "finding the gap", select: "choosing searches", search: "searching" },
@@ -240,7 +240,7 @@
       lead: "DeepLit", planner: "ผู้วางแผน", perspective: "ผู้หามุมมอง", researcher: "นักค้นคว้า",
       search: "เอเจนต์ค้นหา", crawl: "เอเจนต์อ่านเว็บ", writer: "ผู้เขียน", outline: "ผู้วางโครงเรื่อง", article: "ผู้เขียนแต่ละหัวข้อ",
       polish: "ผู้เกลาเนื้อหา", compose: "ผู้รวมรายงาน", experts: "ผู้เชี่ยวชาญหัวข้อ",
-      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน", grounding: "โยงหลักฐาน" },
+      stages: { interpret: "ตีความหัวเรื่อง", research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน", grounding: "โยงหลักฐาน" },
       tree: { generating_query: "กำลังคิดคำค้น", generated_query: "ได้คำค้นแล้ว", searching: "กำลังค้น", search_complete: "ค้นเสร็จ",
         processing_search_result: "กำลังอ่านผล", node_complete: "เสร็จ", no_evidence: "ไม่พบหลักฐาน", error: "ผิดพลาด" },
       phase: { observe: "สังเกต", gap: "หาช่องว่างความรู้", select: "เลือกคำค้น", search: "กำลังค้น" },
@@ -323,11 +323,15 @@
     }
     if (ev.type === "stage") {
       S.stage = d.stage; stageAgent(d.stage);
+      if (d.stage === "interpret") S.interpreted = true; // its topic read first (litstorm.interpret)
       say("lead", W.say.stage(W.stages[d.stage] || d.stage));
       return;
     }
     if (ev.type !== "note") return;
     switch (d.kind) {
+      case "interpretation":
+        if (d.question) say("lead", d.question);
+        break;
       case "browsed": {
         const urls = d.urls || [];
         S.pages += urls.length;
@@ -492,7 +496,7 @@
     $("mTokens").textContent = S.tokens >= 1e6 ? (S.tokens / 1e6).toFixed(2) + "M" : S.tokens >= 1e4 ? Math.round(S.tokens / 1e3) + "k" : S.tokens;
     $("mClaims").textContent = S.claims.length ? `${S.grounded}/${S.claims.length}` : "—";
     $("hAgentsN").textContent = String(S.spawned);
-    const stages = (STAGES[S.engine] || ["research", "report"]).concat(["grounding"]);
+    const stages = [...(S.interpreted ? ["interpret"] : []), ...(STAGES[S.engine] || ["research", "report"]), "grounding"];
     const pipe = $("pipeline"); pipe.textContent = "";
     const at = S.phase !== "research" ? stages.length - 1 : Math.max(0, stages.indexOf(S.stage));
     stages.forEach((s, i) => {

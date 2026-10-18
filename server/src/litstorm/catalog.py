@@ -21,7 +21,10 @@ SEARCH_PROVIDERS = ("searxng", "tavily", "arxiv", "tci")
 # Engine ใช้ร่วมกัน): the Search Provider kinds it can use, its stages for
 # the progress bar, whether it needs a model that can call tools, and how
 # many Search Providers one Run may search together (`max_sources`, 1 when
-# absent). An Engine is offered only once `ready`; an Administrator can still
+# absent), and whether its Runs can read their topic first (`interprets`,
+# litstorm.interpret: an Engine that researches from a topic it is given;
+# a Discussion is steered turn by turn instead, and Medical Review's service
+# reads the question itself). An Engine is offered only once `ready`; an Administrator can still
 # switch a ready one off (litstorm.engine_settings). Order is the tabs' order.
 ENGINES = {
     "storm": {
@@ -32,6 +35,7 @@ ENGINES = {
         "ready": True,
         # Search Providers one Run may search at once (MultiRM).
         "max_sources": 3,
+        "interprets": True,
     },
     "co-storm": {
         "label": "Co-STORM",
@@ -51,6 +55,7 @@ ENGINES = {
         "needs_tools": False,
         "ready": True,
         "max_sources": 3,
+        "interprets": True,
     },
     "agent": {
         "label": "Agent Research",
@@ -59,6 +64,7 @@ ENGINES = {
         "needs_tools": True,
         "ready": True,
         "max_sources": 3,
+        "interprets": True,
     },
     # A remote Engine: MedicalReviewerAgent, a service of its own that this
     # Engine asks over HTTP (engines/medical, docs/adr/0013). It searches

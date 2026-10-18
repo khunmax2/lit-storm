@@ -60,7 +60,7 @@ APP_MIME = "text/html;profile=mcp-app"
 # The modes with a server of their own, and what each is good for: what a
 # client reads to choose one (times and sources measured on this stack's
 # Runs, 2026-10-15, with the default model). Co-STORM talks in turns: not here.
-MODES = ("storm", "deep", "agent")
+MODES = ("storm", "deep", "agent", "medical")
 ABOUT = {
     "storm": (
         "STORM writes a Wikipedia-style article. It imagines several expert perspectives on the topic, "
@@ -88,12 +88,24 @@ ABOUT = {
         "no source passages, so it has no evidence quotes or number charts. Usually about 1 minute (fast), "
         "2 (standard), 2 to 5 (deep)."
     ),
+    "medical": (
+        "Medical Review asks MedicalReviewerAgent, a medical literature-review service, for a review. It frames "
+        "the question as PICO, searches PubMed, Europe PMC, OpenAlex, Semantic Scholar, Crossref, arXiv, DOAJ, "
+        "OpenAIRE and Thai journals, screens the studies with PRISMA reasons, reads their abstracts and checks "
+        "every number against the sentence it came from, then grades the evidence (GRADE-lite). Best for a health "
+        "or medical question that needs studies weighed, not the open web: a quick answer from about 8 studies "
+        "in about 2 minutes, or a full systematic review, meta-analysis (with pooled estimates), scoping or "
+        "narrative review of up to 30 studies in 2 to 3 minutes. Every Source's evidence is the abstract "
+        "sentence a number was checked against. Not for questions about one person's own case; an emergency is "
+        "declined with hotlines."
+    ),
 }
 # What the combined server's `mode` parameter says of each, in a line.
 LINE = {
     "storm": "storm (the default): a Wikipedia-style overview article from many perspectives, many sources",
     "deep": "deep: Deep Research, a focused question answered fast and cheaply by following leads",
     "agent": "agent: Agent Research, agents loop on knowledge gaps and read whole pages; slower, for complex questions",
+    "medical": "medical: Medical Review, a graded medical literature review of studies (PubMed and more), quick or full",
 }
 
 
@@ -108,7 +120,7 @@ def canvas_uri(mode=None):
 def _instructions(mode, p):
     if mode is None:
         about = ("DeepLit researches a topic on the web and in academic sources, then writes a report whose every "
-                 "claim cites its sources. It has three modes, chosen with the mode parameter of "
+                 f"claim cites its sources. It has {len(LINE)} modes, chosen with the mode parameter of "
                  f"{p}_start: {'; '.join(LINE.values())}. DeepLit also offers one server per mode.")
     else:
         others = ", ".join(f"deeplit-{m} ({ENGINES[m]['label']})" for m in MODES if m != mode)
@@ -120,7 +132,9 @@ def _instructions(mode, p):
         f"{p}_status (each call follows it for 20 seconds by default, up to 45), then read it with {p}_report. "
         'Reports can be written in English ("en") or Thai ("th"). '
         f"{p}_export gives a short-lived download link for a finished report as a file (one HTML page with "
-        f"its charts, plain HTML, Markdown or PDF). {p}_options lists the depths, sources and the quota left. "
+        f"its charts, plain HTML, Markdown or PDF). {p}_options lists "
+        + ("the kinds of review, study designs, whether the service takes reviews now" if mode == "medical"
+           else "the depths, sources") + " and the quota left. "
         f"Clients that show MCP Apps draw {p}_start and {p}_status as a live canvas of the research agents."
     )
 
@@ -138,6 +152,7 @@ _MEANING = {
     "not_found": "No research with that id belongs to this account.",
     "cannot_cancel": "That research has already ended.",
     "no_report": "That research has no report: it did not finish successfully.",
+    "not_for_mode": "That mode searches and writes on its own: it takes no sources or sections.",
 }
 
 
@@ -320,7 +335,7 @@ async def _follow(ctx, user, run_id, seconds, mode=None, p="research"):
         notify.runs.unsubscribe(run_id, key)
 
 
-def _repeat_of(session, user, token, topic, mode, depth, language, provider_ids, model_id):
+def _repeat_of(session, user, token, topic, mode, depth, language, provider_ids, model_id, service=None):
     """The Run this token started for the very same request within REPEAT_WINDOW,
     unless it ended without a report; else None."""
     from datetime import timedelta
@@ -342,6 +357,9 @@ def _repeat_of(session, user, token, topic, mode, depth, language, provider_ids,
             continue
         if model_id and run.llm_model_id != model_id:
             continue
+        asked = {k: v for k, v in ((run.config or {}).get("service") or {}).items() if k != "url"}
+        if service is not None and asked != service:
+            continue  # Medical Review: a quick answer is not a full review of the same question
         return run
     return None
 
@@ -446,6 +464,15 @@ Wait = Annotated[
 ]
 Model = Annotated[str | None, Field(description="A model by name or id; omit for the default.")]
 Id = Annotated[str, Field(description="The research id.")]
+Review = Annotated[Literal["quick", "full"], Field(
+    description="A quick answer (about 8 studies, about 2 minutes) or a full review (up to 30 studies, 2-3 minutes).")]
+ReviewType = Annotated[Literal["slr", "meta_analysis", "scoping", "narrative"], Field(
+    description="For a full review: systematic review (slr), meta-analysis (adds pooled estimates), scoping or "
+                "narrative. A quick answer is always a short systematic review.")]
+StudyTypes = Annotated[list[str] | None, Field(
+    description="Study designs to keep, e.g. RCT, Cohort, Case-control, Cross-sectional, Non-randomized trial, "
+                "Qualitative, Mixed methods, Systematic review, Meta-analysis. Omit for every design.")]
+YearFrom = Annotated[int | None, Field(description="Only studies published from this year.", ge=1950, le=2100)]
 
 
 def build(mode=None):
@@ -474,15 +501,33 @@ def build(mode=None):
 
     @server.tool(
         name=f"{p}_options",
-        description=f"What this account can start{'' if mode else ': research modes'}: depths (with their usual "
-                    "minutes), sources, models, report languages, and the research quota left this month.",
+        description=(
+            "What this account can start: kinds of review, study designs, report languages, whether "
+            "MedicalReviewerAgent takes reviews now, and the research quota left this month."
+            if mode == "medical" else
+            f"What this account can start{'' if mode else ': research modes'}: depths (with their usual "
+            "minutes), sources, models, report languages, and the research quota left this month."
+        ),
     )
     async def options(ctx: Context) -> dict:
+        from litstorm import medical
         from litstorm.api import research
 
         user, _ = await _caller(ctx)
 
         def read(session):
+            if mode == "medical":
+                # Its own sources and models; what it is asked for instead.
+                u = quota.usage(session, user)
+                return {
+                    "engines": [e for e in research.options(user=user, session=session).model_dump()["engines"]
+                                if e["id"] == "medical"],
+                    "reviews": ["quick", "full"], "review_types": list(medical.REVIEW_TYPES),
+                    "study_types": list(medical.STUDY_TYPES), "languages": ["en", "th"],
+                    "service": {k: v for k, v in medical.check(medical.load(session).url, None, timeout=3.0).items()
+                                if k != "key_ok"},
+                    "quota": {"month": u.month, "limit": u.limit, "used": u.used, "remaining": u.remaining},
+                }
             o = research.options(user=user, session=session).model_dump()
             if user.allowed_engines is not None:
                 o["engines"] = [e for e in o["engines"] if e["id"] in user.allowed_engines]
@@ -494,7 +539,7 @@ def build(mode=None):
 
         return await deps.with_session(read)
 
-    async def start(ctx, topic, language, engine, depth, sources, model, wait_seconds):
+    async def start(ctx, topic, language, engine, depth, sources, model, wait_seconds, medical=None):
         from litstorm.api import research
 
         user, token = await _caller(ctx, "research")
@@ -504,7 +549,9 @@ def build(mode=None):
         def begin(session):
             provider_ids = [_pick_named(session, SearchProvider, s, "source").id for s in (sources or [])]
             model_id = _pick_named(session, LlmModel, model, "model").id if model else None
-            again = _repeat_of(session, user, token, topic, engine, depth, language, provider_ids, model_id)
+            asked = research.MedicalIn(**(medical or {})) if engine == "medical" else None
+            again = _repeat_of(session, user, token, topic, engine, depth, language, provider_ids, model_id,
+                               asked.model_dump() if asked else None)
             if again is not None:
                 return again.id, True
             body = research.NewSessionIn(
@@ -512,6 +559,7 @@ def build(mode=None):
                 llm_model_id=model_id,
                 search_provider_id=provider_ids[0] if provider_ids else None,
                 extra_search_provider_ids=provider_ids[1:],
+                medical=asked,
             )
             try:
                 made = research._start_session(session, user, None, body)
@@ -551,8 +599,30 @@ def build(mode=None):
             sources: Sources = None,
             model: Model = None,
             wait_seconds: Wait = WAIT,
+            review: Annotated[Review, Field(description="mode medical only: quick or full.")] = "quick",
+            review_type: Annotated[ReviewType, Field(description="mode medical only, full review: the kind.")] = "slr",
+            study_types: Annotated[StudyTypes, Field(description="mode medical only: study designs to keep.")] = None,
+            year_from: Annotated[YearFrom, Field(description="mode medical only: published from this year.")] = None,
         ) -> dict:
-            return await start(ctx, topic, language, mode, depth, sources, model, wait_seconds)
+            medical = {"mode": review, "review_type": review_type, "study_types": study_types or [], "year_from": year_from}
+            return await start(ctx, topic, language, mode, depth, sources, model, wait_seconds,
+                               medical if mode == "medical" else None)
+
+    elif mode == "medical":
+
+        @server.tool(name=f"{p}_start", description=f"Start {label} on a question. {ABOUT[mode]} {started}", meta=on_canvas)
+        async def medical_start(
+            ctx: Context,
+            topic: Annotated[str, Field(description="The health or medical question, or a topic (3 to 500 characters).")],
+            language: Language = "en",
+            review: Review = "quick",
+            review_type: ReviewType = "slr",
+            study_types: StudyTypes = None,
+            year_from: YearFrom = None,
+            wait_seconds: Wait = WAIT,
+        ) -> dict:
+            medical = {"mode": review, "review_type": review_type, "study_types": study_types or [], "year_from": year_from}
+            return await start(ctx, topic, language, mode, "standard", None, None, wait_seconds, medical)
 
     else:
 

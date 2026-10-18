@@ -2605,6 +2605,48 @@
     }
    }
   },
+  "/api/runs/{run_id}/service-page": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "View Service Page",
+    "description": "A remote Engine's own report page, kept with the Run when it ended\n(Medical Review: MRA's offline report, docs/adr/0013), for the reader's\n\"full report\" view. Sandboxed like the interactive page: its script runs\nin an origin of its own, with no reach into the app.",
+    "operationId": "view_service_page_api_runs__run_id__service_page_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}/observatory": {
    "get": {
     "tags": [
@@ -3516,6 +3558,110 @@
     }
    }
   },
+  "/api/medical/status": {
+   "get": {
+    "tags": [
+     "medical"
+    ],
+    "summary": "Status",
+    "description": "Whether Medical Review can take a question now, for the tab's notice.\nLooked up at most every STATUS_TTL seconds, and never with the key.",
+    "operationId": "status_api_medical_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MedicalCheck"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/medical": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Get Settings",
+    "operationId": "get_settings_api_admin_medical_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MedicalSettingsOut"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Put Settings",
+    "operationId": "put_settings_api_admin_medical_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MedicalSettingsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MedicalSettingsOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/medical/check": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Check Settings",
+    "description": "Ask MRA now, with the stored address and key.",
+    "operationId": "check_settings_api_admin_medical_check_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MedicalCheck"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/health": {
    "get": {
     "summary": "Health",
@@ -4286,6 +4432,11 @@
       "type": "array",
       "title": "Sections At",
       "default": []
+     },
+     "remote": {
+      "type": "boolean",
+      "title": "Remote",
+      "default": false
      }
     },
     "type": "object",
@@ -4327,6 +4478,11 @@
      "needs_tools": {
       "type": "boolean",
       "title": "Needs Tools"
+     },
+     "remote": {
+      "type": "boolean",
+      "title": "Remote",
+      "default": false
      }
     },
     "type": "object",
@@ -5016,6 +5172,168 @@
     ],
     "title": "MeOut"
    },
+   "MedicalCheck": {
+    "properties": {
+     "reachable": {
+      "type": "boolean",
+      "title": "Reachable"
+     },
+     "accepting": {
+      "type": "boolean",
+      "title": "Accepting"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "key_ok": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Key Ok"
+     },
+     "sources": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sources",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "reachable",
+     "accepting",
+     "reason"
+    ],
+    "title": "MedicalCheck"
+   },
+   "MedicalIn": {
+    "properties": {
+     "mode": {
+      "type": "string",
+      "enum": [
+       "quick",
+       "full"
+      ],
+      "title": "Mode",
+      "default": "quick"
+     },
+     "review_type": {
+      "type": "string",
+      "enum": [
+       "slr",
+       "meta_analysis",
+       "scoping",
+       "narrative"
+      ],
+      "title": "Review Type",
+      "default": "slr"
+     },
+     "study_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 10,
+      "title": "Study Types"
+     },
+     "year_from": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 2100.0,
+        "minimum": 1950.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year From"
+     }
+    },
+    "type": "object",
+    "title": "MedicalIn",
+    "description": "What Medical Review asks MedicalReviewerAgent for (litstorm.medical):\na quick answer or a full review, of which kind, from which designs and year."
+   },
+   "MedicalSettingsIn": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Url"
+     },
+     "web_url": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Web Url",
+      "default": ""
+     },
+     "api_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url"
+    ],
+    "title": "MedicalSettingsIn"
+   },
+   "MedicalSettingsOut": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "web_url": {
+      "type": "string",
+      "title": "Web Url"
+     },
+     "console_url": {
+      "type": "string",
+      "title": "Console Url"
+     },
+     "has_key": {
+      "type": "boolean",
+      "title": "Has Key"
+     },
+     "configured": {
+      "type": "boolean",
+      "title": "Configured"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url",
+     "web_url",
+     "console_url",
+     "has_key",
+     "configured"
+    ],
+    "title": "MedicalSettingsOut"
+   },
    "ModelCheckOut": {
     "properties": {
      "ok": {
@@ -5465,6 +5783,16 @@
        }
       ],
       "title": "Request Key"
+     },
+     "medical": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MedicalIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "project_id": {
       "anyOf": [
@@ -6184,6 +6512,18 @@
       ],
       "title": "Via Token"
      },
+     "service": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Service"
+     },
      "refinement": {
       "items": {
        "$ref": "#/components/schemas/QuestionAnswer"
@@ -6351,6 +6691,16 @@
        }
       ],
       "title": "Request Key"
+     },
+     "medical": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MedicalIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
@@ -6521,6 +6871,18 @@
        }
       ],
       "title": "Via Token"
+     },
+     "service": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Service"
      },
      "refinement": {
       "items": {
@@ -6919,6 +7281,16 @@
        }
       ],
       "title": "Request Key"
+     },
+     "medical": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MedicalIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",

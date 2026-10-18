@@ -50,6 +50,9 @@ class RunConfig:
     # A Discussion's Turn (engines/costorm): {"action", "text", "steps",
     # "state_from"}, the last being the state file the previous Turn left.
     discussion: dict[str, Any] = field(default_factory=dict)
+    # A remote Engine's service (catalog.remote): {"url"} and what it is
+    # asked for, e.g. Medical Review's {"mode", "review_type", ...}.
+    service: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data):
@@ -66,6 +69,8 @@ class Secrets:
     search_extra_api_keys: tuple = ()
     embedding_api_key: str = ""
     fast_llm_api_key: str = ""
+    # A remote Engine's key for its service (litstorm.medical).
+    service_api_key: str = ""
 
     def __repr__(self):
         return "Secrets(<redacted>)"
@@ -89,8 +94,9 @@ class Progress(Protocol):
     def note(self, kind: str, **data: Any) -> None:
         """Something the owner may want to see while waiting."""
 
-    def usage(self, stage: str, llm: dict, search: dict) -> None:
-        """Tokens per model and queries per search provider for one stage."""
+    def usage(self, stage: str, llm: dict, search: dict, usd: float | None = None) -> None:
+        """Tokens per model and queries per search provider for one stage.
+        `usd`: what a remote service says the stage cost, priced there."""
 
 
 class Engine(Protocol):

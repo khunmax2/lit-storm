@@ -20,6 +20,10 @@ def get(name):
         from .agent.engine import AgentEngine
 
         return AgentEngine()
+    if name == "medical":
+        from .medical.engine import MedicalEngine
+
+        return MedicalEngine()
     if name == "fake":
         from .fake import FakeEngine
 

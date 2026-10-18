@@ -39,8 +39,11 @@ class FileProgress:
     def note(self, kind, **data):
         self._write({"type": "note", "kind": kind, **data})
 
-    def usage(self, stage, llm, search):
-        self._write({"type": "usage", "stage": stage, "llm": llm, "search": search})
+    def usage(self, stage, llm, search, usd=None):
+        event = {"type": "usage", "stage": stage, "llm": llm, "search": search}
+        if usd is not None:
+            event["usd"] = usd
+        self._write(event)
 
 
 class FileCancelToken:

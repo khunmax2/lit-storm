@@ -547,6 +547,7 @@ class EngineOut(BaseModel):
     enabled: bool
     search_kinds: list[str]
     needs_tools: bool
+    remote: bool = False  # a service elsewhere, set up under Medical Review (api/medical.py)
 
 
 @router.get("/engines", response_model=list[EngineOut])
@@ -554,7 +555,7 @@ def list_engines(session=Depends(deps.database)):
     off = set(modes.load(session).disabled)
     return [
         EngineOut(id=name, label=e["label"], ready=e["ready"], enabled=name not in off,
-                  search_kinds=list(e["search"]), needs_tools=e["needs_tools"])
+                  search_kinds=list(e["search"]), needs_tools=e["needs_tools"], remote=bool(e.get("remote")))
         for name, e in ENGINES.items()
     ]
 
@@ -574,7 +575,7 @@ def switch_engine(engine: str, body: EngineSwitch, session=Depends(deps.database
         off.discard(engine)
     else:
         off.add(engine)
-    if not any(e["ready"] and name not in off for name, e in ENGINES.items()):
+    if not modes.offered(session, off):
         raise HTTPException(409, "last_engine")
     modes.save(session, modes.EngineSettings(disabled=sorted(off)))
     session.commit()

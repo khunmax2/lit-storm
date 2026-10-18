@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import limits, modes, notify, quota, sections, settings, trash
+from litstorm import catalog, limits, modes, notify, quota, sections, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
@@ -75,6 +75,8 @@ class EngineChoice(BaseModel):
     max_sources: int = 1
     # The depth levels at which the owner may set the report's sections.
     sections_at: list[str] = []
+    # A service elsewhere (catalog.remote): it brings its own sources and models.
+    remote: bool = False
 
 
 class Options(BaseModel):
@@ -91,6 +93,7 @@ def engine_choice(name, configured):
         id=name, label=e["label"], search_kinds=list(e["search"]), stages=list(e["stages"]),
         needs_tools=e["needs_tools"], max_sources=e.get("max_sources", 1),
         sections_at=[d for d in limits.DEPTHS if takes_sections(configured, name, d)],
+        remote=catalog.remote(name),
     )
 
 
@@ -288,6 +291,17 @@ def refine_topic(body: RefineIn, user=Depends(deps.current_user), session=Depend
     return RefineOut(questions=found)
 
 
+class MedicalIn(BaseModel):
+    """What Medical Review asks MedicalReviewerAgent for (litstorm.medical):
+    a quick answer or a full review, of which kind, from which designs and year."""
+
+    mode: Literal["quick", "full"] = "quick"
+    review_type: Literal["slr", "meta_analysis", "scoping", "narrative"] = "slr"
+    # MRA's canonical names (medical.STUDY_TYPES) or its "Other: ..."; it normalises them.
+    study_types: list[str] = Field(default_factory=list, max_length=10)
+    year_from: int | None = Field(default=None, ge=1950, le=2100)
+
+
 class RunIn(BaseModel):
     topic: str = Field(min_length=3, max_length=500)
     language: str = Field(pattern="^(th|en)$")
@@ -307,6 +321,8 @@ class RunIn(BaseModel):
     # The page's id for one press of "Start". Sending the same key again
     # returns the Run it already made instead of making another.
     request_key: str | None = Field(default=None, max_length=64)
+    # Medical Review's own choices (engine "medical"); its defaults when absent.
+    medical: MedicalIn | None = None
 
 
 class SessionIn(RunIn):
@@ -339,6 +355,9 @@ class RunOut(BaseModel):
     notes: dict = {}
     # The API token's name when it was started through the MCP server.
     via_token: str | None = None
+    # What a remote Engine was asked (Medical Review: its mode and kind of
+    # review); never its address. None for the other modes.
+    service: dict | None = None
     # The clarifying questions the owner answered before it started.
     refinement: list[QuestionAnswer] = []
     # The report's sections, as the owner set them.
@@ -384,6 +403,7 @@ def run_out(run):
         turn=run.turn,
         quota_units=run.quota_units if run.quota_units is not None else 1,
         via_token=run.via_token.name if run.via_token_id and run.via_token else None,
+        service={k: v for k, v in run.config["service"].items() if k != "url"} if run.config.get("service") else None,
     )
 
 
@@ -513,6 +533,22 @@ def _instructions(session, research_session):
     return {"instructions": kept} if kept else {}
 
 
+def _service(session, config, options):
+    """A remote Engine's config (catalog.remote, docs/adr/0013): its service's
+    address now and what it is asked for. The model and Search Provider kept
+    beside it fill the Run's columns; they are not its to use, and the Run
+    says whose work it is instead."""
+    from litstorm import medical
+
+    return {
+        **config,
+        "llm": {**config.get("llm", {}), "label": "MedicalReviewerAgent"},
+        "search": {**config.get("search", {}), "label": "MRA"},
+        "refinement": [],  # MRA turns the question into PICO itself
+        "service": {**{k: v for k, v in options.items() if k != "url"}, "url": medical.load(session).url},
+    }
+
+
 def new_run(session, owner, research_session, body, parent_run_id=None):
     """A queued Run with its config snapshot. Secrets are not in it.
 
@@ -529,17 +565,32 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         raise HTTPException(422, "use_discussion")
     model = _pick(session, LlmModel, body.llm_model_id)
     provider = _pick(session, SearchProvider, body.search_provider_id)
+    remote = catalog.remote(body.engine)
     # What the page offers for the mode, checked again here: a Run that
     # could only fail half-way is refused before it takes quota.
-    if not modes.search_fits(body.engine, provider):
-        raise HTTPException(422, "search_not_for_engine")
-    if not modes.model_fits(body.engine, model):
-        raise HTTPException(422, "model_cannot_use_tools")
-    extra = _extra_searches(session, body, provider)
+    if remote:
+        if body.extra_search_provider_ids or body.sections:
+            raise HTTPException(422, "not_for_mode")  # it searches and writes on its own
+        extra = []
+    else:
+        if not modes.search_fits(body.engine, provider):
+            raise HTTPException(422, "search_not_for_engine")
+        if not modes.model_fits(body.engine, model):
+            raise HTTPException(422, "model_cannot_use_tools")
+        extra = _extra_searches(session, body, provider)
     wanted = sections.clean(body.sections)
     if wanted and not takes_sections(limits.load(session), body.engine, body.depth):
         raise HTTPException(422, "sections_not_for_mode")
     quota.check_submit(session, owner)
+    config = {
+        **_snapshot(session, model, provider, body.depth, body.engine),
+        "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
+        **({"search_extra": extra} if extra else {}),
+        **({"sections": wanted} if wanted else {}),
+        **_instructions(session, research_session),
+    }
+    if remote:
+        config = _service(session, config, (body.medical or MedicalIn()).model_dump())
     run = Run(
         session_id=research_session.id,
         owner_id=owner.id,
@@ -549,13 +600,7 @@ def new_run(session, owner, research_session, body, parent_run_id=None):
         language=body.language,
         llm_model_id=model.id,
         search_provider_id=provider.id,
-        config={
-            **_snapshot(session, model, provider, body.depth, body.engine),
-            "refinement": [qa.model_dump() for qa in body.refinement if qa.answer.strip()],
-            **({"search_extra": extra} if extra else {}),
-            **({"sections": wanted} if wanted else {}),
-            **_instructions(session, research_session),
-        },
+        config=config,
         status=QUEUED,
         quota_month=limits.quota_month(),
         request_key=body.request_key,
@@ -771,8 +816,24 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
         return run_out(discussions.new_turn(session, user, rs, old.turn))
     model = session.get(LlmModel, old.llm_model_id)
     provider = session.get(SearchProvider, old.search_provider_id)
-    available = model is not None and model.enabled and provider is not None and provider.enabled
+    remote = catalog.remote(old.engine)
+    # A remote Engine uses neither: only its service decides (modes.offered).
+    available = remote or (model is not None and model.enabled and provider is not None and provider.enabled)
     quota.check_submit(session, user)
+    if remote:
+        # The same question, asked of the service where it is now.
+        config = _service(session, old.config, old.config.get("service", {}))
+    elif available:
+        config = {
+            **_snapshot(session, model, provider, old.config.get("depth", "standard"), old.engine),
+            "refinement": old.config.get("refinement", []),
+            **({"search_extra": old.config["search_extra"]} if old.config.get("search_extra") else {}),
+            **({"sections": old.config["sections"]} if old.config.get("sections") else {}),
+            # The instructions it was started with, not the Project's now.
+            **({"instructions": old.config["instructions"]} if old.config.get("instructions") else {}),
+        }
+    else:
+        config = old.config
     run = Run(
         session_id=old.session_id,
         owner_id=user.id,
@@ -782,14 +843,7 @@ def retry(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(de
         language=old.language,
         llm_model_id=old.llm_model_id,
         search_provider_id=old.search_provider_id,
-        config={
-            **_snapshot(session, model, provider, old.config.get("depth", "standard"), old.engine),
-            "refinement": old.config.get("refinement", []),
-            **({"search_extra": old.config["search_extra"]} if old.config.get("search_extra") else {}),
-            **({"sections": old.config["sections"]} if old.config.get("sections") else {}),
-            # The instructions it was started with, not the Project's now.
-            **({"instructions": old.config["instructions"]} if old.config.get("instructions") else {}),
-        } if available else old.config,
+        config=config,
         status=QUEUED if available else NEEDS_SELECTION,
         quota_month=limits.quota_month(),
     )
@@ -826,7 +880,8 @@ class RunDetail(RunOut):
 
 # Notes an owner sees while waiting. Tracebacks and the like stay in the
 # database for whoever debugs; they are not the owner's reading.
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow"}
+# MRA's own events, for Medical Review's canvas (engines/medical) too.
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical"}
 
 
 EVENTS_PER_READ = 500
@@ -1215,6 +1270,26 @@ def view_interactive(
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "private, no-store",
         },
+    )
+
+
+@router.get("/runs/{run_id}/service-page")
+def view_service_page(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """A remote Engine's own report page, kept with the Run when it ended
+    (Medical Review: MRA's offline report, docs/adr/0013), for the reader's
+    "full report" view. Sandboxed like the interactive page: its script runs
+    in an origin of its own, with no reach into the app."""
+    run = deps.readable(session, Run, run_id, user, "report")
+    path = os.path.join(settings.get().runs_dir, str(run.id), "work", "mra_report.html")
+    if not catalog.remote(run.engine) or not os.path.exists(path):
+        raise HTTPException(404, "no_service_page")
+    with open(path, "rb") as f:
+        page = f.read()
+    return Response(
+        page,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Security-Policy": INTERACTIVE_SANDBOX, "X-Content-Type-Options": "nosniff",
+                 "Cache-Control": "private, no-store"},
     )
 
 

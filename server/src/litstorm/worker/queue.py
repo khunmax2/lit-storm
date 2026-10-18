@@ -18,10 +18,11 @@ import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, literal, or_, select, text, update
+from sqlalchemy import and_, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import JSONB
 
-from litstorm import cost, discussion, embedding, limits, quota, security, settings
+from litstorm import catalog, cost, discussion, embedding, limits, medical, quota, security, settings
+from litstorm.catalog import ENGINES
 from litstorm.db.models import (
     ACTIVE,
     CANCELLING,
@@ -65,10 +66,12 @@ def park_unavailable(session):
     their place is given up (docs/web-app-design.md, การปิดใช้งานโมเดล)."""
     disabled_models = select(LlmModel.id).where(LlmModel.enabled.is_(False))
     disabled_providers = select(SearchProvider.id).where(SearchProvider.enabled.is_(False))
+    remote = [name for name in ENGINES if catalog.remote(name)]  # they use neither
     return session.execute(
         update(Run)
         .where(
             Run.status == QUEUED,
+            Run.engine.not_in(remote),
             or_(Run.llm_model_id.in_(disabled_models), Run.search_provider_id.in_(disabled_providers)),
         )
         .values(status=NEEDS_SELECTION)
@@ -122,6 +125,8 @@ def claim(session):
     secrets, llm, fast = _secrets(session, run)
     extra, extra_keys = _extra_searches(session, run)
     secrets = replace(secrets, search_extra_api_keys=tuple(extra_keys))
+    if catalog.remote(run.engine):
+        secrets = replace(secrets, service_api_key=medical.key(session))
     session.commit()
 
     config = RunConfig(
@@ -137,6 +142,7 @@ def claim(session):
         embedding=run.config.get("embedding", {}),
         target_seconds=60.0 * run.config["target_minutes"] if run.config.get("target_minutes") else None,
         search_cache_dir=settings.get().search_cache_dir,
+        service=run.config.get("service", {}),
         refinement=run.config.get("refinement", []),
         sections=run.config.get("sections", []),
         instructions=run.config.get("instructions", {}),
@@ -244,7 +250,9 @@ def set_stage(session, claim, stage):
 
 
 # The engine's notes an owner is shown on the Run, not only in its log.
-NOTE_KINDS = ("research_cut_short", "embedding", "search_cache", "sources_skipped", "rewritten")
+NOTE_KINDS = ("research_cut_short", "embedding", "search_cache", "sources_skipped", "rewritten",
+              # a remote Engine's: its job there, a result it gave back for free, its own page kept
+              "service", "service_cache", "service_page")
 
 
 def add_note(session, claim, kind, data):
@@ -260,6 +268,8 @@ def finish(session, claim, outcome, report_title=None, source_count=None):
     """Write the final status once. False if the Run was no longer ours."""
     tokens_in, tokens_out, searches, by_model = cost.totals(outcome.usage)
     priced = cost.price(by_model, prices=claim.prices)
+    paid = cost.paid(outcome.usage)
+    usd = priced.usd + paid if priced.usd is not None else None
     extra = {}
     if priced.unpriced or priced.priced_as:
         # Said on the Run and in the log, never silently a NULL cost: the
@@ -277,7 +287,12 @@ def finish(session, claim, outcome, report_title=None, source_count=None):
             status=outcome.status,
             reason=outcome.reason,
             message=(outcome.message or None),
-            quota_refunded=outcome.refunds_quota,
+            # A remote service's result it already had costs nothing: its
+            # quota comes back too (docs/adr/0013).
+            quota_refunded=or_(
+                literal(outcome.refunds_quota),
+                and_(literal(outcome.status == "succeeded"), Run.notes.has_key("service_cache")),
+            ),
             finished_at=_now(),
             lease_expires_at=None,
             report_title=report_title,
@@ -285,7 +300,7 @@ def finish(session, claim, outcome, report_title=None, source_count=None):
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             search_calls=searches,
-            cost_usd=priced.usd,
+            cost_usd=usd,
         )
     ).rowcount
     session.commit()

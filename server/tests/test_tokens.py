@@ -143,7 +143,8 @@ def test_an_account_starts_only_the_modes_it_is_allowed(admin, browser, configur
 def test_the_setup_page_names_every_mcp_server_and_who_may_use_it(admin, browser):
     user = make_user(admin, browser)
     endpoints = {e["id"]: e for e in user.get("/api/me/connection").json()["endpoints"]}
-    assert list(endpoints) == ["all", "storm", "deep", "agent"] and all(e["allowed"] for e in endpoints.values())
+    assert list(endpoints) == ["all", "storm", "deep", "agent", "medical"]
+    assert [e["id"] for e in endpoints.values() if not e["allowed"]] == ["medical"]  # until MRA is set up
     assert endpoints["deep"]["path"] == "/api/mcp/deep" and endpoints["deep"]["name"] == "deeplit-deep"
     assert endpoints["deep"]["url"].endswith("/api/mcp/deep") and endpoints["deep"]["tool_prefix"] == "deep_research"
     admin.put("/api/admin/engines/agent", json={"enabled": False})

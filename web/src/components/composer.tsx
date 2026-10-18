@@ -5,6 +5,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
   Gauge,
+  HeartPulse,
+  SlidersHorizontal,
   Globe,
   ListOrdered,
   Loader2,
@@ -33,6 +35,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -56,7 +61,24 @@ export type RunForm = {
   // uses them (the composer sets it): typed text is kept when it does not.
   sections_text?: string;
   sections_on?: boolean;
+  // Medical Review's own choices (engine "medical"; MedicalReviewerAgent).
+  medical?: MedicalForm;
 };
+
+export type MedicalForm = {
+  mode: "quick" | "full";
+  review_type: "slr" | "meta_analysis" | "scoping" | "narrative";
+  study_types: string[];
+  year_from: number | null;
+};
+export const MEDICAL_DEFAULT: MedicalForm = { mode: "quick", review_type: "slr", study_types: [], year_from: null };
+const REVIEW_TYPES = ["slr", "meta_analysis", "scoping", "narrative"] as const;
+const STUDY_TYPES = [
+  "RCT", "Cohort", "Case-control", "Cross-sectional", "Non-randomized trial", "Qualitative", "Mixed methods",
+  "Systematic review", "Meta-analysis",
+];
+// MRA's usual times (its docs: a quick answer about 1.5 minutes, a full review 2-3).
+const MEDICAL_MINUTES = { quick: 2, full: 3 };
 
 // One press of Start is one Run: the same key goes with every retry of the
 // request, and a new key is made only after the Run was created.
@@ -85,6 +107,8 @@ export function runBody(form: RunForm, request_key: string) {
     refinement: (form.refinement ?? []).filter((qa) => qa.answer.trim()),
     extra_search_provider_ids: form.extra_search_provider_ids ?? [],
     sections: form.sections_on ? (form.sections_text ?? "").split("\n").filter((l) => l.trim()) : [],
+    // Only Medical Review asks MedicalReviewerAgent; other modes do not send it.
+    medical: form.engine === "medical" ? (form.medical ?? MEDICAL_DEFAULT) : null,
     request_key,
   };
 }
@@ -403,6 +427,103 @@ function SearchPicker({
   );
 }
 
+/** Medical Review's choices in the tray: a quick answer or a full review,
+ *  and, for a full review, its kind, the study designs and the first year. */
+function MedicalChips({ value, onChange }: { value: MedicalForm; onChange: (v: MedicalForm) => void }) {
+  const { t } = useT();
+  const set = (patch: Partial<MedicalForm>) => onChange({ ...value, ...patch });
+  const chosen = value.study_types.length + (value.year_from ? 1 : 0) + (value.mode === "full" && value.review_type !== "slr" ? 1 : 0);
+  return (
+    <>
+      <Chip
+        label={t("medical.mode")}
+        heading={t("medical.mode")}
+        hint={t("medical.modeHint")}
+        icon={<HeartPulse className="size-3.5 text-brand" />}
+        value={value.mode}
+        onChange={(mode) => set({ mode: mode as MedicalForm["mode"] })}
+        items={[
+          { value: "quick", label: t("medical.quick") },
+          { value: "full", label: t("medical.full") },
+        ]}
+      />
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="ghost" size="sm" className={cn(CHIP, chosen > 0 && "border-brand text-brand")}>
+            <SlidersHorizontal className="size-3.5" />
+            {t("medical.more")}
+            {chosen > 0 && <span className="rounded-md bg-brand-soft px-1.5 text-xs">{chosen}</span>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="grid w-80 gap-3 text-sm">
+          <label className="grid gap-1">
+            <span className="text-xs font-medium">{t("medical.reviewType")}</span>
+            <Select
+              value={value.review_type}
+              disabled={value.mode === "quick"}
+              onValueChange={(v) => v && set({ review_type: v as MedicalForm["review_type"] })}
+            >
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REVIEW_TYPES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {t(`medical.type.${r}` as Parameters<typeof t>[0])}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {value.mode === "quick" && <span className="text-[11px] text-muted-foreground">{t("medical.quickType")}</span>}
+          </label>
+          <div className="grid gap-1.5">
+            <span className="text-xs font-medium">{t("medical.studyTypes")}</span>
+            <span className="text-[11px] leading-snug text-muted-foreground">{t("medical.studyTypesHint")}</span>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {STUDY_TYPES.map((s) => (
+                <label key={s} className="flex items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={value.study_types.includes(s)}
+                    onCheckedChange={(on) =>
+                      set({ study_types: on ? [...value.study_types, s] : value.study_types.filter((x) => x !== s) })
+                    }
+                  />
+                  {s}
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="grid gap-1">
+            <span className="text-xs font-medium">{t("medical.yearFrom")}</span>
+            <Input
+              type="number"
+              min={1950}
+              max={2100}
+              className="h-8"
+              placeholder={t("medical.yearAny")}
+              value={value.year_from ?? ""}
+              onChange={(e) => set({ year_from: e.target.value ? Number(e.target.value) : null })}
+            />
+          </label>
+        </PopoverContent>
+      </Popover>
+    </>
+  );
+}
+
+/** Whether MedicalReviewerAgent takes questions now, said under the composer. */
+function MedicalStatus() {
+  const { t } = useT();
+  const status = useQuery({
+    queryKey: ["medical-status"],
+    queryFn: () => call(api.GET("/api/medical/status")),
+    refetchInterval: 60000,
+  });
+  const s = status.data;
+  if (!s || (s.reachable && s.accepting)) return null;
+  return <p className="px-3 pt-2 text-sm text-warning">{s.reachable ? t("medical.busy") : t("medical.down")}</p>;
+}
+
 export function Composer({
   form,
   setForm,
@@ -432,6 +553,8 @@ export function Composer({
   // Engine ใช้ร่วมกัน): its Search Provider kinds, and models that call tools
   // when it drives tools.
   const engine = o?.engines.find((e) => e.id === form.engine);
+  // A service elsewhere (Medical Review): it brings its own sources and models.
+  const remote = !!engine?.remote;
   const models = o?.models.filter((m) => !engine?.needs_tools || m.supports_tools === true) ?? [];
   const providers = o?.search_providers.filter((p) => !engine || engine.search_kinds.includes(p.kind)) ?? [];
 
@@ -468,9 +591,10 @@ export function Composer({
     if (Object.keys(patch).length) setForm({ ...form, ...patch });
   }, [o, form.engine, sectionsOn, form.sections_on]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unavailable = o && (models.length === 0 || providers.length === 0);
+  const unavailable = o && !remote && (models.length === 0 || providers.length === 0);
   // Each level's time target, as the Administrator set it.
   const minutes = (d: Depth) => o?.depth_levels.find((x) => x.id === d)?.target_minutes ?? 5;
+  const medical = form.medical ?? MEDICAL_DEFAULT;
   const ready = form.topic.trim().length >= 3 && !unavailable && !pending && !locked;
   const showSections = sectionsOn && sectionsOpen;
   // Headings typed in are used whether the panel shows or not; the chip says so.
@@ -513,7 +637,8 @@ export function Composer({
             { value: "en", label: t("lang.en") },
           ]}
         />
-        {providers.length > 0 && (
+        {remote && <MedicalChips value={medical} onChange={(m) => setForm({ ...form, medical: m })} />}
+        {!remote && providers.length > 0 && (
           <SearchPicker
             providers={providers}
             main={form.search_provider_id}
@@ -524,8 +649,8 @@ export function Composer({
             }
           />
         )}
-        <DepthPicker value={form.depth} onChange={(depth) => setForm({ ...form, depth })} minutes={minutes} />
-        {sectionsOn && (
+        {!remote && <DepthPicker value={form.depth} onChange={(depth) => setForm({ ...form, depth })} minutes={minutes} />}
+        {!remote && sectionsOn && (
           <Button
             type="button"
             variant="ghost"
@@ -575,7 +700,7 @@ export function Composer({
                 if (ready) onSubmit();
               }
             }}
-            placeholder={t("home.placeholder")}
+            placeholder={remote ? t("medical.placeholder") : t("home.placeholder")}
             maxLength={500}
             className={cn(
               "resize-none rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 dark:bg-transparent",
@@ -583,7 +708,7 @@ export function Composer({
             )}
           />
         </div>
-        {showSections && (
+        {!remote && showSections && (
           <div className="mx-3 mt-3 grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm animate-in duration-300 ease-out fade-in-0 slide-in-from-top-2 motion-reduce:animate-none">
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 font-medium">
@@ -662,7 +787,7 @@ export function Composer({
           </div>
         )}
         <div className="flex items-center gap-2 px-3 pt-2 pb-3">
-          {models.length > 0 && (
+          {!remote && models.length > 0 && (
             <Chip
               label={t("run.model")}
               icon={<Sparkles className="size-3.5 text-brand" />}
@@ -674,7 +799,7 @@ export function Composer({
           )}
           <div className="ml-auto flex items-center gap-3">
             {/* A Discussion is steered as it goes; it has no questions up front. */}
-            {!locked && qa.length === 0 && form.engine !== "co-storm" && (
+            {!locked && qa.length === 0 && form.engine !== "co-storm" && !remote && (
               <Button
                 type="button"
                 variant="ghost"
@@ -690,7 +815,7 @@ export function Composer({
             {locked ? (
               <span className="text-xs text-muted-foreground">{locked}</span>
             ) : (
-              <Estimate minutes={minutes(form.depth)} />
+              <Estimate minutes={remote ? MEDICAL_MINUTES[medical.mode] : minutes(form.depth)} />
             )}
             {/* Lights up once there is a topic; leans forward under the pointer. */}
             <Button
@@ -710,6 +835,7 @@ export function Composer({
         </div>
       </div>
       {unavailable && <p className="px-3 pt-2 text-sm text-warning">{t("run.noOptions")}</p>}
+      {remote && <MedicalStatus />}
     </form>
   );
 }

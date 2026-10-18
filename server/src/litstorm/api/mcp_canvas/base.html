@@ -172,7 +172,8 @@ window.DL = (() => {
       researcher: "Researcher", search: "Search agent", crawl: "Crawl agent", writer: "Writer", outline: "Outline writer",
       article: "Section writers", polish: "Polisher", compose: "Long writer", experts: "Topic expert",
       read: "Read the report", open: "Open in DeepLit", full: "Full screen",
-      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish" },
+      stages: { research: "Research", outline: "Outline", article: "Article", polish: "Polish", plan: "Plan", report: "Report", normalize: "Finish",
+        refine: "Question", search: "Search", screen: "Screen", read: "Read", synthesize: "Synthesize" },
       status: { queued: "Queued", running: "Running", succeeded: "Done", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted", needs_selection: "Needs a choice" },
       phase: { observe: "observing", gap: "finding the gap", select: "choosing searches", search: "searching", write: "writing" },
       steps: { observe: "Observe", gap: "Knowledge gap", select: "Choose tools", search: "Search & read" },
@@ -183,6 +184,10 @@ window.DL = (() => {
       learnings: (n) => `${n} findings`, queries: (n) => `${n} searches`, found: (n) => `${n} sources`, complete: "enough known",
       interview: "Interviews: each perspective asks, the expert searches and answers", pages: (n) => `${n} pages read`,
       report: "Report", sections: "sections", levels: "levels", findings: "findings", perspectives: "perspectives",
+      med: { refine: "Frame the question", search: "Search", screen: "Screen", read: "Read & check", synthesize: "Synthesize",
+        question: "The question as framed", records: (n) => `${n} records`, kept: (k, t) => `kept ${k} of ${t}`,
+        checked: (n) => `${n} numbers checked`, noNumbers: "no numbers", disagreed: "models disagreed", papers: "papers",
+        numbers: "numbers checked", pools: (n) => `${n} pooled analyses` },
       log: {
         stage: (s) => `Stage: ${s}`, perspectives: (n) => `Found ${n} perspectives; each interviews a topic expert`,
         plan: (n) => `Planned ${n} sections, one researcher each`,
@@ -200,7 +205,8 @@ window.DL = (() => {
       researcher: "นักค้นคว้า", search: "เอเจนต์ค้นหา", crawl: "เอเจนต์อ่านเว็บ", writer: "ผู้เขียน", outline: "ผู้วางโครงเรื่อง",
       article: "ผู้เขียนแต่ละหัวข้อ", polish: "ผู้เกลาเนื้อหา", compose: "ผู้รวมรายงาน", experts: "ผู้เชี่ยวชาญหัวข้อ",
       read: "อ่านรายงาน", open: "เปิดใน DeepLit", full: "เต็มจอ",
-      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน" },
+      stages: { research: "ค้นคว้า", outline: "วางโครงเรื่อง", article: "เขียนบทความ", polish: "เกลา", plan: "วางแผน", report: "เขียนรายงาน", normalize: "เก็บงาน",
+        refine: "ตั้งคำถาม", search: "ค้น", screen: "คัดกรอง", read: "อ่าน", synthesize: "สังเคราะห์" },
       status: { queued: "รอคิว", running: "กำลังทำงาน", succeeded: "เสร็จแล้ว", failed: "ไม่สำเร็จ", cancelled: "ยกเลิกแล้ว", interrupted: "ถูกขัดจังหวะ", needs_selection: "ต้องเลือกใหม่" },
       phase: { observe: "สังเกต", gap: "หาช่องว่างความรู้", select: "เลือกคำค้น", search: "กำลังค้น", write: "กำลังเขียน" },
       steps: { observe: "สังเกต", gap: "หาช่องว่าง", select: "เลือกเครื่องมือ", search: "ค้นและอ่านเว็บ" },
@@ -211,6 +217,10 @@ window.DL = (() => {
       learnings: (n) => `ข้อค้นพบ ${n}`, queries: (n) => `${n} คำค้น`, found: (n) => `${n} แหล่ง`, complete: "รู้พอแล้ว",
       interview: "สัมภาษณ์: แต่ละมุมมองถาม ผู้เชี่ยวชาญค้นแล้วตอบ", pages: (n) => `อ่าน ${n} หน้า`,
       report: "รายงาน", sections: "หัวข้อ", levels: "ชั้น", findings: "ข้อค้นพบ", perspectives: "มุมมอง",
+      med: { refine: "ตั้งคำถาม", search: "ค้น", screen: "คัดกรอง", read: "อ่านและตรวจ", synthesize: "สังเคราะห์",
+        question: "คำถามที่ตั้ง", records: (n) => `${n} รายการ`, kept: (k, t) => `เหลือ ${k} จาก ${t}`,
+        checked: (n) => `ตรวจตัวเลข ${n} ตัว`, noNumbers: "ไม่มีตัวเลข", disagreed: "โมเดลเห็นต่าง", papers: "ฉบับ",
+        numbers: "ตัวเลขที่ตรวจ", pools: (n) => `วิเคราะห์รวม ${n} ชุด` },
       log: {
         stage: (s) => `ขั้นตอน: ${s}`, perspectives: (n) => `พบ ${n} มุมมอง แต่ละมุมมองสัมภาษณ์ผู้เชี่ยวชาญหัวข้อ`,
         plan: (n) => `วางแผน ${n} หัวข้อ แยกนักค้นคว้าหัวข้อละคน`,
@@ -444,7 +454,7 @@ window.DL = (() => {
     }
   }
 
-  const ENGINE_OF = { "STORM": "storm", "Deep Research": "deep", "Agent Research": "agent" };
+  const ENGINE_OF = { "STORM": "storm", "Deep Research": "deep", "Agent Research": "agent", "Medical Review": "medical" };
   function takeRun(run) {
     state.run = { ...(state.run || {}), ...run };
     if (!state.engine) state.engine = run.engine || ENGINE_OF[run.mode] || null;

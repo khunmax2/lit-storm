@@ -1,19 +1,22 @@
 name: Images
 
-# Builds the two images host 203 runs and pushes them to GHCR, so a deploy
-# pulls digests instead of building on the host (docs/deploy/HOST-203.md).
+# Builds the images host 203 runs and pushes them to GHCR, so a deploy
+# pulls digests instead of building on the host (docs/deploy/HOST-203.md):
+# lit-storm's two, and MedicalReviewerAgent's three.
 #
 # On a deploy tag, or by hand for any ref:
 #   git tag -a deploy-YYYY-MM-DD -m "..." && git push origin deploy-YYYY-MM-DD
 #   gh workflow run images.yml --repo khunmax2/lit-storm --ref <tag>
 #
-# The Engine forks are checked out at the commits in stack/engines.lock.json,
-# and stack/build-images.sh (the one place the build arguments live) refuses
-# anything else. The job summary prints the digests to put in the host's
-# stack/host.env.
+# The Engine forks and MedicalReviewerAgent are checked out at the commits
+# in stack/engines.lock.json, and stack/build-images.sh (the one place the
+# build arguments live) refuses anything else. The forks are private: the
+# secret ENGINES_TOKEN is a fine-grained token that can read their contents
+# and nothing more. The job summary prints the digests to put on the host.
 #
 # Images: ghcr.io/khunmax2/lit-storm-server, ghcr.io/khunmax2/lit-storm-web
-# (built for /litstorm). Platform: linux/amd64, the host's.
+# (built for /litstorm), ghcr.io/khunmax2/mra-backend, mra-web, mra-searxng.
+# Platform: linux/amd64, the host's.
 
 on:
   push:
@@ -48,7 +51,7 @@ jobs:
           import json, os
           lock = json.load(open("lit-storm/stack/engines.lock.json", encoding="utf-8"))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              for name in ("agents", "deep"):
+              for name in ("agents", "deep", "mra"):
                   out.write(f"{name}_repo={lock[name]['repo']}\n{name}_commit={lock[name]['commit']}\n")
 
       # Beside lit-storm, where stack/compose.yml and the server's
@@ -59,6 +62,7 @@ jobs:
           repository: ${{ steps.pin.outputs.agents_repo }}
           ref: ${{ steps.pin.outputs.agents_commit }}
           path: agents-deep-research
+          token: ${{ secrets.ENGINES_TOKEN }}
 
       - name: Checkout Deep Research at its pin
         uses: actions/checkout@v4
@@ -66,13 +70,22 @@ jobs:
           repository: ${{ steps.pin.outputs.deep_repo }}
           ref: ${{ steps.pin.outputs.deep_commit }}
           path: deep-research-web-ui
+          token: ${{ secrets.ENGINES_TOKEN }}
+
+      # Public: no token.
+      - name: Checkout MedicalReviewerAgent at its pin
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.mra_repo }}
+          ref: ${{ steps.pin.outputs.mra_commit }}
+          path: MedicalReviewerAgent
 
       - name: Tag
         id: tag
         run: echo "tag=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
 
       - name: Build with stack/build-images.sh
-        run: bash lit-storm/stack/build-images.sh "${{ steps.tag.outputs.tag }}" agents-deep-research deep-research-web-ui
+        run: bash lit-storm/stack/build-images.sh "${{ steps.tag.outputs.tag }}" agents-deep-research deep-research-web-ui MedicalReviewerAgent
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -85,21 +98,33 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ steps.tag.outputs.tag }}"
+          push() { # image, variable: pushes, then prints VAR=digest to the summary and the log
+            local ref="ghcr.io/khunmax2/$1:$tag"
+            docker push "$ref"
+            local digest
+            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$ref")
+            echo "$2=$digest" >> "$GITHUB_STEP_SUMMARY"
+            echo "$2=$digest"
+          }
           {
-            echo "## lit-storm images ($tag)"
+            echo "## Images ($tag)"
             echo
-            echo "lit-storm \`$(git -C lit-storm rev-parse HEAD)\`, agents \`${{ steps.pin.outputs.agents_commit }}\`, deep \`${{ steps.pin.outputs.deep_commit }}\`"
+            echo "lit-storm \`$(git -C lit-storm rev-parse HEAD)\`, agents \`${{ steps.pin.outputs.agents_commit }}\`, deep \`${{ steps.pin.outputs.deep_commit }}\`, MedicalReviewerAgent \`${{ steps.pin.outputs.mra_commit }}\`"
             echo
             echo "Put in the host's \`stack/host.env\`:"
             echo
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          for image in server web; do
-            ref="ghcr.io/khunmax2/lit-storm-$image:$tag"
-            docker push "$ref"
-            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$ref")
-            var=$([ "$image" = server ] && echo LITSTORM_SERVER_IMAGE || echo LITSTORM_WEB_IMAGE)
-            echo "$var=$digest" >> "$GITHUB_STEP_SUMMARY"
-            echo "$var=$digest"
-          done
+          push lit-storm-server LITSTORM_SERVER_IMAGE
+          push lit-storm-web LITSTORM_WEB_IMAGE
+          {
+            echo '```'
+            echo
+            echo "Put in MedicalReviewerAgent's \`.env\` on the host (docs/deploy/HOST-203.md, §M):"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          push mra-backend MRA_BACKEND_IMAGE
+          push mra-web MRA_WEB_IMAGE
+          push mra-searxng MRA_SEARXNG_IMAGE
           echo '```' >> "$GITHUB_STEP_SUMMARY"

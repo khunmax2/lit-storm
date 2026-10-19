@@ -8,6 +8,11 @@
 #
 # stack/host.env (from stack/host.env.example, chmod 600) names the images
 # and the port. Compose >= 2.24, for `!reset`.
+#
+# The api and the worker also join litstorm-mra, the network
+# MedicalReviewerAgent's Caddy is on as "mra" (stack/mra/compose.host.yml):
+# Medical Review asks it at http://mra. Create the network once, before the
+# first `up`: docker network create litstorm-mra
 services:
   api:
     build: !reset null
@@ -17,6 +22,7 @@ services:
       LITSTORM_PUBLIC_URL: ${LITSTORM_PUBLIC_URL:-https://203.185.144.41/litstorm}
       # Behind HTTPS only: the session cookie is never sent in the clear.
       LITSTORM_COOKIE_SECURE: "true"
+    networks: [default, mra]
     logging: &logs
       driver: json-file
       options: { max-size: 10m, max-file: "5" }
@@ -27,6 +33,7 @@ services:
     environment:
       LITSTORM_PUBLIC_URL: ${LITSTORM_PUBLIC_URL:-https://203.185.144.41/litstorm}
       LITSTORM_COOKIE_SECURE: "true"
+    networks: [default, mra]
     logging: *logs
 
   web:
@@ -44,3 +51,8 @@ services:
     environment:
       SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET in stack/host.env}
     logging: *logs
+
+networks:
+  mra:
+    name: litstorm-mra
+    external: true

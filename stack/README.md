@@ -39,10 +39,16 @@ its `report.json`). `docker compose down` keeps them; `down -v` deletes them.
 
 `docs/deploy/HOST-203.md` is the runbook. The files it uses:
 
-- `build-images.sh` — the two images, from this checkout and the Engine
-  forks pinned in `engines.lock.json` (run by `.github/workflows/images.yml`)
+- `build-images.sh` — the images, from this checkout, the Engine forks and
+  MedicalReviewerAgent pinned in `engines.lock.json` (run by
+  `.github/workflows/images.yml`)
 - `compose.host.yml` + `host.env` (from `host.env.example`) — the stack
-  pulling those images by digest, on one loopback port
+  pulling those images by digest, on one loopback port, its api and worker
+  on the network `litstorm-mra`
+- `mra/compose.host.yml` — MedicalReviewerAgent beside it, run from MRA's own
+  checkout: images by digest, one loopback port for its admin console, a
+  gateway on `litstorm-mra` as `http://mra`; `mra/backup-mra.sh` backs up and
+  restores its database
 - `host/apply-nginx.sh` — `/litstorm` in the host's nginx: preview, install,
   uninstall; `host/rehearse-nginx.sh` rehearses it off the host
 - `backup.sh` — back up, verify and restore a stack

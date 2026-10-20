@@ -1,0 +1,66 @@
+# MedicalReviewerAgent on host 203, beside lit-storm (docs/deploy/HOST-203.md, §M;
+# docs/adr/0013). The third file over MRA's own two, run from MRA's checkout at
+# the commit stack/engines.lock.json pins:
+#
+#   docker compose -p mra -f docker-compose.yml -f docker-compose.prod.yml \
+#     -f /home/search/Thoughtmind/lit-storm/stack/mra/compose.host.yml up -d
+#
+# What it changes:
+# - the images the GHCR workflow built, pulled by digest; nothing built on the host;
+# - no port on the host but one, on loopback, for the admin console: an
+#   administrator reaches it through `ssh -L` (MRA's prod file would publish
+#   80 and 443, which are the host nginx's);
+# - a small gateway joins the network litstorm-mra as "mra", which lit-storm's
+#   api and worker join too (stack/compose.host.yml): DeepLit asks MRA at
+#   http://mra, and the gateway passes it to MRA's Caddy (see below why not
+#   Caddy itself).
+#
+# The digests and the port go in MRA's .env, beside its own settings.
+services:
+  migrate:
+    build: !reset null
+    image: ${MRA_BACKEND_IMAGE:?set MRA_BACKEND_IMAGE in .env (a digest)}
+    pull_policy: missing
+  api:
+    image: ${MRA_BACKEND_IMAGE:?set MRA_BACKEND_IMAGE in .env (a digest)}
+    pull_policy: missing
+  worker:
+    image: ${MRA_BACKEND_IMAGE:?set MRA_BACKEND_IMAGE in .env (a digest)}
+    pull_policy: missing
+  harness:
+    image: ${MRA_BACKEND_IMAGE:?set MRA_BACKEND_IMAGE in .env (a digest)}
+    pull_policy: missing
+  web:
+    build: !reset null
+    image: ${MRA_WEB_IMAGE:?set MRA_WEB_IMAGE in .env (a digest)}
+    pull_policy: missing
+  searxng:
+    build: !reset null
+    image: ${MRA_SEARXNG_IMAGE:?set MRA_SEARXNG_IMAGE in .env (a digest)}
+    pull_policy: missing
+  caddy:
+    ports: !override
+      - "127.0.0.1:${MRA_HOST_PORT:-10350}:80"
+
+  # The one MRA container on litstorm-mra, as "mra". Not MRA's own Caddy:
+  # that proxies to the names "api" and "web", and lit-storm's api is "api"
+  # on litstorm-mra too, so from there it reached lit-storm's API and
+  # answered 404 (found in the rehearsal, 2026-10-19). This one forwards
+  # everything to "caddy", which nothing on litstorm-mra is called.
+  gateway:
+    image: caddy:2-alpine
+    command: ["caddy", "reverse-proxy", "--from", ":80", "--to", "caddy:80"]
+    depends_on: [caddy]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "5" }
+    networks:
+      edge: {}
+      litstorm-mra:
+        aliases: [mra]
+
+networks:
+  litstorm-mra:
+    name: litstorm-mra
+    external: true

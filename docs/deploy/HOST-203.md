@@ -4,6 +4,17 @@ runbook สำหรับวันขึ้น host ครั้งแรก �
 
 **ยังไม่ได้ขึ้น** ขึ้นได้เมื่อรุ่นสองผ่านครบบนเครื่อง dev แล้วเท่านั้น (ผ่านแล้ว 2026-09-30, ดู `docs/web-app-implementation-plan.md`) และผู้ดูแลสั่งขึ้นเอง
 
+**เพิ่ม 2026-10-19:** แท็บ Medical Review ต้องมี MedicalReviewerAgent (MRA, [ADR-0013](../adr/0013-remote-engine-medical-review.md)) รันอยู่บน host เดียวกัน ขั้นของ MRA อยู่ใน §M ทำหลัง §3 และก่อน §4
+- MRA เป็น compose project แยก (`mra`) รันจาก checkout ของ MRA เองตาม commit ที่ pin ไว้ ใช้ image จาก GHCR เหมือน lit-storm
+- **หน้าเว็บของ MRA ไม่เปิดสู่ภายนอก:** เปิดเฉพาะ loopback port เดียวสำหรับหน้า admin ซึ่งผู้ดูแลเข้าผ่าน `ssh -L`
+- **ทางเชื่อม:** api และ worker ของ lit-storm คุยกับ MRA ผ่าน Docker network `litstorm-mra` ที่ `http://mra` ซึ่งเป็น gateway ตัวเล็กที่ส่งต่อให้ Caddy ของ MRA
+  - ไม่ให้ Caddy ของ MRA อยู่บน network นี้เอง เพราะ Caddy ส่งต่อไปที่ชื่อ `api` และบน network นี้ `api` คือ API ของ lit-storm (เจอตอนซ้อม 2026-10-19 ได้ 404 จาก lit-storm แทน MRA)
+- **ซ้อมบนเครื่อง dev แล้ว (2026-10-19):** image ทั้ง 5 ตัวจาก `stack/build-images.sh`, lit-storm ด้วย `compose.host.yml` (project `ls203`) และ MRA ด้วย compose 3 ไฟล์จาก clone ที่ pin (project `mra203`) ผ่าน 13 ข้อ
+  - §3 ครบ: 5 container, health, หน้าตั้งค่าครั้งแรก, migration `0013`
+  - §M ครบ: MRA ขึ้นครบ, เปิดแค่ `127.0.0.1:10350`, lit-storm เรียก `http://mra` ได้, สร้าง key ด้วย CLI ได้
+  - §4: ทดสอบโมเดลผ่าน, ทดสอบการเชื่อม MRA ผ่าน (แหล่งค้น 9), แท็บ Medical Review แสดง, STORM ระดับเร็วภาษาไทยสำเร็จ (มีขั้นตีความหัวเรื่องก่อน), export PDF ได้, Medical Review ถามเร็วภาษาไทยสำเร็จ (ค่าใช้จ่ายจาก MRA), MCP เส้น medical ตอบ
+  - §8: `backup.sh` และ `backup-mra.sh` สำรองได้ กู้คืนฐานข้อมูลของ MRA แล้วรีวิวอยู่ครบ
+
 **หลักคิด**
 - host ไม่ build อะไร: pull image ตาม digest ที่ workflow `images.yml` build จาก tag
 - ไม่มีขั้นไหนแตะ nginx บน :443 จนถึง §5 และ §5 ถอยได้ในไม่กี่วินาทีด้วยคำสั่งเดียว (§7)
@@ -24,6 +35,11 @@ runbook สำหรับวันขึ้น host ครั้งแรก �
 | backup บน host | `/home/search/Thoughtmind/_litstorm_backup` |
 | Compose project | `litstorm` |
 | image | `ghcr.io/khunmax2/lit-storm-server`, `ghcr.io/khunmax2/lit-storm-web` (build สำหรับ `/litstorm`) |
+| MRA: checkout บน host | `/home/search/Thoughtmind/MedicalReviewerAgent` (commit ตาม `stack/engines.lock.json`) |
+| MRA: Compose project | `mra` |
+| MRA: พอร์ต loopback ของหน้า admin | `10350` (ไม่ผ่าน nginx; เข้าด้วย `ssh -L`) |
+| MRA: image | `ghcr.io/khunmax2/mra-backend`, `mra-web`, `mra-searxng` |
+| network ระหว่างสอง stack | `litstorm-mra` (MRA เป็น `http://mra` ผ่าน gateway ของ MRA) |
 
 คำสั่ง compose ที่ใช้ทั้งไฟล์ (บน host):
 
@@ -37,11 +53,12 @@ COMPOSE="docker compose -p litstorm -f stack/compose.yml -f stack/compose.host.y
 
 ```bash
 docker compose version                      # ต้อง >= 2.24 (ใช้ !reset)
-ss -ltnp | grep -E ':(10340|9443)\s'        # ต้องว่างทั้งคู่
+ss -ltnp | grep -E ':(10340|9443|10350)\s'  # ต้องว่างทั้งหมด
 sudo nginx -T 2>/dev/null | grep -n 'litstorm'   # ต้องว่าง: ยังไม่มีใครใช้ /litstorm
 sudo nginx -T 2>/dev/null | grep -nE 'ssl_certificate|server_name|listen'   # :443 อยู่ในไฟล์ sansarnnews-ssl, :80 ในไฟล์ ade
-df -h / && docker system df                 # ต้องว่าง >= 15 GB (server image ~7 GB)
-docker ps --format '{{.Names}}\t{{.Ports}}' | grep -i litstorm   # ต้องว่าง
+df -h / && docker system df                 # ต้องว่าง >= 20 GB (server image ~7 GB, MRA ~3 GB)
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep -iE 'litstorm|mra'   # ต้องว่าง
+docker network ls | grep litstorm-mra       # ต้องว่าง (สร้างใน §3)
 ```
 
 - [ ] ไฟล์ :443 คือ `/etc/nginx/sites-available/sansarnnews-ssl` และ :80 คือ `/etc/nginx/sites-available/ade` ถ้าไม่ใช่ ให้ส่งค่าจริงผ่าน env `SSL=` / `HTTP=` ของ `stack/host/apply-nginx.sh` และแก้ตารางนี้
@@ -84,8 +101,12 @@ git push origin deploy-YYYY-MM-DD
 - workflow checkout fork ทั้งสองตาม `stack/engines.lock.json` แล้วเรียก `stack/build-images.sh` ซึ่งไม่ยอม build ถ้า checkout ไม่ตรง pin
 - ใช้เวลาราว 15–25 นาที; ดูด้วย `gh run watch --repo khunmax2/lit-storm`
 - job summary พิมพ์สองบรรทัดสำหรับ `stack/host.env`: `LITSTORM_SERVER_IMAGE=...@sha256:...` และ `LITSTORM_WEB_IMAGE=...@sha256:...`
+- และอีกสามบรรทัดสำหรับ `.env` ของ MRA (§M): `MRA_BACKEND_IMAGE`, `MRA_WEB_IMAGE`, `MRA_SEARXNG_IMAGE`
 
-- [ ] **ครั้งแรกเท่านั้น:** GitHub → Packages → `lit-storm-server` และ `lit-storm-web` → Package settings → **Change visibility → Public** (ครั้งแรกเป็น private; repo เป็น public และ image ไม่มี secret — ถ้าอยากเก็บ private ต้อง `docker login ghcr.io` บน host ด้วย PAT `read:packages`)
+- repo ที่ workflow ดึงทั้งหมดเป็น public (fork สองตัวเปลี่ยนเป็น public 2026-10-20) จึงไม่ต้องใช้ token หรือ secret เพิ่ม
+  - [ ] ถ้า fork ตัวไหนกลับเป็น private ขั้น checkout จะล้มด้วย "repository not found" ต้องเพิ่ม `token:` ให้ขั้นนั้นใน `images.yml` ด้วย fine-grained token ที่อ่านได้อย่างเดียว
+
+- [ ] **ครั้งแรกเท่านั้น:** GitHub → Packages → `lit-storm-server`, `lit-storm-web`, `mra-backend`, `mra-web` และ `mra-searxng` → Package settings → **Change visibility → Public** (ครั้งแรกเป็น private; repo เป็น public และ image ไม่มี secret — ถ้าอยากเก็บ private ต้อง `docker login ghcr.io` บน host ด้วย PAT `read:packages`)
 - [ ] ทดสอบ pull จากเครื่อง dev: `docker pull <LITSTORM_WEB_IMAGE>` แล้ว `docker run --rm --entrypoint cat <ref> /etc/nginx/base-path` ต้องได้ `/litstorm`
 
 ### 1.2 ย้าย pin ของ fork (เฉพาะเมื่อ fork เปลี่ยน)
@@ -117,6 +138,7 @@ nano stack/host.env                                    # ใส่ digest สอ
 ## 3. ขึ้น stack (ยังไม่แตะ nginx)
 
 ```bash
+docker network create litstorm-mra   # ครั้งแรกเท่านั้น: ทางที่ api และ worker คุยกับ MRA (§M)
 $COMPOSE pull           # ขั้นแยก: ช้าหรือค้างก็ไม่กระทบใคร (บทเรียน DeepWitya 2026-09-12)
 $COMPOSE up -d
 docker ps --filter label=com.docker.compose.project=litstorm --format '{{.Names}}\t{{.Status}}'
@@ -125,8 +147,64 @@ docker ps --filter label=com.docker.compose.project=litstorm --format '{{.Names}
 - [ ] 5 container รัน: db (healthy), api, worker, web, searxng
 - [ ] `curl -s http://127.0.0.1:10340/litstorm/api/health` → `{"status":"ok"}`
 - [ ] `curl -s http://127.0.0.1:10340/litstorm/api/setup` → `"needed":true,"code_configured":true`
-- [ ] `docker exec litstorm-db-1 psql -U litstorm -tAc "select version_num from alembic_version"` → `0010` (หรือเลขล่าสุดใน `server/src/litstorm/migrations/versions/`)
+- [ ] `docker exec litstorm-db-1 psql -U litstorm -tAc "select version_num from alembic_version"` → `0013` (หรือเลขล่าสุดใน `server/src/litstorm/migrations/versions/`)
 - [ ] `bash stack/host/apply-nginx.sh --check` → `app: /litstorm/api/health → 200` (ไม่ต้อง sudo)
+
+---
+
+## M. MedicalReviewerAgent (หลัง §3 ก่อน §4)
+
+MRA เป็น stack ของตัวเอง รันจาก checkout ของ MRA ด้วยไฟล์ compose ของ MRA สองไฟล์บวก `stack/mra/compose.host.yml` ของเรา
+- image มาจาก GHCR ตาม digest ไม่ build บน host
+- ไฟล์ตั้งค่าของ MRA (ค่าโมเดล, Caddyfile, SearXNG) mount จาก checkout เพราะ compose รันบน host ตรง ๆ
+- ไม่มี port ไหนเปิดบน host นอกจาก `127.0.0.1:10350` สำหรับหน้า admin
+
+```bash
+cd /home/search/Thoughtmind
+git clone https://github.com/santipongth/MedicalReviewerAgent.git   # ครั้งแรก
+cd MedicalReviewerAgent
+git fetch origin && git checkout <commit ของ mra ใน stack/engines.lock.json ของ tag>
+git log --oneline -1 && git status --short             # ต้องได้ commit ที่ pin และ status ว่าง
+cp .env.example .env && chmod 600 .env
+docker run --rm <MRA_BACKEND_IMAGE> python -m app.cli.admin llm-keys-secret   # → LLM_KEYS_SECRET
+openssl rand -hex 32                                   # → SEARXNG_SECRET
+openssl rand -hex 16                                   # → IP_HASH_SALT
+nano .env
+```
+
+ค่าใน `.env` ของ MRA ที่ต้องแก้ ที่เหลือคงตาม `.env.example`:
+
+| ค่า | ตั้งเป็น |
+|---|---|
+| `APP_ENV` | `prod` |
+| `LLM_KEYS_SECRET`, `SEARXNG_SECRET`, `IP_HASH_SALT` | ค่าที่สุ่มข้างบน |
+| `OPENROUTER_API_KEY` | key ของ OpenRouter (หรือเว้นว่าง แล้วใส่ในหน้า admin ของ MRA) |
+| `MAX_USD_PER_DAY` | `2` เริ่มต่ำไว้ก่อน ปรับทีหลังได้ |
+| `PUBLIC_BASE_URL` | `http://localhost:10350` (ที่อยู่ที่ผู้ดูแลเปิดผ่าน tunnel) |
+| เพิ่มบรรทัด `MRA_BACKEND_IMAGE`, `MRA_WEB_IMAGE`, `MRA_SEARXNG_IMAGE` | digest จาก §1.1 |
+| เพิ่มบรรทัด `MRA_HOST_PORT` | `10350` |
+
+- [ ] **สำเนา `.env` ของ MRA ออกนอก host ทันที** เหมือน `secret_key` ใน §2 ไม่มี `LLM_KEYS_SECRET` key ที่ใส่ในหน้า admin ของ MRA ต้องกรอกใหม่หมด
+
+```bash
+MRA="docker compose -p mra -f docker-compose.yml -f docker-compose.prod.yml -f /home/search/Thoughtmind/lit-storm/stack/mra/compose.host.yml"
+$MRA pull
+$MRA up -d
+$MRA ps                                                # postgres, redis, searxng, api, worker, web, caddy, gateway รัน; migrate จบด้วย exit 0
+```
+
+- [ ] `curl -s http://127.0.0.1:10350/api/v1/status` → ขึ้นต้นด้วย `{"accepting":true` และมี `"sources"` 9 แหล่ง
+- [ ] lit-storm มองเห็น MRA: `docker exec litstorm-api-1 python -c "import urllib.request; print(urllib.request.urlopen('http://mra/api/v1/status').status)"` → `200` (ถ้าได้ 404 แปลว่าคำขอไปถึง API ของ lit-storm เอง: ตรวจว่ามีแค่ `mra-gateway-1` จาก MRA อยู่บน network `docker network inspect litstorm-mra`)
+- [ ] `docker ps --format '{{.Names}}\t{{.Ports}}' | grep mra` มีพอร์ตเดียว คือ `127.0.0.1:10350->80/tcp`
+
+**ผู้ดูแลตั้งเอง (คนพิมพ์รหัสผ่าน ไม่ใช่ Claude):**
+
+```bash
+$MRA exec api python -m app.cli.admin create admin           # ถามรหัสผ่านสองครั้ง
+$MRA exec api python -m app.cli.keys mint --name deeplit     # พิมพ์ key ครั้งเดียว: คัดไว้ใช้ใน §4
+```
+
+- [ ] เปิดหน้า admin ของ MRA ผ่าน tunnel: บนเครื่องคุณ `ssh -L 10350:127.0.0.1:10350 search@203.185.144.41` แล้วเปิด http://localhost:10350/admin ล็อกอินได้
 
 ---
 
@@ -155,6 +233,12 @@ ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
 - [ ] Run จริง 1 ครั้งภาษาไทย ระดับเร็ว (STORM) สำเร็จ, เปิดรายงาน, คลิก citation, export PDF อ่านภาษาไทยได้
 - [ ] Deep Research 1 ครั้ง แผนผังการค้นคว้าแสดง
 - [ ] Co-STORM: เริ่ม Discussion, พิมพ์แทรก 1 ครั้ง, สร้างรายงาน
+- [ ] การตีความหัวเรื่อง: Run ข้างบนมีขั้น "ตีความหัวเรื่อง" ก่อน และการ์ด Run มี "ตีความหัวเรื่องว่า …"
+- [ ] Medical Review (ต้องทำ §M ก่อน):
+  - ตั้งค่า › โหมดวิจัย › การ์ด Medical Review: ที่อยู่ `http://mra`, ที่อยู่หน้าเว็บ `http://localhost:10350`, API key จาก §M แล้วกด "ทดสอบการเชื่อมต่อ" ต้องผ่านครบ (ติดต่อได้, รับงาน, รับ key, แหล่งค้น 9 แหล่ง)
+  - แท็บ Medical Review ปรากฏ แบบถามเร็ว 1 ครั้งภาษาไทย สำเร็จ ค่าใช้จ่ายขึ้นจาก MRA
+  - แบบรีวิวเต็ม 1 ครั้ง มุมมอง "รายงานแบบเต็ม (MRA)" เปิดได้
+- [ ] MCP: ตั้งค่า › การเชื่อมต่อ สร้าง token แล้ว `curl -sk -X POST https://localhost:18443/litstorm/api/mcp/medical -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'` ได้รายชื่อ tool ขึ้นต้นด้วย `medical_research_`
 - [ ] สร้างผู้ใช้ทดสอบ ส่งลิงก์ตั้งรหัสผ่าน (ลิงก์ต้องขึ้นต้นด้วย `https://203.185.144.41/litstorm/` — ใน preview ให้เปลี่ยน host เป็น `localhost:18443` เอง)
 - [ ] devtools → Network: ไม่มีคำขอใดออกนอก `/litstorm/` และไม่มี 404
 - [ ] `docker ps` ทุกตัวยังรัน, `docker inspect litstorm-worker-1 --format '{{.RestartCount}}'` = 0
@@ -211,9 +295,16 @@ script: ตรวจว่าไม่มี `/litstorm` ของคนอื�
 cd /home/search/Thoughtmind/lit-storm && PROJECT=litstorm bash stack/backup.sh ../_litstorm_backup
 PROJECT=litstorm bash stack/backup.sh --verify <stamp> ../_litstorm_backup
 
+# ฐานข้อมูลของ MRA (§M): ทดสอบมือครั้งแรกด้วย
+bash stack/mra/backup-mra.sh ../_litstorm_backup
+
 # cron (crontab -e ของ user ที่อยู่ในกลุ่ม docker)
 45 3 * * * cd /home/search/Thoughtmind/lit-storm && PROJECT=litstorm bash stack/backup.sh ../_litstorm_backup >> ../_litstorm_backup/backup.log 2>&1
+50 3 * * * cd /home/search/Thoughtmind/lit-storm && bash stack/mra/backup-mra.sh ../_litstorm_backup >> ../_litstorm_backup/backup.log 2>&1
 ```
+
+- MRA: ไฟล์เดียวต่อรอบ (`mra-<stamp>.dump`) ไม่สำรอง Redis โดยตั้งใจ ถ้าหายเสียแค่งานที่กำลังรันอยู่ และตัวนับค่าใช้จ่ายของวันนั้นเริ่มนับใหม่
+- `LLM_KEYS_SECRET` ใน `.env` ของ MRA ไม่อยู่ใน backup เหตุผลเดียวกับ `secret_key` สำเนาไว้นอก host ตาม §M
 
 ```powershell
 # บนเครื่องผู้ดูแล — ทุกสัปดาห์ (หรือตั้ง Task Scheduler)
@@ -239,6 +330,13 @@ $COMPOSE pull                                                                   
 # ---- จุดรอ: ดูว่าไม่มี Run กำลังทำอยู่ (หน้าตั้งค่า › การใช้งาน) — Run ที่ทำอยู่จะถูกทำเครื่องหมาย interrupted และคืนโควตา
 $COMPOSE up -d
 docker inspect litstorm-api-1 --format '{{.Config.Image}}'                        # ต้องเป็น digest ใหม่ ไม่ใช่แค่ "รันอยู่"
+
+# MRA: ทำเฉพาะเมื่อ pin ของ mra ใน stack/engines.lock.json หรือ digest ของ MRA เปลี่ยน ($MRA ตั้งตาม §M)
+cd /home/search/Thoughtmind/MedicalReviewerAgent
+git fetch origin && git checkout <commit ใหม่ของ mra> && git status --short      # ต้องว่าง
+bash ../lit-storm/stack/mra/backup-mra.sh ../_litstorm_backup                     # จุดถอยก่อนเปลี่ยน
+nano .env                                                                         # MRA_*_IMAGE ใหม่
+$MRA pull && $MRA up -d && $MRA ps
 ```
 
 - [ ] `curl -sk https://203.185.144.41/litstorm/api/health` → ok
@@ -255,11 +353,12 @@ docker inspect litstorm-api-1 --format '{{.Config.Image}}'                      
 host 203.185.144.41, checkout ที่ /home/search/Thoughtmind/lit-storm
 วันนี้ขึ้น lit-storm ตาม docs/deploy/HOST-203.md ของ tag deploy-YYYY-MM-DD
 ขั้น 0 ก่อนอ่านอะไร: git fetch origin --tags && git checkout deploy-YYYY-MM-DD && git log --oneline -1 && git status --short
-แล้วอ่าน runbook จาก checkout นี้ ทำ §0 → §2 → §3 → §4 ทีละหัวข้อ รายงานค่าที่วัดได้จริงทุกข้อ
+แล้วอ่าน runbook จาก checkout นี้ ทำ §0 → §2 → §3 → §M → §4 ทีละหัวข้อ รายงานค่าที่วัดได้จริงทุกข้อ
 กติกา:
 1. ค่าใดไม่ตรง runbook ให้หยุดแล้วเสนอแก้ runbook ไม่ใช่แก้ host
 2. ห้ามข้าม checklist; ข้อไหนไม่ผ่านให้หยุดและบอก
-3. ขั้น sudo ให้พิมพ์คำสั่งมาให้ฉันรันเอง แล้วรอ output
+3. ขั้น sudo และขั้นที่ต้องพิมพ์รหัสผ่าน (สร้าง admin ของ MRA) ให้พิมพ์คำสั่งมาให้ฉันรันเอง แล้วรอ output
 4. §5 ทำเมื่อฉันพิมพ์ "เปิดใช้" เท่านั้น; ถ้าพังหลัง §5 ทำ §7 บรรทัดแรกทันที
 5. digest ของ image: <LITSTORM_SERVER_IMAGE> และ <LITSTORM_WEB_IMAGE>
+   ของ MRA: <MRA_BACKEND_IMAGE>, <MRA_WEB_IMAGE> และ <MRA_SEARXNG_IMAGE>
 ```

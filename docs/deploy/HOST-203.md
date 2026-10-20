@@ -29,7 +29,7 @@ runbook สำหรับวันขึ้น host ครั้งแรก �
 | | ค่า |
 |---|---|
 | path | `https://203.185.144.41/litstorm/` |
-| พอร์ต loopback ของ stack | `10340` (DeepWitya ใช้ 10310/10320/10330) |
+| พอร์ต loopback ของ stack | `10343` (DeepWitya ใช้ 10310/10320/10330; วัด 2026-10-20: 10340 เป็นของ HIS Mapping, 10341 ของ Agenta (traefik), 10342 ของ TCI-AP-Web) |
 | พอร์ต preview บน host | `9443` (8443 เป็นของ Kong ของแอปอื่น) |
 | checkout บน host | `/home/search/Thoughtmind/lit-storm` |
 | backup บน host | `/home/search/Thoughtmind/_litstorm_backup` |
@@ -53,7 +53,7 @@ COMPOSE="docker compose -p litstorm -f stack/compose.yml -f stack/compose.host.y
 
 ```bash
 docker compose version                      # ต้อง >= 2.24 (ใช้ !reset)
-ss -ltnp | grep -E ':(10340|9443|10350)\s'  # ต้องว่างทั้งหมด
+ss -ltnp | grep -E ':(10343|9443|10350)\s'  # ต้องว่างทั้งหมด
 sudo nginx -T 2>/dev/null | grep -n 'litstorm'   # ต้องว่าง: ยังไม่มีใครใช้ /litstorm
 sudo nginx -T 2>/dev/null | grep -nE 'ssl_certificate|server_name|listen'   # :443 อยู่ในไฟล์ sansarnnews-ssl, :80 ในไฟล์ ade
 df -h / && docker system df                 # ต้องว่าง >= 20 GB (server image ~7 GB, MRA ~3 GB)
@@ -62,7 +62,7 @@ docker network ls | grep litstorm-mra       # ต้องว่าง (สร�
 ```
 
 - [ ] ไฟล์ :443 คือ `/etc/nginx/sites-available/sansarnnews-ssl` และ :80 คือ `/etc/nginx/sites-available/ade` ถ้าไม่ใช่ ให้ส่งค่าจริงผ่าน env `SSL=` / `HTTP=` ของ `stack/host/apply-nginx.sh` และแก้ตารางนี้
-- [ ] ถ้าพอร์ตไม่ว่าง เลือกเลขใหม่ แล้วใช้เลขนั้นทุกที่ที่เขียน 10340 / 9443
+- [ ] ถ้าพอร์ตไม่ว่าง เลือกเลขใหม่ แล้วใช้เลขนั้นทุกที่ที่เขียน 10343 / 9443 / 10350
 - [ ] ออกอินเทอร์เน็ตได้: `curl -sI https://ghcr.io | head -1` และ `curl -sI https://openrouter.ai | head -1`
 - [ ] RAM ว่างและจำนวน core: `free -m && nproc` แล้วเลือกเพดานจากตารางด้านล่าง
 
@@ -145,8 +145,8 @@ docker ps --filter label=com.docker.compose.project=litstorm --format '{{.Names}
 ```
 
 - [ ] 5 container รัน: db (healthy), api, worker, web, searxng
-- [ ] `curl -s http://127.0.0.1:10340/litstorm/api/health` → `{"status":"ok"}`
-- [ ] `curl -s http://127.0.0.1:10340/litstorm/api/setup` → `"needed":true,"code_configured":true`
+- [ ] `curl -s http://127.0.0.1:10343/litstorm/api/health` → `{"status":"ok"}`
+- [ ] `curl -s http://127.0.0.1:10343/litstorm/api/setup` → `"needed":true,"code_configured":true`
 - [ ] `docker exec litstorm-db-1 psql -U litstorm -tAc "select version_num from alembic_version"` → `0013` (หรือเลขล่าสุดใน `server/src/litstorm/migrations/versions/`)
 - [ ] `bash stack/host/apply-nginx.sh --check` → `app: /litstorm/api/health → 200` (ไม่ต้อง sudo)
 
@@ -213,7 +213,7 @@ $MRA exec api python -m app.cli.keys mint --name deeplit     # พิมพ์ k
 บน host (คนพิมพ์เอง — sudo):
 
 ```bash
-sudo bash stack/host/apply-nginx.sh --preview 10340 9443
+sudo bash stack/host/apply-nginx.sh --preview 10343 9443
 ```
 
 บนเครื่องคุณ (PowerShell ใหม่ ปล่อยค้าง; เลขซ้ายเลือกพอร์ตว่างบนเครื่องคุณ):
@@ -250,11 +250,11 @@ ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
 ## 5. เปิดใช้ (จุดเดียวที่แตะ :443)
 
 ```bash
-sudo bash stack/host/apply-nginx.sh --install 10340
+sudo bash stack/host/apply-nginx.sh --install 10343
 sudo bash stack/host/apply-nginx.sh --remove-preview
 ```
 
-script: ตรวจว่าไม่มี `/litstorm` ของคนอื่นใน :443/:80 และมีแอปฟังที่ 10340 → backup สองไฟล์ → เขียน snippet ของเรา (`/etc/nginx/snippets/litstorm.conf`, `litstorm-http.conf`) → เพิ่มบรรทัด `include` ไฟล์ละบรรทัด → `nginx -t` (ไม่ผ่าน = คืนไฟล์เดิม ไม่ reload) → reload
+script: ตรวจว่าไม่มี `/litstorm` ของคนอื่นใน :443/:80 และมีแอปฟังที่ 10343 → backup สองไฟล์ → เขียน snippet ของเรา (`/etc/nginx/snippets/litstorm.conf`, `litstorm-http.conf`) → เพิ่มบรรทัด `include` ไฟล์ละบรรทัด → `nginx -t` (ไม่ผ่าน = คืนไฟล์เดิม ไม่ reload) → reload
 
 จากเครื่องคุณ (ไม่ผ่าน tunnel):
 
@@ -311,7 +311,7 @@ bash stack/mra/backup-mra.sh ../_litstorm_backup
 scp -r search@203.185.144.41:/home/search/Thoughtmind/_litstorm_backup D:\Backups\lit-storm\
 ```
 
-- [ ] ซ้อมกู้คืนบน host อย่างน้อยครั้งหนึ่งหลังเปิดใช้: ขึ้น stack อีกชุดชื่อ `litstorm-restoretest` บนพอร์ตอื่น (`LITSTORM_HOST_PORT=10341` ใน env file แยก), `PROJECT=litstorm-restoretest bash stack/backup.sh --restore <stamp> ../_litstorm_backup`, เทียบจำนวน Run กับ manifest, แล้ว `down -v` ชุดทดสอบ — ขั้นตอนเดียวกับที่ซ้อมบนเครื่อง dev 2026-09-30
+- [ ] ซ้อมกู้คืนบน host อย่างน้อยครั้งหนึ่งหลังเปิดใช้: ขึ้น stack อีกชุดชื่อ `litstorm-restoretest` บนพอร์ตอื่น (`LITSTORM_HOST_PORT=10344` ใน env file แยก; 10341 เป็นของ Agenta), `PROJECT=litstorm-restoretest bash stack/backup.sh --restore <stamp> ../_litstorm_backup`, เทียบจำนวน Run กับ manifest, แล้ว `down -v` ชุดทดสอบ — ขั้นตอนเดียวกับที่ซ้อมบนเครื่อง dev 2026-09-30
 
 ---
 

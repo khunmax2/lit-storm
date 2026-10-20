@@ -89,7 +89,7 @@ CONF
 }
 
 if [ "${1:-}" = "--check" ]; then
-  PORT="${2:-10340}"
+  PORT="${2:-10343}"
   echo "== lit-storm nginx: check (no changes) =="
   for f in "$SSL:$SNIP_SSL" "$HTTP:$SNIP_HTTP"; do
     file=${f%%:*}; snip=${f#*:}
@@ -153,7 +153,7 @@ PY
 
 case "${1:-}" in
   --preview)
-    PORT="${2:-10340}"
+    PORT="${2:-10343}"
     PP="${3:-9443}"
     echo "== preview: https://127.0.0.1:$PP/litstorm/ → 127.0.0.1:$PORT =="
     if [ -f "$PREVIEW" ] && grep -q "listen 127.0.0.1:$PP " "$PREVIEW"; then
@@ -185,7 +185,7 @@ case "${1:-}" in
     ;;
 
   --install)
-    PORT="${2:-10340}"
+    PORT="${2:-10343}"
     echo "== install: :443 /litstorm/ → 127.0.0.1:$PORT, :80 /litstorm → https =="
     for file in "$SSL" "$HTTP"; do
       foreign=$(foreign_location "$file")

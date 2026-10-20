@@ -41,7 +41,7 @@ services:
     image: ${LITSTORM_WEB_IMAGE:?set LITSTORM_WEB_IMAGE in stack/host.env (a digest)}
     pull_policy: missing
     ports: !override
-      - "127.0.0.1:${LITSTORM_HOST_PORT:-10340}:80"
+      - "127.0.0.1:${LITSTORM_HOST_PORT:-10343}:80"
     logging: *logs
 
   db:

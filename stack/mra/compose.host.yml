@@ -40,7 +40,7 @@ services:
     pull_policy: missing
   caddy:
     ports: !override
-      - "127.0.0.1:${MRA_HOST_PORT:-10350}:80"
+      - "127.0.0.1:${MRA_HOST_PORT:-10345}:80"
 
   # The one MRA container on litstorm-mra, as "mra". Not MRA's own Caddy:
   # that proxies to the names "api" and "web", and lit-storm's api is "api"

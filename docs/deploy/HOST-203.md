@@ -37,7 +37,7 @@ runbook สำหรับวันขึ้น host ครั้งแรก �
 | image | `ghcr.io/khunmax2/lit-storm-server`, `ghcr.io/khunmax2/lit-storm-web` (build สำหรับ `/litstorm`) |
 | MRA: checkout บน host | `/home/search/Thoughtmind/MedicalReviewerAgent` (commit ตาม `stack/engines.lock.json`) |
 | MRA: Compose project | `mra` |
-| MRA: พอร์ต loopback ของหน้า admin | `10350` (ไม่ผ่าน nginx; เข้าด้วย `ssh -L`) |
+| MRA: พอร์ต loopback ของหน้า admin | `10345` (ไม่ผ่าน nginx; เข้าด้วย `ssh -L`; ไม่ใช้ 10350 เพราะ nginx ของ host จดไว้ว่าเป็นของ Agenta) |
 | MRA: image | `ghcr.io/khunmax2/mra-backend`, `mra-web`, `mra-searxng` |
 | network ระหว่างสอง stack | `litstorm-mra` (MRA เป็น `http://mra` ผ่าน gateway ของ MRA) |
 
@@ -53,8 +53,9 @@ COMPOSE="docker compose -p litstorm -f stack/compose.yml -f stack/compose.host.y
 
 ```bash
 docker compose version                      # ต้อง >= 2.24 (ใช้ !reset)
-ss -ltnp | grep -E ':(10343|9443|10350)\s'  # ต้องว่างทั้งหมด
+ss -ltnp | grep -E ':(10343|9443|10345)\s'  # ต้องว่างทั้งหมด
 sudo nginx -T 2>/dev/null | grep -n 'litstorm'   # ต้องว่าง: ยังไม่มีใครใช้ /litstorm
+sudo nginx -T 2>/dev/null | grep -nE '^# configuration file|1034[345]'   # ไม่มีบรรทัดไหนนอกจากชื่อไฟล์ที่อ้างถึง 10343/10344/10345 (ว่างพอร์ตไม่พอ: 10350 ว่างแต่ nginx จดไว้ว่าเป็นของ Agenta)
 sudo nginx -T 2>/dev/null | grep -nE 'ssl_certificate|server_name|listen'   # :443 อยู่ในไฟล์ sansarnnews-ssl, :80 ในไฟล์ ade
 df -h / && docker system df                 # ต้องว่าง >= 20 GB (server image ~7 GB, MRA ~3 GB)
 docker ps --format '{{.Names}}\t{{.Ports}}' | grep -iE 'litstorm|mra'   # ต้องว่าง
@@ -62,7 +63,7 @@ docker network ls | grep litstorm-mra       # ต้องว่าง (สร�
 ```
 
 - [ ] ไฟล์ :443 คือ `/etc/nginx/sites-available/sansarnnews-ssl` และ :80 คือ `/etc/nginx/sites-available/ade` ถ้าไม่ใช่ ให้ส่งค่าจริงผ่าน env `SSL=` / `HTTP=` ของ `stack/host/apply-nginx.sh` และแก้ตารางนี้
-- [ ] ถ้าพอร์ตไม่ว่าง เลือกเลขใหม่ แล้วใช้เลขนั้นทุกที่ที่เขียน 10343 / 9443 / 10350
+- [ ] ถ้าพอร์ตไม่ว่าง เลือกเลขใหม่ แล้วใช้เลขนั้นทุกที่ที่เขียน 10343 / 9443 / 10345
 - [ ] ออกอินเทอร์เน็ตได้: `curl -sI https://ghcr.io | head -1` และ `curl -sI https://openrouter.ai | head -1`
 - [ ] RAM ว่างและจำนวน core: `free -m && nproc` แล้วเลือกเพดานจากตารางด้านล่าง
 
@@ -157,7 +158,7 @@ docker ps --filter label=com.docker.compose.project=litstorm --format '{{.Names}
 MRA เป็น stack ของตัวเอง รันจาก checkout ของ MRA ด้วยไฟล์ compose ของ MRA สองไฟล์บวก `stack/mra/compose.host.yml` ของเรา
 - image มาจาก GHCR ตาม digest ไม่ build บน host
 - ไฟล์ตั้งค่าของ MRA (ค่าโมเดล, Caddyfile, SearXNG) mount จาก checkout เพราะ compose รันบน host ตรง ๆ
-- ไม่มี port ไหนเปิดบน host นอกจาก `127.0.0.1:10350` สำหรับหน้า admin
+- ไม่มี port ไหนเปิดบน host นอกจาก `127.0.0.1:10345` สำหรับหน้า admin
 
 ```bash
 cd /home/search/Thoughtmind
@@ -180,9 +181,9 @@ nano .env
 | `LLM_KEYS_SECRET`, `SEARXNG_SECRET`, `IP_HASH_SALT` | ค่าที่สุ่มข้างบน |
 | `OPENROUTER_API_KEY` | key ของ OpenRouter (หรือเว้นว่าง แล้วใส่ในหน้า admin ของ MRA) |
 | `MAX_USD_PER_DAY` | `2` เริ่มต่ำไว้ก่อน ปรับทีหลังได้ |
-| `PUBLIC_BASE_URL` | `http://localhost:10350` (ที่อยู่ที่ผู้ดูแลเปิดผ่าน tunnel) |
+| `PUBLIC_BASE_URL` | `http://localhost:10345` (ที่อยู่ที่ผู้ดูแลเปิดผ่าน tunnel) |
 | เพิ่มบรรทัด `MRA_BACKEND_IMAGE`, `MRA_WEB_IMAGE`, `MRA_SEARXNG_IMAGE` | digest จาก §1.1 |
-| เพิ่มบรรทัด `MRA_HOST_PORT` | `10350` |
+| เพิ่มบรรทัด `MRA_HOST_PORT` | `10345` |
 
 - [ ] **สำเนา `.env` ของ MRA ออกนอก host ทันที** เหมือน `secret_key` ใน §2 ไม่มี `LLM_KEYS_SECRET` key ที่ใส่ในหน้า admin ของ MRA ต้องกรอกใหม่หมด
 
@@ -193,9 +194,9 @@ $MRA up -d
 $MRA ps                                                # postgres, redis, searxng, api, worker, web, caddy, gateway รัน; migrate จบด้วย exit 0
 ```
 
-- [ ] `curl -s http://127.0.0.1:10350/api/v1/status` → ขึ้นต้นด้วย `{"accepting":true` และมี `"sources"` 9 แหล่ง
+- [ ] `curl -s http://127.0.0.1:10345/api/v1/status` → ขึ้นต้นด้วย `{"accepting":true` และมี `"sources"` 9 แหล่ง
 - [ ] lit-storm มองเห็น MRA: `docker exec litstorm-api-1 python -c "import urllib.request; print(urllib.request.urlopen('http://mra/api/v1/status').status)"` → `200` (ถ้าได้ 404 แปลว่าคำขอไปถึง API ของ lit-storm เอง: ตรวจว่ามีแค่ `mra-gateway-1` จาก MRA อยู่บน network `docker network inspect litstorm-mra`)
-- [ ] `docker ps --format '{{.Names}}\t{{.Ports}}' | grep mra` มีพอร์ตเดียว คือ `127.0.0.1:10350->80/tcp`
+- [ ] `docker ps --format '{{.Names}}\t{{.Ports}}' | grep mra` มีพอร์ตเดียว คือ `127.0.0.1:10345->80/tcp`
 
 **ผู้ดูแลตั้งเอง (คนพิมพ์รหัสผ่าน ไม่ใช่ Claude):**
 
@@ -204,7 +205,7 @@ $MRA exec api python -m app.cli.admin create admin           # ถามรห�
 $MRA exec api python -m app.cli.keys mint --name deeplit     # พิมพ์ key ครั้งเดียว: คัดไว้ใช้ใน §4
 ```
 
-- [ ] เปิดหน้า admin ของ MRA ผ่าน tunnel: บนเครื่องคุณ `ssh -L 10350:127.0.0.1:10350 search@203.185.144.41` แล้วเปิด http://localhost:10350/admin ล็อกอินได้
+- [ ] เปิดหน้า admin ของ MRA ผ่าน tunnel: บนเครื่องคุณ `ssh -L 10345:127.0.0.1:10345 search@203.185.144.41` แล้วเปิด http://localhost:10345/admin ล็อกอินได้
 
 ---
 
@@ -235,7 +236,7 @@ ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
 - [ ] Co-STORM: เริ่ม Discussion, พิมพ์แทรก 1 ครั้ง, สร้างรายงาน
 - [ ] การตีความหัวเรื่อง: Run ข้างบนมีขั้น "ตีความหัวเรื่อง" ก่อน และการ์ด Run มี "ตีความหัวเรื่องว่า …"
 - [ ] Medical Review (ต้องทำ §M ก่อน):
-  - ตั้งค่า › โหมดวิจัย › การ์ด Medical Review: ที่อยู่ `http://mra`, ที่อยู่หน้าเว็บ `http://localhost:10350`, API key จาก §M แล้วกด "ทดสอบการเชื่อมต่อ" ต้องผ่านครบ (ติดต่อได้, รับงาน, รับ key, แหล่งค้น 9 แหล่ง)
+  - ตั้งค่า › โหมดวิจัย › การ์ด Medical Review: ที่อยู่ `http://mra`, ที่อยู่หน้าเว็บ `http://localhost:10345`, API key จาก §M แล้วกด "ทดสอบการเชื่อมต่อ" ต้องผ่านครบ (ติดต่อได้, รับงาน, รับ key, แหล่งค้น 9 แหล่ง)
   - แท็บ Medical Review ปรากฏ แบบถามเร็ว 1 ครั้งภาษาไทย สำเร็จ ค่าใช้จ่ายขึ้นจาก MRA
   - แบบรีวิวเต็ม 1 ครั้ง มุมมอง "รายงานแบบเต็ม (MRA)" เปิดได้
 - [ ] MCP: ตั้งค่า › การเชื่อมต่อ สร้าง token แล้ว `curl -sk -X POST https://localhost:18443/litstorm/api/mcp/medical -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'` ได้รายชื่อ tool ขึ้นต้นด้วย `medical_research_`

@@ -10,9 +10,8 @@ name: Images
 #
 # The Engine forks and MedicalReviewerAgent are checked out at the commits
 # in stack/engines.lock.json, and stack/build-images.sh (the one place the
-# build arguments live) refuses anything else. The forks are private: the
-# secret ENGINES_TOKEN is a fine-grained token that can read their contents
-# and nothing more. The job summary prints the digests to put on the host.
+# build arguments live) refuses anything else. All of them are public, so
+# no token is needed. The job summary prints the digests to put on the host.
 #
 # Images: ghcr.io/khunmax2/lit-storm-server, ghcr.io/khunmax2/lit-storm-web
 # (built for /litstorm), ghcr.io/khunmax2/mra-backend, mra-web, mra-searxng.
@@ -62,7 +61,6 @@ jobs:
           repository: ${{ steps.pin.outputs.agents_repo }}
           ref: ${{ steps.pin.outputs.agents_commit }}
           path: agents-deep-research
-          token: ${{ secrets.ENGINES_TOKEN }}
 
       - name: Checkout Deep Research at its pin
         uses: actions/checkout@v4
@@ -70,9 +68,7 @@ jobs:
           repository: ${{ steps.pin.outputs.deep_repo }}
           ref: ${{ steps.pin.outputs.deep_commit }}
           path: deep-research-web-ui
-          token: ${{ secrets.ENGINES_TOKEN }}
 
-      # Public: no token.
       - name: Checkout MedicalReviewerAgent at its pin
         uses: actions/checkout@v4
         with:

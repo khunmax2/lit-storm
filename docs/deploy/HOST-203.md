@@ -103,11 +103,8 @@ git push origin deploy-YYYY-MM-DD
 - job summary พิมพ์สองบรรทัดสำหรับ `stack/host.env`: `LITSTORM_SERVER_IMAGE=...@sha256:...` และ `LITSTORM_WEB_IMAGE=...@sha256:...`
 - และอีกสามบรรทัดสำหรับ `.env` ของ MRA (§M): `MRA_BACKEND_IMAGE`, `MRA_WEB_IMAGE`, `MRA_SEARXNG_IMAGE`
 
-- [ ] **ครั้งแรกเท่านั้น: secret `ENGINES_TOKEN`** fork สองตัวเป็น private ซึ่ง token ปกติของ workflow อ่านไม่ได้ ถ้าไม่มี secret นี้ workflow จะล้มที่ขั้น checkout
-  - ผู้ดูแลสร้าง fine-grained token ที่ GitHub › Settings › Developer settings › Fine-grained tokens
-  - Repository access: เฉพาะ `lit_agents-deep-research` และ `lit_deep-research-web`
-  - Permissions: **Contents: Read-only** อย่างเดียว
-  - ใส่ที่ lit-storm › Settings › Secrets and variables › Actions › New repository secret ชื่อ `ENGINES_TOKEN`
+- repo ที่ workflow ดึงทั้งหมดเป็น public (fork สองตัวเปลี่ยนเป็น public 2026-10-20) จึงไม่ต้องใช้ token หรือ secret เพิ่ม
+  - [ ] ถ้า fork ตัวไหนกลับเป็น private ขั้น checkout จะล้มด้วย "repository not found" ต้องเพิ่ม `token:` ให้ขั้นนั้นใน `images.yml` ด้วย fine-grained token ที่อ่านได้อย่างเดียว
 
 - [ ] **ครั้งแรกเท่านั้น:** GitHub → Packages → `lit-storm-server`, `lit-storm-web`, `mra-backend`, `mra-web` และ `mra-searxng` → Package settings → **Change visibility → Public** (ครั้งแรกเป็น private; repo เป็น public และ image ไม่มี secret — ถ้าอยากเก็บ private ต้อง `docker login ghcr.io` บน host ด้วย PAT `read:packages`)
 - [ ] ทดสอบ pull จากเครื่อง dev: `docker pull <LITSTORM_WEB_IMAGE>` แล้ว `docker run --rm --entrypoint cat <ref> /etc/nginx/base-path` ต้องได้ `/litstorm`

@@ -11,14 +11,17 @@ from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from litstorm import checks, cost, embedding, limits, modes, quota, roles, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
-from litstorm.db.models import PERSON, AuthSession, LlmCredential, LlmModel, PasswordSetupToken, Run, SearchProvider, User
+from litstorm.db.models import (
+    PERSON, AuthSession, LlmCredential, LlmModel, PasswordSetupToken, Project, ResearchSession, Run, SearchProvider,
+    User,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(deps.admin)])
 
@@ -41,9 +44,16 @@ class UserOut(BaseModel):
     quota_limit: int | None = None
     quota_used: int | None = None
     quota_reserved: int | None = None
+    # Never had a Project, a Session or a Run: the account can be deleted outright.
+    # One that has is turned off instead, and keeps its quota and cost history.
+    deletable: bool = False
 
 
-def user_out(user, usage=None):
+def _has_research(user_id):
+    return or_(*(exists().where(t.owner_id == user_id) for t in (Project, ResearchSession, Run)))
+
+
+def user_out(user, usage=None, deletable=False):
     return UserOut(
         id=str(user.id),
         email=user.email,
@@ -58,6 +68,7 @@ def user_out(user, usage=None):
         quota_limit=usage.limit if usage else None,
         quota_used=usage.used if usage else None,
         quota_reserved=usage.reserved if usage else None,
+        deletable=deletable,
     )
 
 
@@ -86,11 +97,11 @@ class UserPatch(BaseModel):
 @router.get("/users", response_model=list[UserOut])
 def list_users(session=Depends(deps.database)):
     configured = limits.load(session)
-    return [
-        user_out(u, quota.usage(session, u, configured=configured))
+    rows = session.execute(
         # Integration accounts have a page of their own (api/tokens.py).
-        for u in session.scalars(select(User).where(User.kind == PERSON).order_by(User.created_at))
-    ]
+        select(User, ~_has_research(User.id)).where(User.kind == PERSON).order_by(User.created_at)
+    )
+    return [user_out(u, quota.usage(session, u, configured=configured), deletable) for u, deletable in rows]
 
 
 @router.post("/users", response_model=LinkOut, status_code=201)
@@ -139,6 +150,26 @@ def patch_user(user_id: uuid.UUID, body: UserPatch, admin=Depends(deps.admin), s
         session.execute(PasswordSetupToken.__table__.delete().where(PasswordSetupToken.user_id == user.id))
     session.commit()
     return user_out(user)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: uuid.UUID, admin=Depends(deps.admin), session=Depends(deps.database)):
+    """Only an account that never had research: its keys, sign-ins, links and
+    grants go with it (ON DELETE CASCADE). The admin doing it stays, so an
+    admin always remains."""
+    user = session.get(User, user_id)
+    if user is None or user.kind != PERSON:
+        raise HTTPException(404, "not_found")
+    if user.id == admin.id:
+        raise HTTPException(409, "cannot_delete_self")
+    if session.scalar(select(_has_research(user.id))):
+        raise HTTPException(409, "has_research")
+    try:
+        session.execute(delete(User).where(User.id == user.id))
+        session.commit()
+    except IntegrityError:  # a Project made in the meantime
+        session.rollback()
+        raise HTTPException(409, "has_research")
 
 
 # --- LLM credentials and models --------------------------------------------

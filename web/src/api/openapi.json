@@ -424,6 +424,41 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Delete User",
+    "description": "Only an account that never had research: its keys, sign-ins, links and\ngrants go with it (ON DELETE CASCADE). The admin doing it stays, so an\nadmin always remains.",
+    "operationId": "delete_user_api_admin_users__user_id__delete",
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "User Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/api/admin/llm-credentials": {
@@ -7972,6 +8007,11 @@
        }
       ],
       "title": "Quota Reserved"
+     },
+     "deletable": {
+      "type": "boolean",
+      "title": "Deletable",
+      "default": false
      }
     },
     "type": "object",

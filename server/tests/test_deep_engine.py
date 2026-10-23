@@ -105,6 +105,13 @@ def test_a_failure_and_an_empty_result_are_told_apart(engine, tmp_path):
     assert empty.value.reason == "empty_report"
 
 
+def test_a_provider_that_kept_refusing_is_not_called_our_fault(engine, tmp_path):
+    """The CLI reports failures as text; a 429 it gave up on is a provider's limit, not an engine error."""
+    with pytest.raises(EngineFailure) as failed:
+        run(engine, tmp_path, "limited")
+    assert failed.value.reason == "retries_exhausted" and "Too Many Requests" in str(failed.value)
+
+
 def test_a_stop_kills_the_cli(engine, tmp_path):
     cancel = Cancel()
     threading.Timer(1.5, cancel.asked.set).start()

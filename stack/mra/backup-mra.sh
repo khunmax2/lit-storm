@@ -49,7 +49,8 @@ fi
 
 DEST="${1:-$HERE/../../../_litstorm_backup}"
 mkdir -p "$DEST"
-STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+# The same stamp as stack/backup.sh (local time), so one night's two backups sort and read alike.
+STAMP="$(date +%Y%m%d-%H%M%S)"
 DUMP="$DEST/mra-$STAMP.dump"
 echo "== MRA backup $STAMP ('$PROJECT') → $DEST =="
 docker exec "$DB" pg_dump -U mra -d mra -Fc > "$DUMP"

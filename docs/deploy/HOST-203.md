@@ -2,7 +2,7 @@
 
 runbook สำหรับวันขึ้น host ครั้งแรก และรอบอัปเดตหลังจากนั้น ทำตามแบบของ DeepWitya ซึ่งอยู่บน host เดียวกัน (`D:\Vscode\Upstream_Deeptutor\deploy\GO-LIVE.md`) บทเรียนจากรอบนั้นใส่ไว้ในขั้นที่เกี่ยวข้องแล้ว
 
-**ยังไม่ได้ขึ้น** ขึ้นได้เมื่อรุ่นสองผ่านครบบนเครื่อง dev แล้วเท่านั้น (ผ่านแล้ว 2026-09-30, ดู `docs/web-app-implementation-plan.md`) และผู้ดูแลสั่งขึ้นเอง
+**ขึ้นแล้ว 2026-10-23** จาก tag `deploy-2026-10-20c` พร้อม MedicalReviewerAgent ผลตรวจรับอยู่ที่ [acceptance/2026-10-23-host-203](../acceptance/2026-10-23-host-203.md) ส่วนรอบต่อไปใช้ §9 (รอบอัปเดต)
 
 **เพิ่ม 2026-10-19:** แท็บ Medical Review ต้องมี MedicalReviewerAgent (MRA, [ADR-0013](../adr/0013-remote-engine-medical-review.md)) รันอยู่บน host เดียวกัน ขั้นของ MRA อยู่ใน §M ทำหลัง §3 และก่อน §4
 - MRA เป็น compose project แยก (`mra`) รันจาก checkout ของ MRA เองตาม commit ที่ pin ไว้ ใช้ image จาก GHCR เหมือน lit-storm
@@ -62,7 +62,7 @@ docker ps --format '{{.Names}}\t{{.Ports}}' | grep -iE 'litstorm|mra'   # ต้
 docker network ls | grep litstorm-mra       # ต้องว่าง (สร้างใน §3)
 ```
 
-- [ ] ไฟล์ :443 คือ `/etc/nginx/sites-available/sansarnnews-ssl` และ :80 คือ `/etc/nginx/sites-available/ade` ถ้าไม่ใช่ ให้ส่งค่าจริงผ่าน env `SSL=` / `HTTP=` ของ `stack/host/apply-nginx.sh` และแก้ตารางนี้
+- [ ] ไฟล์ :443 คือ `/etc/nginx/sites-available/sansarnnews-ssl` และ :80 คือ `/etc/nginx/sites-available/ade` (`nginx -T` แสดงเป็น `sites-enabled/...` ซึ่งเป็น symlink ไปไฟล์เดียวกัน; ยืนยันแล้ว 2026-10-23) ถ้าไม่ใช่ ให้ส่งค่าจริงผ่าน env `SSL=` / `HTTP=` ของ `stack/host/apply-nginx.sh` และแก้ตารางนี้
 - [ ] ถ้าพอร์ตไม่ว่าง เลือกเลขใหม่ แล้วใช้เลขนั้นทุกที่ที่เขียน 10343 / 9443 / 10345
 - [ ] ออกอินเทอร์เน็ตได้: `curl -sI https://ghcr.io | head -1` และ `curl -sI https://openrouter.ai | head -1`
 - [ ] RAM ว่างและจำนวน core: `free -m && nproc` แล้วเลือกเพดานจากตารางด้านล่าง
@@ -132,6 +132,7 @@ nano stack/host.env                                    # ใส่ digest สอ
 ```
 
 - [ ] `LITSTORM_SERVER_IMAGE` และ `LITSTORM_WEB_IMAGE` ลงท้ายด้วย `@sha256:` ไม่ใช่ tag
+- ไฟล์ใน `stack/secrets/` ได้สิทธิ์ตาม umask ของ host (0002 → `-rw-rw-r--`) และ**ล็อกเป็น 600 ไม่ได้**: container รันเป็น uid 10001 จึงอ่านไม่ได้ stack จะไม่ขึ้น ที่ยังปลอดภัยเพราะ `/home/search` เป็น 750 user อื่นบนเครื่องเข้าไม่ถึง (ตรวจ 2026-10-23) ถ้าสิทธิ์ของ home เปลี่ยน ต้องคิดใหม่
 - [ ] **สำเนา `stack/secrets/secret_key` ออกนอก host ทันที** (เก็บในที่ปลอดภัยของผู้ดูแล เช่น password manager) — ไม่มี key นี้ API key ที่เก็บไว้ทั้งหมดต้องกรอกใหม่, และ backup ไม่เก็บ key นี้โดยตั้งใจ (§8)
 
 ---
@@ -201,11 +202,15 @@ $MRA ps                                                # postgres, redis, searxn
 **ผู้ดูแลตั้งเอง (คนพิมพ์รหัสผ่าน ไม่ใช่ Claude):**
 
 ```bash
-$MRA exec api python -m app.cli.admin create admin           # ถามรหัสผ่านสองครั้ง
+$MRA exec api python -m app.cli.admin create --username admin   # ถามรหัสผ่านสองครั้ง (ยาว 12 ตัวขึ้นไป)
 $MRA exec api python -m app.cli.keys mint --name deeplit     # พิมพ์ key ครั้งเดียว: คัดไว้ใช้ใน §4
 ```
 
-- [ ] เปิดหน้า admin ของ MRA ผ่าน tunnel: บนเครื่องคุณ `ssh -L 10345:127.0.0.1:10345 search@203.185.144.41` แล้วเปิด http://localhost:10345/admin ล็อกอินได้
+- **อย่าถ่ายภาพหน้าจอตอน key แสดงอยู่** ถ้าหลุดแล้ว: `$MRA exec api python -m app.cli.keys list` แล้ว `keys revoke <prefix>` ตัวที่หลุด และ `mint` ใหม่ (2026-10-23 ทำแบบนี้มาแล้วครั้งหนึ่ง)
+- `passwords do not match` แปลว่าพิมพ์สองครั้งไม่ตรงกัน (หน้าจอไม่แสดงตัวอักษร ระวังแป้นภาษาไทย) ไม่ใช่กติกาความซับซ้อน
+
+- [ ] เปิดหน้า admin ของ MRA ผ่าน tunnel: บนเครื่องคุณ `ssh -L 10345:127.0.0.1:10345 search@203.185.144.41` (หรือแท็บ **Ports** ของ Antigravity/VS Code ที่ต่อ SSH อยู่: Forward a Port → `10345`) แล้วเปิด http://localhost:10345/admin ล็อกอินได้
+- [ ] ใส่ OpenRouter key ของ MRA ที่หน้า admin › Models หัวข้อ "ผู้ให้บริการและคีย์" (ถ้าปล่อย `OPENROUTER_API_KEY` ว่างไว้ใน `.env`) — MRA ใช้ key ของตัวเอง ไม่ใช่ของ DeepLit
 
 ---
 
@@ -217,7 +222,7 @@ $MRA exec api python -m app.cli.keys mint --name deeplit     # พิมพ์ k
 sudo bash stack/host/apply-nginx.sh --preview 10343 9443
 ```
 
-บนเครื่องคุณ (PowerShell ใหม่ ปล่อยค้าง; เลขซ้ายเลือกพอร์ตว่างบนเครื่องคุณ):
+บนเครื่องคุณ (PowerShell ใหม่ ปล่อยค้าง; เลขซ้ายเลือกพอร์ตว่างบนเครื่องคุณ) หรือแท็บ **Ports** ของ Antigravity/VS Code: Forward a Port → `9443` แล้วใช้ `https://localhost:9443/litstorm/` แทน 18443 ในทุกข้อข้างล่าง (2026-10-23 ใช้ทางนี้):
 
 ```bash
 ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
@@ -228,7 +233,9 @@ ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
 ก่อนเริ่ม ยืนยันว่าถึงตัวจริง: `curl -k -s https://localhost:18443/litstorm/api/health` ต้องได้ `{"status":"ok"}` — ถ้าได้ `Server: kong` หรือกล่อง Basic auth แปลว่าพอร์ตชน
 
 - [ ] หน้าตั้งค่าครั้งแรก: ใส่โค้ดจาก `stack/secrets/bootstrap_code` สร้างผู้ดูแลคนแรก (ใช้อีเมลจริงของผู้ดูแล)
-- [ ] ตั้งค่า › โมเดล: API key ของ OpenRouter, โมเดลหลัก (Gemini 3.1 Flash Lite, `effort:minimal`, 1500/4000), โมเดลเร็ว, กดทดสอบผ่าน
+- [ ] ตั้งค่า › โมเดล: API key ของ OpenRouter, โมเดลหลัก กดทดสอบผ่าน (ปุ่มนี้ตรวจการเรียก tool ด้วย ไม่กด Agent Research จะใช้โมเดลนี้ไม่ได้) และ**ติ๊ก "ค่าเริ่มต้น"** ไม่งั้นผู้ใช้ที่ไม่เลือกโมเดลเองเริ่มงานไม่ได้
+  - 2026-10-23 ใช้ `google/gemini-2.5-flash-lite` (ไม่ตั้ง reasoning) ซึ่งผ่านทุกแท็บ
+  - โมเดลที่คิดก่อนตอบ (เช่น Qwen 3.7 Flash, DeepSeek V4 Flash) กับงบคำตอบ 500 จะล้มด้วย `bad_configuration` "spent 500 tokens thinking": ปิด reasoning หรือเพิ่มงบคำตอบ
 - [ ] ตั้งค่า › โมเดล › Embedding: OpenRouter `baai/bge-m3` กดทดสอบผ่าน (บน host ไม่ใช้ Ollama ของเครื่อง dev)
 - [ ] ตั้งค่า › บริการค้นหา: SearXNG และ SearXNG LDR-academic มีให้แล้ว กดทดสอบ; เพิ่ม TCI-ThaiJO และ arXiv ถ้าต้องการ
 - [ ] Run จริง 1 ครั้งภาษาไทย ระดับเร็ว (STORM) สำเร็จ, เปิดรายงาน, คลิก citation, export PDF อ่านภาษาไทยได้
@@ -240,8 +247,9 @@ ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
   - แท็บ Medical Review ปรากฏ แบบถามเร็ว 1 ครั้งภาษาไทย สำเร็จ ค่าใช้จ่ายขึ้นจาก MRA
   - แบบรีวิวเต็ม 1 ครั้ง มุมมอง "รายงานแบบเต็ม (MRA)" เปิดได้
 - [ ] MCP: ตั้งค่า › การเชื่อมต่อ สร้าง token แล้ว `curl -sk -X POST https://localhost:18443/litstorm/api/mcp/medical -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'` ได้รายชื่อ tool ขึ้นต้นด้วย `medical_research_`
-- [ ] สร้างผู้ใช้ทดสอบ ส่งลิงก์ตั้งรหัสผ่าน (ลิงก์ต้องขึ้นต้นด้วย `https://203.185.144.41/litstorm/` — ใน preview ให้เปลี่ยน host เป็น `localhost:18443` เอง)
-- [ ] devtools → Network: ไม่มีคำขอใดออกนอก `/litstorm/` และไม่มี 404
+- [ ] สร้างผู้ใช้ทดสอบ ส่งลิงก์ตั้งรหัสผ่าน (ลิงก์ต้องขึ้นต้นด้วย `https://203.185.144.41/litstorm/` — ก่อน §5 ลิงก์นี้เปิดแล้วได้ Not Found ของแอปอื่น เป็นปกติ) แล้ว**ปิดบัญชีทดสอบ**เมื่อจบ §5 (ลิงก์ของบัญชีที่ปิดใช้ไม่ได้)
+- [ ] devtools → Network: ไม่มีคำขอใดออกนอก `/litstorm/` และไม่มี 404 (หน้าเว็บไม่โหลดอะไรจากโดเมนอื่น: ฟอนต์และไอคอนของแหล่งอ้างอิงอยู่ในเครื่องเอง)
+- [ ] Run ที่ล้มด้วย "Too Many Requests" คือ OpenRouter จำกัดอัตราชั่วคราว ระบบคืนโควตาให้ กดลองใหม่ได้ (2026-10-23 Deep Research ล้มแบบนี้หนึ่งครั้ง ลองใหม่ผ่าน)
 - [ ] `docker ps` ทุกตัวยังรัน, `docker inspect litstorm-worker-1 --format '{{.RestartCount}}'` = 0
 
 ถ้าข้อใดไม่ผ่าน: ยังไม่ได้แตะ :443 เลย แก้แล้ว `$COMPOSE up -d` ซ้ำได้
@@ -254,6 +262,8 @@ ssh -L 18443:127.0.0.1:9443 search@203.185.144.41
 sudo bash stack/host/apply-nginx.sh --install 10343
 sudo bash stack/host/apply-nginx.sh --remove-preview
 ```
+
+ถ้า reload ขึ้น `Failed to allocate directory watch: Too many open files` เป็นคำเตือนของ systemctl เมื่อ inotify ของ host เต็ม (เพดาน 128 ของทั้งเครื่อง) nginx reload ไปแล้วจริง ให้ตัดสินจาก curl ข้างล่างเสมอ
 
 script: ตรวจว่าไม่มี `/litstorm` ของคนอื่นใน :443/:80 และมีแอปฟังที่ 10343 → backup สองไฟล์ → เขียน snippet ของเรา (`/etc/nginx/snippets/litstorm.conf`, `litstorm-http.conf`) → เพิ่มบรรทัด `include` ไฟล์ละบรรทัด → `nginx -t` (ไม่ผ่าน = คืนไฟล์เดิม ไม่ reload) → reload
 
@@ -285,8 +295,9 @@ script: ตรวจว่าไม่มี `/litstorm` ของคนอื�
 ## 8. สำรองข้อมูล (ต้องตั้งก่อนเปิดให้คนใช้จริง)
 
 **ตัดสินแล้ว (2026-09-30)**
-- ทุกวัน 03:45 เวลา host (หลัง backup ของ DeepWitya 03:30) ด้วย `stack/backup.sh` เก็บ 30 วันที่ `/home/search/Thoughtmind/_litstorm_backup`
+- ทุกวัน 04:00 เวลา host และ MRA 04:05 (03:30 เป็นของ DeepWitya, 03:45 เป็นของ HIS Mapping: เรียงต่อกัน ไม่ dump พร้อมกัน) ด้วย `stack/backup.sh` เก็บ 30 วันที่ `/home/search/Thoughtmind/_litstorm_backup`
 - หนึ่งชุดมี 3 ไฟล์: database (`pg_dump -Fc`), ไฟล์ของทุก Run (volume `run-data` ยกเว้นแคชผลค้นหา), และ manifest
+  - `litstorm-runs-*.tar.gz` เป็นของ `root` เพราะ container ที่อ่าน volume เขียนในฐานะ root แต่อ่านได้ (644) จึง `scp` ออกได้ และการลบชุดเก่ายังทำได้ เพราะโฟลเดอร์เป็นของ `search`
 - script ตรวจเองว่า dump มีตาราง ไม่งั้นไม่นับเป็น backup
 - **`secret_key` ไม่อยู่ใน backup โดยตั้งใจ:** ถ้าเก็บไว้ด้วยกัน ใครได้ backup ก็ถอด API key ได้ทั้งหมด manifest เก็บแค่ fingerprint ของ key ไว้ให้ restore เตือนเมื่อ key ไม่ตรง — สำเนา key อยู่นอก host ตาม §2
 - **สำเนานอก host:** เครื่องของผู้ดูแลดึงทุกสัปดาห์ (ข้างล่าง) backup บน host อย่างเดียวไม่พอ ถ้า host เสียทั้งเครื่อง
@@ -300,8 +311,8 @@ PROJECT=litstorm bash stack/backup.sh --verify <stamp> ../_litstorm_backup
 bash stack/mra/backup-mra.sh ../_litstorm_backup
 
 # cron (crontab -e ของ user ที่อยู่ในกลุ่ม docker)
-45 3 * * * cd /home/search/Thoughtmind/lit-storm && PROJECT=litstorm bash stack/backup.sh ../_litstorm_backup >> ../_litstorm_backup/backup.log 2>&1
-50 3 * * * cd /home/search/Thoughtmind/lit-storm && bash stack/mra/backup-mra.sh ../_litstorm_backup >> ../_litstorm_backup/backup.log 2>&1
+0 4 * * * cd /home/search/Thoughtmind/lit-storm && PROJECT=litstorm bash stack/backup.sh ../_litstorm_backup >> ../_litstorm_backup/backup.log 2>&1
+5 4 * * * cd /home/search/Thoughtmind/lit-storm && bash stack/mra/backup-mra.sh ../_litstorm_backup >> ../_litstorm_backup/backup.log 2>&1
 ```
 
 - MRA: ไฟล์เดียวต่อรอบ (`mra-<stamp>.dump`) ไม่สำรอง Redis โดยตั้งใจ ถ้าหายเสียแค่งานที่กำลังรันอยู่ และตัวนับค่าใช้จ่ายของวันนั้นเริ่มนับใหม่
@@ -349,6 +360,10 @@ $MRA pull && $MRA up -d && $MRA ps
 ## 10. วิธีสั่ง Claude วันขึ้น host
 
 จากรอบ DeepWitya: Claude บน host ใช้ sudo ไม่ได้ (ไม่มี TTY) — ทุกขั้น sudo (§0 บางบรรทัด, §4, §5, §7 บรรทัดแรก) คนพิมพ์เองแล้ววาง output ให้
+
+**วิธีที่ใช้จริง (2026-10-23):** ต่อเครื่องผ่าน SSH ของ Antigravity (หรือ VS Code) เปิดโฟลเดอร์ `/home/search/Thoughtmind` แล้วใช้ Claude Code ในแผงนั้น ส่วนขั้น sudo และขั้นรหัสผ่านรันใน Terminal ของ IDE เดียวกัน
+- SSH key จากเครื่อง dev ใส่ไม่ได้: `~/.ssh/authorized_keys` บน host ไม่ให้ `search` เขียน (ไม่ต้องไปแก้)
+- port forward ของ IDE ใช้แทน `ssh -L` ได้ทั้ง 9443 (preview) และ 10345 (หน้า admin ของ MRA)
 
 ```
 host 203.185.144.41, checkout ที่ /home/search/Thoughtmind/lit-storm

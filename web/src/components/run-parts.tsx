@@ -1,8 +1,9 @@
 // Pieces of a Run's card that a Discussion's Turns use too: the stepper,
-// the notes on how it went, and the confirm dialog.
+// the notes on how it went, why it failed, and the confirm dialog.
 import { Check, Circle, History, Info, Loader2, Timer } from "lucide-react";
 import { useState } from "react";
 
+import type { Schemas } from "@/api/client";
 import { useRunOptions } from "@/components/composer";
 import {
   AlertDialog,
@@ -14,12 +15,43 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useT, type Key } from "@/i18n";
+import { has, useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 export const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
 // STORM's stages; every Engine's own list comes with the options.
 const DEFAULT_STAGES = ["research", "outline", "article", "polish"];
+
+/** Why a Run or Turn did not work, whose fault it was, and what to do next. A failure of the
+ * system's own (server: monitor.SYSTEM) says so, and that the Administrators see it on
+ * System status: the owner has nothing to report. */
+export function FailureNote({
+  run,
+  refunded = "run.refunded",
+  className,
+}: {
+  run: Schemas["RunOut"];
+  refunded?: Key;
+  className?: string;
+}) {
+  const { t } = useT();
+  if (!run.reason || run.reason === "cancelled" || run.status === "succeeded") return null;
+  const reason = `reason.${run.reason}`;
+  const next = `failure.next.${run.reason}`;
+  const after = [
+    run.system_fault && t("failure.system"),
+    has(next) && t(next as Key),
+    run.quota_refunded && t(refunded),
+  ].filter(Boolean);
+  return (
+    <div className={cn("rounded-lg bg-destructive/5 px-3 py-2 text-sm", className)}>
+      <p className="text-destructive">{has(reason) ? t(reason as Key) : run.reason}</p>
+      {/* What the service said, e.g. MRA's message and its hotlines for an emergency. */}
+      {run.reason === "service_declined" && run.message && <p className="mt-1 text-destructive">{run.message}</p>}
+      {after.length > 0 && <p className="mt-1 text-xs text-muted-foreground">{after.join(" · ")}</p>}
+    </div>
+  );
+}
 
 /** Ask before doing something that cannot be undone from this page. */
 export function useConfirm() {

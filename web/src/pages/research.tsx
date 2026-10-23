@@ -44,7 +44,7 @@ import { ResearchCanvas } from "@/components/research-canvas";
 const StormObservatory3D = lazy(() => import("@/components/agent-observatory-3d").then((m) => ({ default: m.StormObservatory3D })));
 import { SupportDialog } from "@/components/support-dialog";
 import { RunReading, type Reading } from "@/components/interpretation";
-import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
+import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
 import { useRunLive } from "@/hooks/use-run-live";
 import {
@@ -88,7 +88,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { has, useT, type Key } from "@/i18n";
+import { useT, type Key } from "@/i18n";
 
 type Run = Schemas["RunOut"];
 
@@ -644,7 +644,6 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
   // The research map starts open while a Deep Research Run works.
   const [mapOpen, setMapOpen] = useState(!FINAL.has(run.status));
   const readable = run.status === "succeeded" || (run.status === "cancelled" && !!run.report_title);
-  const reasonKey = `reason.${run.reason}`;
   const canRetry = ["failed", "interrupted", "cancelled"].includes(run.status);
   const canCancel = !FINAL.has(run.status) && run.status !== "cancelling";
 
@@ -796,14 +795,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
             )}
           </div>
         </div>
-        {run.status !== "succeeded" && run.reason && run.reason !== "cancelled" && (
-          <p className="rounded-lg bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {has(reasonKey) ? t(reasonKey as "reason.timed_out") : run.reason}
-            {/* What the service said, e.g. MRA's message and its hotlines for an emergency. */}
-            {run.reason === "service_declined" && run.message && <span className="mt-1 block">{run.message}</span>}
-            {run.quota_refunded && <span className="ml-2 text-xs text-muted-foreground">· {t("run.refunded")}</span>}
-          </p>
-        )}
+        <FailureNote run={run} />
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />

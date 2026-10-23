@@ -150,6 +150,16 @@ def test_the_badge_counts_what_needs_a_look(admin, browser, configured, db):
     assert admin.get("/api/admin/monitor/open").json()["open_count"] == 0
 
 
+def test_the_owner_is_told_whether_it_was_the_system(admin, browser, configured, db):
+    """The owner's page says a failure was the system's, and that Administrators see it (monitor.SYSTEM)."""
+    alice = make_user(admin, browser, "alice@example.org")
+    limited, empty = started(alice), started(alice)
+    ended(db, limited)
+    ended(db, empty, reason="empty_report", message="the research found no sources")
+    assert alice.get(f"/api/runs/{limited}").json()["system_fault"] is True
+    assert alice.get(f"/api/runs/{empty}").json()["system_fault"] is False
+
+
 def test_users_cannot_see_the_system_status(admin, browser):
     user = make_user(admin, browser)
     assert user.get("/api/admin/monitor").status_code == 403

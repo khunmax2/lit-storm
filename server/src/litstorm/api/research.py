@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import catalog, limits, modes, notify, quota, sections, settings, trash
+from litstorm import catalog, limits, modes, monitor, notify, quota, sections, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
@@ -346,6 +346,9 @@ class RunOut(BaseModel):
     reason: str | None
     message: str | None
     quota_refunded: bool
+    # It failed through the system's fault, not the topic's or the owner's: Administrators
+    # see it on System status (litstorm.monitor), and the owner is told so.
+    system_fault: bool = False
     queued_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -392,6 +395,7 @@ def run_out(run):
         reason=run.reason,
         message=run.message,
         quota_refunded=run.quota_refunded,
+        system_fault=run.status in (FAILED, INTERRUPTED) and run.reason in monitor.SYSTEM,
         queued_at=run.queued_at,
         started_at=run.started_at,
         finished_at=run.finished_at,

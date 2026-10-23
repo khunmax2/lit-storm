@@ -6893,6 +6893,11 @@
       "type": "boolean",
       "title": "Quota Refunded"
      },
+     "system_fault": {
+      "type": "boolean",
+      "title": "System Fault",
+      "default": false
+     },
      "queued_at": {
       "type": "string",
       "format": "date-time",
@@ -7257,6 +7262,11 @@
      "quota_refunded": {
       "type": "boolean",
       "title": "Quota Refunded"
+     },
+     "system_fault": {
+      "type": "boolean",
+      "title": "System Fault",
+      "default": false
      },
      "queued_at": {
       "type": "string",

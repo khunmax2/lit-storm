@@ -2579,6 +2579,11 @@ export interface components {
             /** Quota Refunded */
             quota_refunded: boolean;
             /**
+             * System Fault
+             * @default false
+             */
+            system_fault: boolean;
+            /**
              * Queued At
              * Format: date-time
              */
@@ -2708,6 +2713,11 @@ export interface components {
             message: string | null;
             /** Quota Refunded */
             quota_refunded: boolean;
+            /**
+             * System Fault
+             * @default false
+             */
+            system_fault: boolean;
             /**
              * Queued At
              * Format: date-time

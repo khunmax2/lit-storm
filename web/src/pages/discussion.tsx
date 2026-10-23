@@ -43,7 +43,7 @@ import {
 import { QuotaLine, type Depth } from "@/components/composer";
 import { MoveSessionDialog } from "@/components/move-session";
 import { SupportDialog } from "@/components/support-dialog";
-import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
+import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,7 +71,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { has, useT, type Key } from "@/i18n";
+import { useT, type Key } from "@/i18n";
 import { useRunLive } from "@/hooks/use-run-live";
 import { cn } from "@/lib/utils";
 
@@ -210,7 +210,6 @@ function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) 
 /** The last Turn that did not work, with the way to ask for it again. */
 function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => void; pending: boolean }) {
   const { t } = useT();
-  const reasonKey = `reason.${turn.reason}`;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm">
       <div className="min-w-0">
@@ -218,12 +217,8 @@ function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => voi
           <StatusBadge status={turn.status} />
           <span className="text-muted-foreground">{t(`disc.action.${turn.turn?.action}` as Key)}</span>
         </div>
-        {turn.reason && turn.reason !== "cancelled" && (
-          <p className="mt-1 text-destructive">
-            {has(reasonKey) ? t(reasonKey as Key) : turn.reason}
-            {turn.quota_refunded && <span className="ml-2 text-xs text-muted-foreground">· {t("disc.turnBack")}</span>}
-          </p>
-        )}
+        {/* Already in the Turn's red box. */}
+        <FailureNote run={turn} refunded="disc.turnBack" className="mt-1 bg-transparent p-0" />
       </div>
       <Button variant="outline" size="sm" disabled={pending} onClick={onRetry}>
         <RotateCcw />

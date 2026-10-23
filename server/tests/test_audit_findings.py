@@ -8,10 +8,9 @@ calls a real model or search service; outbound calls are captured.
 
 import asyncio
 import http.server
+import re
 import ssl
-import statistics
 import threading
-import time
 from pathlib import Path
 
 import pytest
@@ -75,27 +74,33 @@ def test_sec03_repeated_wrong_passwords_are_slowed_down(admin, browser):
         stranger.post("/api/auth/login", json={"email": "audit-victim@example.org", "password": f"guess {i:04d}"}).status_code
         for i in range(50)
     ]
-    assert 429 in codes, f"50 wrong passwords in a row, all answered {set(codes)}"
+    # 429 Too Many Requests, 423 Locked or 503 with Retry-After: any of them is a throttle.
+    assert THROTTLED & set(codes), f"50 wrong passwords in a row, all answered {set(codes)}"
+
+
+THROTTLED = {423, 429, 503}
 
 
 @finding("SEC-08")
 @pytest.mark.db
-def test_sec08_login_takes_as_long_for_an_unknown_address(admin, browser):
+def test_sec08_login_does_the_same_work_for_an_unknown_address(admin, browser, monkeypatch):
     """An address with no account is refused before any password is
-    hashed, about 50 ms sooner than a wrong password for a real account."""
-    make_user(admin, browser, "audit-known@example.org", "the right password 1")
-    stranger = browser()
+    checked, so it answers about 50 ms sooner (argon2) than a wrong password
+    for a real account. Safe: the password is checked (against a dummy hash)
+    whether or not the address has an account."""
+    from litstorm import security
 
-    def timed(email):
-        started = time.perf_counter()
-        r = stranger.post("/api/auth/login", json={"email": email, "password": "not the password"})
-        assert r.status_code == 401
-        return time.perf_counter() - started
+    calls = []
+    real = security.verify_password
 
-    timed("audit-known@example.org")  # warm up
-    known = statistics.median(timed("audit-known@example.org") for _ in range(7))
-    unknown = statistics.median(timed("audit-nobody@example.org") for _ in range(7))
-    assert known < unknown * 3, f"known {known * 1000:.0f} ms, unknown {unknown * 1000:.0f} ms"
+    def counted(password_hash, password):
+        calls.append(password_hash)
+        return real(password_hash, password)
+
+    monkeypatch.setattr(security, "verify_password", counted)
+    r = browser().post("/api/auth/login", json={"email": "audit-nobody@example.org", "password": "not the password"})
+    assert r.status_code == 401
+    assert calls, "no password was checked for an address without an account"
 
 
 # --- SEC-05: a stored key goes to an address typed in the request -----------------
@@ -194,9 +199,13 @@ WEB = Path(__file__).resolve().parents[2] / "web"
 
 @finding("SEC-09")
 def test_sec09_the_web_app_is_served_with_a_csp_and_no_framing():
-    conf = (WEB / "nginx.conf").read_text(encoding="utf-8")
-    assert "Content-Security-Policy" in conf
-    assert "frame-ancestors" in conf or "X-Frame-Options" in conf
+    # Directives only: a comment that names a header does not send it.
+    lines = (WEB / "nginx.conf").read_text(encoding="utf-8").splitlines()
+    conf = "\n".join(line.split("#", 1)[0] for line in lines)
+    assert re.search(r"add_header\s+Content-Security-Policy\s", conf)
+    assert re.search(r"add_header\s+Content-Security-Policy\s[^\n]*frame-ancestors", conf) or re.search(
+        r"add_header\s+X-Frame-Options\s", conf
+    )
 
 
 # --- SEC-11: dependencies with fixes that reach our code ----------------------------

@@ -24,6 +24,7 @@ import {
 import { useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
+import heroUrl from "@/assets/auth-hero.webp";
 import { BrandLogo } from "@/components/brand";
 import { ErrorText } from "@/components/common";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -49,6 +50,10 @@ function Hero() {
   const { t } = useT();
   return (
     <div className="relative hidden min-h-[640px] flex-col overflow-hidden bg-[linear-gradient(165deg,#dbe8ff_0%,#b9cff7_38%,#8e9ee6_68%,#4d4a9e_100%)] lg:flex">
+      {/* The owner's picture (logo/S__34324484_0.jpg): sky above for the words, the desk below. */}
+      <img src={heroUrl} alt="" className="absolute inset-0 size-full object-cover object-bottom" />
+      {/* A veil over the sky, so the dark words read on its blue. */}
+      <div className="absolute inset-x-0 top-0 h-3/5 bg-gradient-to-b from-white/75 via-white/40 to-transparent" />
       <div className="relative z-10 p-12">
         {/* The picture is light in either theme, so "Deep" stays near-black. */}
         <BrandLogo className="h-24 w-fit dark:text-[#0F1A3D]" />

@@ -1,0 +1,22 @@
+# Puts the api on Agenta's shared `agenta-mcp` network as `deeplit-api`, so
+# Agenta's MCP gateway reaches DeepLit at http://deeplit-api:8000/api/mcp.
+# That name must be in Agenta's AGENTA_MCP_GATEWAY_HOST_ALLOWLIST, and
+# LITSTORM_EXPORT_URL in stack/.env should be http://deeplit-api:8000.
+# Add it to any stack (mirror or host) after the other files:
+#
+#   docker network create --subnet 192.168.224.0/20 agenta-mcp   # once, if missing
+#   docker compose -f stack/compose.yml -f stack/compose.mirror.yml \
+#     -f stack/compose.agenta.yml up -d
+#
+# Without this file the alias is lost each time the api is recreated.
+services:
+  api:
+    networks:
+      default: {}
+      agenta:
+        aliases: [deeplit-api]
+
+networks:
+  agenta:
+    name: agenta-mcp
+    external: true

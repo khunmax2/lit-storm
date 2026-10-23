@@ -1,7 +1,7 @@
 """Stands in for the Deep Research CLI (cli/litstorm.ts) in tests: reads the
 config line, then writes the events its topic asks for, as JSON lines.
 
-    topic "[hang] ..." | "[fail] ..." | "[empty] ..." | "[search] ..."; anything else: ok
+    topic "[hang] ..." | "[fail] ..." | "[limited] ..." | "[empty] ..." | "[search] ..."; anything else: ok
 
 "[search]" asks the search address it was given, as the CLI asks a SearXNG,
 and reports on the first result.
@@ -46,6 +46,9 @@ if script == "hang":
         time.sleep(1)
 if script == "fail":
     emit(type="error", message="the model refused")
+    sys.exit(2)
+if script == "limited":  # the AI SDK's words when the provider kept answering 429
+    emit(type="error", message="Failed after 3 attempts. Last error: Too Many Requests")
     sys.exit(2)
 if script == "empty":
     emit(type="error", message="the research found nothing it could use")

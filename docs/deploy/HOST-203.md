@@ -149,7 +149,7 @@ docker ps --filter label=com.docker.compose.project=litstorm --format '{{.Names}
 - [ ] 5 container รัน: db (healthy), api, worker, web, searxng
 - [ ] `curl -s http://127.0.0.1:10343/litstorm/api/health` → `{"status":"ok"}`
 - [ ] `curl -s http://127.0.0.1:10343/litstorm/api/setup` → `"needed":true,"code_configured":true`
-- [ ] `docker exec litstorm-db-1 psql -U litstorm -tAc "select version_num from alembic_version"` → `0013` (หรือเลขล่าสุดใน `server/src/litstorm/migrations/versions/`)
+- [ ] `docker exec litstorm-db-1 psql -U litstorm -tAc "select version_num from alembic_version"` → `0014` (หรือเลขล่าสุดใน `server/src/litstorm/migrations/versions/`)
 - [ ] `bash stack/host/apply-nginx.sh --check` → `app: /litstorm/api/health → 200` (ไม่ต้อง sudo)
 
 ---

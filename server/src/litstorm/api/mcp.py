@@ -446,7 +446,7 @@ def _events(session, user, run_id, after, mode=None, p="research"):
     from litstorm.api import research
 
     run, facts = _run_facts(session, user, run_id, mode, p)  # the owner's only, as every tool
-    detail, last, more = research._run_detail(session, run_id, user, after, record=False)
+    detail, last, more = research._run_detail(session, run_id, user, after)
     facts["engine"] = run.engine
     return {
         "run": facts,
@@ -662,13 +662,13 @@ def build(mode=None):
             _fail(error, p)
         return await _follow(ctx, user, run_id, wait_seconds, mode, p)
 
-    def finished(session, user, run_id, how):
+    def finished(session, user, run_id):
         from litstorm.api import research
 
         run = _own(session, user, run_id, mode)
         if run.status != "succeeded":
             raise HTTPException(409, "no_report")
-        return research._report(session, run_id, user, how)[1]
+        return research._report(session, run_id, user)[1]
 
     @server.tool(
         name=f"{p}_report",
@@ -689,7 +689,7 @@ def build(mode=None):
         user, _ = await _caller(ctx, "read")
         run_id = _uuid(id)
         try:
-            found = await deps.with_session(lambda s: finished(s, user, run_id, "mcp"))
+            found = await deps.with_session(lambda s: finished(s, user, run_id))
         except HTTPException as error:
             _fail(error, p)
         if part == "outline":
@@ -723,7 +723,7 @@ def build(mode=None):
         user, _ = await _caller(ctx, "read")
         run_id = _uuid(id)
         try:
-            found = await deps.with_session(lambda s: finished(s, user, run_id, "export"))
+            found = await deps.with_session(lambda s: finished(s, user, run_id))
         except HTTPException as error:
             _fail(error, p)
         token, expires = exports.sign(run_id, user.id, format)

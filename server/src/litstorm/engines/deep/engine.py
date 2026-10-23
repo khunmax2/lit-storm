@@ -191,7 +191,8 @@ class DeepEngine:
         if result is None:
             if failure and "nothing it could use" in failure:
                 raise EngineFailure(outcomes.EMPTY_REPORT, failure)
-            raise EngineFailure(outcomes.ENGINE_ERROR, failure or f"the research process exited with {proc.returncode}")
+            # The CLI tells its failure in words only: a provider's 429 is not our fault (outcomes.from_message).
+            raise EngineFailure(outcomes.from_message(failure), failure or f"the research process exited with {proc.returncode}")
 
         with open(os.path.join(workspace, "report.md"), "w", encoding="utf-8") as f:
             f.write(result["markdown"])

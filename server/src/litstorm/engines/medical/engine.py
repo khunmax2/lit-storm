@@ -182,7 +182,9 @@ class MedicalEngine:
             raise EngineFailure(outcomes.SERVICE_UNAVAILABLE, "MRA's administrator cancelled the review")
         if kind == "rejected":
             raise EngineFailure(outcomes.SERVICE_DECLINED, data.get("reason") or "MRA declined the question")
-        raise EngineFailure(outcomes.ENGINE_ERROR, f"MRA: {data.get('message') or 'the review failed'}")
+        said = data.get("message") or "the review failed"
+        # Its own LLM's limits come back in the message (outcomes.from_message).
+        raise EngineFailure(outcomes.from_message(said), f"MRA: {said}")
 
 
 def _frames(lines, cancel):

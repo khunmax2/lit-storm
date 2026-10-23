@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+  Activity,
   ChevronsUpDown,
   Cloud,
   FolderOpen,
@@ -23,6 +24,7 @@ import type { ReactNode } from "react";
 
 import { api, call, type Schemas } from "@/api/client";
 import { BrandIcon } from "@/components/brand";
+import { useOpenIssues } from "@/components/system-status";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -47,6 +49,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
@@ -73,15 +76,32 @@ const ITEM =
   "data-[active=true]:text-sidebar-foreground data-[active=true]:shadow-xs data-[active=true]:ring-1 " +
   "data-[active=true]:ring-sidebar-border";
 
-function NavItem({ to, icon, label, active }: { to: string; icon: ReactNode; label: string; active: boolean }) {
+function NavItem({
+  to,
+  icon,
+  label,
+  active,
+  alert = 0,
+}: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  active: boolean;
+  // A count that needs someone's attention: a red badge, or a dot when the sidebar is folded.
+  alert?: number;
+}) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active} tooltip={label} className={ITEM}>
-        <Link to={to}>
+      <SidebarMenuButton asChild isActive={active} tooltip={alert ? `${label} (${alert})` : label} className={ITEM}>
+        <Link to={to} className="relative">
           {icon}
           <span>{label}</span>
+          {alert > 0 && (
+            <span className="absolute top-1.5 left-5 hidden size-2 rounded-full bg-destructive group-data-[collapsible=icon]:block" />
+          )}
         </Link>
       </SidebarMenuButton>
+      {alert > 0 && <SidebarMenuBadge className="bg-destructive text-white">{alert}</SidebarMenuBadge>}
     </SidebarMenuItem>
   );
 }
@@ -94,6 +114,7 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const issues = useOpenIssues(me.role === "admin");
   const recent = useQuery({
     queryKey: ["recent"],
     queryFn: () => call(api.GET("/api/sessions/recent", { params: { query: { limit: 12 } } })),
@@ -207,6 +228,15 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
       <SidebarFooter className="gap-3 p-3">
         <SidebarMenu>
           <NavItem to="/trash" icon={<Trash2 />} label={t("nav.trash")} active={path === "/trash"} />
+          {me.role === "admin" && (
+            <NavItem
+              to="/status"
+              icon={<Activity />}
+              label={t("admin.status")}
+              active={path === "/status"}
+              alert={issues.data?.open_count ?? 0}
+            />
+          )}
           {me.role === "admin" && (
             <NavItem
               to="/settings/users"

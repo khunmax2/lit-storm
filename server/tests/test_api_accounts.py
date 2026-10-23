@@ -65,6 +65,24 @@ def test_a_new_link_replaces_the_old_one(admin, browser):
     assert browser().post("/api/auth/password", json={"token": second, "password": "a fine password"}).status_code == 200
 
 
+def test_turning_an_account_off_ends_its_link(admin, browser):
+    """A link that got out (a screenshot, a forwarded message) dies with the account: the page says so
+    at once, and turning the account back on does not revive it; a new link does."""
+    created = admin.post("/api/admin/users", json={"email": "t@e.org", "name": "T"}).json()
+    token = created["link"].split("#", 1)[1]
+    uid = created["user"]["id"]
+    assert admin.patch(f"/api/admin/users/{uid}", json={"is_active": False}).status_code == 200
+    b = browser()
+    assert b.post("/api/auth/password-link", json={"token": token, "password": ""}).json() == {
+        "valid": False, "email": None, "purpose": None}
+    assert b.post("/api/auth/password", json={"token": token, "password": "a fine password"}).status_code == 410
+
+    admin.patch(f"/api/admin/users/{uid}", json={"is_active": True})
+    assert b.post("/api/auth/password-link", json={"token": token, "password": ""}).json()["valid"] is False
+    fresh = admin.post(f"/api/admin/users/{uid}/link").json()["link"].split("#", 1)[1]
+    assert b.post("/api/auth/password", json={"token": fresh, "password": "a fine password"}).status_code == 200
+
+
 def test_reset_stops_the_old_password_and_signs_out(admin, browser):
     user = make_user(admin, browser)
     uid = user.get("/api/me").json()["id"]

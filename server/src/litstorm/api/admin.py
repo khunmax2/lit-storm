@@ -18,7 +18,7 @@ from litstorm import checks, cost, embedding, limits, modes, quota, roles, secur
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
-from litstorm.db.models import PERSON, AuthSession, LlmCredential, LlmModel, Run, SearchProvider, User
+from litstorm.db.models import PERSON, AuthSession, LlmCredential, LlmModel, PasswordSetupToken, Run, SearchProvider, User
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(deps.admin)])
 
@@ -135,6 +135,8 @@ def patch_user(user_id: uuid.UUID, body: UserPatch, admin=Depends(deps.admin), s
         setattr(user, key, value)
     if changes.get("is_active") is False:
         session.execute(AuthSession.__table__.delete().where(AuthSession.user_id == user.id))
+        # A set-password link that got out dies with the account; turning it back on takes a new link.
+        session.execute(PasswordSetupToken.__table__.delete().where(PasswordSetupToken.user_id == user.id))
     session.commit()
     return user_out(user)
 

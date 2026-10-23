@@ -11,7 +11,6 @@ import {
   FileText,
   FolderInput,
   FolderOpen,
-  LifeBuoy,
   Gauge,
   Globe,
   Loader2,
@@ -42,7 +41,6 @@ import {
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
 import { MoveSessionDialog } from "@/components/move-session";
-import { SupportDialog } from "@/components/support-dialog";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
   AlertDialog,
@@ -330,7 +328,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
-  const [helping, setHelping] = useState(false);
   const [table3d, setTable3d] = useState(false);
   const [text, setText] = useState("");
   // A Turn waiting for the owner to agree to another quota unit.
@@ -427,7 +424,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
         session={moving ? { id: d.id, title: d.title, project_id: d.project_id } : null}
         onOpenChange={setMoving}
       />
-      {!d.read_only && <SupportDialog sessionId={d.id} open={helping} onOpenChange={setHelping} />}
       <AlertDialog open={!!extending} onOpenChange={(open) => !open && setExtending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -485,7 +481,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             }
             actions={
               d.read_only ? (
-                <span className="rounded-md bg-warning-soft px-2 py-1 text-xs text-warning">{t("support.readOnly")}</span>
+                <span className="rounded-md bg-warning-soft px-2 py-1 text-xs text-warning">{t("run.readOnly")}</span>
               ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -497,10 +493,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   <DropdownMenuItem onClick={() => setMoving(true)}>
                     <FolderInput />
                     {t("move.title")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setHelping(true)}>
-                    <LifeBuoy />
-                    {t("support.title")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

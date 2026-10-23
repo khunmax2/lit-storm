@@ -127,13 +127,12 @@ def own(session, model, row_id, user):
     return row
 
 
-def readable(session, model, row_id, user, what, record=True):
-    """Like `own`, for reading only: the owner, or an Administrator the owner
-    granted access to this Run or Discussion (litstorm.support), whose read
-    is then recorded for the owner to see. Anyone else gets the same 404."""
-    from litstorm import support, trash
-    from litstorm.db.models import ResearchSession, Run
-
+def readable(session, model, row_id, user):
+    """Like `own`, for reading only: the owner, or an Administrator when the
+    owner is an integration account. A person's research is theirs alone;
+    when it fails through the system's fault, Administrators see that on
+    System status without its content (litstorm.monitor). Anyone else gets
+    the same 404."""
     try:
         return own(session, model, row_id, user)
     except HTTPException:
@@ -145,19 +144,7 @@ def readable(session, model, row_id, user, what, record=True):
     owner = session.get(User, row.owner_id) if row is not None else None
     if owner is not None and owner.kind == INTEGRATION and not getattr(row, "trashed_at", None):
         return row
-    alive = row is not None and (
-        trash.run_alive(session, row) if model is Run else trash.session_alive(session, row)
-    )
-    grant = None
-    if alive and model is Run:
-        grant = support.covering(session, user, run=row)
-    elif alive and model is ResearchSession:
-        grant = support.covering(session, user, research_session=row)
-    if grant is None:
-        raise HTTPException(404, "not_found")
-    if record:  # a live stream's later reads are the same look, recorded once
-        support.record(session, grant, what)
-    return row
+    raise HTTPException(404, "not_found")
 
 
 def by_email(session, email):

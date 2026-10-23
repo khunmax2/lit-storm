@@ -95,7 +95,7 @@ class DiscussionOut(BaseModel):
     # sources (engines/costorm/engine.py, view). None before the warm start.
     view: dict | None
     reports: list[ReportRef]
-    read_only: bool = False  # an Administrator under a Support Access Grant
+    read_only: bool = False  # an Administrator reading an integration account's (deps.readable)
 
 
 def _load_view(rows):
@@ -262,7 +262,7 @@ def start(body: DiscussionIn, user=Depends(deps.current_user), session=Depends(d
 
 @router.get("/{session_id}", response_model=DiscussionOut)
 def get(session_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
-    rs = deps.readable(session, ResearchSession, session_id, user, "discussion")
+    rs = deps.readable(session, ResearchSession, session_id, user)
     if rs.kind != DISCUSSION:
         raise HTTPException(404, "not_found")
     out = discussion_out(session, rs)

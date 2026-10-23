@@ -154,8 +154,8 @@ def patch_user(user_id: uuid.UUID, body: UserPatch, admin=Depends(deps.admin), s
 
 @router.delete("/users/{user_id}", status_code=204)
 def delete_user(user_id: uuid.UUID, admin=Depends(deps.admin), session=Depends(deps.database)):
-    """Only an account that never had research: its keys, sign-ins, links and
-    grants go with it (ON DELETE CASCADE). The admin doing it stays, so an
+    """Only an account that never had research: its keys, sign-ins and links
+    go with it (ON DELETE CASCADE). The admin doing it stays, so an
     admin always remains."""
     user = session.get(User, user_id)
     if user is None or user.kind != PERSON:

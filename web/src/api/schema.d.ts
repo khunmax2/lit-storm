@@ -179,8 +179,8 @@ export interface paths {
         post?: never;
         /**
          * Delete User
-         * @description Only an account that never had research: its keys, sign-ins, links and
-         *     grants go with it (ON DELETE CASCADE). The admin doing it stays, so an
+         * @description Only an account that never had research: its keys, sign-ins and links
+         *     go with it (ON DELETE CASCADE). The admin doing it stays, so an
          *     admin always remains.
          */
         delete: operations["delete_user_api_admin_users__user_id__delete"];
@@ -1119,85 +1119,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/support/admins": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Administrators
-         * @description Whom the owner can ask for help.
-         */
-        get: operations["administrators_api_support_admins_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/grants": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Grants
-         * @description The owner's grants, newest first; for one Run or Discussion if asked.
-         */
-        get: operations["my_grants_api_grants_get"];
-        put?: never;
-        /** Create Grant */
-        post: operations["create_grant_api_grants_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/grants/{grant_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke */
-        delete: operations["revoke_api_grants__grant_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/support": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Granted To Me
-         * @description What owners have granted this Administrator: live ones, and those that
-         *     ended in the last week.
-         */
-        get: operations["granted_to_me_api_admin_support_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/me/connection": {
         parameters: {
             query?: never;
@@ -1438,29 +1359,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AccessOut */
-        AccessOut: {
-            /**
-             * At
-             * Format: date-time
-             */
-            at: string;
-            /** What */
-            what: string;
-        };
         /** AcknowledgeIn */
         AcknowledgeIn: {
             /** Keys */
             keys: string[];
-        };
-        /** AdminChoice */
-        AdminChoice: {
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Email */
-            email: string;
         };
         /** AdminRunOut */
         AdminRunOut: {
@@ -1830,50 +1732,6 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
-        };
-        /** GrantIn */
-        GrantIn: {
-            /**
-             * Admin Id
-             * Format: uuid
-             */
-            admin_id: string;
-            /** Run Id */
-            run_id?: string | null;
-            /** Session Id */
-            session_id?: string | null;
-        };
-        /** GrantOut */
-        GrantOut: {
-            /** Id */
-            id: string;
-            admin: components["schemas"]["AdminChoice"];
-            /** Owner Email */
-            owner_email: string;
-            /** Kind */
-            kind: string;
-            /** Run Id */
-            run_id: string | null;
-            /** Session Id */
-            session_id: string | null;
-            /** Title */
-            title: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
-            /** Revoked At */
-            revoked_at: string | null;
-            /** Live */
-            live: boolean;
-            /** Accesses */
-            accesses: components["schemas"]["AccessOut"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5520,142 +5378,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    administrators_api_support_admins_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminChoice"][];
-                };
-            };
-        };
-    };
-    my_grants_api_grants_get: {
-        parameters: {
-            query?: {
-                run_id?: string | null;
-                session_id?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GrantOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_grant_api_grants_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GrantIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GrantOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_api_grants__grant_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                grant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GrantOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    granted_to_me_api_admin_support_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GrantOut"][];
                 };
             };
         };

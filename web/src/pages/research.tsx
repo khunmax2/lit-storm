@@ -7,7 +7,6 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
-  LifeBuoy,
   Gauge,
   Plug,
   Globe,
@@ -42,7 +41,6 @@ import { ResearchCanvas } from "@/components/research-canvas";
 
 // three.js comes only with the 3D view, when someone opens it.
 const StormObservatory3D = lazy(() => import("@/components/agent-observatory-3d").then((m) => ({ default: m.StormObservatory3D })));
-import { SupportDialog } from "@/components/support-dialog";
 import { RunReading, type Reading } from "@/components/interpretation";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import { Segmented } from "@/components/segmented";
@@ -640,7 +638,6 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
     },
     onError,
   });
-  const [helping, setHelping] = useState(false);
   // The research map starts open while a Deep Research Run works.
   const [mapOpen, setMapOpen] = useState(!FINAL.has(run.status));
   const readable = run.status === "succeeded" || (run.status === "cancelled" && !!run.report_title);
@@ -778,11 +775,6 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                       <DropdownMenuSeparator />
                     </>
                   )}
-                  <DropdownMenuItem onClick={() => setHelping(true)}>
-                    <LifeBuoy />
-                    {t("support.title")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={() => confirm(t("delete.confirmRun"), () => remove.mutate())}
@@ -833,7 +825,6 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
             )}
           </details>
         )}
-        <SupportDialog runId={run.id} open={helping} onOpenChange={setHelping} />
       </CardContent>
     </Card>
   );

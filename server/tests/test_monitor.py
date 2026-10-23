@@ -138,7 +138,20 @@ def test_old_failures_fall_out_of_the_window(admin, browser, configured, db):
     assert len(admin.get("/api/admin/monitor?days=30").json()["issues"]) == 1
 
 
+def test_the_badge_counts_what_needs_a_look(admin, browser, configured, db):
+    alice = make_user(admin, browser, "alice@example.org")
+    assert admin.get("/api/admin/monitor/open").json() == {"open_count": 0, "last_at": None}
+    ended(db, started(alice), minutes_ago=3)
+    ended(db, started(alice), reason="empty_report", message="the research found no sources", minutes_ago=1)
+    badge = admin.get("/api/admin/monitor/open").json()
+    assert badge["open_count"] == 1 and badge["last_at"] is not None
+    key = next(i["key"] for i in admin.get("/api/admin/monitor").json()["issues"] if i["open"])
+    admin.post("/api/admin/monitor/acknowledge", json={"keys": [key]})
+    assert admin.get("/api/admin/monitor/open").json()["open_count"] == 0
+
+
 def test_users_cannot_see_the_system_status(admin, browser):
     user = make_user(admin, browser)
     assert user.get("/api/admin/monitor").status_code == 403
+    assert user.get("/api/admin/monitor/open").status_code == 403
     assert user.post("/api/admin/monitor/acknowledge", json={"keys": ["x"]}).status_code == 403

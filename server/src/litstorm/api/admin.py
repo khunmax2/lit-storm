@@ -788,8 +788,21 @@ class AcknowledgeIn(BaseModel):
 
 
 @router.get("/monitor", response_model=MonitorOut)
-def system_status(days: int = Query(default=7, ge=1, le=monitor.MAX_DAYS), session=Depends(deps.database)):
+def system_status(
+    days: int = Query(default=monitor.DEFAULT_DAYS, ge=1, le=monitor.MAX_DAYS), session=Depends(deps.database)
+):
     return monitor.status(session, days)
+
+
+class BadgeOut(BaseModel):
+    open_count: int
+    last_at: datetime | None
+
+
+@router.get("/monitor/open", response_model=BadgeOut)
+def open_issues(session=Depends(deps.database)):
+    """The sidebar's badge and the home page's notice ask this every minute."""
+    return monitor.badge(session)
 
 
 @router.post("/monitor/acknowledge", status_code=204)

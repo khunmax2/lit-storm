@@ -23,6 +23,7 @@ from litstorm.db.models import FAILED, INTERRUPTED, PERSON, Run, SystemSetting, 
 
 ACKS = "monitor.acks"
 MAX_DAYS = 30  # the longest window the page shows (api/admin.system_status)
+DEFAULT_DAYS = 7  # the page's first window, and the badge's
 MESSAGE_CHARS = 300
 SAID_CHARS = 40
 DIGITS = re.compile(r"\d+")
@@ -178,7 +179,7 @@ def queue(session):
     }
 
 
-def status(session, days=7):
+def status(session, days=DEFAULT_DAYS):
     since = _now() - timedelta(days=days)
     found = issues(session, since)
     return {
@@ -190,6 +191,8 @@ def status(session, days=7):
     }
 
 
-def open_count(session, days=7):
-    """For the badge: the open Issues, without the rest of the page."""
-    return status(session, days)["open_count"]
+def badge(session, days=DEFAULT_DAYS):
+    """For the sidebar and the home page: how many Issues are open, and the
+    latest of them, without the rest of the page."""
+    found = [i for i in issues(session, _now() - timedelta(days=days)) if i["open"]]
+    return {"open_count": len(found), "last_at": max((i["last_at"] for i in found), default=None)}

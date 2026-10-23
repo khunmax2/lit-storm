@@ -516,6 +516,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/monitor/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Issues
+         * @description The sidebar's badge and the home page's notice ask this every minute.
+         */
+        get: operations["open_issues_api_admin_monitor_open_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/monitor/acknowledge": {
         parameters: {
             query?: never;
@@ -1506,6 +1526,13 @@ export interface components {
             used: number;
             /** Remaining */
             remaining: number;
+        };
+        /** BadgeOut */
+        BadgeOut: {
+            /** Open Count */
+            open_count: number;
+            /** Last At */
+            last_at: string | null;
         };
         /** CheckOut */
         CheckOut: {
@@ -4265,6 +4292,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_issues_api_admin_monitor_open_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BadgeOut"];
                 };
             };
         };

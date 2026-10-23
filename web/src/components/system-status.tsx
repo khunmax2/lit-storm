@@ -1,4 +1,4 @@
-// Settings › System status: what failed, grouped into Issues; how long each mode takes; the queue
+// System status, its own page beside the settings: what failed, grouped into Issues; how long each mode takes; the queue
 // (server: litstorm.monitor). Only what the system did is shown, never a topic or a report.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCheck, CheckCircle2, Eye } from "lucide-react";
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { api, call, type Schemas } from "@/api/client";
-import { ErrorText, LoadingRows, PortalTo, errorMessage, formatDate, timeAgo } from "@/components/common";
+import { ErrorText, LoadingRows, PageHeader, errorMessage, formatDate, timeAgo } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,16 @@ export function useSystemStatus(days = 7) {
   });
 }
 
+// The sidebar's badge and the home page's notice (server: monitor.badge).
+export function useOpenIssues(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin-monitor-open"],
+    queryFn: () => call(api.GET("/api/admin/monitor/open")),
+    refetchInterval: 60_000,
+    enabled,
+  });
+}
+
 function minutes(m: number | null | undefined) {
   return m == null ? "–" : m < 10 ? m.toFixed(1) : Math.round(m).toString();
 }
@@ -36,7 +46,10 @@ function useAcknowledge() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (keys: string[]) => call(api.POST("/api/admin/monitor/acknowledge", { body: { keys } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-monitor"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-monitor"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-monitor-open"] });
+    },
     onError: (e) => toast.error(errorMessage(e, t)),
   });
 }
@@ -106,17 +119,16 @@ export function SystemStatus() {
   const [days, setDays] = useState(7);
   const status = useSystemStatus(days);
   const acknowledge = useAcknowledge();
-  if (status.isLoading) return <LoadingRows />;
-  if (!status.data) return <ErrorText error={status.error} />;
   const s = status.data;
-  const open = s.issues.filter((i) => i.open);
-  const rest = s.issues.filter((i) => !i.open);
-  const q = s.queue;
+  const open = s?.issues.filter((i) => i.open) ?? [];
+  const rest = s?.issues.filter((i) => !i.open) ?? [];
 
-  return (
-    <div className="grid gap-4">
-      <PortalTo id="settings-actions">
-        <div className="flex gap-2">
+  const header = (
+    <PageHeader
+      title={t("admin.status")}
+      description={t("monitor.lead")}
+      actions={
+        <>
           <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
             <SelectTrigger className="w-36">
               <SelectValue />
@@ -135,8 +147,16 @@ export function SystemStatus() {
               {t("monitor.acknowledgeAll")}
             </Button>
           )}
-        </div>
-      </PortalTo>
+        </>
+      }
+    />
+  );
+  if (!s) return <>{header}{status.isLoading ? <LoadingRows /> : <ErrorText error={status.error} />}</>;
+  const q = s.queue;
+
+  return (
+    <div className="grid gap-4">
+      {header}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="gap-1 py-4">

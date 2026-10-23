@@ -1362,6 +1362,28 @@
     }
    }
   },
+  "/api/admin/monitor/open": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Open Issues",
+    "description": "The sidebar's badge and the home page's notice ask this every minute.",
+    "operationId": "open_issues_api_admin_monitor_open_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BadgeOut"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/monitor/acknowledge": {
    "post": {
     "tags": [
@@ -4034,6 +4056,32 @@
      "remaining"
     ],
     "title": "AllowanceOut"
+   },
+   "BadgeOut": {
+    "properties": {
+     "open_count": {
+      "type": "integer",
+      "title": "Open Count"
+     },
+     "last_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "open_count",
+     "last_at"
+    ],
+    "title": "BadgeOut"
    },
    "CheckOut": {
     "properties": {

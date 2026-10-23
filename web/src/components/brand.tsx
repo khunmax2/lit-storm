@@ -1,5 +1,7 @@
 // DeepLit's mark: the icon (the sidebar, the favicon) and the full logo, the icon over the
 // wordmark (the sign-in pages). Drawn by the owner, 2026-10-23.
+import { useId } from "react";
+
 import iconUrl from "@/assets/deeplit-icon.svg";
 import logoRaw from "@/assets/deeplit-logo.svg?raw";
 import { cn } from "@/lib/utils";
@@ -15,10 +17,11 @@ export function BrandIcon({ className }: { className?: string }) {
 }
 
 export function BrandLogo({ className }: { className?: string }) {
+  // Each copy names its gradients for itself: with two on a page and the first one hidden
+  // (the sign-in page's picture, below lg), url(#id) finds the hidden one's and draws nothing.
+  const own = useId().replace(/[^\w-]/g, "");
+  const svg = LOGO.replace(/id="([\w-]+)"/g, `id="$1-${own}"`).replace(/url\(#([\w-]+)\)/g, `url(#$1-${own})`);
   return (
-    <div
-      className={cn("text-[#0F1A3D] dark:text-foreground", className)}
-      dangerouslySetInnerHTML={{ __html: LOGO }}
-    />
+    <div className={cn("text-[#0F1A3D] dark:text-foreground", className)} dangerouslySetInnerHTML={{ __html: svg }} />
   );
 }

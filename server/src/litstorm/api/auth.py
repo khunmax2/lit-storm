@@ -228,9 +228,9 @@ def _link(session, token):
 def check_link(body: SetPasswordIn, session=Depends(deps.database)):
     """Whether a link still works — POST, so the token stays out of logs."""
     row = _link(session, body.token)
-    if row is None:
-        return LinkStatus(valid=False)
-    user = session.get(User, row.user_id)
+    user = session.get(User, row.user_id) if row is not None else None
+    if user is None or not user.is_active:
+        return LinkStatus(valid=False)  # nor whose it was
     return LinkStatus(valid=True, email=user.email, purpose=row.purpose)
 
 

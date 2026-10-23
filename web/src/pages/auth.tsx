@@ -1,10 +1,11 @@
 // Setup, sign-in and set-password: a centred card, as in shadcn's login blocks.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { BookOpenText, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
+import { BrandLogo } from "@/components/brand";
 import { ErrorText } from "@/components/common";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,17 +19,12 @@ function Centered({ title, description, children }: { title: string; description
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-6">
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 font-semibold">
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <BookOpenText className="size-4" />
-            </div>
-            DeepLit
-          </div>
+        <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={() => setLang(lang === "th" ? "en" : "th")}>
             {lang === "th" ? "English" : "ไทย"}
           </Button>
         </div>
+        <BrandLogo className="mx-auto -mt-4 h-28" />
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{title}</CardTitle>

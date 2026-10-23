@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  BookOpenText,
   ChevronsUpDown,
   Cloud,
   FolderOpen,
@@ -23,6 +22,7 @@ import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 
 import { api, call, type Schemas } from "@/api/client";
+import { BrandIcon } from "@/components/brand";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -125,9 +125,7 @@ export function AppSidebar({ me, onSearch }: { me: Schemas["MeOut"]; onSearch: (
       <SidebarHeader className="gap-3 p-3">
         <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2.5 group-data-[collapsible=icon]:flex-none">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-              <BookOpenText className="size-4" />
-            </div>
+            <BrandIcon className="size-8" />
             <span className="truncate text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
               DeepLit
             </span>

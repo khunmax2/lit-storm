@@ -177,7 +177,13 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete User
+         * @description Only an account that never had research: its keys, sign-ins, links and
+         *     grants go with it (ON DELETE CASCADE). The admin doing it stays, so an
+         *     admin always remains.
+         */
+        delete: operations["delete_user_api_admin_users__user_id__delete"];
         options?: never;
         head?: never;
         /** Patch User */
@@ -2992,6 +2998,11 @@ export interface components {
             quota_used?: number | null;
             /** Quota Reserved */
             quota_reserved?: number | null;
+            /**
+             * Deletable
+             * @default false
+             */
+            deletable: boolean;
         };
         /** UserPatch */
         UserPatch: {
@@ -3378,6 +3389,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LinkOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_api_admin_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

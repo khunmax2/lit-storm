@@ -83,6 +83,44 @@ def test_turning_an_account_off_ends_its_link(admin, browser):
     assert b.post("/api/auth/password", json={"token": fresh, "password": "a fine password"}).status_code == 200
 
 
+def test_an_account_never_used_can_be_deleted(admin, browser):
+    """Made by mistake, or never used: it goes, with its link, its sign-ins and its keys."""
+    created = admin.post("/api/admin/users", json={"email": "oops@e.org", "name": "Oops"}).json()
+    token = created["link"].split("#", 1)[1]
+    user = make_user(admin, browser, "used-once@e.org")
+    uid = user.get("/api/me").json()["id"]
+    assert user.post("/api/me/tokens", json={"name": "k", "scopes": ["read"]}).status_code == 201
+    listed = {u["email"]: u["deletable"] for u in admin.get("/api/admin/users").json()}
+    assert listed["oops@e.org"] is True and listed["used-once@e.org"] is True
+
+    assert admin.delete(f"/api/admin/users/{created['user']['id']}").status_code == 204
+    assert admin.delete(f"/api/admin/users/{uid}").status_code == 204
+    emails = [u["email"] for u in admin.get("/api/admin/users").json()]
+    assert "oops@e.org" not in emails and "used-once@e.org" not in emails
+    assert user.get("/api/me").status_code == 401
+    assert browser().post("/api/auth/password", json={"token": token, "password": "a fine password"}).status_code == 410
+    # The address is free again.
+    assert admin.post("/api/admin/users", json={"email": "oops@e.org", "name": "Oops"}).status_code == 201
+
+
+def test_an_account_with_research_is_turned_off_not_deleted(admin, browser):
+    """Its Runs carry the month's quota and cost, so the account stays; turning it off is the way."""
+    alice = make_user(admin, browser, "alice@example.org")
+    uid = alice.get("/api/me").json()["id"]
+    alice.post("/api/projects", json={"name": "A"})
+    assert {u["email"]: u["deletable"] for u in admin.get("/api/admin/users").json()}["alice@example.org"] is False
+    r = admin.delete(f"/api/admin/users/{uid}")
+    assert r.status_code == 409 and r.json()["detail"] == "has_research"
+    assert alice.get("/api/me").status_code == 200
+
+
+def test_an_admin_cannot_delete_themself(admin):
+    me = admin.get("/api/me").json()["id"]
+    r = admin.delete(f"/api/admin/users/{me}")
+    assert r.status_code == 409 and r.json()["detail"] == "cannot_delete_self"
+    assert admin.delete("/api/admin/users/00000000-0000-0000-0000-000000000000").status_code == 404
+
+
 def test_reset_stops_the_old_password_and_signs_out(admin, browser):
     user = make_user(admin, browser)
     uid = user.get("/api/me").json()["id"]

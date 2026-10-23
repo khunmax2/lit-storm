@@ -31,6 +31,7 @@ import {
   Search as SearchIcon,
   Server,
   SlidersHorizontal,
+  Trash2,
   UserPlus,
   UsersRound,
   XCircle,
@@ -43,6 +44,7 @@ import { McpSettings } from "@/components/mcp-admin";
 import { MedicalSettings } from "@/components/medical-admin";
 
 import { api, call, type Schemas } from "@/api/client";
+import { useConfirm } from "@/components/run-parts";
 import { ErrorText, LoadingRows, PageHeader, PortalTo, StatusBadge, Toolbar, errorMessage, formatDate } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -282,6 +285,8 @@ function Users() {
   const queryClient = useQueryClient();
   const onError = useToastError();
   const users = useQuery({ queryKey: ["admin-users"], queryFn: () => call(api.GET("/api/admin/users")) });
+  const me = useQuery({ queryKey: ["me"], queryFn: () => call(api.GET("/api/me")), retry: false });
+  const { confirm: ask, dialog } = useConfirm();
   const [creating, setCreating] = useState(false);
   const [limitsFor, setLimitsFor] = useState<User | null>(null);
   const [issued, setIssued] = useState<{ link: string; email: string } | null>(null);
@@ -298,6 +303,15 @@ function Users() {
     mutationFn: ({ id, body }: { id: string; body: Schemas["UserPatch"] }) =>
       call(api.PATCH("/api/admin/users/{user_id}", { params: { path: { user_id: id } }, body })),
     onSuccess: refresh,
+    onError,
+  });
+  // Only an account that never had research (server: api/admin.delete_user); one that has is turned off.
+  const remove = useMutation({
+    mutationFn: (id: string) => call(api.DELETE("/api/admin/users/{user_id}", { params: { path: { user_id: id } } })),
+    onSuccess: () => {
+      toast.success(t("admin.userDeleted"));
+      refresh();
+    },
     onError,
   });
 
@@ -368,6 +382,18 @@ function Users() {
                         <SlidersHorizontal />
                         {t("admin.overrides").split("—")[0].trim()}
                       </DropdownMenuItem>
+                      {u.deletable && u.id !== me.data?.id && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => ask(t("admin.deleteUserConfirm", { email: u.email }), () => remove.mutate(u.id))}
+                          >
+                            <Trash2 />
+                            {t("admin.deleteUser")}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -376,6 +402,7 @@ function Users() {
           </TableBody>
         </Table>
       </CardContent>
+      {dialog}
       <NewUserDialog open={creating} onOpenChange={setCreating} />
       <LimitsDialog user={limitsFor} onOpenChange={(o) => !o && setLimitsFor(null)} />
       <Dialog open={!!issued} onOpenChange={(o) => !o && setIssued(null)}>

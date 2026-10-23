@@ -499,6 +499,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/monitor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** System Status */
+        get: operations["system_status_api_admin_monitor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/monitor/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge */
+        post: operations["acknowledge_api_admin_monitor_acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/limits": {
         parameters: {
             query?: never;
@@ -1394,6 +1428,11 @@ export interface components {
             /** What */
             what: string;
         };
+        /** AcknowledgeIn */
+        AcknowledgeIn: {
+            /** Keys */
+            keys: string[];
+        };
         /** AdminChoice */
         AdminChoice: {
             /** Id */
@@ -1725,6 +1764,23 @@ export interface components {
              */
             interpret: boolean;
         };
+        /** EngineStatOut */
+        EngineStatOut: {
+            /** Engine */
+            engine: string;
+            /** Engine Label */
+            engine_label: string;
+            /** Runs */
+            runs: number;
+            /** Succeeded */
+            succeeded: number;
+            /** Failed */
+            failed: number;
+            /** P50 Minutes */
+            p50_minutes: number | null;
+            /** P90 Minutes */
+            p90_minutes: number | null;
+        };
         /** EngineSwitch */
         EngineSwitch: {
             /** Enabled */
@@ -1877,6 +1933,43 @@ export interface components {
             scopes?: string[];
             /** Days */
             days?: number | null;
+        };
+        /** IssueOut */
+        IssueOut: {
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /** Severity */
+            severity: string;
+            /** Engine */
+            engine: string;
+            /** Engine Label */
+            engine_label: string;
+            /** Model Label */
+            model_label: string;
+            /** Count */
+            count: number;
+            /** Users */
+            users: string[];
+            /**
+             * First At
+             * Format: date-time
+             */
+            first_at: string;
+            /**
+             * Last At
+             * Format: date-time
+             */
+            last_at: string;
+            /** Message */
+            message: string;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Open */
+            open: boolean;
+            /** Recent */
+            recent: components["schemas"]["OccurrenceOut"][];
         };
         /** LanguageIn */
         LanguageIn: {
@@ -2157,6 +2250,21 @@ export interface components {
             /** Table Name */
             table_name?: string | null;
         };
+        /** MonitorOut */
+        MonitorOut: {
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** Issues */
+            issues: components["schemas"]["IssueOut"][];
+            /** Open Count */
+            open_count: number;
+            /** Engines */
+            engines: components["schemas"]["EngineStatOut"][];
+            queue: components["schemas"]["QueueOut"];
+        };
         /** MoveIn */
         MoveIn: {
             /** Project Id */
@@ -2203,6 +2311,16 @@ export interface components {
             /** Token */
             token: string;
             record: components["schemas"]["TokenOut"];
+        };
+        /** OccurrenceOut */
+        OccurrenceOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Who */
+            who: string;
         };
         /** Options */
         Options: {
@@ -2321,6 +2439,17 @@ export interface components {
              * @default
              */
             answer: string;
+        };
+        /** QueueOut */
+        QueueOut: {
+            /** Queued */
+            queued: number;
+            /** Running */
+            running: number;
+            /** Oldest Wait Seconds */
+            oldest_wait_seconds: number | null;
+            /** Max Running */
+            max_running: number;
         };
         /** QuotaOut */
         QuotaOut: {
@@ -4097,6 +4226,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminRunOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    system_status_api_admin_monitor_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_api_admin_monitor_acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcknowledgeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

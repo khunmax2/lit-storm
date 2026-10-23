@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import {
+  Activity,
   Bot,
   BookOpenText,
   ChartColumn,
@@ -41,6 +42,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { McpSettings } from "@/components/mcp-admin";
+import { SystemStatus } from "@/components/system-status";
 import { MedicalSettings } from "@/components/medical-admin";
 
 import { api, call, type Schemas } from "@/api/client";
@@ -2251,6 +2253,7 @@ function Support() {
 // The settings sections, each its own address, listed in the settings page's
 // own side column.
 export const SETTINGS = [
+  { id: "status", label: "admin.status", lead: "settings.statusLead", icon: Activity, page: SystemStatus },
   { id: "users", label: "admin.users", lead: "settings.usersLead", icon: UsersRound, page: Users },
   { id: "models", label: "admin.models", lead: "settings.modelsLead", icon: Bot, page: Models },
   { id: "search", label: "admin.search", lead: "settings.searchLead", icon: SearchIcon, page: Search },

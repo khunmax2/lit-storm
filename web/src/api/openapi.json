@@ -1317,6 +1317,85 @@
     }
    }
   },
+  "/api/admin/monitor": {
+   "get": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "System Status",
+    "operationId": "system_status_api_admin_monitor_get",
+    "parameters": [
+     {
+      "name": "days",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 30,
+       "minimum": 1,
+       "default": 7,
+       "title": "Days"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MonitorOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/admin/monitor/acknowledge": {
+   "post": {
+    "tags": [
+     "admin"
+    ],
+    "summary": "Acknowledge",
+    "operationId": "acknowledge_api_admin_monitor_acknowledge_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AcknowledgeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/admin/limits": {
    "get": {
     "tags": [
@@ -3735,6 +3814,24 @@
     ],
     "title": "AccessOut"
    },
+   "AcknowledgeIn": {
+    "properties": {
+     "keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 200,
+      "minItems": 1,
+      "title": "Keys"
+     }
+    },
+    "type": "object",
+    "required": [
+     "keys"
+    ],
+    "title": "AcknowledgeIn"
+   },
    "AdminChoice": {
     "properties": {
      "id": {
@@ -4541,6 +4638,63 @@
     ],
     "title": "EngineOut"
    },
+   "EngineStatOut": {
+    "properties": {
+     "engine": {
+      "type": "string",
+      "title": "Engine"
+     },
+     "engine_label": {
+      "type": "string",
+      "title": "Engine Label"
+     },
+     "runs": {
+      "type": "integer",
+      "title": "Runs"
+     },
+     "succeeded": {
+      "type": "integer",
+      "title": "Succeeded"
+     },
+     "failed": {
+      "type": "integer",
+      "title": "Failed"
+     },
+     "p50_minutes": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P50 Minutes"
+     },
+     "p90_minutes": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P90 Minutes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "engine",
+     "engine_label",
+     "runs",
+     "succeeded",
+     "failed",
+     "p50_minutes",
+     "p90_minutes"
+    ],
+    "title": "EngineStatOut"
+   },
    "EngineSwitch": {
     "properties": {
      "enabled": {
@@ -5047,6 +5201,100 @@
      "name"
     ],
     "title": "IntegrationTokenIn"
+   },
+   "IssueOut": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "severity": {
+      "type": "string",
+      "title": "Severity"
+     },
+     "engine": {
+      "type": "string",
+      "title": "Engine"
+     },
+     "engine_label": {
+      "type": "string",
+      "title": "Engine Label"
+     },
+     "model_label": {
+      "type": "string",
+      "title": "Model Label"
+     },
+     "count": {
+      "type": "integer",
+      "title": "Count"
+     },
+     "users": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Users"
+     },
+     "first_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "First At"
+     },
+     "last_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Last At"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     },
+     "acknowledged_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acknowledged At"
+     },
+     "open": {
+      "type": "boolean",
+      "title": "Open"
+     },
+     "recent": {
+      "items": {
+       "$ref": "#/components/schemas/OccurrenceOut"
+      },
+      "type": "array",
+      "title": "Recent"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "reason",
+     "severity",
+     "engine",
+     "engine_label",
+     "model_label",
+     "count",
+     "users",
+     "first_at",
+     "last_at",
+     "message",
+     "acknowledged_at",
+     "open",
+     "recent"
+    ],
+    "title": "IssueOut"
    },
    "LanguageIn": {
     "properties": {
@@ -5734,6 +5982,45 @@
     ],
     "title": "ModelOut"
    },
+   "MonitorOut": {
+    "properties": {
+     "since": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Since"
+     },
+     "issues": {
+      "items": {
+       "$ref": "#/components/schemas/IssueOut"
+      },
+      "type": "array",
+      "title": "Issues"
+     },
+     "open_count": {
+      "type": "integer",
+      "title": "Open Count"
+     },
+     "engines": {
+      "items": {
+       "$ref": "#/components/schemas/EngineStatOut"
+      },
+      "type": "array",
+      "title": "Engines"
+     },
+     "queue": {
+      "$ref": "#/components/schemas/QueueOut"
+     }
+    },
+    "type": "object",
+    "required": [
+     "since",
+     "issues",
+     "open_count",
+     "engines",
+     "queue"
+    ],
+    "title": "MonitorOut"
+   },
    "MoveIn": {
     "properties": {
      "project_id": {
@@ -5891,6 +6178,25 @@
     ],
     "title": "NewTokenOut",
     "description": "The token itself, shown this once, and its record."
+   },
+   "OccurrenceOut": {
+    "properties": {
+     "at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "At"
+     },
+     "who": {
+      "type": "string",
+      "title": "Who"
+     }
+    },
+    "type": "object",
+    "required": [
+     "at",
+     "who"
+    ],
+    "title": "OccurrenceOut"
    },
    "Options": {
     "properties": {
@@ -6196,6 +6502,41 @@
      "question"
     ],
     "title": "QuestionAnswer"
+   },
+   "QueueOut": {
+    "properties": {
+     "queued": {
+      "type": "integer",
+      "title": "Queued"
+     },
+     "running": {
+      "type": "integer",
+      "title": "Running"
+     },
+     "oldest_wait_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Oldest Wait Seconds"
+     },
+     "max_running": {
+      "type": "integer",
+      "title": "Max Running"
+     }
+    },
+    "type": "object",
+    "required": [
+     "queued",
+     "running",
+     "oldest_wait_seconds",
+     "max_running"
+    ],
+    "title": "QueueOut"
    },
    "QuotaOut": {
     "properties": {

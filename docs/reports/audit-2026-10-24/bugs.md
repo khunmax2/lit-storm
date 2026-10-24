@@ -8,6 +8,8 @@
 
 **ส่วนที่สอง (Task 3b): กลุ่ม (d) (e) (f)** ฐานที่ตรวจ HEAD `15687d5` · (d) Discussion/Co-STORM Turn · (e) หน้าสถานะระบบ (`monitor.py`, `outcomes.py`), บัญชีผู้ใช้ใน `api/admin.py`, การ login/ตั้งรหัส · (f) MCP, token, engine Deep และ Medical (MRA) ผู้อ่านส่งข้อสงสัยมา 35 ข้อ (d 11, e 12, f 12) ลองทำซ้ำทีละข้อตาม `superpowers:systematic-debugging` ผลคือ **21 รหัสบั๊กใหม่ (BUG-24 ถึง BUG-44) คลุม 22 ข้อสงสัย** (e-S3 กับ f-S11 เป็นรากเดียวกันจึงรวมเป็น BUG-30), **2 ข้อสงสัย** ที่ต้องใช้เบราว์เซอร์ (ส่งต่อ Task 8/9 หรือ Task 5), **3 ข้อที่ซ้ำ** กับรหัสที่มีอยู่แล้ว (BUG-09, 12/15, 19) และ **8 ข้อที่ตัดทิ้ง** เทสต์ใหม่ทุกข้อต่อท้าย `server/tests/test_audit_findings.py` ใต้หัวข้อ `Task 3b` และรันด้วย `--runxfail` ครั้งหนึ่งแล้วว่าล้มที่ assertion ของตัวเอง ไม่มีข้อใดเป็น **วิกฤต** ข้อเดียวที่เป็น **กลาง** คือ BUG-26 นอกนั้นเป็น **ต่ำ**: `cd server && uv run pytest tests/test_audit_findings.py -k "bug24 or bug25 or bug26 or bug27 or bug28 or bug29 or bug3 or bug4" --runxfail`
 
+**ส่วนที่สาม (Task 4): ตรวจโค้ดอัตโนมัติ, migration และ backup** ฐานที่ตรวจ HEAD `d61f170` · `ruff` (F, B, E9) 162 รายการ ส่วนใหญ่เป็นแบบแผนของ FastAPI และไม่ใช่บั๊ก (นับไว้ใน `task-4-report.md`) เหลือ 1 รายการจริง (BUG-45) · migration ลง base แล้วขึ้น head ผ่านทุกขั้น แต่ `alembic check` พบ model กับ migration ไม่ตรง (BUG-46) · backup/restore ผ่าน แต่ตัวเลขใน `backup.sh` หลอกตา (BUG-47) · เทสต์ที่ไม่เสถียรที่รู้อยู่แล้วลงเป็น BUG-48 **รหัสใหม่ BUG-45 ถึง BUG-48 เป็น ต่ำ ทั้งหมด**
+
 **เกณฑ์ระดับ** ตามสเปก: **วิกฤต** ข้อมูลรั่วหรือระบบใช้ไม่ได้ · **สูง** กระทบผู้ใช้จริงบ่อย หรือต้องมีสิทธิ์บางอย่าง · **กลาง** · **ต่ำ** ไม่มีข้อใดในชุดนี้เป็น **วิกฤต** เพราะทุกข้อต้องมีบัญชีที่ login แล้ว หรือต้องมีความผิดปกติของระบบเกิดก่อน
 
 **หลักฐาน:** ทุกบั๊กมีเทสต์ใน `server/tests/test_audit_findings.py` ที่ยืนยันพฤติกรรมที่ **ถูกต้อง** เป็น `xfail(strict=True, raises=AssertionError, reason="BUG-xx")` จึงล้มวันนี้และจะผ่านเมื่อแก้ (strict จะฟ้องให้ถอด mark) ทุกเทสต์ถูกรันครั้งหนึ่งด้วย `--runxfail` เพื่อยืนยันว่าล้มที่ assertion ของตัวเอง ไม่ใช่ error อื่น: `cd server && uv run pytest tests/test_audit_findings.py -k test_bug --runxfail`
@@ -548,6 +550,54 @@
 | หลักฐาน | `api/mcp.py:392-404` (`_outline` พิมพ์เลขซ้อนเช่น `2.1`), `:407-416` (`_section` รับเฉพาะเลขหลักของหัวข้อบนสุดหรือชื่อหัวข้อบนสุด และ `wanted.isdigit()` เป็นจริงกับ `²`, `٣` แล้ว `int()` ยก `ValueError`) · เทสต์ `test_bug44_every_section_number_the_outline_prints_can_be_read` (`ToolError: No section '2.1'. The report has sections 1 to 2`) และ `test_bug44_a_section_number_that_is_not_a_number_is_told_so` (`ValueError` แทน `ToolError`) |
 
 **วิธีแก้ที่เสนอ:** แยกเลขซ้อนด้วย `.` แล้วเดินตามลำดับลูก และใช้ `str.isdecimal()`/regex `^\d+$` แทน `isdigit()` · ขนาด: เล็ก
+
+## BUG-45 — `render/brief.py` ใช้ f-string แบบ Python 3.12 แต่ `pyproject.toml` ประกาศว่ารองรับ 3.11
+
+| | |
+|---|---|
+| ระดับ | ต่ำ (ภาพ Docker ใช้ Python 3.12 จึงไม่กระทบระบบจริงวันนี้; กระทบเมื่อมีคนรันบน 3.11 ตามที่ประกาศ: รายงานแบบโต้ตอบ (`interactive`) สร้างไม่ได้) |
+| ผู้ใช้เห็นไหม | ไม่ (ในการติดตั้งปัจจุบัน) |
+| หลักฐาน | `server/pyproject.toml:5` (`requires-python = ">=3.11,<3.13"`) · `server/src/litstorm/render/brief.py:558` (`f'<div class="tile c{i}"{f' id="{block_id}"' if block_id else ""}>...'` ใช้เครื่องหมายคำพูดตัวนอกซ้ำในนิพจน์ซ้อน ซึ่งเพิ่งถูกต้องใน Python 3.12 / PEP 701) · `ruff check src --select F,B,E9` รายงาน `invalid-syntax: Cannot reuse outer quote character in f-strings on Python 3.11` · ยืนยันด้วยตัวแปล 3.11.15 จริง: `uv run --no-project --python 3.11 python -c "compile(open('src/litstorm/render/brief.py',encoding='utf-8').read(),'brief.py','exec')"` ได้ `SyntaxError: f-string: expecting '}'` ที่บรรทัด 558 · `render/interactive.py:936` import `brief` แบบ lazy จึงพังตอนสร้างรายงาน ไม่ใช่ตอนเริ่มระบบ |
+
+**สถานการณ์:** นักพัฒนาหรือผู้ติดตั้งที่ใช้ Python 3.11 (ซึ่งอยู่ในช่วงที่ประกาศ) เริ่มระบบได้ปกติ Run ทำงานได้ แต่เมื่อ Run จบแล้วสร้าง `interactive-*.html` จะได้ `SyntaxError` ที่ import `brief` และไม่มีรายงานแบบโต้ตอบ เทสต์ทั้งชุดรันบน 3.12 จึงไม่เคยเห็น
+
+**วิธีแก้ที่เสนอ:** ดึงนิพจน์ซ้อนออกเป็นตัวแปร (`ident = f' id="{block_id}"' if block_id else ""`) หรือเปลี่ยนเป็น `requires-python = ">=3.12,<3.13"` ให้ตรงกับภาพ Docker · ขนาด: เล็ก
+
+## BUG-46 — โมเดล SQLAlchemy กับ migration ไม่ตรงกัน: `alembic check` ล้มด้วย index 3 ตัว
+
+| | |
+|---|---|
+| ระดับ | ต่ำ (ฐานข้อมูลทำงานถูก; ผลคือ autogenerate ครั้งหน้าจะสร้าง migration ที่ลบ index เดิมแล้วสร้างตัวใหม่เอง และ `alembic check` ใช้เป็นด่านใน CI ไม่ได้) |
+| ผู้ใช้เห็นไหม | ไม่ |
+| หลักฐาน | บน stack `litstorm-audit` ที่ migration 0014: `docker exec -w /app/server litstorm-audit-api-1 alembic check` ได้ `FAILED: New upgrade operations detected` มี 6 รายการ (ลบ+เพิ่มอย่างละ 3): `api_tokens_user` vs `ix_api_tokens_user_id` · `question_refinements_user (user_id, created_at)` vs `ix_question_refinements_user_id (user_id)` · `visuals_requests_user (user_id, created_at)` vs `ix_visuals_requests_user_id (user_id)` · migration สร้างด้วยชื่อเอง (`0013_api_tokens.py:42`, `0007_question_refinements.py:24`, `0011_visuals_requests.py:24`) ขณะที่โมเดลใช้ `index=True` (`db/models.py:77, 240, 251`) · schema หลัง downgrade base แล้ว upgrade head เหมือนเดิมทุกบรรทัด (ดู `task-4-report.md`) แปลว่า migration เป็นฝ่ายที่ใช้งานจริง และ index แบบ `(user_id, created_at)` คือสิ่งที่ฐานข้อมูลมี |
+
+**สถานการณ์:** นักพัฒนารัน `alembic revision --autogenerate` เพื่อเพิ่มตารางใหม่ แล้วได้ migration ที่แอบมี `drop_index`/`create_index` ของสามตารางนี้ติดมา ถ้าไม่ตรวจก็จะเปลี่ยน index ประกอบ `(user_id, created_at)` ที่ใช้นับโควตารายวันเป็น index เดี่ยว
+
+**วิธีแก้ที่เสนอ:** ให้โมเดลประกาศ `Index("question_refinements_user", "user_id", "created_at")` ฯลฯ ตรงกับ migration (หรือสร้าง migration ใหม่ที่ปรับชื่อ) แล้วเพิ่มเทสต์ที่เรียก `alembic.autogenerate.compare_metadata` ให้ได้รายการว่าง · ขนาด: เล็ก
+
+## BUG-47 — `backup.sh` นับ "ตารางที่มีข้อมูล" จากทุกตารางในไฟล์ dump จึงรายงานเกินจริงและด่าน "ไม่ใช่ backup" ไม่เคยกันฐานข้อมูลว่าง
+
+| | |
+|---|---|
+| ระดับ | ต่ำ (ข้อความหลอกคนอ่านผล backup/verify; ข้อมูลไม่เสีย) |
+| ผู้ใช้เห็นไหม | ใช่ (ผู้ดูแลที่รัน `backup.sh` หรือ `--verify` เห็นจำนวนที่ไม่จริง) |
+| หลักฐาน | `stack/backup.sh:64-66` (`tables_in`: `pg_restore --list \| grep -c 'TABLE DATA'`) ซึ่ง pg_restore เขียนรายการ `TABLE DATA` ให้ทุกตารางไม่ว่ามีแถวหรือไม่ · `:124-125` ใช้เป็นด่านก่อนเขียน manifest · ลองจริงบน `litstorm-audit` (มีแถวแค่ 3 ตาราง: `system_settings` 1, `search_providers` 1, `alembic_version` 1 จาก `pg_stat_user_tables`; 12 ตารางที่เหลือว่าง): `PROJECT=litstorm-audit bash stack/backup.sh <dest>` พิมพ์ `verified  15 tables with data` และ manifest ใส่ `tables=15`; `--verify` พิมพ์ `tables with data: 15`; `--restore` พิมพ์ `database restored (15 tables with data)` ·  ผลข้างเคียง: dump ของฐานข้อมูลที่ถูกล้างหมดก็ผ่านด่าน (ตัวเลขเท่าเดิม) |
+
+**สถานการณ์:** ผู้ดูแลเห็น `15 tables with data` เชื่อว่าฐานข้อมูลสำรองครบ ทั้งที่ dump ว่างทั้งหมดก็ได้ตัวเลขเท่ากัน การเตือนว่า "ไม่ใช่ backup" (`lists no table data`) จึงเกิดได้เฉพาะ dump เสียจน `pg_restore --list` อ่านไม่ได้เท่านั้น
+
+**วิธีแก้ที่เสนอ:** เปลี่ยนข้อความเป็น "tables in dump" และให้ manifest เก็บแถวของตารางหลัก (`select count(*)` ของ `users`, `runs`) เทียบกับหลัง restore · ขนาด: เล็ก
+
+## BUG-48 — เทสต์ `test_two_runs_at_once_keep_their_own_language` ไม่เสถียร: ล้มเมื่อ process ลูกจองหน่วยความจำไม่ได้ และเทสต์ซ่อนสาเหตุ
+
+| | |
+|---|---|
+| ระดับ | ต่ำ (เทสต์ไม่เสถียร ไม่ใช่ผลิตภัณฑ์; แต่ทำให้ชุดเทสต์เต็มแดงบน baseline ทำให้แยกบั๊กจริงยาก) |
+| ผู้ใช้เห็นไหม | ไม่ |
+| หลักฐาน | `tests/test_supervisor.py:128-147` · รายงาน Task 3a และ 3b บันทึกว่าล้มในชุดเต็มบน baseline (889 passed, 1 failed; `KeyError: 'th'`) และผ่านเมื่อรันเดี่ยว · ในรอบ Task 4 (หน่วยความจำ commit ว่างของเครื่อง dev เหลือ 1.7 GB จาก 32 GB เพราะ Docker Desktop) **ล้มเมื่อรันเดี่ยว 3 จาก 3 ครั้ง**: `uv run pytest -q tests/test_supervisor.py::test_two_runs_at_once_keep_their_own_language` · สาเหตุที่ขุดได้ด้วยสคริปต์ที่พิมพ์ `outcome`: Run หนึ่งจบ `failed`/`engine_error` ("the run's process exited with code 1 and no outcome") และ `stderr.log` ของมันเต็มไปด้วย `OpenBLAS error: Memory allocation still failed after 10 retries, giving up.` (process ลูกที่ import numpy พร้อมกันสองตัว แต่ละตัวเปิด thread ตามจำนวน core = 16) · Run เดี่ยวแบบเดียวกันผ่าน · หลังหน่วยความจำ commit ว่างกลับมา (11 GB) เทสต์เดียวกันผ่านใน `pytest -m "not db"` (222 passed) ซึ่งสนับสนุนสาเหตุเรื่องหน่วยความจำ · เทสต์ใช้ `assert` ใน thread (`:138`) ซึ่ง pytest เก็บเป็นแค่ warning แล้วเทสต์ล้มที่ `KeyError: 'th'` บรรทัด 146 จึงไม่บอกสาเหตุ · ไม่มีการจำกัด `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS` ที่ใดใน `server/` และ `stack/` (grep ไม่พบ) |
+
+**สถานการณ์:** เครื่องที่หน่วยความจำ commit ใกล้เต็ม (หรือ container ที่มี memory limit เล็ก) เมื่อ Worker เริ่มสอง Run พร้อมกัน process ลูกของ Run หนึ่งอาจตายตั้งแต่ import numpy ผู้ใช้เห็น Run ล้มเป็น engine error โดยสาเหตุจริงอยู่แค่ใน `stderr.log` ของ Run
+
+**วิธีแก้ที่เสนอ:** (1) ทำให้เทสต์เก็บ `outcome` จาก thread แล้ว assert ในเธรดหลักพร้อมแนบ `stderr.log` · (2) ตั้ง `OPENBLAS_NUM_THREADS=1` (หรือค่าเล็ก) ใน environment ของ process ลูกที่ supervisor เปิด เพื่อไม่ให้แต่ละ Run จอง buffer ตามจำนวน core · ขนาด: เล็ก
 
 ---
 

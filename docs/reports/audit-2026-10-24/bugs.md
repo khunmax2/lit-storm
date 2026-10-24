@@ -696,3 +696,54 @@
 **แก้ที่เสนอ:** นับ timeout/ConnectionError/5xx เป็น `refused` พร้อม `last_refusal` และถ้าทุกคำค้นของ Run ล้มด้วยเหตุแบบนี้ ให้ล้มเป็น `retries_exhausted` (ระดับ system) ขนาด: เล็ก **เทสต์:** `test_bug53_a_search_service_that_cannot_be_reached_counts_as_refusing` (xfail strict)
 
 **ซ้ำกับของเดิม (ไม่เพิ่มรหัสใหม่):** `message` ดิบของผู้ให้บริการ/ระบบที่ API ส่งให้เจ้าของ Run (เช่น `AuthenticationError: litellm.AuthenticationError: ... OpenAIException - Incorrect API key provided`, `MRA cannot be reached: [Errno 101] Network is unreachable`) คือ BUG-50 เรื่องเดียวกัน
+
+
+---
+
+## ส่วนที่หก (Task 7): ขีดจำกัดและข้อมูลแปลกๆ
+
+ฐานที่ตรวจ HEAD `fdd97f5` บน stack audit (:8098) ผ่าน HTTP จริง (stub ของ Task 6 ไม่เสียเงิน) และ pytest ค่าที่ลอง: คิวเต็ม, Run พร้อมกันเกินเพดาน, หัวข้อ 10,000 ตัว, ไทย/อังกฤษ/emoji/RTL ปน, ชื่อโปรเจกต์ซ้ำ **ทำงานถูกต้อง** (ดู [live.md](live.md#ขีดจำกัดและข้อมูลแปลกๆ)) ที่พังมี 4 ข้อด้านล่าง ส่วนที่เกี่ยวกับ XSS อยู่ใน [security.md](security.md) (SEC-12 และตาราง "ผลของ Task 7")
+
+## BUG-54 — ตัวอักษร NUL หรือ surrogate เดี่ยวในข้อความที่ผู้ใช้พิมพ์ ทำให้ได้ 500
+
+| | |
+|---|---|
+| ระดับ | **กลาง** |
+| ผู้ใช้เห็นไหม | ใช่ (ข้อผิดพลาดทั่วไป ไม่รู้สาเหตุ) แต่ต้องมีคนส่งค่านั้นจริง (วางข้อความจากไฟล์ไบนารีหรือ PDF เสีย หรือ client ที่ยิง API ตรง) |
+| หลักฐาน | live บน stack audit: `POST /api/sessions` ด้วย `topic` ที่มี `\u0000` และอีกครั้งด้วย `\ud800` → `500 Internal Server Error` ทั้งคู่ เช่นเดียวกับ `POST /api/projects` (`name`), `request_key`, `sections[]`, `refinement[].answer` และ `PATCH /api/projects/{id}` (`search_scope`, `writing_style`) |
+
+ความยาวผ่าน pydantic แล้วค่อยพังตอนเขียน: Postgres `text` ไม่รับ NUL (`psycopg.DataError: PostgreSQL text fields cannot contain NUL (0x00) bytes` ส่วน `sections` และ `refinement` ที่เก็บเป็น JSONB ได้ `UntranslatableCharacter: \u0000 cannot be converted to text`) และ UTF-8 เข้ารหัส surrogate เดี่ยว `\ud800` ไม่ได้ (`UnicodeEncodeError`) JSON มาตรฐานยอมให้เขียนทั้งสองเป็น escape จึงไม่ถูกกันตอน parse Run ไม่ถูกสร้างและโควตาไม่ถูกหัก แต่ได้ 500 (log ขึ้น traceback) แทน 422 ข้อความของ Co-STORM (`text` ของ Turn เก็บใน `runs.turn` ซึ่งเป็น JSONB) น่าจะเป็นแบบเดียวกันตามโค้ด แต่ไม่ได้ทดสอบ เพราะต้องรอ warm start เสร็จ จึงไม่นับ
+
+**แก้ที่เสนอ:** ตัด `\x00` และปฏิเสธ surrogate ที่ชั้นเดียว เช่น validator กลางของ pydantic ใช้กับ `RunIn`, `DiscussionIn`, `TurnIn`, `ProjectIn`, `ProjectPatch`, `QuestionAnswer` และ `sections` แล้วตอบ 422 ขนาด: เล็ก **เทสต์:** `test_bug54_a_character_the_database_cannot_hold_is_refused_not_a_500` (2 ตัวแปร xfail strict)
+
+## BUG-55 — หัวข้อที่มีแต่ช่องว่างผ่านการตรวจ ได้ Run ที่ไม่มีหัวข้อ
+
+| | |
+|---|---|
+| ระดับ | **กลาง** |
+| ผู้ใช้เห็นไหม | ใช่ผ่าน API/MCP/token integration (หน้าเว็บกันเองด้วย `topic.trim().length >= 3`, `composer.tsx:598`) |
+| หลักฐาน | live: `POST /api/sessions` ด้วย `topic: "     "` (และ `"\n\n\n"`) → 201 `title: ""`; Run ถูกหยิบไปทำจริง `running` แล้วล้ม `empty_report` ที่ขั้น research ใน ~20 วินาที (ใช้ stub) `topic: ""` ในรายละเอียด Run และรายการ Session แสดงแถวไม่มีชื่อ |
+
+`RunIn.topic` มี `min_length=3` ซึ่งนับช่องว่าง แล้ว `new_run` ค่อย `.strip()` (`research.py:608`) topic ว่างจึงไปถึง engine: ขั้นอ่านโจทย์และค้นหารันด้วยหัวข้อว่าง กับโมเดลจริงจะเสียค่าโมเดลไปเรียก "ตีความหัวข้อว่าง" (ไม่ได้ลองกับโมเดลจริงเพราะห้ามเสียเงิน) กับ stub โควตาคืนเพราะ `empty_report` แต่ระหว่างนั้นกิน slot ของ Worker ผู้ใช้ MCP (`start` ใช้ `RunIn` เดียวกัน) ก็ผ่านได้
+
+**แก้ที่เสนอ:** strip ก่อนตรวจความยาว (`StringConstraints(strip_whitespace=True, min_length=3)`) ใช้กับ `RunIn`, `DiscussionIn`, `RefineIn` ขนาด: เล็ก **เทสต์:** `test_bug55_a_topic_of_only_spaces_is_refused`
+
+## BUG-56 — ชื่อโปรเจกต์ที่มีแต่ช่องว่างผ่านการตรวจ ได้โปรเจกต์ไม่มีชื่อ
+
+| | |
+|---|---|
+| ระดับ | ต่ำ |
+| ผู้ใช้เห็นไหม | ใช่ (การ์ดโปรเจกต์ไม่มีชื่อ แยกจากอันอื่นไม่ออก) |
+| หลักฐาน | live: `POST /api/projects {"name":"     "}` → 201 `name: ""`; `shots/t7-projects-blank-dup.png` เห็นการ์ดไม่มีชื่อ เทสต์พบว่า `PATCH` ตั้งชื่อ `"   "` ก็ผ่าน |
+
+สาเหตุเดียวกับ BUG-55: `ProjectIn.name` และ `ProjectPatch.name` มี `min_length` ก่อน `.strip()` (`research.py:196,208`) (BUG-30 ว่าด้วยชื่อว่างของ *บัญชีผู้ใช้* ต่างเรื่องกัน) **แก้ที่เสนอ:** วิธีเดียวกับ BUG-55 ขนาด: เล็ก **เทสต์:** `test_bug56_a_project_named_with_only_spaces_is_refused`
+
+## BUG-57 — เลขอ้างอิง `[n]` ในข้อความ alt ของรูป ทำให้ tag `<img>` เสีย
+
+| | |
+|---|---|
+| ระดับ | ต่ำ |
+| ผู้ใช้เห็นไหม | ใช่ (ข้อความแปลกๆ ต่อท้ายรูป) ต้องมีรูป markdown ที่มี `[n]` ใน alt (โมเดลเขียนได้) |
+| หลักฐาน | `html.render` และ export interactive (live): `<img src="https://example.org/a.png" alt="t <a class="cite" href="#src-1"><span class="b">[</span>1...` หน้ารายงานในเว็บแสดง `t <button type=` เป็นข้อความต่อจากรูป (`shots/t7-xss-report.png`) ไม่ทำให้ script รัน (ตรวจแล้ว ไม่มี attribute `onerror` เกิดขึ้น) |
+
+`CITATION.sub` ทำงานหลัง markdown ถูก render เป็น HTML จึงแทน `[1]` ที่อยู่ในค่า attribute ด้วย `<a class="cite" ...>` ที่มีเครื่องหมายคำพูด attribute `alt` จึงจบกลางคัน (เว็บแอปเกิดแบบเดียวกันด้วย `<button>`) **แก้ที่เสนอ:** ทำเลขอ้างอิงเป็น rule ของ markdown-it ก่อน render แทน regex หลัง render ขนาด: เล็ก **เทสต์:** `test_bug57_a_citation_in_an_images_alt_text_does_not_break_the_tag`

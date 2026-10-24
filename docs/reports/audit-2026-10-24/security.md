@@ -6,7 +6,7 @@
 
 ## สรุป
 
-ไม่มีข้อระดับ **วิกฤต** · **สูง** 4 ข้อ (SEC-02, 04, 05, 07) · กลาง 2 ข้อ (SEC-03, 06) · ต่ำ 4 ข้อ (SEC-08 ถึง 11)
+ไม่มีข้อระดับ **วิกฤต** · **สูง** 4 ข้อ (SEC-02, 04, 05, 07) · กลาง 2 ข้อ (SEC-03, 06) · ต่ำ 4 ข้อ (SEC-08 ถึง 11) · กลาง 1 ข้อเพิ่มจาก Task 7 (SEC-12)
 
 **เกณฑ์ที่ใช้จัดระดับ** (จากนิยามในสเปก): **วิกฤต** คือข้อมูลรั่วหรือระบบใช้ไม่ได้ โดยผู้โจมตีไม่ต้องมีสิทธิ์อะไรเลย · **สูง** คือกระทบผู้ใช้จริงบ่อย หรือผู้โจมตีที่มีสิทธิ์บางอย่าง (บัญชีผู้ใช้, บัญชีผู้ดูแล, บัญชีที่เคยยึดได้ หรือที่ยืนบน origin เดียวกัน) ใช้แล้วได้ความลับ ข้อมูลของคนอื่น หรือยึดบัญชีได้ · **กลาง** คือต้องอาศัยเงื่อนไขที่อยู่นอกมือผู้โจมตี (ตำแหน่งดักกลางทาง, รหัสผ่านที่อ่อน) หรือผลจำกัดกว่านั้น · **ต่ำ** คือการเสริมความแข็งแรง หรือข้อมูลรั่วเล็กน้อยที่ไม่ได้ความลับหรือบัญชีโดยตรง หัวข้อด้านล่างเรียงตามระดับ ไม่ใช่ตามรหัส
 
@@ -22,6 +22,7 @@
 | SEC-09 | ต่ำ | หน้าเว็บไม่มี CSP และไม่กันการถูกฝังใน frame | ไม่ | เทสต์ + curl |
 | SEC-10 | ต่ำ | network `agenta-mcp` เห็น API ทั้งตัว และ container ยังไม่ได้ลดสิทธิ์ | ไม่ | ขั้นตอนทำซ้ำ (อ่านจาก config) |
 | SEC-11 | ต่ำ | dependency ที่มีแพตช์และโค้ดเราใช้ถึง: certifi, aiohttp, markdown-it (JS) | ไม่ | เทสต์ + `npm audit` |
+| SEC-12 | กลาง | รูปใน markdown ของรายงานชี้ไปเว็บนอกได้ เปิดรายงานแล้วเบราว์เซอร์ผู้อ่านดึงรูปนั้นเอง (ช่องทางส่งข้อมูลออก/ติดตามผู้อ่าน) | ไม่ | เทสต์ + Edge บน stack audit |
 
 เทสต์อยู่ใน `server/tests/test_audit_findings.py` ทุกข้อเป็น `xfail(strict=True, raises=AssertionError, reason="SEC-xx")` และยืนยันพฤติกรรมที่ **ปลอดภัย** จึงล้มวันนี้ และจะผ่าน (ทำให้ strict ฟ้อง) เมื่อแก้แล้ว คนแก้ถอด mark ออก เทสต์ทุกข้อไม่เรียกโมเดลหรือบริการค้นหาจริง (ดักคำขอที่จะออกไว้ก่อน)
 
@@ -255,6 +256,21 @@ Content-Type: application/json
 
 ---
 
+## SEC-12 — รูปใน markdown ของรายงานชี้ไปเว็บนอกได้ เปิดรายงานแล้วเบราว์เซอร์ผู้อ่านดึงรูปนั้นเอง
+
+| | |
+|---|---|
+| ด้าน | ข้อมูลรั่วออกนอก / การติดตามผู้อ่าน |
+| ระดับ | **กลาง** (ต้องให้หน้าเว็บที่โมเดลอ่านทำให้โมเดลเขียน `![](https://...)` ลงรายงาน ซึ่งเป็นทาง prompt injection ที่รู้จักกัน ผลคือ IP ของผู้อ่านและสิ่งที่ฝังใน URL ไปถึงเซิร์ฟเวอร์ภายนอก) |
+| ผู้ใช้เห็นไหม | ไม่ (เห็นแค่รูปเสีย) |
+| หลักฐาน | `test_sec12_a_report_cannot_make_the_readers_browser_fetch_an_outside_image` และ Edge บน stack audit: แก้ `report.json` ของ Run ทดสอบให้มี `![t [1] ...](https://example.org/a.png)` แล้วเปิดหน้ารายงานกับไฟล์ export HTML เบราว์เซอร์พยายามขอ `https://example.org/a.png` (ดักด้วย `page.route` แล้วตัดทิ้ง ไม่มีคำขอออกจริง) |
+
+markdown-it ของ SPA และ `render/html.py` ยอมรูปทุก URL ตามค่าเริ่มต้น หน้า interactive และ brief ปลอดภัยเพราะมี CSP `img-src data:` (`render/interactive.py:901`, `brief.py:828`) แต่หน้ารายงานของเว็บไม่มี CSP (SEC-09) และไฟล์ HTML ที่ export ไม่มี CSP เลย
+
+**วิธีแก้ที่เสนอ:** ใน markdown-it และ `render/html.py` ปิด image rule (`md.disable("image")`) หรือยอมเฉพาะ `data:` และใส่ `img-src 'self' data:` ใน CSP ของ SPA (รวมกับ SEC-09) กับใน `<meta http-equiv="Content-Security-Policy">` ของ export HTML · ขนาด: **เล็ก**
+
+---
+
 ## ต้องยืนยันในเบราว์เซอร์ (Task 5/8)
 
 จากการอ่านโค้ด ข้อเหล่านี้ปลอดภัย แต่ผลจริงขึ้นกับเบราว์เซอร์ จึงให้ Task 5/8 ลองบน stack audit ด้วยบัญชีทดสอบ
@@ -265,6 +281,18 @@ Content-Type: application/json
 | markdown ของรายงาน (แก้ `report.json` ของ Run ทดสอบบน volume ของ stack audit ให้ section body เป็น `[x](javascript:alert(1)) <img src=x onerror=alert(1)> ![t [1] onerror=alert(1)](https://example.org/a.png)` และเพิ่ม source ที่ `url` เป็น `javascript:alert(document.domain)`) | | หน้ารายงาน: ลิงก์ javascript ไม่ถูกทำเป็นลิงก์ (markdown-it) HTML เป็นตัวอักษร และลิงก์ของแหล่งอ้างอิงถูก React 19 บล็อก · export HTML: href เป็น `#` (`render/html.py:376-377`) · observatory: ลิงก์ของแหล่งที่ไม่ใช่ http(s) เป็นข้อความ (`render/observatory.html:721`) · หน้า interactive: ไม่ทำลิงก์ (`render/brief.py:800,815`) |
 | หน้า interactive และ service page ใน iframe | เปิด DevTools ใน frame แล้วรัน `fetch("/litstorm/api/me").then(r => r.status)` และ `document.cookie` | fetch ล้มเพราะ origin เป็น `null` (CSP `sandbox` ไม่มี `allow-same-origin`) และ cookie ว่าง ทั้งตอนเปิดใน iframe และตอนเปิด URL ของ API ตรงๆ ในแท็บ |
 | observatory แบบ live (`/litstorm/api/runs/{id}/observatory`) | DevTools: `fetch("https://example.org")` | ถูก CSP `connect-src 'self'` บล็อก |
+
+
+**ผลของ Task 7 (Edge, stack audit, บัญชีทดสอบ, ดัก `dialog` ทุกหน้า):** ไม่มี alert เลยทั้งผู้ใช้และผู้ดูแล ไม่มีองค์ประกอบ `img[src=x]`, `svg[onload]` หรือ attribute `onerror`/`onload` เกิดขึ้นในหน้าไหน (สคริปต์ `server/tests/audit/odd_inputs.py xss`, ภาพ `shots/t7-xss-*.png`)
+
+| ข้อ | ผล |
+|---|---|
+| ชื่อ Project, หัวข้อ, ข้อความ Co-STORM (`<img src=x onerror=alert(1)>"><svg onload=alert(1)>`) | แสดงเป็นตัวอักษรใน: หน้าแรก, sidebar "ล่าสุด", `/projects`, หน้า Project, `/research`, หน้า Session, การ์ด Run ที่ล้ม, ถังขยะ (Project ที่ลบแล้ว), หน้ารายงาน (หัวเรื่อง, สารบัญ, breadcrumb), หน้า Discussion (ชื่อบทบาทและข้อความของผู้ใช้ที่ฉีดใน `discussion.json`) `<title>` ของเว็บเป็น "DeepLit" เสมอ `<title>` ของ observatory เป็นข้อความที่ escape แล้ว ("Observatory — &lt;img ...") |
+| markdown ของรายงาน (`[x](javascript:alert(1))`, `<img onerror>`, `<script>`, รูปที่ alt มี `[1]`, source ที่ `url` เป็น `javascript:`) | หน้ารายงาน: ไม่มีลิงก์ `javascript:` สักตัว HTML เป็นตัวอักษร ลิงก์ source ไม่ถูกทำ export HTML: ไม่มี `href="javascript:`, source ที่ url เป็น `javascript:` ได้ `href="#"` (`javascript:alert(document.domain)` ปรากฏเป็นข้อความ) observatory: ไม่มีลิงก์ของ source นั้น **พบ 2 เรื่องใหม่:** รูปจาก URL ภายนอกถูกเบราว์เซอร์ขอจริง (SEC-12) และเลขอ้างอิงใน alt ทำ `<img>` เสีย (BUG-57) |
+| หน้า interactive เปิดตรงในแท็บ | `fetch("/litstorm/api/me")` → `TypeError` (ถูกบล็อก) และ `document.cookie` → `SecurityError: The document is sandboxed and lacks the 'allow-same-origin' flag` |
+| observatory แบบ live | `fetch("https://example.org")` → `TypeError` (CSP `connect-src` บล็อก) |
+| หน้าสถานะระบบ (ผู้ดูแล) | ไม่แสดงหัวข้อหรือชื่อ Project ของผู้ใช้เลย (`/api/admin/monitor` ไม่มีสตริง `onerror` หลังมี Run ล้มที่หัวข้อเป็น payload) จึงไม่มีที่ให้ฉีด |
+| ไม่ได้ตรวจ | หน้า interactive ใน iframe (หน้ารายงานของเว็บไม่ได้ฝัง frame ในรอบนี้ ไม่พบ frame ให้ตรวจ) ตรวจเฉพาะตอนเปิดตรง ซึ่งคือ origin และ CSP ชุดเดียวกัน |
 
 ---
 

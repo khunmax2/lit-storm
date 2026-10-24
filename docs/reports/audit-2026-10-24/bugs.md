@@ -676,3 +676,23 @@
 | f-S7 (event ของ MRA ที่มี key `kind`/`event`/`seq` ชนกับอาร์กิวเมนต์ของ `progress.note`) | ตรวจ payload ที่ MRA ส่งจริงแล้วที่ `../MedicalReviewerAgent/backend/app` (`graph/nodes/*.py`, `worker/runner.py`): ทุก event ใช้ key `type`, `ref`, `title`, `found`, `queries`, `kept`, `total`, `ok`, `verified`, `uncertain`, `direction`, `design`, `refined_question` ฯลฯ และ worker เพิ่มเฉพาะ `elapsed_s` ไม่มี event ใดใช้ `kind`, `event` หรือ `seq` ความล้มเหลวเป็นทฤษฎีล้วน (ผู้อ่านเองให้ความมั่นใจต่ำและบอกให้ตรวจก่อน) |
 | f-S9 (Run ที่ถูก kill ทิ้ง Node CLI วิ่งต่อและใช้ token ต่อ) | อ่านต้นฉบับ CLI แล้ว (`../deep-research-web-ui/cli/litstorm.ts`): มี `process.stdin.on('end', () => (done ? process.exit(3) : ...))` และ stdin อยู่ในโหมด flowing (`on('data')`) เมื่อ process แม่ถูก kill ท่อ stdin ปิดและ CLI ออกเอง แม้กำลังรอ fetch (event loop ยังทำงาน) เอกสารบนหัวไฟล์ระบุไว้ ("It also exits when stdin closes, so it never outlives the process that started it") จึงไม่ใช่บั๊ก (ยังไม่ได้ลองกับ CLI ที่ bundle แล้วในคอนเทนเนอร์ Worker จริง แต่ตรรกะปิดช่องแล้ว) |
 | f-S10 (Deep CLI: usage ก่อน stage แรกหาย, ไม่มี `markdown` ได้ KeyError, เริ่มไม่ขึ้นทำให้ handle รั่ว) | อ่านต้นฉบับ CLI แล้ว: (a) `emit({type:'stage', stage:'research'})` ออกก่อนที่ `deepResearch` จะเรียกโมเดลตัวแรก จึงไม่มี usage ก่อน stage แรก (`onUsage` เรียกในโมเดลเท่านั้น); (b) event `report` ถูกสร้างพร้อม `markdown` เสมอ (สตริงว่างได้ ไม่ใช่ไม่มี key); (c) แต่ละ Run ทำงานใน process ของตัวเองที่จบเมื่อ Run จบ handle ที่ไม่ปิดไม่สะสม และ `BrokenPipe` ต้องแข่งกับการตายของ Node ภายในไม่กี่ร้อยมิลลิวินาที (ถ้า `node` หาไม่เจอ `Popen` ยกข้อยกเว้นเอง) ผลสุดท้ายคือ Run `engine_error` ที่คืนโควตา ไม่มีผลต่อผู้ใช้เกินข้อความ |
+
+---
+
+## ส่วนที่ห้า (Task 6): จำลองความล้มเหลว
+
+ฐานที่ตรวจ HEAD `92f2934` บน stack audit (:8098) ด้วย stub ที่ตอบ 429/401/ช้าเอง ไม่เสียเงินจริง รายละเอียดทั้งห้ากรณีอยู่ใน [live.md](live.md#จำลองความล้มเหลว) ผล 4 ใน 5 กรณีตรงที่คาดทุกข้อ (เหตุผล, Issue ที่เปิด, คืนโควตา) มี 1 ข้อใหม่คือ **BUG-53**
+
+## BUG-53 — บริการค้นหาที่ไม่ตอบ ถูกรายงานว่า "ค้นไม่พบเนื้อหา" และผู้ดูแลไม่ได้รับแจ้ง
+
+| | |
+|---|---|
+| ระดับ | **กลาง** |
+| ผู้ใช้เห็นไหม | ใช่ (ข้อความโทษหัวข้อ) และผู้ดูแลไม่เห็น |
+| หลักฐาน | Run `5c48bf01` (STORM, ไทย, เร็ว): Search Provider ชนิด SearXNG ชี้ไป stub ที่ตอบหลัง 75 วินาที (เกิน timeout 30 วินาที) Run ล้ม `empty_report` ที่ขั้น research ใน 71 วินาที `system_fault=false` `message="the research found no sources for this topic"` การ์ดบอกผู้ใช้ "ค้นคว้าแล้วไม่พบเนื้อหาที่จะเขียนรายงาน ลองเขียนหัวข้อให้กว้างขึ้น หรือเลือกบริการค้นหาอื่น" หน้าสถานะระบบขึ้นเป็น Issue ระดับ `watch` และ `open=false` ป้ายแจ้งเตือน (`/api/admin/monitor/open`) ไม่เพิ่ม |
+
+`knowledge_storm/rm.py` (`SearXNG.forward`) จับทุก exception ใน `except Exception` แล้วแค่ log จึงไม่นับเป็น `refused` ทั้งที่ engine มีทางบอก "the search provider refused N searches" อยู่แล้ว (`engines/storm/engine.py:204`, `costorm/engine.py:361`) timeout, connection refused และ 5xx ของบริการค้นหาจึงเหมือนหัวข้อที่ไม่มีแหล่ง โควตาคืนถูกต้อง แต่ถ้าบริการค้นหาล่มจริง ผู้ใช้ทุกคนจะถูกบอกให้แก้หัวข้อ และผู้ดูแลไม่ถูกเตือนเลย (Issue ที่เป็น `watch` ไม่เปิดป้าย)
+
+**แก้ที่เสนอ:** นับ timeout/ConnectionError/5xx เป็น `refused` พร้อม `last_refusal` และถ้าทุกคำค้นของ Run ล้มด้วยเหตุแบบนี้ ให้ล้มเป็น `retries_exhausted` (ระดับ system) ขนาด: เล็ก **เทสต์:** `test_bug53_a_search_service_that_cannot_be_reached_counts_as_refusing` (xfail strict)
+
+**ซ้ำกับของเดิม (ไม่เพิ่มรหัสใหม่):** `message` ดิบของผู้ให้บริการ/ระบบที่ API ส่งให้เจ้าของ Run (เช่น `AuthenticationError: litellm.AuthenticationError: ... OpenAIException - Incorrect API key provided`, `MRA cannot be reached: [Errno 101] Network is unreachable`) คือ BUG-50 เรื่องเดียวกัน

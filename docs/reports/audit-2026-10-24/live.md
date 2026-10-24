@@ -64,3 +64,25 @@
 
 - เพิกถอน key ของ MRA: prefix **`mra_ugcrPzYf`** ชื่อ `audit-2026-10-24` (`docker exec mra-api-1 python -m app.cli.keys revoke mra_ugcrPzYf`)
 - ลบบัญชี `audit-*@example.org` และไฟล์ `creds.json` ใน scratch เมื่อจบ
+
+## จำลองความล้มเหลว
+
+(Task 6, ฐาน HEAD `92f2934`, stack audit :8098) ไม่เสียเงิน: `server/tests/audit/stub_provider.py` เป็น HTTP server บนพอร์ต 9099 ตอบแบบ OpenAI-compatible และแบบ SearXNG โดยเลือกอาการจาก path (`/429/`, `/401/`, `/slow/` ตอบหลัง 75 วินาที) ชุดคำสั่งอยู่ที่ `server/tests/audit/failure_cases.py` (`prep`, `case NAME`, `restore`) ทุกกรณีใช้ STORM ไทย "เร็ว" ด้วยโมเดล `AUDIT stub model` (openai-compatible ชี้ stub) เริ่มโดย `audit-user` ค่าเริ่มต้นของ stack (Gemini 2.5 Flash Lite, SearXNG) ไม่ถูกเปลี่ยน หลังจบ: URL ของ Medical คืนเป็น `http://host.docker.internal:8088` (ตรวจ `medical/check` ได้ reachable และ key_ok), โมเดลกับ Search Provider ของ stub ถูกปิด, credential openai-compatible ถูกลบ ภาพการ์ดอยู่ที่ scratch `shots/t6-{429,401,worker,mra,search}.png` (ไม่มี secret)
+
+| กรณี | Run | คาด | ได้ | ข้อความที่ผู้ใช้เห็นบนการ์ด | Issue ในสถานะระบบ | คืนโควตา |
+|---|---|---|---|---|---|---|
+| 429 | `414a383b` | `retries_exhausted` | `retries_exhausted` (ล้มที่ research, 11 วิ) | "บริการภายนอกล้มเหลวซ้ำหลังลองใหม่แล้ว ... ไม่ใช่ความผิดของคุณ และผู้ดูแลระบบเห็นเรื่องนี้แล้ว · ลองใหม่ได้ในอีกสักครู่ · คืนโควตาแล้ว" | เปิด, system, `retries_exhausted:storm:AUDIT stub model` | true |
+| key ผิด (401) | `23947400` | `bad_configuration` | `bad_configuration` (research, 10 วิ) | "การตั้งค่าโมเดลหรือบริการค้นหาใช้งานไม่ได้ ผู้ดูแลระบบต้องตรวจสอบ ... ลองใหม่ได้หลังผู้ดูแลแก้การตั้งค่าแล้ว · คืนโควตาแล้ว" | เปิด, system, `bad_configuration:storm:...` | true |
+| worker ตาย | `343806f1` (ครั้งแรก `b662f031` ผลเหมือนกัน) | `interrupted` | `interrupted` ที่ขั้น interpret | ป้าย "ถูกขัดจังหวะ" + "ระบบประมวลผลหยุดทำงานระหว่างรอบนี้ ... ลองใหม่ได้เลย · คืนโควตาแล้ว" | เปิด, system, `interrupted:storm:...` นับ 2 (สองรอบที่ลอง) | true |
+| MRA ติดต่อไม่ได้ | `72c57906` | `service_unavailable` | `service_unavailable` (21 วิ) | "ติดต่อ Medical Review ไม่ได้ หรือมีงานรอนานเกินเวลาของ Run ... ลองใหม่ได้ในอีกสักครู่ · คืนโควตาแล้ว" | เปิด, system, `service_unavailable:medical:MedicalReviewerAgent` | true |
+| บริการค้นหาไม่ตอบ | `5c48bf01` | `empty_report` หรือ `retries_exhausted` | `empty_report` (research, 71 วิ), `system_fault=false` | "ค้นคว้าแล้วไม่พบเนื้อหาที่จะเขียนรายงาน ลองเขียนหัวข้อให้กว้างขึ้น หรือเลือกบริการค้นหาอื่น · คืนโควตาแล้ว" | **มีแต่ระดับ watch และไม่เปิด** (`open=false`, ป้ายไม่เพิ่ม ยัง 6) | true |
+
+ทั้งห้ากรณี `status` ถูกต้อง (`failed` ยกเว้น worker เป็น `interrupted`) และโควตาคืนทุกครั้ง ข้อที่ไม่ตรงความคาดหวัง: กรณีสุดท้ายผ่านเกณฑ์ "empty_report" แต่ทำให้ผู้ดูแลมองไม่เห็นว่าบริการค้นหาล่ม และข้อความโทษหัวข้อ → **BUG-53** ([bugs.md](bugs.md#bug-53--บริการค้นหาที่ไม่ตอบ-ถูกรายงานว่า-ค้นไม่พบเนื้อหา-และผู้ดูแลไม่ได้รับแจ้ง)) ส่วน `message` ดิบที่ API ส่งให้ผู้ใช้ (ชื่อ exception ของ litellm, `[Errno 101]`) เป็นเรื่องเดียวกับ BUG-50 ไม่เพิ่มรหัสใหม่ หน้าเว็บแสดงข้อความสุภาพทุกกรณี
+
+ข้อสังเกตอื่น: 429 และ 401 จาก stub ล้มภายใน 10 วินาทีเพราะ stub ตอบทันที (ไม่มี Retry-After ที่ยาว) ส่วน 429 จริงของ OpenRouter ที่ลองซ้ำ 30–150 วินาทีคือ BUG-51 ระหว่าง worker หยุด Run ยังแสดง `running` (ตรวจ 15 วินาทีหลังหยุด) และเปลี่ยนเป็น `interrupted` ราว 50 วินาทีหลัง worker กลับมา (Run `343806f1`)
+
+| รหัส | ระดับ | เรื่อง | หลักฐาน |
+|---|---|---|---|
+| UX-05 | ต่ำ | ระหว่าง worker ตาย ผู้ใช้เห็น Run "กำลังทำ" เรื่อยๆ ไม่มีสัญญาณว่าระบบประมวลผลไม่ทำงาน (สถานะรู้ก็ต่อเมื่อ worker กลับมากวาด) หน้าสถานะระบบก็รู้ทีหลังเช่นกัน ยังไม่ได้ตรวจว่า "คิว" ในหน้านั้นเตือนเมื่อไม่มี worker | Run `343806f1`; จับเวลา 15 วิ หลัง stop |
+| UX-06 | ต่ำ | การ์ดล้มด้วย `empty_report` ชี้ให้ "เขียนหัวข้อให้กว้างขึ้น" แม้สาเหตุคือบริการค้นหาล่ม ผู้ใช้จะลองแก้ที่ผิดที่ (ดู BUG-53) | `shots/t6-search.png` |
+| UX-07 | ต่ำ | การ์ดของ Run ที่ล้มก่อนเริ่มทำจริง (429/401 ที่ขั้น research) ยังมีปุ่ม "ดูเอเจนต์ทำงาน" และ "ดูเอเจนต์แบบ 3D" ทั้งที่ไม่มีอะไรให้ดู | `shots/t6-429.png`, `t6-401.png` |

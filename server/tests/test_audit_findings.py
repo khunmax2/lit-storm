@@ -1643,3 +1643,18 @@ def test_bug44_a_section_number_that_is_not_a_number_is_told_so():
         except Exception as error:  # noqa: BLE001
             raised = error
         assert isinstance(raised, ToolError), f"section {wanted!r}: {type(raised).__name__}"
+
+
+# --- BUG-53: a search service that does not answer reads as "no sources for this topic" ---
+
+
+@finding("BUG-53")
+def test_bug53_a_search_service_that_cannot_be_reached_counts_as_refusing():
+    """SearXNG.forward catches every exception, logs it and returns []. `refused` stays 0, so the
+    Engine says "no sources for this topic" (empty_report, a watch item, not an open Issue) instead of
+    "the search provider refused N searches" (live: Run 5c48bf01 on the audit stack)."""
+    from knowledge_storm.rm import SearXNG
+
+    rm = SearXNG(searxng_api_url="http://127.0.0.1:1/search")  # nothing listens on port 1
+    assert rm.forward("sleep and memory") == []
+    assert rm.refused >= 1, "the failed search was not counted, so the Run cannot say the service was down"

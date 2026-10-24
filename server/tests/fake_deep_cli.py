@@ -1,7 +1,7 @@
 """Stands in for the Deep Research CLI (cli/litstorm.ts) in tests: reads the
 config line, then writes the events its topic asks for, as JSON lines.
 
-    topic "[hang] ..." | "[fail] ..." | "[limited] ..." | "[empty] ..." | "[search] ..."; anything else: ok
+    topic "[hang] ..." | "[fail] ..." | "[limited] ..." | "[empty] ..." | "[search] ..." | "[stream] ..."; anything else: ok
 
 "[search]" asks the search address it was given, as the CLI asks a SearXNG,
 and reports on the first result.
@@ -44,6 +44,10 @@ if script == "search":
 if script == "hang":
     while True:
         time.sleep(1)
+if script == "stream":  # never quiet for a second: the research tree growing, a line every 50 ms
+    for i in range(160):
+        emit(type="node", id=f"n{i}", status="searching", query="Songkran")
+        time.sleep(0.05)
 if script == "fail":
     emit(type="error", message="the model refused")
     sys.exit(2)

@@ -8,6 +8,7 @@ calls a real model or search service; outbound calls are captured.
 
 import asyncio
 import http.server
+import json
 import re
 import ssl
 import threading
@@ -1019,3 +1020,626 @@ def test_bug23_listing_topics_does_not_cost_a_query_per_topic(admin, browser, co
     seed(40)
     many = statements()
     assert many - few <= 3, f"5 topics took {few} statements, 45 took {many}"
+
+
+# --- Task 3b: Discussions (Co-STORM Turns) --------------------------------------------------
+
+
+def _discussion_view(user, discussion_id):
+    r = user.get(f"/api/discussions/{discussion_id}")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@finding("BUG-24")
+@pytest.mark.db
+def test_bug24_changing_turns_per_quota_does_not_change_what_a_paid_block_allows(admin, browser, configured, db):
+    """The block size is read from the live setting each time (discussion.allowance), not kept with
+    the unit the owner paid. Paid for two blocks of 4 and 3 Turns left, the Administrator lowers
+    the setting to 2: the same Discussion is "used up" (max(0, 2*2-5) = 0) and the Turns the
+    owner paid for are refused until another unit is taken."""
+    _limits(admin, turns_per_quota=4)
+    user = make_user(admin, browser, "audit-alice@example.org")
+    d = _start_discussion(user)
+    _finish_turn(db, d["turns"][0]["id"])
+    for _ in range(3):  # the rest of the first block of 4
+        step = _ask_turn(user, d["id"], action="step")
+        assert step.status_code == 201, step.text
+        _finish_turn(db, step.json()["id"])
+    extended = _ask_turn(user, d["id"], action="step", extend=True)  # takes the second unit
+    assert extended.status_code == 201, extended.text
+    _finish_turn(db, extended.json()["id"])
+    before = _discussion_view(user, d["id"])["allowance"]
+    assert before["remaining"] == 3  # 2 blocks of 4, 5 Turns used
+    _limits(admin, turns_per_quota=2)
+    r = _ask_turn(user, d["id"], action="step")
+    assert r.status_code == 201, (r.status_code, r.text, _discussion_view(user, d["id"])["allowance"])
+
+
+@finding("BUG-25")
+@pytest.mark.db
+def test_bug25_a_report_that_finished_while_its_owner_pressed_stop_is_listed_with_the_others(admin, browser, configured, db):
+    """supervisor.py keeps such a Run's report "for them to read" but records the Turn as
+    cancelled; discussion_out lists only succeeded Turns, so a report the owner paid for (the
+    unit is not given back) is nowhere on the Discussion page. The Turn here is run through the
+    Worker with the fake engine, with Stop already pressed when it starts."""
+    from sqlalchemy import update
+
+    from litstorm.db.models import CANCELLING, Run
+    from litstorm.worker import main
+
+    user = make_user(admin, browser, "audit-alice@example.org")
+    d = _start_discussion(user)
+    _finish_turn(db, d["turns"][0]["id"])
+    asked = _ask_turn(user, d["id"], action="report")
+    assert asked.status_code == 201, asked.text
+    turn_id = asked.json()["id"]
+    claim = _ready_to_run(db, turn_id, [{"sleep": 1.5}])  # the fake engine ignores Stop, as a Turn nearly done does
+    db.execute(update(Run).where(Run.id == claim.run_id).values(status=CANCELLING))
+    db.commit()
+    main.run_one(claim)
+    row = _state(db, turn_id)
+    assert (row.status, row.quota_refunded) == ("cancelled", False) and row.report_title  # the report was kept
+    listed = [r["run_id"] for r in _discussion_view(user, d["id"])["reports"]]
+    assert listed == [turn_id], f"the finished report is not on the page (listed: {listed})"
+
+
+@finding("BUG-26")
+@pytest.mark.db
+def test_bug26_a_turn_in_a_discussion_is_refused_once_the_mode_is_switched_off(admin, browser, configured, db):
+    """start() checks modes.offered; ask() (and new_turn, which retry() uses too) does not look
+    at it again, as new_run does for every Run of the other modes. The Administrator's switch
+    stops new Discussions and nothing else."""
+    user = make_user(admin, browser, "audit-alice@example.org")
+    d = _start_discussion(user)
+    _finish_turn(db, d["turns"][0]["id"])
+    assert admin.put("/api/admin/engines/co-storm", json={"enabled": False}).status_code == 200
+    assert user.post("/api/discussions", json={"topic": "Songkran and tourism", "language": "th"}).status_code == 422
+    r = _ask_turn(user, d["id"], action="step")
+    assert r.status_code == 422 and r.json()["detail"] == "engine_not_available", (r.status_code, r.text)
+
+
+@finding("BUG-27")
+@pytest.mark.db
+def test_bug27_a_long_topic_is_researched_whole_or_refused(admin, browser, configured, db):
+    """DiscussionIn accepts 500 characters; the Discussion's title is cut at 300 and the Turn
+    takes its topic from that title, so what Co-STORM researches is the first 300 characters
+    of the question, cut wherever they end (a STORM Run keeps the whole topic)."""
+    topic = " ".join(f"question{i:03d}" for i in range(40))[:450]
+    assert 300 < len(topic) <= 500
+    d = _start_discussion(make_user(admin, browser, "audit-alice@example.org"), topic=topic)
+    asked = d["turns"][0]["topic"]
+    assert asked == topic, f"the topic was {len(topic)} characters and the Turn researches {len(asked)}"
+
+
+# --- Task 3b: System status, accounts and signing in ----------------------------------------
+
+from test_monitor import ended as _ended_run  # noqa: E402
+from test_monitor import started as _started_run  # noqa: E402
+
+
+@finding("BUG-28")
+@pytest.mark.db
+def test_bug28_two_administrators_acknowledging_at_once_keep_both_acknowledgements(admin, db, monkeypatch):
+    """acknowledge() reads the one `monitor.acks` row, then writes it back whole, with no lock:
+    the barrier sits between the read and the write, and the second commit replaces the
+    first's. Both Administrators got 204; one acknowledgement is gone and its Issue is open."""
+    from litstorm import monitor
+
+    assert admin.post("/api/admin/monitor/acknowledge", json={"keys": ["first:seen"]}).status_code == 204  # the row exists
+    _meet_at(monkeypatch, monitor, "_now", after=False)
+    results = _together(
+        lambda: admin.post("/api/admin/monitor/acknowledge", json={"keys": ["issue:a"]}),
+        lambda: admin.post("/api/admin/monitor/acknowledge", json={"keys": ["issue:b"]}),
+    )
+    assert [r.status_code for r in results if not isinstance(r, Exception)] == [204, 204], results
+    assert {"issue:a", "issue:b"} <= set(monitor.acks(db))
+
+
+@finding("BUG-28")
+@pytest.mark.db
+def test_bug28_the_very_first_two_acknowledgements_at_once_do_not_end_in_a_500(admin, db, monkeypatch):
+    """With no row yet, both requests add it and one commit fails on the primary key: an
+    unhandled IntegrityError, the page's "Acknowledge" answered with a 500."""
+    from litstorm import monitor
+
+    _meet_at(monkeypatch, monitor, "_now", after=False)
+    results = _together(
+        lambda: admin.post("/api/admin/monitor/acknowledge", json={"keys": ["issue:a"]}),
+        lambda: admin.post("/api/admin/monitor/acknowledge", json={"keys": ["issue:b"]}),
+    )
+    assert [r.status_code for r in results if not isinstance(r, Exception)] == [204, 204], results
+    assert {"issue:a", "issue:b"} <= set(monitor.acks(db))
+
+
+@finding("BUG-29")
+@pytest.mark.db
+def test_bug29_runs_waiting_for_an_account_that_was_turned_off_do_not_stay_in_the_queue(admin, browser, configured, db):
+    """The Worker never claims a deactivated owner's Run (queue._next_run), and turning the
+    account off does nothing else to it: the Run stays `queued` (its quota reserved) and System
+    status counts it as waiting, with an oldest-wait that only grows, until the account is
+    turned on again (when it suddenly starts)."""
+    from litstorm import monitor
+
+    user = make_user(admin, browser, "audit-alice@example.org")
+    research(user)
+    owner = user.get("/api/me").json()["id"]
+    assert admin.patch(f"/api/admin/users/{owner}", json={"is_active": False}).status_code == 200
+    assert _claim_one() is None  # nothing is started for it
+    waiting = monitor.queue(db)
+    assert waiting["queued"] == 0, f"System status still counts the queued Run: {waiting}"
+
+
+@finding("BUG-30")
+@pytest.mark.db
+@pytest.mark.parametrize("field", ["is_active", "name", "role"])
+def test_bug30_an_account_patched_with_an_explicit_null_is_refused_not_a_500(admin, browser, db, field):
+    """UserPatch lets null through for every field (it is meant for the three quota ones, where
+    null clears an override) and patch_user sets each one: a NOT NULL column, an IntegrityError
+    nobody catches."""
+    user = make_user(admin, browser, "audit-alice@example.org")
+    owner = user.get("/api/me").json()["id"]
+    try:
+        outcome = admin.patch(f"/api/admin/users/{owner}", json={field: None}).status_code
+    except Exception as error:  # noqa: BLE001 - the 500 the page would have been given
+        outcome = type(error).__name__
+    assert outcome == 422, f"PATCH {{{field!r}: null}} answered {outcome}"
+
+
+@finding("BUG-30")
+@pytest.mark.db
+def test_bug30_an_account_cannot_be_given_a_blank_name(admin, browser, db):
+    """create_user strips the name; patch_user stores what it is given: only spaces pass
+    min_length=1 and the account is shown as nobody."""
+    user = make_user(admin, browser, "audit-alice@example.org")
+    owner = user.get("/api/me").json()["id"]
+    r = admin.patch(f"/api/admin/users/{owner}", json={"name": "   "})
+    assert r.status_code == 422 or r.json()["name"].strip(), f"stored name {r.json()['name']!r}"
+
+
+@finding("BUG-30")
+@pytest.mark.db
+@pytest.mark.parametrize("field", ["is_active", "name"])
+def test_bug30_an_integration_patched_with_an_explicit_null_is_refused_not_a_500(admin, db, field):
+    """IntegrationPatch has the same optional fields over the same NOT NULL columns
+    (monthly_run_quota: null is meant, and works)."""
+    account = admin.post("/api/admin/integrations", json={"name": "DeepWitya"}).json()
+    try:
+        outcome = admin.patch(f"/api/admin/integrations/{account['id']}", json={field: None}).status_code
+    except Exception as error:  # noqa: BLE001
+        outcome = type(error).__name__
+    assert outcome == 422, f"PATCH {{{field!r}: null}} answered {outcome}"
+
+
+@finding("BUG-31")
+@pytest.mark.db
+def test_bug31_signed_in_browsers_that_expired_are_cleaned_up(admin, browser, db, one_pass):
+    """Every sign-in adds an auth_sessions row for 14 days and nothing ever deletes it:
+    deps only ignores an expired row. After a later sign-in and a pass of the Worker (which
+    does the other housekeeping), the expired rows are still there."""
+    from datetime import datetime, timedelta, timezone
+
+    from litstorm.db.models import AuthSession, User
+
+    make_user(admin, browser, "audit-alice@example.org", password="the audit password 1")
+    owner = db.query(User).filter_by(email="audit-alice@example.org").one()
+    db.add_all([
+        AuthSession(token_hash=uuid.uuid4().hex + uuid.uuid4().hex[:32], user_id=owner.id, csrf_token="x",
+                    expires_at=datetime.now(timezone.utc) - timedelta(days=1 + i))
+        for i in range(3)
+    ])
+    db.commit()
+    signed_in = browser().post("/api/auth/login", json={"email": "audit-alice@example.org", "password": "the audit password 1"})
+    assert signed_in.status_code == 200
+    one_pass()
+    db.expire_all()
+    expired = db.query(AuthSession).filter(AuthSession.expires_at < datetime.now(timezone.utc)).count()
+    assert expired == 0, f"{expired} expired sign-ins are still stored"
+
+
+@finding("BUG-32")
+@pytest.mark.db
+def test_bug32_a_short_topic_does_not_split_one_failure_into_two_issues(admin, browser, configured, db):
+    """monitor._said replaces the topic wherever it occurs as text, inside words too, and the
+    result is part of the Issue's key: the same provider message, from a Run whose topic is
+    "limit" and from one about "weather", is two Issues (and "Rate limit" reads "Rate ...")."""
+    said = "litellm.RateLimitError: rate limit reached for key"
+    alice = make_user(admin, browser, "audit-alice@example.org")
+    for topic in ("limit", "weather"):
+        _ended_run(db, _started_run(alice, topic), reason="retries_exhausted", message=said, engine="storm")
+    issues = admin.get("/api/admin/monitor").json()["issues"]
+    assert [i["count"] for i in issues] == [2], [(i["count"], i["message"]) for i in issues]
+
+
+@finding("BUG-33")
+@pytest.mark.db
+def test_bug33_words_of_the_topic_do_not_decide_why_an_engine_error_is_filed(admin, browser, configured, db):
+    """monitor._reason runs outcomes.from_message over the whole message of an engine_error:
+    a fault in our code that quotes a topic about "rate limit policy" is filed as a provider
+    that kept refusing (retries_exhausted), and the Administrator chases a provider that is fine."""
+    alice = make_user(admin, browser, "audit-alice@example.org")
+    topic = "rate limit policy"
+    _ended_run(db, _started_run(alice, topic), reason="engine_error", engine="storm",
+               message=f"KeyError: could not find a section for '{topic}'")
+    issues = admin.get("/api/admin/monitor").json()["issues"]
+    assert [i["reason"] for i in issues] == ["engine_error"]
+
+
+@finding("BUG-34")
+@pytest.mark.db
+def test_bug34_one_fault_with_different_ids_in_its_words_is_one_issue(admin, browser, configured, db):
+    """The Issue's key turns digits into "#" but not hex letters: a message with a request or
+    run id (ab12cd34, ef56ab78) is a new Issue for every Run, and one acknowledgement covers
+    one occurrence."""
+    alice = make_user(admin, browser, "audit-alice@example.org")
+    for ident in ("ab12cd34", "ef56ab78", "cd90ef12"):
+        _ended_run(db, _started_run(alice), reason="bad_configuration", engine="storm",
+                   message=f"RuntimeError: request {ident} refused")
+    issues = admin.get("/api/admin/monitor").json()["issues"]
+    assert [i["count"] for i in issues] == [3], [(i["count"], i["message"]) for i in issues]
+
+
+@finding("BUG-34")
+@pytest.mark.db
+def test_bug34_two_different_faults_with_the_same_first_words_are_two_issues(admin, browser, configured, db):
+    """Only the first 40 characters of the message are in the key: two BadRequests of one model
+    that differ after them (which is what tells them apart) share an Issue and an acknowledgement."""
+    alice = make_user(admin, browser, "audit-alice@example.org")
+    for cause in ("model a/m is not available in your region", "reasoning is not supported by this model"):
+        _ended_run(db, _started_run(alice), reason="bad_configuration", engine="storm",
+                   message=f"litellm.BadRequestError: OpenrouterException - {cause}")
+    issues = admin.get("/api/admin/monitor").json()["issues"]
+    assert len(issues) == 2, [(i["count"], i["message"]) for i in issues]
+
+
+@finding("BUG-35")
+@pytest.mark.db
+def test_bug35_a_set_password_link_can_be_used_once_even_by_two_at_the_same_moment(admin, browser, db, monkeypatch):
+    """set_password reads the link, then deletes it with no lock on its row: two requests with
+    one token both pass the check (the barrier sits right after it) and both set a password and
+    both sign in; the second DELETE finds nothing and only warns."""
+    from litstorm import security
+
+    link = admin.post("/api/admin/users", json={"email": "audit-alice@example.org", "name": "U"}).json()["link"]
+    token = link.split("#", 1)[1]
+    _meet_at(monkeypatch, security, "hash_password", after=False)
+    first, second = browser(), browser()
+    results = _together(
+        lambda: first.post("/api/auth/password", json={"token": token, "password": "the first password 1"}),
+        lambda: second.post("/api/auth/password", json={"token": token, "password": "the second password 2"}),
+    )
+    outcome = sorted(str(type(r).__name__ if isinstance(r, Exception) else r.status_code) for r in results)
+    assert outcome == ["200", "410"], f"one link used twice at once answered {outcome}"
+
+
+@finding("BUG-36")
+@pytest.mark.db
+def test_bug36_an_integration_account_is_not_patched_through_the_people_endpoint(admin, db):
+    """reset_link and delete_user answer 404 for an integration account ("it has a page of its
+    own", api/tokens.py); patch_user has no such check, and gives it the role admin."""
+    from litstorm.db.models import User
+
+    account = admin.post("/api/admin/integrations", json={"name": "DeepWitya"}).json()
+    r = admin.patch(f"/api/admin/users/{account['id']}", json={"role": "admin"})
+    db.expire_all()
+    role = db.get(User, uuid.UUID(account["id"])).role
+    assert r.status_code == 404 and role == "user", (r.status_code, role)
+
+
+# --- Task 3b: Discussions, the rest ---------------------------------------------------------
+
+
+@finding("BUG-37")
+@pytest.mark.db
+def test_bug37_a_request_key_used_again_for_another_discussion_does_not_hand_back_the_first_turn(admin, browser, configured, db):
+    """_existing looks a request_key up by owner only: a key that already made a Turn of
+    Discussion A, sent with a different Turn for Discussion B, is answered 201 with A's Turn and
+    B is asked nothing. (The web app sends no key with a Turn, and a new key with each start; this
+    is for API and MCP clients.)"""
+    user = make_user(admin, browser, "audit-alice@example.org")
+    first = _start_discussion(user)
+    _finish_turn(db, first["turns"][0]["id"])
+    second = _start_discussion(user)
+    _finish_turn(db, second["turns"][0]["id"])
+    a = _ask_turn(user, first["id"], action="step", request_key="same-key")
+    assert a.status_code == 201, a.text
+    b = _ask_turn(user, second["id"], action="say", text="What about prices?", request_key="same-key")
+    assert b.status_code >= 400 or b.json()["session_id"] == second["id"], (
+        f"asked of Discussion B, answered with Discussion A's Turn: {b.json()['turn']}"
+    )
+
+
+@finding("BUG-38")
+@pytest.mark.slow
+def test_bug38_two_snippets_of_one_page_cited_together_are_one_citation(tmp_path):
+    """report_files gives every snippet of a page the page's lowest number, and rewrites each
+    [n] on its own: a model that cites both snippets of one page, "[4][9]", is left with "[1][1]"
+    in the report the owner exports."""
+    from litstorm.engines.costorm import engine
+    from litstorm.engines.storm import normalize
+    from test_costorm_engine import _info, _runner
+
+    runner = _runner([
+        _info("https://a.test", "A", ["first passage"], 4),
+        _info("https://b.test", "B", ["other"], 5),
+        _info("https://a.test", "A", ["second passage"], 9),
+    ])
+    engine.report_files(runner, "# Intro\n\nA claim [4][9].\n\n# History\n\nOld [9][5].", str(tmp_path))
+    report, _ = normalize.normalize(str(tmp_path), "x", "en")
+    bodies = [report["lead"], *(s["body"] for s in report["sections"])]
+    doubled = [b for b in bodies if re.search(r"(\[\d+\])\1", b)]
+    assert not doubled, f"the same citation twice in a row: {doubled}"
+
+
+# --- Task 3b: MCP, tokens and the engines -----------------------------------------------------
+
+from test_deep_engine import engine  # noqa: E402,F401 - a fixture
+
+
+@finding("BUG-39")
+@pytest.mark.db
+def test_bug39_starting_again_after_cancelling_does_not_hand_back_the_run_being_cancelled(admin, browser, configured, db):
+    """_repeat_of leaves out failed, cancelled and interrupted Runs but not `cancelling`, which
+    lasts until the child stops (up to 30 s): the agent that cancels and asks again is told
+    "this is that run, no quota used", and a few seconds later that run is cancelled."""
+    from datetime import datetime, timezone
+
+    from litstorm.db.models import RUNNING, Run
+
+    user = make_user(admin, browser, "audit-alice@example.org")
+    token = _token(user)
+    started = _mcp_start(token)
+    run = db.get(Run, uuid.UUID(started["id"]))
+    run.status, run.started_at = RUNNING, datetime.now(timezone.utc)
+    db.commit()
+    stopped = user.post(f"/api/runs/{started['id']}/cancel")
+    assert stopped.status_code == 200 and stopped.json()["status"] == "cancelling", stopped.text
+    again = _mcp_start(token)
+    assert again["id"] != started["id"], "started again, handed the run that is being cancelled"
+
+
+class _MiniMRA:
+    """A stand-in MRA whose answers a test lists, in order (the last repeats): what each
+    POST /reviews does, what the event stream sends, and what GET /reviews/{id} says."""
+
+    ID = "11111111-2222-3333-4444-555555555555"
+
+    def __init__(self, post=None, events=None, review=None):
+        from test_medical import EVENTS, RESULT
+
+        self.post = list(post or [(0, 202, {"review_id": self.ID, "cached": False})])
+        self.events = list(events or [(200, EVENTS)])
+        self.review = list(review or [(200, {"id": self.ID, "status": "done", "cost_usd": 0.0421, "result": RESULT})])
+        self.posted, self.streamed, self.fetched = 0, 0, 0
+
+    @staticmethod
+    def _next(items):
+        return items.pop(0) if len(items) > 1 else items[0]
+
+    def serve(self):
+        import http.server
+        import time
+        from urllib.parse import parse_qs, urlparse
+
+        mra = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def _send(self, code, body, kind="application/json"):
+                data = body if isinstance(body, bytes) else json.dumps(body).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", kind)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):  # noqa: N802
+                self.rfile.read(int(self.headers["Content-Length"]))
+                mra.posted += 1
+                delay, code, body = mra._next(mra.post)
+                time.sleep(delay)
+                try:
+                    self._send(code, body)
+                except OSError:
+                    pass  # the client gave up waiting
+
+            def do_GET(self):  # noqa: N802
+                url = urlparse(self.path)
+                if url.path.endswith("/events"):
+                    mra.streamed += 1
+                    code, frames = mra._next(mra.events)
+                    if code != 200:
+                        return self._send(code, {"detail": "no"})
+                    since = int(parse_qs(url.query).get("since", ["0"])[0])
+                    text = "".join(f"id: {i}\nevent: {kind}\ndata: {json.dumps(data)}\n\n"
+                                   for i, (kind, data) in enumerate(frames, 1) if i > since)
+                    return self._send(200, text.encode(), "text/event-stream")
+                if url.path == f"/api/v1/reviews/{mra.ID}":
+                    mra.fetched += 1
+                    code, body = mra._next(mra.review)
+                    return self._send(code, body)
+                if url.path == f"/r/{mra.ID}/report.html":
+                    return self._send(200, b"<!doctype html>", "text/html")
+                self._send(404, {"detail": "not found"})
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{server.server_port}"
+        self.server = server
+        return self
+
+
+@pytest.fixture
+def mini_mra(monkeypatch):
+    from litstorm.engines.medical import engine
+
+    monkeypatch.setattr(engine, "_sleep", lambda seconds, cancel: None)  # the waits between tries
+    made = []
+
+    def make(**answers):
+        made.append(_MiniMRA(**answers).serve())
+        return made[-1]
+
+    yield make
+    for mra in made:
+        mra.server.shutdown()
+
+
+def _review(mra, tmp_path, **service):
+    """MedicalEngine against `mra`: ("report", report) or (the exception, None)."""
+    from test_medical import _run
+
+    try:
+        report, progress = _run(mra, tmp_path, **service)
+        return report, progress
+    except Exception as error:  # noqa: BLE001 - what the Worker would have ended the Run with
+        return error, None
+
+
+@finding("BUG-40")
+def test_bug40_a_blip_when_the_stream_closed_early_does_not_fail_a_review_mra_is_still_running(mini_mra, tmp_path):
+    """_follow retries a dropped stream but not the GET that asks what became of the review when
+    a stream closes without an ending: an MRA that is restarting answers 503 once and the Run
+    ends engine_error (HTTPStatusError), though the review goes on (and a retry gets it cached)."""
+    from test_medical import EVENTS, RESULT
+
+    done = (200, {"id": _MiniMRA.ID, "status": "done", "cost_usd": 0.0421, "result": RESULT})
+    mra = mini_mra(
+        events=[(200, EVENTS[:5]), (200, EVENTS)],  # closes after 5 events, then the whole story
+        review=[(503, {"detail": "restarting"}), done],
+    )
+    outcome, _ = _review(mra, tmp_path)
+    assert not isinstance(outcome, Exception), f"the Run ended with {type(outcome).__name__}: {outcome}"
+
+
+@finding("BUG-40")
+def test_bug40_a_blip_on_the_final_fetch_does_not_throw_away_a_review_that_is_done(mini_mra, tmp_path):
+    """The review is done and the GET that fetches its result is not retried: one 503 and the
+    paid-for review is lost to the Run (engine_error)."""
+    from test_medical import RESULT
+
+    mra = mini_mra(review=[(503, {"detail": "restarting"}), (200, {"id": _MiniMRA.ID, "status": "done",
+                                                                    "cost_usd": 0.0421, "result": RESULT})])
+    outcome, _ = _review(mra, tmp_path)
+    assert not isinstance(outcome, Exception), f"the Run ended with {type(outcome).__name__}: {outcome}"
+
+
+@finding("BUG-40")
+def test_bug40_a_refused_key_on_the_stream_is_not_reported_as_an_mra_that_went_quiet(mini_mra, tmp_path):
+    """A 401 on the event stream (the key was rotated while the review ran) is retried six
+    times like an outage and reported as service_unavailable; the submit says
+    bad_configuration for the same 401."""
+    mra = mini_mra(events=[(401, None)])
+    outcome, _ = _review(mra, tmp_path)
+    assert getattr(outcome, "reason", None) == "bad_configuration", f"{type(outcome).__name__}: {outcome}"
+
+
+@finding("BUG-41")
+def test_bug41_a_review_started_by_the_run_itself_is_not_given_back_as_free(mini_mra, tmp_path, monkeypatch):
+    """MRA took longer than the read timeout to answer the first POST (it had accepted the
+    review and started paying for it); the retry is answered `cached: true` with the same
+    review. The Run is then treated as one that cost nothing: "service_cache" noted, its price
+    recorded as 0 and its quota given back (worker.queue.finish)."""
+    import httpx
+
+    from litstorm.engines.medical import engine
+    from test_medical import EVENTS
+
+    monkeypatch.setattr(engine, "TIMEOUT", httpx.Timeout(connect=5.0, read=0.5, write=5.0, pool=5.0))
+    mra = mini_mra(post=[(1.5, 202, {"review_id": _MiniMRA.ID, "cached": False}),
+                         (0, 202, {"review_id": _MiniMRA.ID, "cached": True})])
+    outcome, progress = _review(mra, tmp_path)
+    assert not isinstance(outcome, Exception), f"{type(outcome).__name__}: {outcome}"
+    assert mra.posted == 2  # it did ask twice
+    kinds = [k for k, _ in progress.notes]
+    assert "service_cache" not in kinds and progress.usages == [0.0421], (kinds, progress.usages)
+
+
+@finding("BUG-42")
+def test_bug42_an_outcome_without_a_quote_does_not_lose_the_review():
+    """convert.to_report calls .strip() on `evidence_quote` taken with .get(key, ""), which
+    defaults a missing key only: an outcome whose quote is null (MRA's own stub cards have
+    them) raises AttributeError out of the Engine after the review was paid for."""
+    from litstorm import report as report_mod
+    from litstorm.engines.medical.convert import to_report
+    from test_medical import RESULT
+
+    papers = [{**RESULT["papers"][0], "card": {"study_design": "RCT", "outcomes": [{"evidence_quote": None}]}},
+              *RESULT["papers"][1:]]
+    try:
+        report = to_report({"result": {**RESULT, "papers": papers}}, "en", "drug X and Z")
+    except Exception as error:  # noqa: BLE001
+        report = None
+        failure = f"{type(error).__name__}: {error}"
+    assert report is not None, failure
+    report_mod.validate(report)
+
+
+@finding("BUG-43")
+def test_bug43_a_stop_is_noticed_while_the_deep_cli_keeps_talking(engine, tmp_path):
+    """DeepEngine checks for a stop only when the CLI has been quiet for a second, and at a
+    stage change. A CLI that writes a line every 50 ms for 8 s (the research tree growing) is
+    not stopped until it has finished; the supervisor kills it after its 30 s grace instead."""
+    import time
+
+    from test_deep_engine import Cancel, run
+
+    from litstorm.engines.base import Cancelled
+
+    cancel = Cancel()
+    threading.Timer(1.0, cancel.asked.set).start()
+    started = time.monotonic()
+    try:
+        run(engine, tmp_path, "stream", cancel=cancel)
+        outcome = "finished"
+    except Cancelled:
+        outcome = "cancelled"
+    waited = time.monotonic() - started
+    assert outcome == "cancelled" and waited < 4, f"asked to stop after 1 s: {outcome} after {waited:.1f} s"
+
+
+def _nested_report():
+    return {
+        "title": "T", "language": "en", "lead": "",
+        "sections": [
+            {"id": "s1", "heading": "Background", "body": "First [1].", "children": []},
+            {"id": "s2", "heading": "Methods", "body": "Second.", "children": [
+                {"id": "s2a", "heading": "Search", "body": "Nested text [1].", "children": []}]},
+        ],
+        "sources": [{"id": 1, "url": "https://a.test", "title": "A", "evidence": []}],
+    }
+
+
+@finding("BUG-44")
+def test_bug44_every_section_number_the_outline_prints_can_be_read():
+    """_outline numbers nested sections ("2.1. Search") and tells the model to ask for part
+    'section:N'; _section takes only a top-level number or a top-level heading, and answers
+    "No section '2.1'" for a number the outline just printed."""
+    from litstorm.api import mcp
+
+    report = _nested_report()
+    assert "2.1. Search" in mcp._outline(report)
+    try:
+        text = mcp._section(report, "2.1")
+    except Exception as error:  # noqa: BLE001
+        text = f"{type(error).__name__}: {error}"
+    assert "Nested text" in text, text
+
+
+@finding("BUG-44")
+def test_bug44_a_section_number_that_is_not_a_number_is_told_so():
+    """str.isdigit() is true for "²" and "٣": int() then raises ValueError instead of the
+    ToolError the tool gives for any other section it cannot find."""
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    from litstorm.api import mcp
+
+    for wanted in ("²", "٣"):
+        try:
+            mcp._section(_nested_report(), wanted)
+            raised = None
+        except Exception as error:  # noqa: BLE001
+            raised = error
+        assert isinstance(raised, ToolError), f"section {wanted!r}: {type(raised).__name__}"

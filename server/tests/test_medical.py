@@ -250,6 +250,15 @@ def test_a_question_mra_rejects_ends_the_run_declined(mra, tmp_path):
     assert failed.value.reason == "service_declined" and "one person's own case" in str(failed.value)
 
 
+def test_a_review_mra_failed_is_read_by_its_message(mra, tmp_path):
+    from litstorm.engines.base import EngineFailure
+
+    mra.events = EVENTS[:3] + [("error", {"message": "litellm.RateLimitError: 429 Too Many Requests"})]
+    with pytest.raises(EngineFailure) as failed:
+        _run(mra, tmp_path)
+    assert failed.value.reason == "retries_exhausted" and "429" in str(failed.value)
+
+
 def test_an_mra_that_cannot_be_reached_is_unavailable(tmp_path, monkeypatch):
     from litstorm.engines.base import EngineFailure
     from litstorm.engines.medical import engine

@@ -4,6 +4,8 @@ The table is docs/web-app-design.md, "ความล้มเหลวกับ
 recorded whatever the outcome; this decides only the quota.
 """
 
+import re
+
 SUCCEEDED = "succeeded"
 CANCELLED = "cancelled"  # the owner stopped a Run that had started
 RETRIES_EXHAUSTED = "retries_exhausted"  # timeouts, 5xx, rate limits
@@ -82,7 +84,29 @@ def classify(error):
         return BAD_CONFIGURATION
     if status is not None:
         return RETRIES_EXHAUSTED
-    return ENGINE_ERROR
+    # litellm's plain APIError, say, which OpenRouter's "Key limit exceeded" came as.
+    return from_message(str(error))
+
+
+# What a failure says, for the failures that reach us only as text: the Deep
+# Research CLI's error line, a review MRA reports failed, an exception none of
+# the classes above names. A spent key is checked first: it too says "limit".
+_SAID = (
+    (BAD_CONFIGURATION, re.compile(
+        r"key limit exceeded|insufficient (credits|quota|balance)|payment required|\b40[12]\b|unauthori[sz]ed"
+        r"|(invalid|incorrect) api key|no endpoints found|model not found|not a valid model", re.I)),
+    (RETRIES_EXHAUSTED, re.compile(
+        r"too many requests|rate[ -]?limit|\b(429|50[234])\b|overloaded|service unavailable|bad gateway"
+        r"|gateway timeout|timed? ?out|econnreset|fetch failed", re.I)),
+)
+
+
+def from_message(said, default=ENGINE_ERROR):
+    """The reason a failure's own words give, or `default` when they name none."""
+    for reason, pattern in _SAID:
+        if said and pattern.search(said):
+            return reason
+    return default
 
 
 def _google_status(error):

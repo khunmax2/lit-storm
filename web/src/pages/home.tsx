@@ -2,13 +2,14 @@
 // recent research under it.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, History, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, History, Sparkles } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { api, call } from "@/api/client";
 import { DOT } from "@/components/app-sidebar";
 import { ErrorText, timeAgo } from "@/components/common";
 import { Composer, QuotaLine, startResearch, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
+import { useOpenIssues } from "@/components/system-status";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Segmented } from "@/components/segmented";
 import { has, useT, type Key } from "@/i18n";
@@ -89,6 +90,33 @@ function ModeHint({ id, label }: { id: string; label: string }) {
   );
 }
 
+// For an Administrator: the system has failures nobody has looked at yet (server: monitor.badge).
+function IssuesNotice() {
+  const { t, lang } = useT();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => call(api.GET("/api/me")), retry: false });
+  const issues = useOpenIssues(me.data?.role === "admin");
+  const open = issues.data?.open_count ?? 0;
+  if (!open) return null;
+  return (
+    <Link
+      to="/status"
+      className="mt-6 flex items-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm transition-colors hover:bg-destructive/10"
+    >
+      <AlertTriangle className="size-4 shrink-0 text-destructive" />
+      <span className="flex-1">
+        <span className="font-medium text-destructive">{t("home.issues", { count: open })}</span>
+        {issues.data?.last_at && (
+          <span className="text-muted-foreground"> · {t("monitor.last")} {timeAgo(issues.data.last_at, lang)}</span>
+        )}
+      </span>
+      <span className="flex items-center gap-1 font-medium">
+        {t("home.issuesLink")}
+        <ArrowRight className="size-4" />
+      </span>
+    </Link>
+  );
+}
+
 export function HomePage() {
   const { t, lang } = useT();
   const navigate = useNavigate();
@@ -156,6 +184,7 @@ export function HomePage() {
       </div>
 
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-16">
+        <IssuesNotice />
         <div className="flex flex-col items-center pt-[9vh] pb-8 text-center">
           <h1 className="font-display text-4xl leading-tight tracking-tight text-balance md:text-6xl">
             {t("home.title")}

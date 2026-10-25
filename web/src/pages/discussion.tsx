@@ -11,7 +11,6 @@ import {
   FileText,
   FolderInput,
   FolderOpen,
-  LifeBuoy,
   Gauge,
   Globe,
   Loader2,
@@ -42,8 +41,7 @@ import {
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
 import { MoveSessionDialog } from "@/components/move-session";
-import { SupportDialog } from "@/components/support-dialog";
-import { FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
+import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,7 +69,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { has, useT, type Key } from "@/i18n";
+import { useT, type Key } from "@/i18n";
 import { useRunLive } from "@/hooks/use-run-live";
 import { cn } from "@/lib/utils";
 
@@ -210,7 +208,6 @@ function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) 
 /** The last Turn that did not work, with the way to ask for it again. */
 function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => void; pending: boolean }) {
   const { t } = useT();
-  const reasonKey = `reason.${turn.reason}`;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm">
       <div className="min-w-0">
@@ -218,12 +215,8 @@ function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => voi
           <StatusBadge status={turn.status} />
           <span className="text-muted-foreground">{t(`disc.action.${turn.turn?.action}` as Key)}</span>
         </div>
-        {turn.reason && turn.reason !== "cancelled" && (
-          <p className="mt-1 text-destructive">
-            {has(reasonKey) ? t(reasonKey as Key) : turn.reason}
-            {turn.quota_refunded && <span className="ml-2 text-xs text-muted-foreground">· {t("disc.turnBack")}</span>}
-          </p>
-        )}
+        {/* Already in the Turn's red box. */}
+        <FailureNote run={turn} refunded="disc.turnBack" className="mt-1 bg-transparent p-0" />
       </div>
       <Button variant="outline" size="sm" disabled={pending} onClick={onRetry}>
         <RotateCcw />
@@ -335,7 +328,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
-  const [helping, setHelping] = useState(false);
   const [table3d, setTable3d] = useState(false);
   const [text, setText] = useState("");
   // A Turn waiting for the owner to agree to another quota unit.
@@ -432,7 +424,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
         session={moving ? { id: d.id, title: d.title, project_id: d.project_id } : null}
         onOpenChange={setMoving}
       />
-      {!d.read_only && <SupportDialog sessionId={d.id} open={helping} onOpenChange={setHelping} />}
       <AlertDialog open={!!extending} onOpenChange={(open) => !open && setExtending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -490,7 +481,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             }
             actions={
               d.read_only ? (
-                <span className="rounded-md bg-warning-soft px-2 py-1 text-xs text-warning">{t("support.readOnly")}</span>
+                <span className="rounded-md bg-warning-soft px-2 py-1 text-xs text-warning">{t("run.readOnly")}</span>
               ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -502,10 +493,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   <DropdownMenuItem onClick={() => setMoving(true)}>
                     <FolderInput />
                     {t("move.title")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setHelping(true)}>
-                    <LifeBuoy />
-                    {t("support.title")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

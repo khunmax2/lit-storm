@@ -14,7 +14,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import delete, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import checks, cost, embedding, limits, modes, quota, roles, security
+from litstorm import checks, cost, embedding, limits, modes, monitor, quota, roles, security
 from litstorm.api import deps
 from litstorm.api.auth import issue_link
 from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
@@ -154,8 +154,8 @@ def patch_user(user_id: uuid.UUID, body: UserPatch, admin=Depends(deps.admin), s
 
 @router.delete("/users/{user_id}", status_code=204)
 def delete_user(user_id: uuid.UUID, admin=Depends(deps.admin), session=Depends(deps.database)):
-    """Only an account that never had research: its keys, sign-ins, links and
-    grants go with it (ON DELETE CASCADE). The admin doing it stays, so an
+    """Only an account that never had research: its keys, sign-ins and links
+    go with it (ON DELETE CASCADE). The admin doing it stays, so an
     admin always remains."""
     user = session.get(User, user_id)
     if user is None or user.kind != PERSON:
@@ -731,6 +731,83 @@ def recent_runs(limit: int = Query(default=100, le=500), session=Depends(deps.da
         )
         for run, email, name, kind in rows
     ]
+
+
+# --- system status (litstorm.monitor) -------------------------------------------
+
+
+class OccurrenceOut(BaseModel):
+    at: datetime
+    who: str
+
+
+class IssueOut(BaseModel):
+    key: str
+    reason: str
+    severity: str  # "system": the system's own failure; "watch": often the topic's
+    engine: str
+    engine_label: str
+    model_label: str
+    count: int
+    users: list[str]
+    first_at: datetime
+    last_at: datetime
+    message: str  # the latest failure's words, the topic taken out
+    acknowledged_at: datetime | None
+    open: bool
+    recent: list[OccurrenceOut]
+
+
+class EngineStatOut(BaseModel):
+    engine: str
+    engine_label: str
+    runs: int
+    succeeded: int
+    failed: int  # the system's failures only
+    p50_minutes: float | None
+    p90_minutes: float | None
+
+
+class QueueOut(BaseModel):
+    queued: int
+    running: int
+    oldest_wait_seconds: int | None
+    max_running: int
+
+
+class MonitorOut(BaseModel):
+    since: datetime
+    issues: list[IssueOut]
+    open_count: int
+    engines: list[EngineStatOut]
+    queue: QueueOut
+
+
+class AcknowledgeIn(BaseModel):
+    keys: list[str] = Field(min_length=1, max_length=200)
+
+
+@router.get("/monitor", response_model=MonitorOut)
+def system_status(
+    days: int = Query(default=monitor.DEFAULT_DAYS, ge=1, le=monitor.MAX_DAYS), session=Depends(deps.database)
+):
+    return monitor.status(session, days)
+
+
+class BadgeOut(BaseModel):
+    open_count: int
+    last_at: datetime | None
+
+
+@router.get("/monitor/open", response_model=BadgeOut)
+def open_issues(session=Depends(deps.database)):
+    """The sidebar's badge and the home page's notice ask this every minute."""
+    return monitor.badge(session)
+
+
+@router.post("/monitor/acknowledge", status_code=204)
+def acknowledge(body: AcknowledgeIn, admin=Depends(deps.admin), session=Depends(deps.database)):
+    monitor.acknowledge(session, body.keys, admin)
 
 
 # --- limits -------------------------------------------------------------------

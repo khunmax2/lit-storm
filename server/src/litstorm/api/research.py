@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from litstorm import catalog, limits, modes, notify, quota, sections, settings, trash
+from litstorm import catalog, limits, modes, monitor, notify, quota, sections, settings, trash
 from litstorm import report as report_mod
 from litstorm.api import deps
 from litstorm.catalog import ENGINES
@@ -346,6 +346,9 @@ class RunOut(BaseModel):
     reason: str | None
     message: str | None
     quota_refunded: bool
+    # It failed through the system's fault, not the topic's or the owner's: Administrators
+    # see it on System status (litstorm.monitor), and the owner is told so.
+    system_fault: bool = False
     queued_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -392,6 +395,7 @@ def run_out(run):
         reason=run.reason,
         message=run.message,
         quota_refunded=run.quota_refunded,
+        system_fault=run.status in (FAILED, INTERRUPTED) and run.reason in monitor.SYSTEM,
         queued_at=run.queued_at,
         started_at=run.started_at,
         finished_at=run.finished_at,
@@ -418,8 +422,8 @@ class SessionOut(BaseModel):
     created_at: datetime
     runs: list[RunOut]
     kind: str = "research"  # "discussion": GET /api/discussions/{id} shows it
-    # Shown to an Administrator under a Support Access Grant: nothing can be
-    # changed from it.
+    # Shown to an Administrator reading an integration account's (deps.readable):
+    # nothing can be changed from it.
     read_only: bool = False
 
 
@@ -747,9 +751,7 @@ def move_session(
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)
 def get_session(session_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
-    # Readable under a grant only for a Discussion's grant, which names the
-    # topic; a Run's grant names that Run alone (litstorm.support).
-    rs = deps.readable(session, ResearchSession, session_id, user, "discussion")
+    rs = deps.readable(session, ResearchSession, session_id, user)
     out = session_out(session, rs)
     out.read_only = rs.owner_id != user.id
     return out
@@ -903,11 +905,11 @@ def get_run(
     return _run_detail(session, run_id, user, after)[0]
 
 
-def _run_detail(session, run_id, user, after, record=True):
+def _run_detail(session, run_id, user, after):
     """The Run with its events after `after`, the last event id read (shown
     or not: where the next read starts), and whether more are waiting."""
-    run = deps.readable(session, Run, run_id, user, "run", record=record)
-    helping = run.owner_id != user.id
+    run = deps.readable(session, Run, run_id, user)
+    administering = run.owner_id != user.id  # an integration account's (deps.readable)
     events = list(
         session.scalars(
             select(RunEvent)
@@ -916,14 +918,14 @@ def _run_detail(session, run_id, user, after, record=True):
             .limit(EVENTS_PER_READ)
         )
     )
-    # An Administrator the owner asked for help sees every note, tracebacks
-    # included: that is what the help is for.
+    # An Administrator reading an integration account's Run sees every note,
+    # tracebacks included: the account is theirs to look after.
     shown = [
         EventOut(id=e.id, at=e.at, type=e.type, data=e.data)
         for e in events
-        if e.type in ("stage", "usage") or (e.type == "note" and (helping or e.data.get("kind") in _SHOWN_NOTES))
+        if e.type in ("stage", "usage") or (e.type == "note" and (administering or e.data.get("kind") in _SHOWN_NOTES))
     ]
-    detail = RunDetail(**run_out(run).model_dump(), events=shown, read_only=helping)
+    detail = RunDetail(**run_out(run).model_dump(), events=shown, read_only=administering)
     return detail, (events[-1].id if events else after), len(events) == EVENTS_PER_READ
 
 
@@ -967,7 +969,7 @@ async def live_run(run_id: uuid.UUID, request: Request, after: int = Query(0, ge
                 if await request.is_disconnected():
                     return
                 detail, cursor, more = await deps.with_session(
-                    lambda s: _run_detail(s, run_id, user, cursor, record=False)
+                    lambda s: _run_detail(s, run_id, user, cursor)
                 )
         finally:
             notify.runs.unsubscribe(run_id, key)
@@ -1061,8 +1063,8 @@ def restore(kind: str, item_id: uuid.UUID, user=Depends(deps.current_user), sess
 # --- Reports -------------------------------------------------------------------
 
 
-def _report(session, run_id, user, what="report"):
-    run = deps.readable(session, Run, run_id, user, what)
+def _report(session, run_id, user):
+    run = deps.readable(session, Run, run_id, user)
     path = os.path.join(settings.get().runs_dir, str(run.id), "report.json")
     if not os.path.exists(path):
         raise HTTPException(404, "no_report")
@@ -1285,7 +1287,7 @@ def view_service_page(run_id: uuid.UUID, user=Depends(deps.current_user), sessio
     (Medical Review: MRA's offline report, docs/adr/0013), for the reader's
     "full report" view. Sandboxed like the interactive page: its script runs
     in an origin of its own, with no reach into the app."""
-    run = deps.readable(session, Run, run_id, user, "report")
+    run = deps.readable(session, Run, run_id, user)
     path = os.path.join(settings.get().runs_dir, str(run.id), "work", "mra_report.html")
     if not catalog.remote(run.engine) or not os.path.exists(path):
         raise HTTPException(404, "no_service_page")
@@ -1310,7 +1312,7 @@ def view_observatory(run_id: uuid.UUID, user=Depends(deps.current_user), session
     it has ended. Opened in a tab of its own, signed in."""
     from litstorm.render import observatory
 
-    run = deps.readable(session, Run, run_id, user, "run")
+    run = deps.readable(session, Run, run_id, user)
     report = None
     if run.status == "succeeded" and os.path.exists(_report_path(run)):
         report = report_mod.load(_report_path(run))
@@ -1357,7 +1359,7 @@ def export_report(
     user=Depends(deps.current_user),
     session=Depends(deps.database),
 ):
-    run, report = _report(session, run_id, user, "export")
+    run, report = _report(session, run_id, user)
     return _export(run, report, format, evidence, charts, session)
 
 
@@ -1380,7 +1382,7 @@ def export_by_link(token: str, session=Depends(deps.database)):
     run = deps.own(session, Run, uuid.UUID(link["run_id"]), owner)
     if run.status != "succeeded":
         raise HTTPException(404, "not_found")
-    run, report = _report(session, run.id, owner, "export")
+    run, report = _report(session, run.id, owner)
     response = _export(run, report, link["format"], False, "static", session)
     response.headers["Cache-Control"] = "private, no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"

@@ -15,6 +15,7 @@ import { LoginPage, SetPasswordPage, SetupPage } from "@/pages/auth";
 import { HomePage } from "@/pages/home";
 import { ReportPage } from "@/pages/report";
 import { AllResearchPage, ProjectPage, ProjectsPage, SessionPage } from "@/pages/research";
+import { StatusPage } from "@/pages/status";
 import { TrashPage } from "@/pages/trash";
 import { ConnectionsPage } from "@/pages/connections";
 
@@ -149,6 +150,7 @@ const adminRoute = createRoute({
     throw redirect({ to: "/settings/$section", params: { section: "users" } });
   },
 });
+const statusRoute = createRoute({ getParentRoute: () => appRoute, path: "status", component: StatusPage });
 const trashRoute = createRoute({ getParentRoute: () => appRoute, path: "trash", component: TrashPage });
 const connectionsRoute = createRoute({ getParentRoute: () => appRoute, path: "connections", component: ConnectionsPage });
 
@@ -156,7 +158,7 @@ const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
   setPasswordRoute,
-  appRoute.addChildren([homeRoute, allResearchRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, trashRoute, connectionsRoute]),
+  appRoute.addChildren([homeRoute, allResearchRoute, projectsRoute, projectRoute, sessionRoute, reportRoute, settingsRoute, adminRoute, statusRoute, trashRoute, connectionsRoute]),
 ]);
 
 export const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });

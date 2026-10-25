@@ -1,4 +1,4 @@
-# บั๊กที่ทำซ้ำได้ใน Worker, โควตา และถังขยะ (Task 3a ของการตรวจทั้งระบบ 2026-10-24)
+# บั๊กที่ทำซ้ำได้ (BUG-01 ถึง BUG-59)
 
 ฐานที่ตรวจ: branch `audit/2026-10-24` (HEAD `46ae8e0`) · ตรวจด้วย pytest กับแอปจริงบน Postgres (testcontainers) และ process ลูกของ fake engine ไม่เรียกโมเดลหรือบริการค้นหาจริง ไม่แตะ stack Docker ใดๆ
 

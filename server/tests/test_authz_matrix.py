@@ -238,7 +238,7 @@ def _cells():
             continue
         for check in checks_for(key, cls):
             finding = FINDINGS.get((key, check))
-            marks = [pytest.mark.xfail(strict=True, reason=finding)] if finding else []
+            marks = [pytest.mark.xfail(strict=True, raises=AssertionError, reason=finding)] if finding else []
             yield pytest.param(key, cls, check, id=f"{key[0]} {key[1]} | {check}", marks=marks)
 
 

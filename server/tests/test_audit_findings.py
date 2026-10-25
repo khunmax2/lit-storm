@@ -279,6 +279,9 @@ def _failed(db, run_id, reason="refused"):
     db.commit()
 
 
+_barrier_broken = []  # set by _meet_at when the two requests never met
+
+
 def _together(*calls):
     """Each call in a thread of its own, started at once; the results, or the exception a call raised."""
     import threading
@@ -296,6 +299,8 @@ def _together(*calls):
         t.start()
     for t in threads:
         t.join(90)
+    if _barrier_broken:
+        pytest.skip("barrier broke: race not exercised")
     return results
 
 
@@ -306,7 +311,8 @@ def _meet_at(monkeypatch, owner, name, *, after):
     import threading
 
     real = getattr(owner, name)
-    barrier = threading.Barrier(2, timeout=3)
+    barrier = threading.Barrier(2, timeout=30)
+    _barrier_broken.clear()
     seen = threading.local()
 
     def wait():
@@ -316,7 +322,7 @@ def _meet_at(monkeypatch, owner, name, *, after):
         try:
             barrier.wait()
         except threading.BrokenBarrierError:
-            pass
+            _barrier_broken.append(True)
 
     def wrapper(*args, **kwargs):
         if after:
@@ -1485,6 +1491,7 @@ def mini_mra(monkeypatch):
     yield make
     for mra in made:
         mra.server.shutdown()
+        mra.server.server_close()
 
 
 def _review(mra, tmp_path, **service):

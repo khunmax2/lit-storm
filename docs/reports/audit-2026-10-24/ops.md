@@ -29,6 +29,8 @@
 | OPS-13 | ต่ำ | ไม่เคยซ้อม reboot ของ host; ข้อสังเกตระดับ host (inotify 128, network ภายนอก, เขตเวลาไม่ถูกบันทึก) | ไม่ | อ่านไฟล์ + acceptance |
 | OPS-14 | ต่ำ | runbook เขียนไม่ตรงกับของจริงบางจุด และไม่มีด่านตรวจว่า host.env เป็น digest | ไม่ | อ่านไฟล์ |
 
+**ความหมายของช่อง "ผู้ใช้เห็นไหม" ในไฟล์นี้:** บอกว่าผู้ใช้เห็น **เหตุ** เมื่อเกิดหรือไม่ (เช่น เว็บล่ม) ไม่ใช่ว่าการแก้เปลี่ยนหน้าจอ การแก้ของ OPS-01 ถึง 03 และ 06 ถึง 14 อยู่ใน runbook, compose, script หรือ CI ล้วน จึงไม่เปลี่ยนสิ่งที่ผู้ใช้เห็นและไม่ต้องรออนุมัติเรื่องหน้าจอ ส่วน OPS-04 (ถ้าตอบ 429 เมื่อ PDF คิวเต็ม) และ 05 (ถ้าเพิ่มเรื่องในหน้าสถานะระบบ) แตะสิ่งที่ผู้ใช้หรือผู้ดูแลเห็นได้ ดูช่องเดียวกันในรายงานรวม
+
 ---
 
 ## OPS-01 — ถอย image (§7) ไม่ได้เมื่อรอบใหม่มี migration
@@ -42,9 +44,22 @@
 
 **ลองจริง:** ทำ DB ที่ `alembic_version = '0014'` แล้วให้ alembic ที่มี script แค่ถึง `0013` รัน `upgrade head` (สคริปต์ชั่วคราว ไม่เกี่ยวกับ docker) ได้ `CommandError: Can't locate revision identified by '0014'` เพราะ `sh -c "alembic upgrade head && exec uvicorn"` ใช้ `&&` api เก่าจึงออกก่อนถึง uvicorn แล้ว `restart: unless-stopped` วนซ้ำ ส่วน web ยังขึ้นแต่ตอบ 502
 
+**เกิดจริงบนเครื่อง dev (Task 12, 2026-10-24, อ่านอย่างเดียว ไม่ได้ restart หรือ build):** stack `litstorm` ของเจ้าของที่ :8095 มีฐานข้อมูลที่ `0014` แล้ว แต่ container `litstorm-api-1` รัน image ที่สร้างก่อน 0014 หลัง Docker Desktop เริ่มใหม่ api จึงวนล้มอยู่แบบเดียวกับสถานการณ์ด้านล่างทุกประการ
+
+```
+$ docker ps -a --filter name=litstorm-api-1
+litstorm-api-1   a123e7deab1c   Restarting (255) 14 seconds ago   (สร้าง 2026-10-24 00:23 +07)
+$ docker logs --tail 5 litstorm-api-1
+FAILED: Can't locate revision identified by '0014'      (ซ้ำ 5 บรรทัด)
+$ docker inspect litstorm-api-1 --format "{{.RestartCount}}"
+159
+```
+
+image `a123e7deab1c` ไม่มีชื่อ tag แล้ว: การ build stack audit ใน Task 0 ย้าย tag ที่ใช้ร่วม `litstorm/server:dev` (ตอนนี้ `19025d7e6dfc`, 01:23 +07) และ `litstorm/web:mirror` (`f0104c87fb3e`, 01:24 +07) ไปที่ image ของ branch นี้ ก่อนใช้ stack `:8095` อีกครั้ง เจ้าของต้อง build ใหม่ (ใน `stack/`: `docker compose -p litstorm -f compose.yml -f compose.mirror.yml up -d --build` ตามไฟล์ที่ label ของ container บอกว่าใช้ตอนเริ่ม จาก branch ที่มี 0014 เช่น branch นี้) ซึ่งจะหยุดการวนล้มไปด้วย เป็นงานของเจ้าของ งานตรวจไม่ได้แตะ stack นั้น
+
 **สถานการณ์:** ผู้ดูแลขึ้นรอบหน้า (migration 0014 ลบตารางสิทธิ์ช่วยตรวจ) แล้วเจอปัญหาที่ไม่เกี่ยวกับ DB ทำตาม §7 ใส่ digest เดิมกลับ → api ขึ้นไม่ได้ เว็บ 502 ต้องหาวิธีเองกลางเหตุ ทางที่ไม่ผิดคือ `alembic downgrade 0013` ด้วย image **ใหม่** ก่อนสลับ (downgrade 0014 → 0013 ลองแล้วใช้ได้บน stack `litstorm` ที่ :8095 ตามบันทึกในสเปกส่วน "การตัดสินใจของผู้ลงมือ" ข้อ 1) แต่ downgrade นี้สร้างตารางเปล่า สิทธิ์เดิมไม่กลับ ผู้ดูแลจึงต้องรู้ล่วงหน้า ทางอื่นคือกู้จาก backup ซึ่งเสียข้อมูลตั้งแต่จุดนั้น
 
-**วิธีแก้ที่เสนอ:** เพิ่มใน §7 และ §9: ก่อน `$COMPOSE up -d` ด้วย digest เก่า ให้รัน `$COMPOSE run --rm --no-deps api alembic downgrade <เลขของรอบก่อน>` ด้วย image ใหม่ (จด revision ของรอบก่อนไว้ใน `images-history.txt` ข้างๆ digest) และบันทึกใน acceptance ของรอบนั้นว่า migration ที่ลบข้อมูลถอยแล้วเสียอะไร ขนาด: **เล็ก** (แก้เอกสาร 2 ย่อหน้า ซ้อมครั้งเดียวบน stack ทิ้งได้)
+**วิธีแก้ที่เสนอ:** เพิ่มใน §7 และ §9: (1) `$COMPOSE stop api worker` ก่อน เพื่อไม่ให้โค้ดใหม่ใช้ตารางระหว่างที่ถูก downgrade และ Worker ไม่หยิบ Run ใหม่กลางทาง (2) รัน `$COMPOSE run --rm --no-deps api alembic downgrade <เลขของรอบก่อน>` ด้วย image ใหม่ (3) ใส่ digest เก่าแล้วจึง `$COMPOSE up -d` (จด revision ของรอบก่อนไว้ใน `images-history.txt` ข้างๆ digest) และบันทึกใน acceptance ของรอบนั้นว่า migration ที่ลบข้อมูลถอยแล้วเสียอะไร ขนาด: **เล็ก** (แก้เอกสาร 2 ย่อหน้า ซ้อมครั้งเดียวบน stack ทิ้งได้)
 
 ---
 
@@ -104,7 +119,7 @@
 | ด้าน | resource limit บนเครื่องที่ใช้ร่วมกับแอปอื่น |
 | ระดับ | กลาง (ยังไม่เคยเกิด และ **ยังไม่ได้วัดการใช้ memory จริง** เพราะห้ามใช้ docker แต่ถ้าเกิดจะกระทบทั้งเครื่อง จึงควรทำก่อนมีผู้ใช้เพิ่ม) |
 | ผู้ใช้เห็นไหม | ใช่ (ถ้าเกิด: ทั้ง DeepLit และแอปอื่นบน 203 ช้าหรือถูก kernel ฆ่า process) |
-| หลักฐาน | `grep -nE "mem_limit\|cpus\|pids_limit\|deploy:\|resources\|ulimits" stack/*.yml stack/mra/*.yml` ได้ว่าง · `server/src/litstorm/api/research.py:1436-1440` export PDF เรียก `pdf.render` ในคำขอ (เป็น handler แบบ sync จึงรันใน threadpool ของ api) · `server/src/litstorm/render/pdf.py:34-35` เปิด Chromium ใหม่หนึ่งตัวต่อคำขอ ไม่มี semaphore, ไม่มี `limits` ต่อผู้ใช้ (`limits.py` มีเฉพาะ `refinements_per_day`, `visuals_per_day`) · RAM ต่อ Run ราว 275-520 MB (`docs/benchmarks/2026-09-30-concurrency.md:21`) และค่าตั้งต้น "Run พร้อมกัน" = 6 (`HOST-203.md:70`) · RAM และ core ของ 203 ที่วัดตาม §0 (`HOST-203.md:68`) **ไม่ได้ถูกบันทึกไว้** ใน acceptance จึงไม่รู้ว่าค่า 6 เหมาะกับเครื่องนั้นไหม |
+| หลักฐาน | `grep -nE "mem_limit\|cpus\|pids_limit\|deploy:\|resources\|ulimits" stack/*.yml stack/mra/*.yml` ได้ว่าง · `server/src/litstorm/api/research.py:1436-1440` export PDF เรียก `pdf.render` ในคำขอ (route `export_report` และ `export_by_link` ที่ `research.py:1353,1367` เป็น `def` ไม่ใช่ `async def` (ตรวจซ้ำใน Task 12) FastAPI จึงรันใน threadpool ของ api) · `server/src/litstorm/render/pdf.py:34-35` เปิด Chromium ใหม่หนึ่งตัวต่อคำขอ ไม่มี semaphore, ไม่มี `limits` ต่อผู้ใช้ (`limits.py` มีเฉพาะ `refinements_per_day`, `visuals_per_day`) · RAM ต่อ Run ราว 275-520 MB (`docs/benchmarks/2026-09-30-concurrency.md:21`) และค่าตั้งต้น "Run พร้อมกัน" = 6 (`HOST-203.md:70`) · RAM และ core ของ 203 ที่วัดตาม §0 (`HOST-203.md:68`) **ไม่ได้ถูกบันทึกไว้** ใน acceptance จึงไม่รู้ว่าค่า 6 เหมาะกับเครื่องนั้นไหม |
 
 **สถานการณ์:**
 - ผู้ใช้หลายคนกด export PDF พร้อมกัน (หรือสคริปต์วนเรียก) แต่ละคำขอเปิด Chromium คนละตัวใน container ของ api (Chromium หนึ่งตัวปกติหลายร้อย MB) threadpool ของ api มีราว 40 thread ไม่มีอะไรหยุดไว้ก่อน RAM หมด ผู้ใช้ที่ login แล้วเท่านั้นทำได้
@@ -174,6 +189,8 @@
 | หลักฐาน | `stack/backup.sh:39` `PROJECT="${PROJECT:-litstorm}"` ค่าตั้งต้นของ `--restore` คือ production และ `:80-103` ไม่มีด่านยืนยัน/ชื่อ stack ที่ต้องพิมพ์ซ้ำ · `:94` หยุด web, worker, api แล้ว `:96-97` `find /d -mindepth 1 -delete` ลบ volume ทั้งก้อน **ก่อน** `:99` pg_restore ถ้า tar หรือ pg_restore ล้ม (`set -e` ออกทันที) api, worker, web ค้างหยุด และไม่มีสำเนาของข้อมูลเดิมก่อนลบ · `:114` `docker exec ... pg_dump > "$DUMP"` ถ้า pg_dump ล้มกลางทาง `set -e` ออกก่อนถึง manifest แต่ไฟล์ `.dump` ที่เขียนไปบางส่วนค้างอยู่ และถูกดึงไป `scp -r` ด้วย `stack/mra/backup-mra.sh:56` เหมือนกัน (`rm -f` ที่ `:59` ใช้เฉพาะกรณี dump อ่านได้แต่ไม่มีตาราง ไม่ใช่กรณี pg_dump ล้ม) · `:101` `docker start worker` ทุกครั้งที่ restore: ตอนซ้อมกู้ตาม `HOST-203.md:326` (stack `litstorm-restoretest`) worker ตัวทดสอบเริ่มพร้อม `stack/secrets/secret_key` ตัวจริงและฐานข้อมูลที่เพิ่งกู้ ถ้าตอนนั้นมี Run สถานะ queued ใน dump มันจะเริ่มเรียก OpenRouter จริงด้วย key ที่ถอดได้ |
 | ข้อเสริม | `stack/backup.sh:77,96,118` ใช้ image `alpine` ที่ไม่ pin ต้องดึงจาก Docker Hub ถ้าไม่มีในเครื่อง (ตอน cron 04:00 หรือตอนกู้ภัย; ถ้าทำตาม OPS-06 แล้วลบ image ที่ไม่ใช้ ต้องไม่ลบตัวนี้) |
 
+**เงื่อนไข:** ทุกสถานการณ์ในข้อนี้ยังไม่เคยเกิด ต้องมีอย่างใดอย่างหนึ่ง: ผู้ดูแลลืมตั้ง `PROJECT`, tar หรือ pg_restore ล้มกลางทาง, pg_dump ล้มกลางทาง หรือ (กรณี worker ของ `litstorm-restoretest`) มี Run ที่ queued อยู่ใน dump ตอนซ้อมกู้ ระดับกลางเพราะผลหนักเมื่อเกิด
+
 **วิธีแก้ที่เสนอ:**
 - `--restore` ต้องการ `PROJECT` ที่ตั้งชัด (ไม่มีค่าตั้งต้นสำหรับ restore) หรือถามให้พิมพ์ชื่อ project ซ้ำ ยกเว้นเมื่อมี `--yes`
 - ก่อน `find -delete` ให้ `pg_restore --list` ผ่านและ tar ทดสอบอ่านได้ก่อน และเก็บ volume เดิมไว้ (เปลี่ยนชื่อ หรือ `tar` ออกไป `_pre-restore-<stamp>`) ถ้า pg_restore ล้มให้ start สามบริการกลับ
@@ -191,7 +208,7 @@ pin ครบแล้ว: image ที่ขึ้น host (`compose.host.yml:1
 
 ### OPS-10 — จุดที่ stack ในเครื่องต่างจาก 203 (ต่ำ, ผู้ใช้เห็น: ไม่)
 
-ที่ต่างกันระหว่าง stack ในเครื่องกับ 203 (`compose.host.yml` ทั้งไฟล์ซ้อมแล้วบน project `ls203` ตาม `HOST-203.md:12,24-27` และ §4/§5 ของ 2026-10-23 ปิดช่องของ TLS, embedding และ MRA บน host จริงแล้ว ช่องที่ยังเปิดจริงคือแถวแรก)
+ที่ต่างกันระหว่าง stack ในเครื่องกับ 203 (`compose.host.yml` ทั้งไฟล์ซ้อมแล้วบน project `ls203` ตาม `HOST-203.md:12,24-27` และ §4/§5 ของ 2026-10-23 ปิดช่องของ TLS, embedding และ MRA บน host จริงแล้ว ช่องที่ยังเปิดจริงคือแถวแรก แถว nginx และทางไป MRA เป็นข้อมูลประกอบ ไม่ใช่ข้อบกพร่อง)
 
 | เรื่อง | stack ในเครื่อง | 203 | ผล |
 |---|---|---|---|
@@ -225,7 +242,7 @@ pin ครบแล้ว: image ที่ขึ้น host (`compose.host.yml:1
 3. §0 ให้วัดและบันทึกค่า (`free -m`, `nproc`, `df -h`) แต่ acceptance ไม่มีค่าเหล่านั้น (ดู OPS-04, OPS-06)
 4. `HOST-203.md:152` คาดว่า migration ปัจจุบันคือ `0014` (ถูกต้องสำหรับรอบหน้า) แต่ผลตรวจรับของ 2026-10-23 เป็น `0013` ผู้ดูแลที่อ่านสองไฟล์ต่อกันอาจสับสนว่าเครื่อง 203 อยู่ที่รุ่นไหน ใส่ "ณ tag นี้" ต่อท้ายเลข
 
-ขนาดรวม: เล็ก (แก้เอกสาร)
+ข้อ 1 และ 2 เป็นข้อบกพร่องของ runbook ข้อ 3 และ 4 เป็นข้อมูลที่ขาดหรือชวนสับสน (ข้อมูลประกอบ) ขนาดรวม: เล็ก (แก้เอกสาร)
 
 ---
 

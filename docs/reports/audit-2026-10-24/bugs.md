@@ -8,11 +8,11 @@
 
 **ส่วนที่สอง (Task 3b): กลุ่ม (d) (e) (f)** ฐานที่ตรวจ HEAD `15687d5` · (d) Discussion/Co-STORM Turn · (e) หน้าสถานะระบบ (`monitor.py`, `outcomes.py`), บัญชีผู้ใช้ใน `api/admin.py`, การ login/ตั้งรหัส · (f) MCP, token, engine Deep และ Medical (MRA) ผู้อ่านส่งข้อสงสัยมา 35 ข้อ (d 11, e 12, f 12) ลองทำซ้ำทีละข้อตาม `superpowers:systematic-debugging` ผลคือ **21 รหัสบั๊กใหม่ (BUG-24 ถึง BUG-44) คลุม 22 ข้อสงสัย** (e-S3 กับ f-S11 เป็นรากเดียวกันจึงรวมเป็น BUG-30), **2 ข้อสงสัย** ที่ต้องใช้เบราว์เซอร์ (ส่งต่อ Task 8/9 หรือ Task 5), **3 ข้อที่ซ้ำ** กับรหัสที่มีอยู่แล้ว (BUG-09, 12/15, 19) และ **8 ข้อที่ตัดทิ้ง** เทสต์ใหม่ทุกข้อต่อท้าย `server/tests/test_audit_findings.py` ใต้หัวข้อ `Task 3b` และรันด้วย `--runxfail` ครั้งหนึ่งแล้วว่าล้มที่ assertion ของตัวเอง ไม่มีข้อใดเป็น **วิกฤต** ข้อเดียวที่เป็น **กลาง** คือ BUG-26 นอกนั้นเป็น **ต่ำ**: `cd server && uv run pytest tests/test_audit_findings.py -k "bug24 or bug25 or bug26 or bug27 or bug28 or bug29 or bug3 or bug4" --runxfail`
 
-**ส่วนที่สาม (Task 4): ตรวจโค้ดอัตโนมัติ, migration และ backup** ฐานที่ตรวจ HEAD `d61f170` · `ruff` (F, B, E9) 162 รายการ ส่วนใหญ่เป็นแบบแผนของ FastAPI และไม่ใช่บั๊ก (นับไว้ใน `task-4-report.md`) เหลือ 1 รายการจริง (BUG-45) · migration ลง base แล้วขึ้น head ผ่านทุกขั้น แต่ `alembic check` พบ model กับ migration ไม่ตรง (BUG-46) · backup/restore ผ่าน แต่ตัวเลขใน `backup.sh` หลอกตา (BUG-47) · เทสต์ที่ไม่เสถียรที่รู้อยู่แล้วลงเป็น BUG-48 **รหัสใหม่ BUG-45 ถึง BUG-48 เป็น ต่ำ ทั้งหมด**
+**ส่วนที่สาม (Task 4): ตรวจโค้ดอัตโนมัติ, migration และ backup** ฐานที่ตรวจ HEAD `d61f170` · `ruff check src --select F,B,E9` 162 รายการ: B008 138 (`Depends(...)` ในค่าเริ่มต้นของ argument ซึ่งเป็นแบบแผนของ FastAPI), B904 9 (raise ใน except ไม่มี `from`), B905 7 (`zip` ไม่มี `strict`; ตรวจ 4 จุดที่ไม่ใช่ render แล้ว ไม่มีการตัดข้อมูลเงียบๆ), F401 4 (import ที่ไม่ใช้), B023 1 (false positive), B007 1, F811 1 ไม่ใช่บั๊กทั้งหมด เหลือ 1 รายการจริงคือ invalid-syntax (BUG-45) · migration ลง base แล้วขึ้น head ผ่านทุกขั้น แต่ `alembic check` พบ model กับ migration ไม่ตรง (BUG-46) · backup/restore ผ่าน แต่ตัวเลขใน `backup.sh` หลอกตา (BUG-47) · เทสต์ที่ไม่เสถียรที่รู้อยู่แล้วลงเป็น BUG-48 **รหัสใหม่ BUG-45 ถึง BUG-48 เป็น ต่ำ ทั้งหมด**
 
 **เกณฑ์ระดับ** ตามสเปก: **วิกฤต** ข้อมูลรั่วหรือระบบใช้ไม่ได้ · **สูง** กระทบผู้ใช้จริงบ่อย หรือต้องมีสิทธิ์บางอย่าง · **กลาง** · **ต่ำ** ไม่มีข้อใดในชุดนี้เป็น **วิกฤต** เพราะทุกข้อต้องมีบัญชีที่ login แล้ว หรือต้องมีความผิดปกติของระบบเกิดก่อน
 
-**หลักฐาน:** ทุกบั๊กมีเทสต์ใน `server/tests/test_audit_findings.py` ที่ยืนยันพฤติกรรมที่ **ถูกต้อง** เป็น `xfail(strict=True, raises=AssertionError, reason="BUG-xx")` จึงล้มวันนี้และจะผ่านเมื่อแก้ (strict จะฟ้องให้ถอด mark) ทุกเทสต์ถูกรันครั้งหนึ่งด้วย `--runxfail` เพื่อยืนยันว่าล้มที่ assertion ของตัวเอง ไม่ใช่ error อื่น: `cd server && uv run pytest tests/test_audit_findings.py -k test_bug --runxfail`
+**หลักฐาน:** BUG-01 ถึง BUG-44 และ BUG-53 ถึง BUG-57 มีเทสต์ใน `server/tests/test_audit_findings.py` (ข้อยกเว้น: BUG-45 ถึง 48 มีหลักฐานเป็นคำสั่งที่รันซ้ำได้ ไม่มี xfail · BUG-49 ถึง 52 มาจาก Run จริงใน [live.md](live.md) · BUG-58, 59 เป็นขั้นตอนทำซ้ำในเบราว์เซอร์ เพราะเว็บไม่มี test framework) เทสต์เหล่านั้นยืนยันพฤติกรรมที่ **ถูกต้อง** เป็น `xfail(strict=True, raises=AssertionError, reason="BUG-xx")` จึงล้มวันนี้และจะผ่านเมื่อแก้ (strict จะฟ้องให้ถอด mark) ทุกเทสต์ถูกรันครั้งหนึ่งด้วย `--runxfail` เพื่อยืนยันว่าล้มที่ assertion ของตัวเอง ไม่ใช่ error อื่น: `cd server && uv run pytest tests/test_audit_findings.py -k test_bug --runxfail`
 
 ## สรุป
 
@@ -331,6 +331,8 @@
 
 **สถานการณ์:** ตั้ง `turns_per_quota=4` เริ่ม Discussion ใช้ครบชุดแรก (4 Turn) แล้วขยายชุดที่สอง (จ่ายหน่วยที่สอง) ใช้ไปรวม 5 Turn เหลือ 3 จาก 8 ผู้ดูแลลดค่าเป็น 2: `allowance` กลายเป็น `{per_block: 2, blocks: 2, used: 5, remaining: 0}` และ Turn ถัดไปตอบ `409 turns_exhausted` ทั้งที่เจ้าของจ่ายหน่วยที่สองไปแล้ว ต้องยอมจ่ายหน่วยที่สามเพื่อได้ Turn ที่เป็นของตนอยู่แล้ว เพิ่มค่าให้ผลตรงข้าม (Turn ที่ใช้ไปแล้วกลับกลายเป็นว่าง) ประวัติของ Run จึงถูกเขียนใหม่ย้อนหลังด้วยค่าตั้งปัจจุบัน
 
+**เจตนาเป็นการตัดสินของเจ้าของ:** โค้ดและเอกสารไม่ได้บอกว่าค่า `turns_per_quota` ใหม่ใช้กับชุดที่จ่ายไปแล้วหรือไม่ รายงานนี้ถือว่า "ชุดที่จ่ายแล้วคงขนาดเดิม" ถูก ถ้าเจ้าของต้องการให้ค่าใหม่มีผลทันที (เช่น ใช้ลดค่าใช้จ่ายฉุกเฉิน) ข้อนี้ไม่ใช่บั๊ก ให้ลบเทสต์ออกแทนการแก้
+
 **วิธีแก้ที่เสนอ:** เก็บขนาดชุดไว้กับ Run ที่เปิดชุด (เช่นใน `config` ของ Turn ที่มี `quota_units > 0`) แล้ว `allowance` รวมจากขนาดที่เก็บไว้ · ขนาด: เล็ก (ไม่แตะ schema ถ้าเก็บใน `config`)
 
 ## BUG-25 — รายงานที่เสร็จตอนกดหยุดพอดี ไม่ปรากฏในรายการรายงานของ Discussion
@@ -342,6 +344,8 @@
 | หลักฐาน | `runner/supervisor.py:226-229` ("Asked to stop, but finished first": ผลเป็น `cancelled`/`finished while stopping` และคอมเมนต์ระบุว่ารายงานที่ทำเสร็จ "is kept for them to read") · `api/discussions.py:143-150` (`reports` เอาเฉพาะ `SUCCEEDED`) · `outcomes.py` (`CANCELLED` ไม่อยู่ใน `REFUNDED`) · เทสต์ `test_bug25_a_report_that_finished_while_its_owner_pressed_stop_is_listed_with_the_others` |
 
 **สถานการณ์:** Turn แบบ `report` ถูกกดหยุดแล้ว child เขียนรายงานเสร็จก่อนรับรู้ เทสต์ใช้ Worker จริงกับ fake engine: ตั้งสถานะ `cancelling` ตั้งแต่ก่อนเริ่ม supervisor เห็นคำขอหยุดในรอบแรก ส่วน fake engine (นอนหลับ 1.5 วินาที ไม่ดู cancel) จบแบบสำเร็จ ผล: Turn เป็น `cancelled`, `quota_refunded=False`, `report_title` ถูกตั้ง (รายงานถูกเก็บ) แต่ `GET /api/discussions/{id}` ได้ `reports: []` ส่วนที่ผู้อ่านเสนอเพิ่ม (state ของ Turn ที่หยุดแล้วไม่ถูกใช้ต่อ `last_state` รับเฉพาะ `SUCCEEDED`) เป็นพฤติกรรมที่ตรงกับเอกสารของโมดูล ("a Turn that ... is stopped ... costs only itself") จึงไม่นับเป็นบั๊ก
+
+**เจตนาเป็นการตัดสินของเจ้าของ:** คอมเมนต์ของ supervisor บอกว่ารายงานที่เสร็จ "is kept for them to read" แต่ไม่ได้บอกว่าจะแสดงในรายการของ Discussion หรือไม่ และหน่วยโควตาที่ไม่คืนถูกหรือไม่ ถ้าเจ้าของเห็นว่า "กดหยุดแล้ว = ไม่ต้องการรายงาน" ข้อนี้ไม่ใช่บั๊ก แต่ควรลบรายงานนั้นด้วยเพื่อไม่ให้ค้างโดยมองไม่เห็น
 
 **วิธีแก้ที่เสนอ:** ให้ `reports` รวม Turn แบบ report ที่ `cancelled` และมี `report_title` (ไฟล์รายงานมีอยู่) · ขนาด: เล็ก
 
@@ -475,6 +479,8 @@
 
 **ผลที่ลองแล้วไม่เป็นบั๊กเพิ่ม:** ส่ง `POST /api/discussions` ซ้ำด้วย key ของ Session วิจัยธรรมดาได้ 201 พร้อม Discussion ว่างที่ชื่อเดิม ไม่ใช่ 500
 
+**เจตนาเป็นการตัดสินของเจ้าของ:** `request_key` ผูกกับบัญชีหรือกับ Discussion เอกสารไม่ได้กำหนด ถ้าผูกกับบัญชี (แบบที่โค้ดทำ) การใช้ key ซ้ำกับ Discussion อื่นเป็นความผิดของ client และทางแก้คือบอกให้รู้ (409) ไม่ใช่คืน Turn ของ A ถ้าผูกกับ Discussion ต้องเปลี่ยน `_existing` ให้กรอง Session ด้วย
+
 **วิธีแก้ที่เสนอ:** เมื่อเจอ key เดิม ตรวจว่า Session, action และข้อความตรงกัน ถ้าไม่ตรงตอบ `409 request_key_reused` (แบบที่ API ที่ใช้ idempotency key ทำ) · ขนาด: เล็ก
 
 ## BUG-38 — `[4][9]` ของหน้าเดียวกันถูกเขียนเป็น `[1][1]`
@@ -537,7 +543,7 @@
 |---|---|
 | ระดับ | ต่ำ (ช่องโหว่ของโค้ดยืนยันได้ แต่ CLI จริงที่รอโมเดลมักเงียบเกินหนึ่งวินาทีจึงรู้เร็วกว่าตัวเลขในเทสต์; กรณีแย่สุด supervisor kill หลัง 30 วินาที เสีย usage ของช่วงนั้น) |
 | ผู้ใช้เห็นไหม | ใช่ (ปุ่มหยุดตอบช้า) |
-| หลักฐาน | `engines/deep/engine.py:143-150` (`cancel.requested()` ดูเฉพาะในสาขา `queue.Empty` และตอน event `stage`) · เทสต์ `test_bug43_a_stop_is_noticed_while_the_deep_cli_keeps_talking` (เพิ่มสคริปต์ `[stream]` ใน `tests/fake_deep_cli.py` ที่เขียน event `node` ทุก 50 มิลลิวินาทีนาน 8 วินาที; ขอหยุดที่วินาทีที่ 1: engine ยก `Cancelled` ที่ 8.5 วินาที) |
+| หลักฐาน | `engines/deep/engine.py:143-150` (`cancel.requested()` ดูเฉพาะในสาขา `queue.Empty` และตอน event `stage`) · เทสต์ `test_bug43_a_stop_is_noticed_while_the_deep_cli_keeps_talking` (เพิ่มสคริปต์ `[stream]` ใน `tests/fake_deep_cli.py` ที่เขียน event `node` ทุก 50 มิลลิวินาทีนาน 8 วินาที; ขอหยุดที่วินาทีที่ 1: engine ยก `Cancelled` หลังสคริปต์เขียนจบหรือใกล้จบ ไม่ใช่ภายใน 4 วินาทีที่เทสต์กำหนด ค่าที่วัดได้ในการรันหลายครั้งอยู่ระหว่างราว 5.6 ถึง 12 วินาที ขึ้นกับภาระของเครื่อง) |
 
 **วิธีแก้ที่เสนอ:** ตรวจ `cancel.requested()` ทุกรอบของ loop (หลังอ่านแต่ละบรรทัดด้วย) · ขนาด: เล็ก
 
@@ -569,7 +575,7 @@
 |---|---|
 | ระดับ | ต่ำ (ฐานข้อมูลทำงานถูก; ผลคือ autogenerate ครั้งหน้าจะสร้าง migration ที่ลบ index เดิมแล้วสร้างตัวใหม่เอง และ `alembic check` ใช้เป็นด่านใน CI ไม่ได้) |
 | ผู้ใช้เห็นไหม | ไม่ |
-| หลักฐาน | บน stack `litstorm-audit` ที่ migration 0014: `docker exec -w /app/server litstorm-audit-api-1 alembic check` ได้ `FAILED: New upgrade operations detected` มี 6 รายการ (ลบ+เพิ่มอย่างละ 3): `api_tokens_user` vs `ix_api_tokens_user_id` · `question_refinements_user (user_id, created_at)` vs `ix_question_refinements_user_id (user_id)` · `visuals_requests_user (user_id, created_at)` vs `ix_visuals_requests_user_id (user_id)` · migration สร้างด้วยชื่อเอง (`0013_api_tokens.py:42`, `0007_question_refinements.py:24`, `0011_visuals_requests.py:24`) ขณะที่โมเดลใช้ `index=True` (`db/models.py:77, 240, 251`) · schema หลัง downgrade base แล้ว upgrade head เหมือนเดิมทุกบรรทัด (ดู `task-4-report.md`) แปลว่า migration เป็นฝ่ายที่ใช้งานจริง และ index แบบ `(user_id, created_at)` คือสิ่งที่ฐานข้อมูลมี |
+| หลักฐาน | บน stack `litstorm-audit` ที่ migration 0014: `docker exec -w /app/server litstorm-audit-api-1 alembic check` ได้ `FAILED: New upgrade operations detected` มี 6 รายการ (ลบ+เพิ่มอย่างละ 3): `api_tokens_user` vs `ix_api_tokens_user_id` · `question_refinements_user (user_id, created_at)` vs `ix_question_refinements_user_id (user_id)` · `visuals_requests_user (user_id, created_at)` vs `ix_visuals_requests_user_id (user_id)` · migration สร้างด้วยชื่อเอง (`server/src/litstorm/migrations/versions/0013_api_tokens.py:42`, `server/src/litstorm/migrations/versions/0007_question_refinements.py:24`, `server/src/litstorm/migrations/versions/0011_visuals_requests.py:24`) ขณะที่โมเดลใช้ `index=True` (`server/src/litstorm/db/models.py:77, 240, 251`) · schema หลัง downgrade base แล้ว upgrade head เหมือนเดิมทุกบรรทัด (ดู `task-4-report.md`) แปลว่า migration เป็นฝ่ายที่ใช้งานจริง และ index แบบ `(user_id, created_at)` คือสิ่งที่ฐานข้อมูลมี |
 
 **สถานการณ์:** นักพัฒนารัน `alembic revision --autogenerate` เพื่อเพิ่มตารางใหม่ แล้วได้ migration ที่แอบมี `drop_index`/`create_index` ของสามตารางนี้ติดมา ถ้าไม่ตรวจก็จะเปลี่ยน index ประกอบ `(user_id, created_at)` ที่ใช้นับโควตารายวันเป็น index เดี่ยว
 
@@ -593,7 +599,7 @@
 |---|---|
 | ระดับ | ต่ำ (เทสต์ไม่เสถียร ไม่ใช่ผลิตภัณฑ์; แต่ทำให้ชุดเทสต์เต็มแดงบน baseline ทำให้แยกบั๊กจริงยาก) |
 | ผู้ใช้เห็นไหม | ไม่ |
-| หลักฐาน | `tests/test_supervisor.py:128-147` · รายงาน Task 3a และ 3b บันทึกว่าล้มในชุดเต็มบน baseline (889 passed, 1 failed; `KeyError: 'th'`) และผ่านเมื่อรันเดี่ยว · ในรอบ Task 4 (หน่วยความจำ commit ว่างของเครื่อง dev เหลือ 1.7 GB จาก 32 GB เพราะ Docker Desktop) **ล้มเมื่อรันเดี่ยว 3 จาก 3 ครั้ง**: `uv run pytest -q tests/test_supervisor.py::test_two_runs_at_once_keep_their_own_language` · สาเหตุที่ขุดได้ด้วยสคริปต์ที่พิมพ์ `outcome`: Run หนึ่งจบ `failed`/`engine_error` ("the run's process exited with code 1 and no outcome") และ `stderr.log` ของมันเต็มไปด้วย `OpenBLAS error: Memory allocation still failed after 10 retries, giving up.` (process ลูกที่ import numpy พร้อมกันสองตัว แต่ละตัวเปิด thread ตามจำนวน core = 16) · Run เดี่ยวแบบเดียวกันผ่าน · หลังหน่วยความจำ commit ว่างกลับมา (11 GB) เทสต์เดียวกันผ่านใน `pytest -m "not db"` (222 passed) ซึ่งสนับสนุนสาเหตุเรื่องหน่วยความจำ · เทสต์ใช้ `assert` ใน thread (`:138`) ซึ่ง pytest เก็บเป็นแค่ warning แล้วเทสต์ล้มที่ `KeyError: 'th'` บรรทัด 146 จึงไม่บอกสาเหตุ · ไม่มีการจำกัด `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS` ที่ใดใน `server/` และ `stack/` (grep ไม่พบ) |
+| หลักฐาน | `tests/test_supervisor.py:128-147` · รายงาน Task 3a และ 3b บันทึกว่าล้มในชุดเต็มบน baseline (889 passed, 1 failed; `KeyError: 'th'`) และผ่านเมื่อรันเดี่ยว (รอบนั้นไม่ได้เก็บ `stderr.log` ไว้ จึง**ไม่ยืนยัน**ว่าเป็นสาเหตุเดียวกับรอบ Task 4 ด้านล่าง เป็นเพียงอาการเดียวกัน) · ในรอบ Task 4 (หน่วยความจำ commit ว่างของเครื่อง dev เหลือ 1.7 GB จาก 32 GB เพราะ Docker Desktop) **ล้มเมื่อรันเดี่ยว 3 จาก 3 ครั้ง**: `uv run pytest -q tests/test_supervisor.py::test_two_runs_at_once_keep_their_own_language` · สาเหตุที่ขุดได้ด้วยสคริปต์ที่พิมพ์ `outcome`: Run หนึ่งจบ `failed`/`engine_error` ("the run's process exited with code 1 and no outcome") และ `stderr.log` ของมันเต็มไปด้วย `OpenBLAS error: Memory allocation still failed after 10 retries, giving up.` (process ลูกที่ import numpy พร้อมกันสองตัว แต่ละตัวเปิด thread ตามจำนวน core = 16) · Run เดี่ยวแบบเดียวกันผ่าน · หลังหน่วยความจำ commit ว่างกลับมา (11 GB) เทสต์เดียวกันผ่านใน `pytest -m "not db"` (222 passed) ซึ่งสนับสนุนสาเหตุเรื่องหน่วยความจำ · เทสต์ใช้ `assert` ใน thread (`:138`) ซึ่ง pytest เก็บเป็นแค่ warning แล้วเทสต์ล้มที่ `KeyError: 'th'` บรรทัด 146 จึงไม่บอกสาเหตุ · ไม่มีการจำกัด `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS` ที่ใดใน `server/` และ `stack/` (grep ไม่พบ) |
 
 **สถานการณ์:** เครื่องที่หน่วยความจำ commit ใกล้เต็ม (หรือ container ที่มี memory limit เล็ก) เมื่อ Worker เริ่มสอง Run พร้อมกัน process ลูกของ Run หนึ่งอาจตายตั้งแต่ import numpy ผู้ใช้เห็น Run ล้มเป็น engine error โดยสาเหตุจริงอยู่แค่ใน `stderr.log` ของ Run
 
@@ -615,7 +621,7 @@
 
 เครื่องมือค้นของ Agent ล้มด้วย 400 แล้ว library ส่งข้อความ error เป็น "ผลค้น" ให้โมเดลเขียนต่อ DeepLit ไม่ตรวจว่าแหล่งอ้างอิงมีเนื้อหาจริง จึงนับเป็นสำเร็จและไม่คืนโควตา ผู้ใช้ได้รายงานที่ไม่มีข้อมูลหนึ่งบรรทัด และเห็น id บัญชี OpenRouter ของเจ้าของระบบ
 
-**แก้ที่เสนอ:** ถ้าไม่มี browsed/found ที่ได้เนื้อหาเลย ให้ Run ล้มด้วยเหตุ `empty_report` (มีอยู่แล้ว ใช้กับ Run `a354bc1c`) และกรองข้อความ error ของผู้ให้บริการก่อนเข้ารายงาน
+**แก้ที่เสนอ:** ถ้าไม่มี browsed/found ที่ได้เนื้อหาเลย ให้ Run ล้มด้วยเหตุ `empty_report` (มีอยู่แล้ว ใช้กับ Run `a354bc1c`) และกรองข้อความ error ของผู้ให้บริการก่อนเข้ารายงาน · ขนาด: เล็ก (ประเมินตอนรวมรายงาน)
 
 ## BUG-50 — `message` ของ Run ที่ล้มส่ง error ดิบของผู้ให้บริการ รวม account id ของ OpenRouter ให้เจ้าของ Run
 
@@ -625,7 +631,7 @@
 | ผู้ใช้เห็นไหม | ผ่าน API และ MCP เท่านั้น (หน้าเว็บแสดงข้อความสุภาพ) |
 | หลักฐาน | 4 Run ที่ล้มด้วย 429 (`3efd60e6`, `a2da08c8`, `52a2619f`, `e04135d5`): `GET /api/runs/{id}` ของผู้ใช้ทั่วไปมี `message` 722 ตัวอักษร ที่มี `"user_id":"user_…"` ของ OpenRouter และชื่อผู้ให้บริการ/URL ตั้งค่า (`openrouter.ai/settings/integrations`) หน้าสถานะระบบไม่แสดง (ตัดแล้ว) นับ `sk-or-` ได้ 0 ทั้งใน log, `message` และ stderr.log — `stderr.log` พบรูปแบบ `user_…` 1 ครั้ง |
 
-ยืนยันข้อสงสัย e-S7 ของ Task 3 (คืนค่า `message` ดิบให้เจ้าของ): key ไม่รั่ว แต่ id บัญชีของ operator รั่ว **แก้ที่เสนอ:** ใช้ตัวกรองเดียวกับหน้าสถานะระบบ (`monitor.KEYLIKE` ขยายให้ครอบ `user_…`) กับ `run_out` ก่อนส่งให้เจ้าของ
+ยืนยันข้อสงสัย e-S7 ของ Task 3 (คืนค่า `message` ดิบให้เจ้าของ): key ไม่รั่ว แต่ id บัญชีของ operator รั่ว **แก้ที่เสนอ:** ใช้ตัวกรองเดียวกับหน้าสถานะระบบ (`monitor.KEYLIKE` ขยายให้ครอบ `user_…`) กับ `run_out` (และ `_run_facts` ของ MCP) ก่อนส่งให้เจ้าของ · ขนาด: เล็ก (ประเมินตอนรวมรายงาน)
 
 ## BUG-51 — ผู้ให้บริการตอบ 429 ชั่วคราว Run ล้ม "retries_exhausted" ภายใน 30–60 วินาที ไม่มี backoff ที่ทนได้
 
@@ -635,7 +641,7 @@
 | ผู้ใช้เห็นไหม | ใช่ |
 | หลักฐาน | โมเดล `google/gemini-2.5-flash-lite` ผ่าน OpenRouter: STORM ไทย ล้มสองครั้งแรก (30 วินาที ที่ขั้น research, 150 วินาที ที่ขั้น outline) ครั้งที่สามผ่านใน 40 วินาที; Co-STORM เปิดล้ม 2 จาก 2 (ขั้น warmup 30 และ 60 วินาที) ข้อความ: `google/gemini-2.5-flash-lite is temporarily rate-limited upstream` (429 จาก pool ร่วมของ Google AI Studio) ปุ่มทดสอบโมเดล (เรียกครั้งเดียว) ผ่านทุกครั้ง |
 
-429 จาก pool ร่วมเป็นเรื่องชั่วคราว แต่ engine ลองซ้ำไม่กี่ครั้งแล้วยอมแพ้ภายในครึ่งนาที (Run จริงใช้ LLM หลายตัวพร้อมกัน จึงชนบ่อยกว่าการทดสอบครั้งเดียว) ผู้ใช้เห็น "ล้มเหลว" แต่โควตาคืนให้ (ถูกต้อง) โมเดลถูกที่สุดที่ README แนะนำจึงใช้งานจริงไม่ได้ในบางช่วง **แก้ที่เสนอ:** backoff แบบยาวขึ้นสำหรับ 429 (ตามเวลา `Retry-After` ถ้ามี) หรือรองรับ fallback model
+429 จาก pool ร่วมเป็นเรื่องชั่วคราว แต่ engine ลองซ้ำไม่กี่ครั้งแล้วยอมแพ้ภายในครึ่งนาที (Run จริงใช้ LLM หลายตัวพร้อมกัน จึงชนบ่อยกว่าการทดสอบครั้งเดียว) ผู้ใช้เห็น "ล้มเหลว" แต่โควตาคืนให้ (ถูกต้อง) โมเดลถูกที่สุดที่ README แนะนำจึงใช้งานจริงไม่ได้ในบางช่วง **แก้ที่เสนอ:** backoff แบบยาวขึ้นสำหรับ 429 (ตามเวลา `Retry-After` ถ้ามี) หรือรองรับ fallback model · ขนาด: กลาง (ประเมินตอนรวมรายงาน: การลองซ้ำอยู่คนละที่ในแต่ละ engine และใน library ของ upstream)
 
 ## BUG-52 — ปุ่มทดสอบโมเดลบอก "เรียก tool ได้" แต่โหมด Agent ใช้ Gemini 2.5 Flash Lite ไม่ได้
 
@@ -645,7 +651,7 @@
 | ผู้ใช้เห็นไหม | ใช่ |
 | หลักฐาน | ทดสอบโมเดลได้ `tools: true` จึงเลือกโหมด Agent ได้; Run `2c6fa24b` ล้มที่เครื่องมือค้นด้วย 400 `Function calling with a response mime type: 'application/json' is unsupported` (ดู BUG-49) การทดสอบของ DeepLit เรียก tool แบบธรรมดา แต่เครื่องมือของ Agent ขอ JSON ผ่าน function calling ร่วมกัน ซึ่ง Gemini ไม่รองรับ |
 
-โมเดลที่ผ่านการทดสอบจึงไม่การันตีว่าใช้กับ Agent ได้ (อีกโมเดลที่ผ่านคือ `openai/gpt-4.1-nano` ก็ได้ `empty_report` ที่ Run `a354bc1c`) **แก้ที่เสนอ:** ให้การทดสอบเลียนแบบการเรียกของ Agent หรือแสดงว่าโหมดไหนใช้กับโมเดลนั้นได้จริง
+โมเดลที่ผ่านการทดสอบจึงไม่การันตีว่าใช้กับ Agent ได้ (อีกโมเดลที่ผ่านคือ `openai/gpt-4.1-nano` ก็ได้ `empty_report` ที่ Run `a354bc1c`) **แก้ที่เสนอ:** ให้การทดสอบเลียนแบบการเรียกของ Agent หรือแสดงว่าโหมดไหนใช้กับโมเดลนั้นได้จริง · ขนาด: เล็กถึงกลาง (ประเมินตอนรวมรายงาน)
 
 ## สงสัย (ทำซ้ำไม่ได้)
 
@@ -775,3 +781,17 @@
 ผลต่อผู้ใช้: ถูกล็อกชั่วคราวเพราะลองผิดบ่อย (429) ก็ยังเห็นว่ารหัสผ่านผิด จึงลองซ้ำหรือขอรีเซ็ต ซึ่งออกจากระบบทุกเครื่อง
 
 **วิธีแก้ที่เสนอ:** แยกตาม `ApiError.status`: 401 ใช้ข้อความเดิม, 429 บอกให้รอสักครู่, อื่นๆ และเครือข่ายล้มบอกว่า "ติดต่อระบบไม่ได้" · ขนาด: เล็ก
+
+---
+
+## ข้อจำกัดของเทสต์ที่ผู้ตรวจทานบันทึกไว้ (รวมใน Task 12)
+
+ไม่เปลี่ยนผลของข้อใด แต่คนที่แก้ควรรู้ก่อนถอด mark:
+
+- **BUG-21:** เทสต์ใช้ `monkeypatch.undo()` กลางเทสต์ (ควรใช้ `monkeypatch.context()`) และการแก้ที่เลิก `ignore_errors` อาจทำให้เทสต์ล้มด้วย `PermissionError` แทน `AssertionError` ซึ่ง `raises=AssertionError` จะรายงานเป็นล้มจริง ไม่ใช่ xfail ที่ผ่าน ให้ปรับเทสต์พร้อมการแก้
+- **BUG-02:** การเตรียมข้อมูลอาศัย race ของ BUG-03 (Run ที่ queued ใน Session ที่ถูกลบ) ถ้าแก้ BUG-03 ก่อน ให้สร้างแถวนั้นตรงในฐานข้อมูลแทน
+- **BUG-09:** มีโอกาสเล็กที่ลำดับการทำงานของ thread ทำให้ไม่เกิด deadlock ในรอบนั้น (ผู้ตรวจทานรัน 3 ครั้ง xfail ทั้ง 3) strict xfail จะฟ้องเป็น XPASS ถ้าเกิด ให้รันซ้ำก่อนสรุปว่าแก้แล้ว
+- **BUG-54:** หนึ่งเทสต์ยิงหกคำขอ (หลายฟิลด์) เมื่อแก้บางฟิลด์ เทสต์ยังล้มจนกว่าจะครบทุกฟิลด์
+- **BUG-55:** เทสต์ขอ fixture `db` ที่ไม่ได้ใช้ (ไม่มีผลต่อผล)
+- **เวลา:** เทสต์ของการตรวจนี้เพิ่มเวลาชุดเต็มราว 1.5 นาที (ส่วนใหญ่คือ Worker จริงกับ fake engine)
+- **BUG-48:** เป็นเทสต์เดิมของโปรเจกต์ที่ไม่เสถียร ไม่ใช่เทสต์ของการตรวจ

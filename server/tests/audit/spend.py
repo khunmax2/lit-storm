@@ -6,6 +6,10 @@ Reads the OPENROUTER_API_KEY= line of each file (a file without one is skipped),
 asks GET https://openrouter.ai/api/v1/key for each distinct key and prints
 {"keys": [{"id", "usage_usd", "limit_usd"}], "total_usd"}. The id is the first
 8 hex characters of sha256(key); the key itself is never printed.
+
+Known limits (left as is for the audit): if no file has the key it prints total 0.0 with no warning;
+the env parsing does not handle a BOM, an `export ` prefix or a trailing comment; the first OPENROUTER_API_KEY=
+line of a file wins; OpenRouter's usage figure lags about one Run behind.
 """
 
 import hashlib

@@ -8,6 +8,11 @@ Each flow drives the Thai interface in Edge, counts clicks and typed fields, tim
 the numbers plus the page text it saw, so friction can be judged from evidence. Screenshots go to the
 scratch dir (shots/t9); none is taken on a page that shows a set-password link, a session or a token.
 Passwords come from creds.json (the invitee's is generated here and saved there); nothing is printed.
+
+Tied to the 2026-10-24 audit stack, which is gone now: `discussion2` defaults to a Discussion id that
+existed only there (pass `--arg <session id>` on any other stack), `run --arg reuse` looks for a Project
+whose name has "audit flow", and creds.json, the stub model "AUDIT stub model" and "AUDIT stub search"
+come from live_runs.py and failure_cases.py prep. Rerunning it needs those set up again.
 """
 
 import argparse

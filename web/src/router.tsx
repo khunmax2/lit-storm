@@ -130,8 +130,30 @@ function SignedIn() {
 
 const rootRoute = createRootRoute({ component: Outlet });
 
-const setupRoute = createRoute({ getParentRoute: () => rootRoute, path: "setup", component: SetupPage });
-const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: "login", component: LoginPage });
+// The sign-in and first-run pages are for someone not signed in: a signed-in
+// visitor goes home instead of seeing the form again. Setup, once done, is
+// the sign-in page's to show.
+async function homeIfSignedIn() {
+  const me = await api.GET("/api/me");
+  if (me.data) throw redirect({ to: "/" });
+}
+
+const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "setup",
+  beforeLoad: async () => {
+    await homeIfSignedIn();
+    const setup = await api.GET("/api/setup");
+    if (setup.data && !setup.data.needed) throw redirect({ to: "/login" });
+  },
+  component: SetupPage,
+});
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "login",
+  beforeLoad: homeIfSignedIn,
+  component: LoginPage,
+});
 const setPasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: "set-password", component: SetPasswordPage });
 
 const appRoute = createRoute({ getParentRoute: () => rootRoute, id: "app", component: SignedIn });

@@ -984,6 +984,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/service-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * View Service Data
+         * @description A remote Engine's own answer, kept with the Run (Medical Review: MRA's
+         *     review JSON), for the web app to draw MRA's report itself.
+         */
+        get: operations["view_service_data_api_runs__run_id__service_data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/service-page": {
         parameters: {
             query?: never;
@@ -5127,6 +5148,37 @@ export interface operations {
                 charts?: string;
                 theme?: string | null;
             };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_service_data_api_runs__run_id__service_data_get: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 run_id: string;

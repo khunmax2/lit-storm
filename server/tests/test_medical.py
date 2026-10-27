@@ -386,6 +386,19 @@ def test_an_administrator_sets_mra_up_and_checks_it(admin, browser, mra):
 
 
 @pytest.mark.db
+def test_mras_review_is_served_to_its_owner_for_the_web_app_to_draw(admin, browser, configured, medical_on, db):  # noqa: F811
+    user = make_user(admin, browser)
+    stored = _run_through_worker(db, user, mode="quick")
+    data = user.get(f"/api/runs/{stored.id}/service-data")
+    assert data.status_code == 200 and data.headers["cache-control"] == "private, no-store"
+    assert data.json() == medical_on.review  # MRA's answer as it gave it
+    other = make_user(admin, browser, email="other@example.org")
+    assert other.get(f"/api/runs/{stored.id}/service-data").status_code == 404  # not theirs
+    queued = user.post("/api/sessions", json={"topic": "drug Y", "language": "en", "engine": "medical"}).json()["runs"][0]
+    assert user.get(f"/api/runs/{queued['id']}/service-data").status_code == 404  # nothing kept yet
+
+
+@pytest.mark.db
 def test_mras_own_page_is_kept_and_shown_sandboxed(admin, browser, configured, medical_on, db):  # noqa: F811
     user = make_user(admin, browser)
     stored = _run_through_worker(db, user, mode="full")

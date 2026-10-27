@@ -8,6 +8,9 @@
 @import "@fontsource/instrument-serif/400.css";
 @import "@fontsource-variable/noto-serif-thai";
 
+/* MRA's report code has its own stylesheet (src/mra/report.css, inside a shadow root). */
+@source not "./mra";
+
 @custom-variant dark (&:is(.dark *));
 
 /* shadcn/ui neutral tokens, with one blue brand colour for what is
@@ -353,5 +356,13 @@
 @media (prefers-reduced-motion: reduce) {
   .lit-flow-edge {
     animation: none;
+  }
+}
+
+/* Printing MRA's report (its own print button): only the report, without the
+   app's sidebar and header around it. */
+@media print {
+  body:has([data-mra-report]) :is([data-slot="sidebar"], [data-slot="sidebar-gap"], header) {
+    display: none !important;
   }
 }

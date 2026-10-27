@@ -10,7 +10,14 @@ const base = `/${(process.env.LITSTORM_BASE_PATH ?? "").replace(/^\/+|\/+$/g, ""
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: {
+    alias: {
+      "@mra": path.resolve(__dirname, "./src/mra"),
+      // MRA's report code (src/mra) links with next/link; a plain anchor here, as in MRA's offline file.
+      "next/link": path.resolve(__dirname, "./src/mra/shims-link.tsx"),
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   server: {
     port: 5173,
     // LITSTORM_API points a second dev server at a second API, as the

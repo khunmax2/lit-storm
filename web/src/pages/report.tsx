@@ -28,7 +28,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { api, BASE, call } from "@/api/client";
 import { ErrorText, Favicon, LoadingRows, Toolbar, domainOf } from "@/components/common";
@@ -180,7 +180,7 @@ function Body({ sections, level = 2 }: { sections: Numbered[]; level?: number })
   );
 }
 
-function ExportMenu({ runId }: { runId: string }) {
+function ExportMenu({ runId, servicePage = false }: { runId: string; servicePage?: boolean }) {
   const { t } = useT();
   const [evidence, setEvidence] = useState(false);
   const [live, setLive] = useState(false);
@@ -210,6 +210,15 @@ function ExportMenu({ runId }: { runId: string }) {
         {item("md", "Markdown", FileType2)}
         {item("interactive", t("report.exportInteractive"), PanelsTopLeft)}
         {item("observatory", t("report.exportObservatory"), Radar)}
+        {servicePage && (
+          // MRA's own report as one HTML file that opens offline, as MRA made it.
+          <DropdownMenuItem asChild>
+            <a href={`${BASE}/api/runs/${runId}/service-page`} download={`mra-review-${runId.slice(0, 8)}.html`}>
+              <FileCode2 />
+              {t("report.exportMra")}
+            </a>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={evidence}
@@ -226,6 +235,9 @@ function ExportMenu({ runId }: { runId: string }) {
   );
 }
 
+// MRA's report code (src/mra, with echarts) loads only when a Medical Review is opened.
+const MraView = lazy(() => import("@/components/mra-view").then((m) => ({ default: m.MraView })));
+
 type VisualBlock = { id: string; type: string; title: string; anchor: string; hidden: boolean; sources: number[] };
 type Visuals = {
   ready: boolean;
@@ -236,35 +248,6 @@ type Visuals = {
   from_report_text: boolean;
   outdated: boolean;
 };
-
-/** A remote Engine's own report page, as it made it (Medical Review: MRA's
- *  comparison table, PRISMA flow, forest plots), kept with the Run so it
- *  opens even when the service is down. Sandboxed like the visual view. */
-function ServicePage({ runId }: { runId: string }) {
-  const { t } = useT();
-  const [loading, setLoading] = useState(true);
-  return (
-    <div className="grid gap-3">
-      <p className="text-sm text-muted-foreground">{t("report.view.serviceLead")}</p>
-      <div className="relative overflow-hidden rounded-xl border bg-background">
-        {loading && (
-          <div className="absolute inset-0 grid place-items-center">
-            <LoadingRows rows={4} />
-          </div>
-        )}
-        <iframe
-          title={t("report.view.service")}
-          src={`${BASE}/api/runs/${runId}/service-page`}
-          // Its own origin: scripts run, links open, nothing else.
-          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-          referrerPolicy="no-referrer"
-          onLoad={() => setLoading(false)}
-          className="block h-[calc(100svh-11rem)] min-h-[32rem] w-full"
-        />
-      </div>
-    </div>
-  );
-}
 
 /** The report with its figures (litstorm.render.interactive), shown as the
  *  server draws it, in a frame of its own: the page runs a script, so it is
@@ -549,7 +532,10 @@ export function ReportPage() {
     queryFn: () => call(api.GET("/api/runs/{run_id}", { params: { path: { run_id: runId } } })),
   });
   const [open, setOpen] = useState<number | null>(null);
-  const [view, setView] = useState<"read" | "visual" | "service">("read");
+  const [view, setView] = useState<"read" | "visual">("read");
+  // A Medical Review shows MRA's report, drawn from its review; its own
+  // reading view only when that review is not kept with the Run.
+  const [mraMissing, setMraMissing] = useState(false);
   const [hover, setHover] = useState<{ id: number; at: DOMRect } | null>(null);
   const byId = useMemo(() => new Map((report.data?.sources ?? []).map((s) => [s.id, s])), [report.data]);
   const sections = useMemo(() => numbered(report.data?.sections ?? []), [report.data]);
@@ -634,17 +620,20 @@ export function ReportPage() {
       })
     : null;
   const hovered = hover && byId.get(hover.id);
-  // A remote Engine's own page, kept with the Run (Medical Review: MRA's full report).
+  // MRA's own offline page, kept with a full review's Run.
   const servicePage = !!(summary?.notes as { service_page?: { kept?: boolean } } | undefined)?.service_page?.kept;
+  const mra = summary?.engine === "medical" && !mraMissing;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
       {/* How far through the report the reader is. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-40 h-0.5 origin-left bg-brand transition-transform duration-150 ease-out motion-reduce:transition-none"
-        style={{ transform: `scaleX(${progress})` }}
-      />
+      {!mra && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-0 z-40 h-0.5 origin-left bg-brand transition-transform duration-150 ease-out motion-reduce:transition-none"
+          style={{ transform: `scaleX(${progress})` }}
+        />
+      )}
       <Toolbar>
         {sessionId && (
           <Button variant="ghost" size="sm" asChild>
@@ -656,23 +645,27 @@ export function ReportPage() {
         )}
         <span className="hidden min-w-0 truncate text-sm font-medium md:inline">{r.title}</span>
         <div className="ml-auto flex items-center gap-2">
-          <Segmented
-            label={t("report.view.visual")}
-            value={view}
-            onChange={setView}
-            className="p-0.5 [&_button]:h-7 [&_button]:px-3 [&_button]:text-xs"
-            options={[
-              { value: "read", label: t("report.view.read") },
-              { value: "visual", label: t("report.view.visual") },
-              ...(servicePage ? [{ value: "service" as const, label: t("report.view.service") }] : []),
-            ]}
-          />
-          <ExportMenu runId={runId} />
+          {/* MRA's report has its figures from the review itself: no visual view beside it. */}
+          {!mra && (
+            <Segmented
+              label={t("report.view.visual")}
+              value={view}
+              onChange={setView}
+              className="p-0.5 [&_button]:h-7 [&_button]:px-3 [&_button]:text-xs"
+              options={[
+                { value: "read", label: t("report.view.read") },
+                { value: "visual", label: t("report.view.visual") },
+              ]}
+            />
+          )}
+          <ExportMenu runId={runId} servicePage={servicePage} />
         </div>
       </Toolbar>
 
-      {view === "service" && servicePage ? (
-        <ServicePage runId={runId} />
+      {mra ? (
+        <Suspense fallback={<LoadingRows rows={6} />}>
+          <MraView runId={runId} onMissing={() => setMraMissing(true)} />
+        </Suspense>
       ) : view === "visual" ? (
         <VisualView runId={runId} />
       ) : (

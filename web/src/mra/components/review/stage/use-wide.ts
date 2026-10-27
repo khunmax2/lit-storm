@@ -1,8 +1,9 @@
 "use client";
 import { useSyncExternalStore } from "react";
+import { APP_CHROME_PX } from "@mra/lib/host";
 
 /** Same as DESIGN.md's rail/drawer breakpoint (Tailwind `lg`); the wide 960px viewBox then renders at >= ~0.96 scale. */
-export const WIDE_QUERY = "(min-width: 1024px)";
+export const WIDE_QUERY = `(min-width: ${1024 + APP_CHROME_PX}px)`;
 const QUERY = WIDE_QUERY;
 
 function subscribe(cb: () => void): () => void {

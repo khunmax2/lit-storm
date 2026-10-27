@@ -625,7 +625,8 @@ export function ReportPage() {
   const mra = summary?.engine === "medical" && !mraMissing;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
+    // MRA's report takes the width MRA gives it (its own page is up to 1680px wide).
+    <div className={cn("mx-auto w-full px-6 py-8", mra ? "max-w-[1680px]" : "max-w-6xl")}>
       {/* How far through the report the reader is. */}
       {!mra && (
         <div

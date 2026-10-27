@@ -5,6 +5,10 @@ export const host: { root: Document | ShadowRoot; el: Element | null } = {
   el: null,
 };
 
+/** DeepLit's sidebar beside the report from `md` up (16rem): MRA's layout widths (its Tailwind breakpoints from `md`,
+ * report.css, and the media queries below) are moved up by it, so a column switch happens at the width MRA meant. */
+export const APP_CHROME_PX = 256;
+
 export function byId(id: string): HTMLElement | null {
   return host.root.getElementById(id) as HTMLElement | null;
 }

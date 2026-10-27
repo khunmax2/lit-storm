@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { byId } from "@mra/lib/host";
+import { APP_CHROME_PX } from "@mra/lib/host";
 
-const NARROW = "(max-width: 1023.98px)"; // below Tailwind `lg`
+const NARROW = `(max-width: ${1024 + APP_CHROME_PX - 0.02}px)`; // below Tailwind `lg`
 const FOCUSABLE = 'a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])';
 
 function useNarrow(): boolean {

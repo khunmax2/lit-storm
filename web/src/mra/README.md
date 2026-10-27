@@ -17,5 +17,7 @@ to `@mra/`. What differs from MRA's code:
 - `report.tsx`: no `pt-8` (the page gives the space), `--header-h` under
   DeepLit's header, the document's `lang` left alone.
 - `quick-answer.tsx`: `upgrade={false}` hides "run a full review" (MRA's own form).
+- Layout widths sit 16rem higher (`APP_CHROME_PX`, DeepLit's sidebar): the `md`-and-up breakpoints in
+  `report.css`, `use-wide.ts`, `rail-drawer.tsx` and `LIT_TABLE_MIN_WIDTH` in `lit-matrix.tsx`.
 - `lib/config.ts`: no `NEXT_PUBLIC_API_URL`.
 - `shims-link.tsx` stands in for `next/link` (from MRA's `standalone/shims`).

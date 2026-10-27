@@ -21,13 +21,14 @@ import { ScrollRegion } from "./scroll-region";
 import { usePrinting } from "./print-mode";
 import { useMinWidth } from "./use-min-width";
 import { L } from "./text";
+import { APP_CHROME_PX } from "@mra/lib/host";
 
 const T = RC.lit;
 
 /** Rows per page (Plan 20 Task 5): a long matrix is paged, never a 10,000px wall. */
 export const LIT_PAGE_SIZE = 15;
 /** The table needs the reading column of the 1280px layout; narrower screens get ruled cards. */
-export const LIT_TABLE_MIN_WIDTH = 1280;
+export const LIT_TABLE_MIN_WIDTH = 1280 + APP_CHROME_PX;
 
 const CLAMP = "line-clamp-3 break-words";
 const TD = "px-2.5 py-2 align-top";

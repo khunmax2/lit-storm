@@ -41,7 +41,7 @@ import {
   formatDate,
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
-import { KindTag, RoomWho, hue, initial, useRoom, type Room } from "@/components/costorm-room";
+import { KindTag, RoomWho, initial, tone, useRoom, type Room } from "@/components/costorm-room";
 import { MoveSessionDialog } from "@/components/move-session";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
@@ -138,10 +138,8 @@ function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, 
     <div className="flex gap-3">
       <span
         aria-hidden
-        className={cn(
-          "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white",
-          hue(turn.role),
-        )}
+        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+        style={{ background: tone(turn.role) }}
       >
         {initial(moderator ? t("disc.moderator") : turn.role === "General Knowledge Provider" ? t("room.gkp") : turn.role)}
       </span>
@@ -547,6 +545,8 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                       view={view ?? null}
                       currentId={d.current?.id ?? null}
                       live={!!d.current && !FINAL.has(d.current.status)}
+                      picked={room.picked}
+                      onPick={(role) => (role ? room.pick(role) : room.picked && room.pick(room.picked))}
                     />
                   </Suspense>
                 </div>

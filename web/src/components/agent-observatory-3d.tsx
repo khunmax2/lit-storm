@@ -5,21 +5,24 @@
 // own view (docs/adr/0012); nothing here is made up. Loaded only when someone opens it (React.lazy),
 // so three.js does not weigh on the rest of the app.
 import { Line, OrbitControls, Stars } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useQuery } from "@tanstack/react-query";
 import { Pause, Play, RotateCcw } from "lucide-react";
+import { useTheme } from "next-themes";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { api, call } from "@/api/client";
+import { tone } from "@/components/costorm-room";
 import { Button } from "@/components/ui/button";
 import { useRunLive } from "@/hooks/use-run-live";
 import { useT, type Key } from "@/i18n";
 
 type Vec = [number, number, number];
-type Kind = "lead" | "persona" | "expert" | "web" | "write" | "report" | "kb" | "speaker" | "you";
+type Kind = "lead" | "persona" | "expert" | "web" | "write" | "report" | "kb" | "speaker" | "you" | "topic";
 type Status = "idle" | "active" | "done" | "fail";
-type Core = { id: string; label: string; sub?: string; kind: Kind; pos: Vec; status: Status; size?: number };
+// color: a speaker's own (costorm-room's tone), else its kind's; faded: an expert no longer at the table.
+type Core = { id: string; label: string; sub?: string; kind: Kind; pos: Vec; status: Status; size?: number; color?: string; faded?: boolean };
 type Link = { id: string; from: string; to: string };
 type Packet = { id: number; from: Vec; to: Vec; color: string; ms: number };
 type Sat = { id: string; label: string; hub: string };
@@ -33,10 +36,14 @@ const COLOR: Record<Kind, string> = {
   web: "#7dff6a",
   write: "#ff3df2",
   report: "#ffffff",
-  kb: "#22e4ff",
+  kb: "#e0f2fe",
   speaker: "#ffb547",
   you: "#7dff6a",
+  topic: "#7dd3fc",
 };
+// Co-STORM's people and topics are glass spheres; STORM's agents keep their crystal look.
+const GLASS = new Set<Kind>(["speaker", "you", "kb", "topic"]);
+const toneOf = (c: Core) => (c.status === "fail" ? "#ff4d6d" : (c.color ?? COLOR[c.kind]));
 const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
 const clip = (s: unknown, n: number) => {
   const x = String(s ?? "").replace(/\s+/g, " ").trim();
@@ -161,18 +168,36 @@ const status = (w: World, id: string, s: Status) => {
 
 // ------------------------------------------------------------------ 3D pieces
 
-function Glow({ color, radius, strength }: { color: string; radius: number; strength: number }) {
+function Glow({ color, radius, strength, light }: { color: string; radius: number; strength: number; light?: boolean }) {
+  // Light adds up to white on a pale ground: there a halo is a plain tint instead.
   return (
     <mesh>
       <sphereGeometry args={[radius, 24, 24]} />
-      <meshBasicMaterial color={color} transparent opacity={strength} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={light ? strength * 0.7 : strength}
+        blending={light ? THREE.NormalBlending : THREE.AdditiveBlending}
+        depthWrite={false}
+        toneMapped={false}
+      />
     </mesh>
   );
 }
 
+const radiusOf = (c: Core) =>
+  (c.size ?? 1) * (c.kind === "lead" || c.kind === "kb" ? 0.46 : c.kind === "report" ? 0.42 : c.kind === "topic" ? 0.16 : 0.32) * (c.faded ? 0.75 : 1);
+
 type Registry = Map<string, THREE.Object3D>;
 
-function CoreMesh({ c, onPick, picked, registry }: { c: Core; onPick: (c: Core) => void; picked: boolean; registry: Registry }) {
+function CoreMesh({ c, onPick, picked, dim, light, registry }: {
+  c: Core;
+  onPick: (c: Core) => void;
+  picked: boolean;
+  dim: boolean; // someone else is picked
+  light: boolean;
+  registry: Registry;
+}) {
   const group = useRef<THREE.Group>(null);
   useEffect(() => {
     const g = group.current;
@@ -184,30 +209,61 @@ function CoreMesh({ c, onPick, picked, registry }: { c: Core; onPick: (c: Core) 
   const shell = useRef<THREE.Mesh>(null);
   const ring = useRef<THREE.Mesh>(null);
   const born = useRef<number | null>(null);
-  const color = COLOR[c.kind];
-  const r = (c.size ?? 1) * (c.kind === "lead" || c.kind === "kb" ? 0.46 : c.kind === "report" ? 0.42 : 0.32);
+  const r = radiusOf(c);
   const active = c.status === "active";
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     if (born.current == null) born.current = t;
     const grow = Math.min(1, (t - born.current) / 0.7);
-    const s = (1 - Math.pow(1 - grow, 3)) * (picked ? 1.2 : 1);
+    const s = (1 - Math.pow(1 - grow, 3)) * (picked ? 1.3 : 1);
     group.current?.scale.setScalar(Math.max(0.001, s));
     if (group.current) group.current.position.y = c.pos[1] + Math.sin(t * 0.7 + c.pos[0]) * 0.07;
     if (shell.current) shell.current.rotation.y += delta * (active ? 0.7 : 0.15);
     if (ring.current) ring.current.rotation.z += delta * (active ? 1.5 : 0.3);
   });
-  const glow = c.status === "fail" ? 0.04 : active ? 0.16 : c.status === "done" ? 0.05 : 0.03;
-  const tone = c.status === "fail" ? "#ff4d6d" : color;
+  const glow = (c.status === "fail" ? 0.04 : picked ? 0.3 : active ? 0.16 : c.status === "done" ? 0.06 : 0.035) * (dim ? 0.35 : 1) * (c.faded ? 0.6 : 1);
+  const tone = toneOf(c);
+  const pick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    onPick(c);
+  };
+  if (GLASS.has(c.kind))
+    return (
+      <group ref={group} position={c.pos} onClick={pick}>
+        {/* A lit core inside a clear shell, a soft halo round it, and a ring only on whoever is picked or speaking. */}
+        <mesh>
+          <sphereGeometry args={[r * 0.72, 32, 32]} />
+          <meshStandardMaterial
+            color={tone}
+            emissive={tone}
+            emissiveIntensity={(picked ? 3 : active ? 2.2 : c.status === "done" ? 1.1 : 0.6) * (dim ? 0.4 : 1) * (c.faded ? 0.6 : 1)}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh ref={shell}>
+          <sphereGeometry args={[r * 1.25, 32, 32]} />
+          <meshPhysicalMaterial
+            color={tone}
+            transparent
+            opacity={(light ? 0.35 : 0.22) * (dim ? 0.5 : 1)}
+            roughness={0.08}
+            metalness={0.1}
+            clearcoat={1}
+            depthWrite={false}
+          />
+        </mesh>
+        {(picked || active) && (
+          <mesh ref={ring} rotation={[Math.PI / 2.2, 0, 0]}>
+            <torusGeometry args={[r * 1.9, picked ? 0.022 : 0.012, 8, 64]} />
+            <meshBasicMaterial color={tone} transparent opacity={picked ? 1 : 0.7} toneMapped={false} />
+          </mesh>
+        )}
+        <Glow color={tone} radius={r * 2.2} strength={glow} light={light} />
+        <Glow color={tone} radius={r * 3.4} strength={glow * 0.35} light={light} />
+      </group>
+    );
   return (
-    <group
-      ref={group}
-      position={c.pos}
-      onClick={(e) => {
-        e.stopPropagation();
-        onPick(c);
-      }}
-    >
+    <group ref={group} position={c.pos} onClick={pick}>
       <mesh>
         <icosahedronGeometry args={[r, 1]} />
         <meshStandardMaterial color={tone} emissive={tone} emissiveIntensity={active ? 2.4 : c.status === "done" ? 0.9 : 0.4} toneMapped={false} />
@@ -220,7 +276,7 @@ function CoreMesh({ c, onPick, picked, registry }: { c: Core; onPick: (c: Core) 
         <torusGeometry args={[r * 2.1, 0.012, 8, 64]} />
         <meshBasicMaterial color={tone} transparent opacity={active ? 0.95 : 0.35} toneMapped={false} />
       </mesh>
-      <Glow color={tone} radius={r * 2.3} strength={glow} />
+      <Glow color={tone} radius={r * 2.3} strength={glow} light={light} />
     </group>
   );
 }
@@ -233,9 +289,26 @@ function arc(a: Vec, b: Vec) {
   return new THREE.QuadraticBezierCurve3(va, mid, vb);
 }
 
-function LinkLine({ a, b, on, color }: { a: Vec; b: Vec; on: boolean; color: string }) {
+function LinkLine({ a, b, on, dim, color }: { a: Vec; b: Vec; on: boolean; dim?: boolean; color: string }) {
   const points = useMemo(() => arc(a, b).getPoints(40), [a, b]);
-  return <Line points={points} color={color} lineWidth={on ? 1.8 : 1} transparent opacity={on ? 0.75 : 0.18} />;
+  return <Line points={points} color={color} lineWidth={on ? 2.2 : 1} transparent opacity={on ? 0.85 : dim ? 0.07 : 0.2} />;
+}
+
+/** Turns the camera to whoever is picked, and back to the table's middle when nobody is. */
+function Focus({ to, home }: { to: Vec | null; home: Vec }) {
+  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
+  const goal = useMemo(() => new THREE.Vector3(), []);
+  const started = useRef(false);
+  useFrame((_, delta) => {
+    if (!controls) return;
+    goal.set(...(to ?? home));
+    if (!started.current) {
+      controls.target.copy(goal);
+      started.current = true;
+    } else controls.target.lerp(goal, 1 - Math.exp(-delta * 2.5));
+    controls.update();
+  });
+  return null;
 }
 
 function PacketMesh({ p, onDone }: { p: Packet; onDone: (id: number) => void }) {
@@ -356,8 +429,9 @@ function LabelSync({ registry, labels }: { registry: Registry; labels: Map<strin
   return null;
 }
 
-function Scene({ world, packets, onArrive, picked, onPick, registry, labels, target }: {
+function Scene({ world, packets, onArrive, picked, onPick, registry, labels, target, light }: {
   target: Vec;
+  light: boolean;
   world: World;
   packets: Packet[];
   onArrive: (id: number) => void;
@@ -368,25 +442,46 @@ function Scene({ world, packets, onArrive, picked, onPick, registry, labels, tar
 }) {
   const cores = [...world.cores.values()];
   const hub = world.cores.get("web")?.pos;
+  const focus = picked ? world.cores.get(picked)?.pos ?? null : null;
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <Stars radius={70} depth={40} count={1800} factor={3} fade speed={0.6} />
+      <ambientLight intensity={light ? 1.1 : 0.4} />
+      <pointLight position={[0, 8, 6]} intensity={light ? 40 : 25} />
+      {!light && <Stars radius={70} depth={40} count={1800} factor={3} fade speed={0.6} />}
       {[...world.links.values()].map((l) => {
         const a = world.cores.get(l.from);
         const b = world.cores.get(l.to);
         if (!a || !b) return null;
-        return <LinkLine key={l.id} a={a.pos} b={b.pos} on={b.status === "active"} color={COLOR[b.kind]} />;
+        const mine = !!picked && (l.from === picked || l.to === picked);
+        return (
+          <LinkLine
+            key={l.id}
+            a={a.pos}
+            b={b.pos}
+            on={mine || b.status === "active" || a.status === "active"}
+            dim={!!picked && !mine}
+            color={a.color ?? COLOR[b.kind]}
+          />
+        );
       })}
       {cores.map((c) => (
-        <CoreMesh key={c.id} c={c} picked={picked === c.id} onPick={onPick} registry={registry} />
+        <CoreMesh
+          key={c.id}
+          c={c}
+          picked={picked === c.id}
+          dim={!!picked && picked !== c.id && c.kind !== "kb"}
+          light={light}
+          onPick={onPick}
+          registry={registry}
+        />
       ))}
       {packets.map((p) => (
         <PacketMesh key={p.id} p={p} onDone={onArrive} />
       ))}
       {hub && <Satellites sats={world.sats} hub={hub} />}
       <MindStars stars={world.stars} />
-      <OrbitControls target={target} enablePan={false} enableDamping autoRotate autoRotateSpeed={0.35} minDistance={5} maxDistance={26} />
+      <OrbitControls makeDefault enablePan={false} enableDamping autoRotate={!picked} autoRotateSpeed={0.35} minDistance={5} maxDistance={26} />
+      <Focus to={focus} home={target} />
       <LabelSync registry={registry} labels={labels} />
     </>
   );
@@ -410,9 +505,14 @@ function Stage({
   canReplay,
   camera = [0, 2.5, 14],
   target = [0, 0, 0],
+  picked: pickedId,
+  onPick,
 }: {
   camera?: Vec;
   target?: Vec;
+  /** Given: the page owns the pick (the Co-STORM table with its cards); else the stage keeps its own. */
+  picked?: string | null;
+  onPick?: (id: string | null) => void;
   title: string;
   director: ReturnType<typeof useDirector>;
   hud: ReactNode;
@@ -420,22 +520,28 @@ function Stage({
   canReplay: boolean;
 }) {
   const { t } = useT();
-  const [picked, setPicked] = useState<Core | null>(null);
+  const [own, setOwn] = useState<Core | null>(null);
+  const controlled = onPick !== undefined;
+  const pickedKey = controlled ? (pickedId ?? null) : (own?.id ?? null);
+  const picked = controlled ? null : own; // the stage's own detail box, when it owns the pick
+  const pick = (c: Core | null) => (controlled ? onPick(c ? c.id : null) : setOwn(c));
+  const { resolvedTheme } = useTheme();
+  const light = resolvedTheme !== "dark";
   const ok = useMemo(webglOk, []);
   const registry = useMemo<Registry>(() => new Map(), []);
   const labels = useMemo(() => new Map<string, HTMLDivElement>(), []);
   const w = director.world.current;
   if (!ok) return <p className="text-xs text-muted-foreground">{t("obs3d.noWebgl")}</p>;
   return (
-    <div className="obs3d relative h-[26rem] overflow-hidden rounded-xl border md:h-[32rem]">
+    <div className="obs3d relative h-[26rem] overflow-hidden rounded-xl border md:h-[32rem]" data-light={light || undefined}>
       <style>{OBS3D_CSS}</style>
-      <Canvas camera={{ position: camera, fov: 50 }} dpr={[1, 2]} onPointerMissed={() => setPicked(null)}>
-        <Scene world={w} packets={director.packets} onArrive={director.arrive} picked={picked?.id ?? null} onPick={setPicked} registry={registry} labels={labels} target={target} />
+      <Canvas camera={{ position: camera, fov: 50 }} dpr={[1, 2]} onPointerMissed={() => pick(null)}>
+        <Scene world={w} packets={director.packets} onArrive={director.arrive} picked={pickedKey} onPick={pick} registry={registry} labels={labels} target={target} light={light} />
       </Canvas>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {[...w.cores.values()].map((c) => {
-          const tone = c.status === "fail" ? "#ff4d6d" : COLOR[c.kind];
-          const r = (c.size ?? 1) * (c.kind === "lead" || c.kind === "kb" ? 0.46 : c.kind === "report" ? 0.42 : 0.32);
+          const tone = toneOf(c);
+          const r = radiusOf(c) * (GLASS.has(c.kind) ? 1.25 : 1);
           return (
             <div
               key={c.id}
@@ -446,10 +552,13 @@ function Stage({
               data-lift={r * 2.2}
               className="obs3d-label absolute top-0 left-0"
               data-state={c.status}
+              data-kind={c.kind}
+              data-picked={pickedKey === c.id || undefined}
+              data-faded={c.faded || undefined}
               style={{ ["--c" as string]: tone, display: "none" }}
             >
               <b>{clip(c.label, 34)}</b>
-              {c.sub && (c.status === "active" || picked?.id === c.id) && <span>{clip(c.sub, 46)}</span>}
+              {c.sub && (c.status === "active" || pickedKey === c.id) && !controlled && <span>{clip(c.sub, 46)}</span>}
             </div>
           );
         })}
@@ -506,13 +615,29 @@ const OBS3D_CSS = `
 .obs3d-title { font: 700 11px ui-monospace, Consolas, monospace; letter-spacing: .2em; color: #22e4ff; text-shadow: 0 0 10px rgba(34,228,255,.7); text-transform: uppercase; }
 .obs3d-meters { display: flex; gap: 12px; margin-top: 4px; font: 11px ui-monospace, Consolas, monospace; color: #7591ad; flex-wrap: wrap; }
 .obs3d-meters b { color: #d4ebff; font-size: 14px; margin-right: 4px; text-shadow: 0 0 8px rgba(34,228,255,.5); }
-.obs3d-label { white-space: nowrap; text-align: center; font-size: 11px; line-height: 1.25; color: #d4ebff; text-shadow: 0 0 6px #000, 0 0 2px #000; }
-.obs3d-label b { display: block; font-weight: 600; color: var(--c); }
-.obs3d-label span { display: block; font-size: 9.5px; color: #8fa9c4; }
-.obs3d-label[data-state="idle"], .obs3d-label[data-state="done"] { opacity: .75; }
+.obs3d-label { white-space: nowrap; text-align: center; font-size: 11px; line-height: 1.25; color: #d4ebff; }
+.obs3d-label b { display: inline-block; font-weight: 600; color: #e6f3ff; background: rgba(4,12,26,.74); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-radius: 999px; padding: 2px 9px; }
+.obs3d-label[data-picked] b { border-color: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 60%, transparent); }
+.obs3d-label[data-kind="topic"] b { font-size: 10px; font-weight: 500; padding: 1px 7px; color: #bae6fd; }
+.obs3d-label[data-faded] { opacity: .55; }
+.obs3d-label span { display: block; margin-top: 2px; font-size: 9.5px; color: #8fa9c4; text-shadow: 0 0 6px #000; }
+.obs3d-label[data-state="idle"], .obs3d-label[data-state="done"] { opacity: .8; }
+.obs3d[data-light] { background: radial-gradient(900px 500px at 50% 0%, #ffffff 0%, #eef3fb 55%, #dfe8f6 100%); color: #0f172a; }
+.obs3d[data-light] .obs3d-title { color: #1d4ed8; text-shadow: none; }
+.obs3d[data-light] .obs3d-meters { color: #475569; }
+.obs3d[data-light] .obs3d-meters b { color: #0f172a; text-shadow: none; }
+.obs3d[data-light] .obs3d-label b { color: #0f172a; background: rgba(255,255,255,.92); }
+.obs3d[data-light] .obs3d-label[data-kind="topic"] b { color: #075985; }
+.obs3d[data-light] .obs3d-label span { color: #475569; text-shadow: none; }
+.obs3d[data-light] .obs3d-log { color: #334155; }
+.obs3d[data-light] .obs3d-log li { text-shadow: none; }
+.obs3d[data-light] .obs3d-log li:last-child { color: #15803d; }
+.obs3d[data-light] .obs3d-bubble, .obs3d[data-light] .obs3d-pick { background: rgba(255,255,255,.94); border-color: #cbd5e1; box-shadow: 0 6px 20px rgba(15,23,42,.08); color: #0f172a; }
+.obs3d[data-light] .obs3d-bubble b, .obs3d[data-light] .obs3d-pick b { color: #b45309; }
 .obs3d-log { list-style: none; margin: 0; padding: 0; font: 11px ui-monospace, Consolas, monospace; color: #9fc3e0; }
 .obs3d-log li { padding: 1px 0; text-shadow: 0 0 4px #000; }
 .obs3d-log li:last-child { color: #7dff6a; }
+.obs3d-bubble, .obs3d-pick, .obs3d-hud { z-index: 1100; }
 .obs3d-bubble, .obs3d-pick { border: 1px solid rgba(34,228,255,.35); background: rgba(3,9,18,.82); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; line-height: 1.55; box-shadow: 0 0 18px rgba(34,228,255,.15); }
 .obs3d-bubble b, .obs3d-pick b { display: block; color: #ffb547; font-size: 11.5px; margin-bottom: 2px; }
 .obs3d-pick span { color: #9fc3e0; font-size: 11.5px; }
@@ -727,22 +852,55 @@ function speakerOf(role: string) {
 /** A Co-STORM table: the moderator, the experts and you around it, the knowledge base (the mind map)
  *  above its middle, and the web below. Each utterance lights its speaker and sends what it found
  *  to the knowledge base; what it cited comes up from the web first. */
-export function CoStormObservatory3D({ view, currentId, live }: { view: DiscussionView | null; currentId: string | null; live: boolean }) {
+// A seat's id on the 3D table and the role the page's cards know it by (costorm-room), both ways.
+const GKP = "General Knowledge Provider";
+const roleOf = (id: string) =>
+  id === "you" ? "Guest" : id === "moderator" ? "Moderator" : id.startsWith("expert:") ? id.slice("expert:".length) : null;
+const seatOf = (role: string) => {
+  const who = speakerOf(role);
+  return who === "bg" ? null : who;
+};
+/** What a mind-map topic holds, its subtopics included. */
+const held = (n: MindNode): number => n.count + (n.children || []).reduce((a, c) => a + held(c), 0);
+
+/** `picked` / `onPick`: the role picked on the page's cards (costorm-room), shared with the table. */
+export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: {
+  view: DiscussionView | null;
+  currentId: string | null;
+  live: boolean;
+  picked?: string | null;
+  onPick?: (role: string | null) => void;
+}) {
   const { t } = useT();
   const director = useDirector();
   const { push, send, world } = director;
   const played = useRef(0);
+  // The experts at the table now; anyone else who spoke sits on the outer ring, faded.
+  const seated = useRef(new Set<string>());
 
   const seat = useCallback((x: World, id: string, label: string, sub?: string) => {
-    if (x.cores.has(id)) return id;
-    core(x, { id, label, sub, kind: id === "you" ? "you" : "speaker", pos: [0, 0, 0], status: "idle" });
-    link(x, id, "kb");
-    // Everyone at the table, evenly round it; you sit nearest the camera.
+    const role = roleOf(id);
+    const faded = id === "bg" || (id.startsWith("expert:") && role !== GKP && !seated.current.has(role ?? ""));
+    const had = x.cores.get(id);
+    if (had && had.faded === faded) return id;
+    if (had) had.faded = faded;
+    else {
+      const color = id === "bg" ? "#94a3b8" : tone(role ?? id);
+      core(x, { id, label, sub, kind: id === "you" ? "you" : "speaker", pos: [0, 0, 0], status: "idle", color, faded });
+      link(x, id, "kb");
+    }
+    // Everyone at the table, evenly round it, you nearest the camera; those who have left, round them.
     const seats = [...x.cores.values()].filter((c) => c.kind === "speaker" || c.kind === "you");
-    const order = [...seats.filter((c) => c.kind !== "you"), ...seats.filter((c) => c.kind === "you")];
+    const inner = seats.filter((c) => !c.faded);
+    const order = [...inner.filter((c) => c.kind !== "you"), ...inner.filter((c) => c.kind === "you")];
     order.forEach((c, i) => {
       const a = Math.PI / 2 + ((i + 1) / order.length) * Math.PI * 2;
       c.pos = [Math.cos(a) * 4.6, 0, Math.sin(a) * 4.6];
+    });
+    const outer = seats.filter((c) => c.faded);
+    outer.forEach((c, i) => {
+      const a = Math.PI / 2 + ((i + 0.5) / outer.length) * Math.PI * 2;
+      c.pos = [Math.cos(a) * 7.2, -0.6, Math.sin(a) * 7.2];
     });
     return id;
   }, []);
@@ -750,27 +908,44 @@ export function CoStormObservatory3D({ view, currentId, live }: { view: Discussi
   const build = useCallback(
     (v: DiscussionView) => {
       const x = world.current;
-      core(x, { id: "kb", label: t("obs3d.kb"), sub: v.topic, kind: "kb", pos: [0, 0.4, 0] });
+      const sources = Object.keys(v.sources || {}).length;
+      // The knowledge base grows with what the table has gathered.
+      core(x, { id: "kb", label: t("obs3d.kb"), sub: v.topic, kind: "kb", pos: [0, 0.4, 0], size: 1 + Math.min(0.6, sources / 200) });
       core(x, { id: "web", label: t("obs3d.web"), kind: "web", pos: [0, -2.8, 0], status: "idle" });
       link(x, "web", "kb");
+      seated.current = new Set(v.experts);
       seat(x, "moderator", t("obs3d.moderator"));
-      if (v.turns.some((u) => speakerOf(u.role) === "bg")) seat(x, "bg", t("obs3d.bgExpert"));
       v.experts.forEach((e) => seat(x, "expert:" + e, e));
+      seat(x, "expert:" + GKP, t("obs3d.general"));
       seat(x, "you", t("obs3d.you"));
-      // The mind map as a constellation over the table, one star per concept.
-      const stars: Star[] = [];
-      let i = 0;
-      const walk = (nodes: MindNode[], depth: number, parent?: string) =>
-        nodes.forEach((n) => {
-          const id = `${parent ?? "m"}/${i}`;
-          const a = i * 2.399;
-          const r = 0.7 + depth * 0.75;
-          stars.push({ id, label: n.name, pos: [Math.cos(a) * r, 2 + depth * 0.55, Math.sin(a) * r], parent, size: n.count });
-          i += 1;
-          walk(n.children || [], depth + 1, id);
+      // Experts who have left, still on the outer ring: they spoke, and what they said is in the cards.
+      v.turns.forEach((u) => {
+        if (u.warmup) return;
+        const id = seatOf(u.role);
+        if (id && id.startsWith("expert:")) seat(x, id, u.role, u.role_description);
+      });
+      if (v.turns.some((u) => speakerOf(u.role) === "bg")) seat(x, "bg", t("obs3d.bgExpert"));
+      // The mind map's top topics round the knowledge base, each as large as what it holds.
+      const topics = v.mind_map || [];
+      topics.forEach((n, k) => {
+        const a = (k / Math.max(1, topics.length)) * Math.PI * 2 + 0.4;
+        const h = held(n);
+        core(x, {
+          id: `topic:${k}`,
+          label: `${clip(n.name, 18)} · ${h}`,
+          kind: "topic",
+          // Above the knowledge base, clear of the seats' labels round the table.
+          pos: [Math.cos(a) * 1.5, 2 + (k % 2) * 0.55, Math.sin(a) * 1.5],
+          status: "done",
+          size: 0.8 + Math.min(2.2, Math.sqrt(h) / 3.2),
         });
-      walk(v.mind_map || [], 0);
-      x.stars = stars;
+        link(x, "kb", `topic:${k}`);
+      });
+      let concepts = 0;
+      const count = (nodes: MindNode[]) => nodes.forEach((n) => ((concepts += 1), count(n.children || [])));
+      count(topics);
+      x.stars = [];
+      x.counts.pages = concepts;
       x.counts.total = v.turns.length;
     },
     [seat, t, world],
@@ -787,7 +962,7 @@ export function CoStormObservatory3D({ view, currentId, live }: { view: Discussi
             ? t("obs3d.moderator")
             : who === "bg"
               ? t("obs3d.bgExpert")
-              : turn.role === "General Knowledge Provider"
+              : turn.role === GKP
                 ? t("obs3d.general")
                 : turn.role;
       const cited = [...new Set(turn.cited)].slice(0, 3);
@@ -813,7 +988,7 @@ export function CoStormObservatory3D({ view, currentId, live }: { view: Discussi
         },
         () => {
           status(world.current, "web", "idle");
-          send(who, "kb", COLOR[who === "you" ? "you" : "speaker"], 1000);
+          send(who, "kb", world.current.cores.get(who)?.color ?? COLOR[who === "you" ? "you" : "speaker"], 1000);
           return 2200;
         },
       ];
@@ -877,21 +1052,33 @@ export function CoStormObservatory3D({ view, currentId, live }: { view: Discussi
     }
   });
 
+  // While someone is picked, what they bring keeps flowing to the knowledge base.
+  const pickedId = picked ? seatOf(picked) : null;
+  useEffect(() => {
+    if (!pickedId) return;
+    const color = world.current.cores.get(pickedId)?.color ?? "#22e4ff";
+    send(pickedId, "kb", color, 1100);
+    const every = setInterval(() => send(pickedId, "kb", color, 1100), 1300);
+    return () => clearInterval(every);
+  }, [pickedId, send, world]);
+
   if (!view) return <p className="text-xs text-muted-foreground">{t("obs3d.waiting")}</p>;
   const c = world.current.counts;
   return (
     <Stage
       title={t("obs3d.costorm")}
       camera={[0, 8.5, 11.5]}
-      target={[0, -2.2, 0]}
+      target={[0, -1.2, 0]}
       director={director}
       canReplay={!!view.turns.length}
       onReplay={() => play(view)}
+      picked={pickedId}
+      onPick={(id) => onPick?.(id ? roleOf(id) : null)}
       hud={
         <div className="obs3d-meters">
           <span><b>{c.turns}/{c.total}</b>{t("obs3d.turns")}</span>
           <span><b>{view.experts.length}</b>{t("obs3d.experts")}</span>
-          <span><b>{world.current.stars.length}</b>{t("obs3d.concepts")}</span>
+          <span><b>{c.pages}</b>{t("obs3d.concepts")}</span>
           <span><b>{world.current.sats.length}</b>{t("obs3d.sources")}</span>
         </div>
       }

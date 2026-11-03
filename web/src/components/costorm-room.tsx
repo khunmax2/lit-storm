@@ -13,15 +13,16 @@ const MODERATOR = "Moderator";
 const GKP = "General Knowledge Provider";
 const GUEST = "Guest";
 
-// The same speaker keeps the same colour through the conversation.
-const HUES = ["bg-sky-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-teal-500"];
-export function hue(role: string) {
-  if (role === MODERATOR || role.toLowerCase().includes("moderator")) return "bg-foreground/70";
-  if (role === GKP) return "bg-slate-500";
-  if (role === GUEST) return "bg-primary";
+// The same speaker keeps the same colour everywhere: the transcript, the cards
+// and the 3D table (components/agent-observatory-3d) all take it from here.
+const TONES = ["#f59e0b", "#a78bfa", "#38bdf8", "#fb7185", "#34d399", "#f472b6", "#fb923c"];
+export function tone(role: string) {
+  if (role === MODERATOR || role.toLowerCase().includes("moderator")) return "#64748b";
+  if (role === GKP) return "#14b8a6";
+  if (role === GUEST) return "#22c55e";
   let n = 0;
   for (const ch of role) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
-  return HUES[n % HUES.length];
+  return TONES[n % TONES.length];
 }
 
 /** The letter in a seat's circle: Thai roles mostly open with ผู้, นัก or
@@ -103,7 +104,6 @@ export function useRoom(turns: RoomTurn[], experts: string[]) {
       seats: all.filter((s) => s.seated),
       past: all.filter((s) => !s.seated),
       spoken,
-
     };
   }, [turns, experts, t]);
   const last = built.spoken[built.spoken.length - 1];
@@ -111,6 +111,8 @@ export function useRoom(turns: RoomTurn[], experts: string[]) {
   return {
     ...built,
     last,
+    // Picked by the owner (a card, or a seat on the 3D table); null: nobody, the latest speaker shows.
+    picked,
     focusRole,
     focus: [...built.seats, ...built.past].find((s) => s.role === focusRole) ?? null,
     pick: (role: string) => setPicked((p) => (p === role ? null : role)),
@@ -123,7 +125,8 @@ function Avatar({ seat }: { seat: Seat }) {
   return (
     <span
       aria-hidden
-      className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", hue(seat.role))}
+      className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+      style={{ background: tone(seat.role) }}
     >
       {initial(seat.name)}
     </span>

@@ -1,0 +1,378 @@
+# DeepLit with MedicalReviewerAgent on aiforthai (https://deeplit.aiforthai.in.th),
+# deployed by .gitlab-ci.yml on the ai4thai-gpu1 runner (deploy/aiforthai/README.md).
+#
+# That runner's jobs drive the host's own Docker daemon, which shapes this file:
+# - nothing is bind-mounted from the checkout (the daemon would look for it on
+#   the host, where the checkout is not): config is built into the images;
+# - data lives in host paths under ${DATA_PATH}, no named volumes;
+# - secrets come from .env (the ENV_FILE CI variable), never from files;
+# - one port, 0.0.0.0:${APP_PORT}, which the aiforthai reverse proxy forwards to.
+#
+# The Engine forks and MRA are built from GitHub at the commits stack/engines.lock.json
+# pins (deploy/aiforthai/pins.sh exports them), so the GitLab repo needs only this one.
+#
+#   . deploy/aiforthai/pins.sh
+#   docker compose -f deploy/aiforthai/compose.yml --env-file .env build
+#   docker compose -f deploy/aiforthai/compose.yml --env-file .env run --rm prepare
+#   docker compose -f deploy/aiforthai/compose.yml --env-file .env up -d --remove-orphans
+name: ${COMPOSE_PROJECT_NAME:-deeplit}
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "5" }
+
+x-server-env: &server-env
+  LITSTORM_DATABASE_URL: postgresql+psycopg://litstorm:${DEEPLIT_DB_PASSWORD:?set DEEPLIT_DB_PASSWORD}@db:5432/litstorm
+  LITSTORM_SECRET_KEY: ${LITSTORM_SECRET_KEY:?set LITSTORM_SECRET_KEY}
+  LITSTORM_PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL}
+  LITSTORM_SEARXNG_URL: http://searxng:8080/search
+  # Behind the aiforthai proxy's HTTPS only: the session cookie is never sent in the clear.
+  LITSTORM_COOKIE_SECURE: "true"
+
+x-mra-env: &mra-env
+  DATABASE_URL: postgresql+psycopg://mra:${MRA_DB_PASSWORD:?set MRA_DB_PASSWORD}@mra-postgres:5432/mra
+  REDIS_URL: redis://mra-redis:6379/0
+  RATELIMIT_STORAGE_URI: redis://mra-redis:6379/1
+  SEARXNG_URL: http://mra-searxng:8080
+  OPENROUTER_API_KEY: ${MRA_OPENROUTER_API_KEY:?set MRA_OPENROUTER_API_KEY}
+  LLM_PRESET: ${MRA_LLM_PRESET:-budget}
+  LLM_KEYS_SECRET: ${MRA_LLM_KEYS_SECRET:-}
+  IP_HASH_SALT: ${MRA_IP_HASH_SALT:?set MRA_IP_HASH_SALT}
+  APP_ENV: prod
+  # Only the "mra" proxy reaches MRA's API, so its X-Forwarded-For can be trusted.
+  TRUST_PROXY: "true"
+  # MRA is reached only inside this stack, as http://mra (no public address).
+  PUBLIC_BASE_URL: http://mra
+  MCP_ALLOWED_HOSTS: '["mra","mra:*","mra-api:*","localhost","127.0.0.1:*"]'
+  MAX_USD_PER_DAY: ${MRA_MAX_USD_PER_DAY:-10}
+  MAX_COST_PER_REVIEW_USD: ${MRA_MAX_COST_PER_REVIEW_USD:-0.25}
+  OPENALEX_MAILTO: ${MRA_OPENALEX_MAILTO:-}
+
+services:
+  # Once per deploy, before the rest (the pipeline runs it on its own): the data
+  # folders under DATA_PATH, made if missing, and the Worker's owned by its user
+  # (uid 10001); the two databases and Redis set their own owners when they start.
+  prepare:
+    image: alpine:3.22
+    profiles: [prepare]
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /d/postgres /d/runs /d/redis /d/mra-postgres
+        [ "$$(stat -c %u /d/runs)" = 10001 ] || chown -R 10001:10001 /d/runs
+        ls -ln /d
+    volumes:
+      - type: bind
+        source: ${DATA_PATH:?set DATA_PATH}
+        target: /d
+        bind: { create_host_path: false }
+
+  # ---------------------------------------------------------------- DeepLit
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      POSTGRES_USER: litstorm
+      POSTGRES_PASSWORD: ${DEEPLIT_DB_PASSWORD:?set DEEPLIT_DB_PASSWORD}
+      POSTGRES_DB: litstorm
+    volumes:
+      - type: bind
+        source: ${DATA_PATH:?set DATA_PATH}/postgres
+        target: /var/lib/postgresql/data
+        bind: { create_host_path: false }
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litstorm"]
+      interval: 5s
+      retries: 20
+    networks: [deeplit]
+    <<: *logging
+
+  api:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile
+      additional_contexts:
+        agents: https://github.com/khunmax2/lit_agents-deep-research.git#${AGENTS_REF:?run deploy/aiforthai/pins.sh}
+        deep: https://github.com/khunmax2/lit_deep-research-web.git#${DEEP_REF:?run deploy/aiforthai/pins.sh}
+    image: deeplit/server:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      <<: *server-env
+      LITSTORM_BOOTSTRAP_CODE: ${LITSTORM_BOOTSTRAP_CODE:?set LITSTORM_BOOTSTRAP_CODE}
+      LITSTORM_API_WORKERS: ${LITSTORM_API_WORKERS:-2}
+    volumes: &run-data
+      - type: bind
+        source: ${DATA_PATH:?set DATA_PATH}/runs
+        target: /data
+        bind: { create_host_path: false }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [deeplit]
+    <<: *logging
+
+  worker:
+    image: deeplit/server:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    command: ["python", "-m", "litstorm.worker.main"]
+    environment: *server-env
+    volumes: *run-data
+    depends_on:
+      api: { condition: service_healthy }  # the api runs the migrations
+    stop_grace_period: 20s
+    networks: [deeplit]
+    <<: *logging
+
+  web:
+    build:
+      context: ../../web
+      args:
+        LITSTORM_BASE_PATH: ""  # the site root: https://deeplit.aiforthai.in.th/
+    image: deeplit/web:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${APP_PORT:?set APP_PORT}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [deeplit]
+    <<: *logging
+
+  searxng:
+    build:
+      context: ../../stack/searxng
+      # The same pinned image as stack/compose.yml, with its settings built in.
+      dockerfile_inline: |
+        FROM searxng/searxng:2026.9.20-2e624bed4@sha256:76f9ec5b3832921c8734c06c34248c9538d94a6cae0cf5e579fa5b41c8479789
+        COPY settings.yml /etc/searxng/settings.yml
+    image: deeplit/searxng:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET}
+    networks: [deeplit]
+    <<: *logging
+
+  # Sets DeepLit's Medical Review to this stack's MRA, with the key below, once:
+  # an administrator's later change in Settings is left alone.
+  deeplit-link:
+    image: deeplit/server:${DEPLOY_TAG:-local}
+    environment:
+      <<: *server-env
+      MRA_SERVICE_API_KEY: ${MRA_SERVICE_API_KEY:?set MRA_SERVICE_API_KEY}
+    command:
+      - python
+      - -c
+      - |
+        import os
+        from litstorm import db, medical
+        with db.sessions()() as s:
+            if medical.configured(s):
+                print("Medical Review is already set up; left as it is")
+            else:
+                medical.save(s, url="http://mra", api_key=os.environ["MRA_SERVICE_API_KEY"])
+                s.commit()
+                print("Medical Review set to http://mra")
+    depends_on:
+      api: { condition: service_healthy }
+      mra-link: { condition: service_completed_successfully }
+    networks: [deeplit]
+    <<: *logging
+
+  # ---------------------------------------------------------------- MRA
+  # Names carry "mra-" so that nothing here answers to DeepLit's "api", "web" or
+  # "db"; DeepLit reaches MRA only through the proxy "mra".
+  mra:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM caddy:2-alpine
+        COPY mra-proxy.Caddyfile /etc/caddy/Caddyfile
+    image: deeplit/mra-proxy:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      mra-api: { condition: service_healthy }
+      mra-web: { condition: service_started }
+    networks: [deeplit, mra]
+    <<: *logging
+
+  mra-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=300"]
+    environment:
+      POSTGRES_USER: mra
+      POSTGRES_PASSWORD: ${MRA_DB_PASSWORD:?set MRA_DB_PASSWORD}
+      POSTGRES_DB: mra
+    volumes:
+      - type: bind
+        source: ${DATA_PATH:?set DATA_PATH}/mra-postgres
+        target: /var/lib/postgresql/data
+        bind: { create_host_path: false }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mra -d mra"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [mra]
+    <<: *logging
+
+  mra-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - type: bind
+        source: ${DATA_PATH:?set DATA_PATH}/redis
+        target: /data
+        bind: { create_host_path: false }
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [mra]
+    <<: *logging
+
+  # The academic SearXNG fork MRA builds, at the commit MRA's compose pins.
+  mra-searxng-base:
+    build:
+      context: https://github.com/porespellar/searxng-LDR-academic.git#${MRA_SEARXNG_REF:?run deploy/aiforthai/pins.sh}
+    image: deeplit/mra-searxng-base:${MRA_SEARXNG_REF:?run deploy/aiforthai/pins.sh}
+    profiles: [build-only]
+
+  mra-searxng:
+    build:
+      context: https://github.com/santipongth/MedicalReviewerAgent.git#${MRA_REF:?run deploy/aiforthai/pins.sh}
+      additional_contexts:
+        base: service:mra-searxng-base
+      # MRA's settings and engine modules, which its compose mounts, built in.
+      # (limiter.toml is not in MRA's repo: the image's entrypoint writes it.)
+      dockerfile_inline: |
+        FROM base
+        COPY infra/searxng/settings.yml /etc/searxng/settings.yml
+        COPY infra/searxng/engines/*.py /usr/local/searxng/searx/engines/
+    image: deeplit/mra-searxng:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${MRA_SEARXNG_SECRET:?set MRA_SEARXNG_SECRET}
+      SEARXNG_BASE_URL: http://mra-searxng:8080/
+      NCBI_API_KEY: ${MRA_NCBI_API_KEY:-}
+      OPENALEX_API_KEY: ${MRA_OPENALEX_API_KEY:-}
+      S2_API_KEY: ${MRA_S2_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5).status == 200 else 1)\""]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 20s
+    networks: [mra]
+    <<: *logging
+
+  mra-migrate:
+    build:
+      context: https://github.com/santipongth/MedicalReviewerAgent.git#${MRA_REF:?run deploy/aiforthai/pins.sh}:backend
+    image: deeplit/mra-backend:${DEPLOY_TAG:-local}
+    environment: *mra-env
+    command: ["sh", "-c", "alembic upgrade head && python -m app.db.setup_checkpointer"]
+    depends_on:
+      mra-postgres: { condition: service_healthy }
+    networks: [mra]
+    <<: *logging
+
+  mra-api:
+    image: deeplit/mra-backend:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    environment: *mra-env
+    command: ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers --workers 2"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/healthz', timeout=5).status == 200 else 1)\""]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+    depends_on:
+      mra-migrate: { condition: service_completed_successfully }
+      mra-redis: { condition: service_healthy }
+      mra-searxng: { condition: service_healthy }
+    networks: [mra]
+    <<: *logging
+
+  mra-worker:
+    image: deeplit/mra-backend:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    environment: *mra-env
+    command: ["arq", "app.worker.settings.WorkerSettings"]
+    depends_on:
+      mra-migrate: { condition: service_completed_successfully }
+      mra-redis: { condition: service_healthy }
+      mra-searxng: { condition: service_healthy }
+    networks: [mra]
+    <<: *logging
+
+  mra-web:
+    build:
+      context: https://github.com/santipongth/MedicalReviewerAgent.git#${MRA_REF:?run deploy/aiforthai/pins.sh}:frontend
+    image: deeplit/mra-web:${DEPLOY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      PUBLIC_API_URL: "/"
+      # The offline report (GET /r/{id}/report.html, which DeepLit keeps with a
+      # full review) is fetched server side, straight from MRA's API.
+      INTERNAL_API_URL: http://mra-api:8000
+    depends_on:
+      mra-api: { condition: service_healthy }
+    networks: [mra]
+    <<: *logging
+
+  # DeepLit's key at MRA, from .env: added to MRA's keys once (MRA stores only its
+  # SHA-256), so deeplit-link can set it in DeepLit without anyone copying it.
+  mra-link:
+    image: deeplit/mra-backend:${DEPLOY_TAG:-local}
+    environment:
+      <<: *mra-env
+      MRA_SERVICE_API_KEY: ${MRA_SERVICE_API_KEY:?set MRA_SERVICE_API_KEY}
+    command:
+      - python
+      - -c
+      - |
+        import asyncio, os
+        from sqlalchemy import select
+        from app.config import get_settings
+        from app.db.models import ApiKey
+        from app.db.session import make_engine, make_session_factory
+        from app.services.api_keys import PREFIX_LEN, hash_key
+
+        async def main():
+            raw = os.environ["MRA_SERVICE_API_KEY"]
+            engine = make_engine(get_settings().database_url)
+            async with make_session_factory(engine)() as s, s.begin():
+                found = (await s.execute(select(ApiKey).where(ApiKey.key_hash == hash_key(raw)))).scalar_one_or_none()
+                if found is None:
+                    s.add(ApiKey(key_hash=hash_key(raw), key_prefix=raw[:PREFIX_LEN], name="deeplit", daily_quota=1000))
+                    print("DeepLit's key added to MRA")
+                else:
+                    print("DeepLit's key is already at MRA")
+            await engine.dispose()
+
+        asyncio.run(main())
+    depends_on:
+      mra-migrate: { condition: service_completed_successfully }
+    networks: [mra]
+    <<: *logging
+
+networks:
+  deeplit: {}
+  mra: {}

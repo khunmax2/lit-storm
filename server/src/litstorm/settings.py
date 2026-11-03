@@ -1,8 +1,10 @@
 """What the API and the Worker read from their environment.
 
-Secrets arrive as files (Docker secrets), never as plain environment values:
-a value in the environment shows up in `docker inspect` and in every child
-process. The Run's own process gets its credentials on stdin instead.
+Secrets arrive as files (Docker secrets) where the host allows: a value in
+the environment shows up in `docker inspect` and in every child process. A
+host whose CI runner cannot bind files (deploy/aiforthai) gives the secret
+key and the bootstrap code as environment values instead; a file wins over
+the environment. The Run's own process gets its credentials on stdin.
 """
 
 import os
@@ -61,7 +63,8 @@ def get():
         data_dir=os.environ.get("LITSTORM_DATA_DIR", os.path.abspath("data")),
         secret_key=_read_file(os.environ.get("LITSTORM_SECRET_KEY_FILE"))
         or os.environ.get("LITSTORM_SECRET_KEY", ""),
-        bootstrap_code=_read_file(os.environ.get("LITSTORM_BOOTSTRAP_CODE_FILE")),
+        bootstrap_code=_read_file(os.environ.get("LITSTORM_BOOTSTRAP_CODE_FILE"))
+        or os.environ.get("LITSTORM_BOOTSTRAP_CODE", ""),
         cookie_secure=os.environ.get("LITSTORM_COOKIE_SECURE", "false").lower() == "true",
         public_url=(public := os.environ.get("LITSTORM_PUBLIC_URL", "http://localhost:8090").rstrip("/")),
         export_url=os.environ.get("LITSTORM_EXPORT_URL", "").rstrip("/") or public,

@@ -1,0 +1,18 @@
+# MRA's one address inside the stack, "mra" (deploy/aiforthai/compose.yml): what
+# MRA's own infra/caddy/Caddyfile does, with its services' names here. DeepLit's
+# api and worker ask it for /api/v1/... and /r/{id}/report.html.
+:80 {
+	encode zstd gzip
+
+	@backend path /api/* /mcp /mcp/*
+	handle @backend {
+		reverse_proxy mra-api:8000 {
+			# Server-Sent Events: forward every event immediately instead of buffering.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy mra-web:3000
+	}
+}

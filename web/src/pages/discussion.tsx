@@ -1,8 +1,9 @@
 // A Discussion (docs/web-app-design.md, รุ่นสอง: Discussion): the round
-// table in the middle — who said what, with citations — the mind map and the
-// reports on the right, and at the foot the owner's turn: speak, let the table
-// go on once or three times, or write a report. Each of those is a Turn that
-// waits in the queue; the page polls until it is done.
+// table first — who sits at it and what each expert has said (components/
+// costorm-room) — then the transcript, folded to its last lines, the mind map
+// and the reports on the right, and at the foot the owner's turn: speak, let the
+// table go on once or three times, or write a report. Each of those is a Turn
+// that waits in the queue; the page polls until it is done.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -40,6 +41,7 @@ import {
   formatDate,
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
+import { KindTag, RoomTable, RoomWho, hue, initial, useRoom, type Room } from "@/components/costorm-room";
 import { MoveSessionDialog } from "@/components/move-session";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
@@ -87,6 +89,8 @@ type MindNode = { name: string; count: number; children: MindNode[] };
 type Source = { url: string; title: string; snippets: string[] };
 type View = { topic: string; turns: ViewTurn[]; mind_map: MindNode[]; sources: Record<string, Source>; experts: string[] };
 
+const NO_EXPERTS: string[] = [];
+
 type Asked = { action: "say" | "step" | "auto" | "report" | "start"; text?: string; steps?: number };
 
 // --- the conversation -----------------------------------------------------------------
@@ -118,14 +122,6 @@ function Cited({ text, sources }: { text: string; sources: Record<string, Source
   );
 }
 
-// The same speaker keeps the same colour through the conversation.
-const HUES = ["bg-sky-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-teal-500"];
-function hue(role: string) {
-  let n = 0;
-  for (const ch of role) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
-  return HUES[n % HUES.length];
-}
-
 function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, Source> }) {
   const { t } = useT();
   const guest = turn.role === "Guest";
@@ -144,14 +140,17 @@ function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, 
         aria-hidden
         className={cn(
           "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white",
-          moderator ? "bg-foreground/70" : hue(turn.role),
+          hue(turn.role),
         )}
       >
-        {turn.role.trim().charAt(0).toUpperCase()}
+        {initial(moderator ? t("disc.moderator") : turn.role === "General Knowledge Provider" ? t("room.gkp") : turn.role)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-baseline gap-x-2 text-sm">
-          <span className="font-medium">{moderator ? t("disc.moderator") : turn.role}</span>
+          <span className="font-medium">
+            {moderator ? t("disc.moderator") : turn.role === "General Knowledge Provider" ? t("room.gkp") : turn.role}
+          </span>
+          <KindTag type={turn.type} />
           {turn.role_description && (
             <span className="truncate text-xs text-muted-foreground" title={turn.role_description}>
               {turn.role_description}
@@ -228,21 +227,29 @@ function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => voi
 
 // --- the side column --------------------------------------------------------------------
 
-function MindMap({ nodes, depth = 0 }: { nodes: MindNode[]; depth?: number }) {
+const held = (n: MindNode): number => n.count + n.children.reduce((a, c) => a + held(c), 0);
+
+/** Folded, the top topics only, each with what its whole subtree holds. */
+function MindMap({ nodes, depth = 0, open }: { nodes: MindNode[]; depth?: number; open: boolean }) {
   return (
     <ul className={cn("flex min-w-0 flex-col gap-0.5", depth > 0 && "mt-0.5 ml-3 border-l pl-2")}>
-      {nodes.map((n, i) => (
-        <li key={`${n.name}-${i}`} className="min-w-0">
-          <div className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted/60">
-            <ChevronRight className={cn("size-3 shrink-0 text-muted-foreground", !n.children.length && "opacity-0")} />
-            <span className="min-w-0 flex-1 truncate" title={n.name}>
-              {n.name}
-            </span>
-            {n.count > 0 && <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{n.count}</span>}
-          </div>
-          {n.children.length > 0 && <MindMap nodes={n.children} depth={depth + 1} />}
-        </li>
-      ))}
+      {nodes.map((n, i) => {
+        const count = open ? n.count : held(n);
+        return (
+          <li key={`${n.name}-${i}`} className="min-w-0">
+            <div className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted/60">
+              <ChevronRight
+                className={cn("size-3 shrink-0 text-muted-foreground transition-transform", !n.children.length && "opacity-0", open && "rotate-90")}
+              />
+              <span className="min-w-0 flex-1 truncate" title={n.name}>
+                {n.name}
+              </span>
+              {count > 0 && <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{count}</span>}
+            </div>
+            {open && n.children.length > 0 && <MindMap nodes={n.children} depth={depth + 1} open />}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -259,12 +266,15 @@ function SideSection({ icon, title, children }: { icon: ReactNode; title: string
   );
 }
 
-/** Reports, the mind map and who is at the table: the side column on wide
- *  screens, a fold above the conversation on narrow ones. */
-function Side({ d, view, sources }: { d: Discussion; view: View | null; sources: Record<string, Source> }) {
+/** What each expert is doing (wide screens: beside the table), the reports and
+ *  the mind map: the side column on wide screens, a fold above the
+ *  conversation on narrow ones, where the experts sit under the table instead. */
+function Side({ d, view, sources, room }: { d: Discussion; view: View | null; sources: Record<string, Source>; room?: Room }) {
   const { t, lang } = useT();
+  const [mapOpen, setMapOpen] = useState(false);
   return (
     <>
+    {room && view && <RoomWho room={room} />}
     <SideSection icon={<FileText className="size-3.5" />} title={t("disc.reports")}>
       {d.reports.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("disc.noReports")}</p>
@@ -295,25 +305,16 @@ function Side({ d, view, sources }: { d: Discussion; view: View | null; sources:
     </SideSection>
     <SideSection icon={<Network className="size-3.5" />} title={t("disc.mindMap")}>
       {view?.mind_map.length ? (
-        <MindMap nodes={view.mind_map} />
+        <>
+          <MindMap nodes={view.mind_map} open={mapOpen} />
+          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" aria-expanded={mapOpen} onClick={() => setMapOpen((o) => !o)}>
+            {t(mapOpen ? "room.mapFold" : "room.mapOpen")}
+          </Button>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">{t("disc.mindMapEmpty")}</p>
       )}
     </SideSection>
-    {!!view?.experts.length && (
-      <SideSection icon={<Users className="size-3.5" />} title={t("disc.experts")}>
-        <ul className="flex flex-col gap-1.5">
-          {view.experts.map((e) => (
-            <li key={e} className="flex min-w-0 items-center gap-2 text-sm">
-              <span className={cn("size-2 shrink-0 rounded-full", hue(e))} />
-              <span className="truncate" title={e}>
-                {e}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </SideSection>
-    )}
     {d.turns.length > 0 && <RunNotes notes={d.turns[d.turns.length - 1].notes ?? {}} />}
     <p className="text-xs text-muted-foreground">{t("disc.sources", { n: Object.keys(sources).length })}</p>
     </>
@@ -329,6 +330,8 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
   const [table3d, setTable3d] = useState(false);
+  // The transcript shows its last lines until opened; the round table above it is the page's subject.
+  const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState("");
   // A Turn waiting for the owner to agree to another quota unit.
   const [extending, setExtending] = useState<Asked | null>(null);
@@ -385,10 +388,11 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const conversation = view?.turns ?? [];
   const warmup = conversation.filter((x) => x.warmup);
   const later = conversation.filter((x) => !x.warmup);
-  // After the conversation grows, keep its newest line in sight.
+  const room = useRoom(conversation, view?.experts ?? NO_EXPERTS);
+  // With the transcript open, keep its newest line in sight as it grows.
   useEffect(() => {
-    if (later.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [later.length, d?.current?.id]);
+    if (chatOpen && later.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chatOpen, later.length, d?.current?.id]);
 
   // The last Turn after the last finished one, if it did not work.
   const failed = useMemo(() => {
@@ -445,7 +449,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
       </AlertDialog>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="mx-auto w-full max-w-3xl flex-1 px-6 pt-8 pb-6">
+        <div className="mx-auto w-full max-w-5xl flex-1 px-6 pt-8 pb-6">
           <Toolbar>
             <Breadcrumb>
               <BreadcrumbList>
@@ -566,8 +570,42 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
           )}
 
           {started && (
+            <div className="mb-6">
+              <RoomTable
+                room={room}
+                sources={Object.keys(sources).length}
+                topics={view.mind_map.length}
+                thinking={
+                  d.current && !FINAL.has(d.current.status)
+                    ? d.current.status === "queued"
+                      ? t("status.queued")
+                      : t(`disc.working.${d.current.turn?.action}` as Key)
+                    : null
+                }
+                renderText={(text) => <Cited text={text} sources={sources} />}
+              />
+              <RoomWho room={room} className="mt-4 rounded-2xl border bg-card p-4 shadow-xs lg:hidden" />
+            </div>
+          )}
+
+          {started && (
             <div className="space-y-6">
-              {warmup.length > 0 && (
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold">
+                  {t("room.chat")}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    {chatOpen || later.length <= 3
+                      ? t("room.chatAll", { n: later.length })
+                      : t("room.chatRecent", { n: 3, total: later.length })}
+                  </span>
+                </h2>
+                {(later.length > 3 || warmup.length > 0) && (
+                  <Button variant="outline" size="sm" aria-expanded={chatOpen} onClick={() => setChatOpen((o) => !o)}>
+                    {t(chatOpen ? "room.fold" : "room.showAll")}
+                  </Button>
+                )}
+              </div>
+              {chatOpen && warmup.length > 0 && (
                 <details className="group rounded-xl border bg-muted/30 px-4 py-3" open={later.length === 0}>
                   <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none">
                     <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
@@ -581,8 +619,8 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   </div>
                 </details>
               )}
-              {later.map((x, i) => (
-                <Utterance key={i} turn={x} sources={sources} />
+              {(chatOpen ? later : later.slice(-3)).map((x, i) => (
+                <Utterance key={chatOpen ? i : later.length - Math.min(3, later.length) + i} turn={x} sources={sources} />
               ))}
               {pendingSay && (
                 <Utterance turn={{ role: "Guest", role_description: "", type: "", text: pendingSay, cited: [], warmup: false }} sources={sources} />
@@ -666,7 +704,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
       </div>
 
       <aside className="sticky top-16 hidden h-[calc(100svh-4rem)] w-80 shrink-0 space-y-7 overflow-x-hidden overflow-y-auto border-l p-5 lg:block">
-        <Side d={d} view={view} sources={sources} />
+        <Side d={d} view={view} sources={sources} room={room} />
       </aside>
     </div>
   );

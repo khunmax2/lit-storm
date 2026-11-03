@@ -92,6 +92,23 @@ def test_a_block_of_turns_then_an_extension_that_takes_a_unit(admin, browser, co
     assert user.get(f"/api/discussions/{d['id']}").json()["allowance"]["remaining"] == 2
 
 
+def test_a_report_again_only_after_the_table_has_said_something_new(admin, browser, configured, db):
+    user = make_user(admin, browser)
+    d = start(user)
+    finish(db, d["turns"][0]["id"])
+    assert user.get(f"/api/discussions/{d['id']}").json()["report_ready"] is True  # the warm start is new
+    finish(db, ask(user, d["id"], action="report").json()["id"])
+    shown = user.get(f"/api/discussions/{d['id']}").json()
+    assert shown["report_ready"] is False
+    assert ask(user, d["id"], action="report").json()["detail"] == "report_up_to_date"
+    # A Turn that did not finish says nothing new either.
+    finish(db, ask(user, d["id"], action="step").json()["id"], status="failed")
+    assert ask(user, d["id"], action="report").json()["detail"] == "report_up_to_date"
+    finish(db, ask(user, d["id"], action="say", text="And the hotels?").json()["id"])
+    assert user.get(f"/api/discussions/{d['id']}").json()["report_ready"] is True
+    assert ask(user, d["id"], action="report").status_code == 201
+
+
 def test_a_turn_whose_quota_came_back_uses_no_turn(admin, browser, configured, db):
     user = make_user(admin, browser)
     d = start(user)

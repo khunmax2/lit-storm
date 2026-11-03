@@ -611,7 +611,7 @@ function Stage({
 }
 
 const OBS3D_CSS = `
-.obs3d { background: radial-gradient(900px 500px at 50% 0%, #0b2242 0%, #03060c 60%); color: #d4ebff; }
+.obs3d { background: radial-gradient(900px 500px at 50% 0%, #0b2242 0%, #03060c 60%); color: #d4ebff; isolation: isolate; }
 .obs3d-title { font: 700 11px ui-monospace, Consolas, monospace; letter-spacing: .2em; color: #22e4ff; text-shadow: 0 0 10px rgba(34,228,255,.7); text-transform: uppercase; }
 .obs3d-meters { display: flex; gap: 12px; margin-top: 4px; font: 11px ui-monospace, Consolas, monospace; color: #7591ad; flex-wrap: wrap; }
 .obs3d-meters b { color: #d4ebff; font-size: 14px; margin-right: 4px; text-shadow: 0 0 8px rgba(34,228,255,.5); }

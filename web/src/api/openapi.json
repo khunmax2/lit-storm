@@ -4197,6 +4197,11 @@
       "type": "array",
       "title": "Reports"
      },
+     "report_ready": {
+      "type": "boolean",
+      "title": "Report Ready",
+      "default": false
+     },
      "read_only": {
       "type": "boolean",
       "title": "Read Only",

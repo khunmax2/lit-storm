@@ -264,43 +264,15 @@ function SideSection({ icon, title, children }: { icon: ReactNode; title: string
   );
 }
 
-/** What each expert is doing (wide screens: beside the table), the reports and
- *  the mind map: the side column on wide screens, a fold above the
- *  conversation on narrow ones, where the experts sit under the table instead. */
+/** What each expert is doing (wide screens: beside the table) and the mind map:
+ *  the side column on wide screens, a fold above the conversation on narrow
+ *  ones, where the experts sit under the table instead. */
 function Side({ d, view, sources, room }: { d: Discussion; view: View | null; sources: Record<string, Source>; room?: Room }) {
-  const { t, lang } = useT();
+  const { t } = useT();
   const [mapOpen, setMapOpen] = useState(false);
   return (
     <>
     {room && view && <RoomWho room={room} renderText={(text) => <Cited text={text} sources={sources} />} />}
-    <SideSection icon={<FileText className="size-3.5" />} title={t("disc.reports")}>
-      {d.reports.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("disc.noReports")}</p>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {[...d.reports].reverse().map((r) => (
-            <li key={r.run_id} className="min-w-0">
-              <Link
-                to="/runs/$runId"
-                params={{ runId: r.run_id }}
-                className="block rounded-lg border bg-card px-3 py-2 text-sm shadow-xs transition-colors hover:bg-muted/50"
-              >
-                <div className="truncate font-medium">{r.title}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{formatDate(r.finished_at, lang)}</span>
-                  {r.source_count != null && (
-                    <span className="flex items-center gap-1">
-                      <BookOpen className="size-3" />
-                      {r.source_count}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </SideSection>
     <SideSection icon={<Network className="size-3.5" />} title={t("disc.mindMap")}>
       {view?.mind_map.length ? (
         <>
@@ -316,6 +288,70 @@ function Side({ d, view, sources, room }: { d: Discussion; view: View | null; so
     {d.turns.length > 0 && <RunNotes notes={d.turns[d.turns.length - 1].notes ?? {}} />}
     <p className="text-xs text-muted-foreground">{t("disc.sources", { n: Object.keys(sources).length })}</p>
     </>
+  );
+}
+
+/** The Discussion's reports, in the middle of the page above the table: the
+ *  newest first and largest, the one being written as it is written. */
+function Reports({ d }: { d: Discussion }) {
+  const { t, lang } = useT();
+  const writing = d.current?.turn?.action === "report" && !FINAL.has(d.current.status);
+  if (!d.reports.length && !writing) return null;
+  const [latest, ...older] = [...d.reports].reverse();
+  return (
+    <section aria-labelledby="disc-reports" className="space-y-2">
+      <h2 id="disc-reports" className="flex items-center gap-2 text-sm font-semibold">
+        <FileText className="size-4 text-muted-foreground" />
+        {t("disc.reports")}
+        {d.reports.length > 0 && <span className="font-normal text-muted-foreground">{d.reports.length}</span>}
+      </h2>
+      {writing && (
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          {t("disc.working.report")}
+        </div>
+      )}
+      {latest && (
+        <Link
+          to="/runs/$runId"
+          params={{ runId: latest.run_id }}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3.5 shadow-xs transition-colors hover:bg-muted/40"
+        >
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{latest.title}</span>
+            <span className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{t("disc.reportLatest")} · {formatDate(latest.finished_at, lang)}</span>
+              {latest.source_count != null && (
+                <span className="flex items-center gap-1">
+                  <BookOpen className="size-3" />
+                  {latest.source_count}
+                </span>
+              )}
+            </span>
+          </span>
+          <span className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground">
+            {t("disc.readReport")}
+            <ChevronRight className="size-4" />
+          </span>
+        </Link>
+      )}
+      {older.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {older.map((r) => (
+            <li key={r.run_id}>
+              <Link
+                to="/runs/$runId"
+                params={{ runId: r.run_id }}
+                className="flex items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+              >
+                <span className="truncate">{r.title}</span>
+                <span className="shrink-0 text-xs">{formatDate(r.finished_at, lang)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -531,6 +567,12 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             </span>
           </div>
 
+          {/* The reports first: they are what the Discussion is for. */}
+          {started && (d.reports.length > 0 || d.current?.turn?.action === "report") && (
+            <div className="mb-6">
+              <Reports d={d} />
+            </div>
+          )}
           {started && (
             <details className="group mb-6" open={table3d} onToggle={(e) => setTable3d((e.target as HTMLDetailsElement).open)}>
               <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
@@ -557,7 +599,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             <details className="mb-6 rounded-xl border px-4 py-3 lg:hidden">
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none">
                 <Network className="size-4 text-muted-foreground" />
-                {t("disc.side", { n: d.reports.length })}
+                {t("disc.mindMap")}
               </summary>
               <div className="mt-4 space-y-6">
                 <Side d={d} view={view} sources={sources} />
@@ -685,10 +727,19 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   <Users />
                   {t("disc.auto")}
                 </Button>
-                <Button type="button" size="sm" disabled={busy} onClick={() => go({ action: "report" })}>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy || !d.report_ready}
+                  title={!d.report_ready && !busy ? t("disc.reportUpToDate") : undefined}
+                  onClick={() => go({ action: "report" })}
+                >
                   <FileText />
                   {t("disc.report")}
                 </Button>
+                {!d.report_ready && !busy && d.reports.length > 0 && (
+                  <span className="text-xs text-muted-foreground">{t("disc.reportUpToDate")}</span>
+                )}
                 <QuotaLine className="ml-auto" />
               </div>
             </form>

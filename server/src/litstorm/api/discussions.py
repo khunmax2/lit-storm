@@ -95,6 +95,8 @@ class DiscussionOut(BaseModel):
     # sources (engines/costorm/engine.py, view). None before the warm start.
     view: dict | None
     reports: list[ReportRef]
+    # A report now would hold something the last one did not (discussion.report_ready).
+    report_ready: bool = False
     read_only: bool = False  # an Administrator reading an integration account's (deps.readable)
 
 
@@ -148,6 +150,7 @@ def discussion_out(session, rs):
             for r in rows
             if r.status == SUCCEEDED and (r.turn or {}).get("action") == "report"
         ],
+        report_ready=discussion.report_ready(rows),
     )
 
 
@@ -177,6 +180,9 @@ def new_turn(
         raise HTTPException(409, "not_started")
     if action == "say" and not (asked.get("text") or "").strip():
         raise HTTPException(422, "nothing_said")
+    if action == "report" and not discussion.report_ready(rows):
+        # The same table, written up again: the owner goes on talking first.
+        raise HTTPException(409, "report_up_to_date")
 
     configured = limits.load(session)
     allowed = discussion.allowance(rows, configured.turns_per_quota)

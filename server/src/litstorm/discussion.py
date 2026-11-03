@@ -53,6 +53,16 @@ def allowance(rows, per_block):
     return Allowance(per_block=per_block, blocks=sum(r.quota_units for r in kept), used=len(kept))
 
 
+def report_ready(rows):
+    """Whether a report would hold anything the last one did not: the table
+    has finished a Turn other than a report since (the warm start counts). A
+    Turn that did not finish said nothing new."""
+    for r in reversed(rows):
+        if r.status == SUCCEEDED:
+            return (r.turn or {}).get("action") != "report"
+    return False
+
+
 def in_progress(rows):
     """The Turn waiting or running, if any."""
     return next((r for r in rows if r.status in WAITING or r.status in ACTIVE), None)

@@ -1569,6 +1569,11 @@ export interface components {
             /** Reports */
             reports: components["schemas"]["ReportRef"][];
             /**
+             * Report Ready
+             * @default false
+             */
+            report_ready: boolean;
+            /**
              * Read Only
              * @default false
              */

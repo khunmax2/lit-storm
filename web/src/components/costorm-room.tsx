@@ -1,13 +1,7 @@
-// The round table of a Discussion (pages/discussion.tsx): who sits at it, who
-// spoke last, and what each of them has said so far — the experts' work first,
-// the transcript folded below it. Built from the view engines/costorm writes
-// beside each finished Turn; nothing here is invented: counts are utterances,
-// citations and sources in that view.
-//
-// useRoom reads the view once; RoomTable (the table and what the picked seat
-// said) and RoomWho (each seat's latest line) share its pick, so the page can
-// put RoomWho beside the table, in its side column, on wide screens.
-import { Loader2 } from "lucide-react";
+// Who sits at a Discussion's round table (pages/discussion.tsx, beside the 3D
+// table of components/agent-observatory-3d), who spoke last, and what each of
+// them has said so far. Built from the view engines/costorm writes beside each
+// finished Turn; nothing here is invented: counts are utterances in that view.
 import { useMemo, useState, type ReactNode } from "react";
 
 import { useT, type Key } from "@/i18n";
@@ -109,7 +103,7 @@ export function useRoom(turns: RoomTurn[], experts: string[]) {
       seats: all.filter((s) => s.seated),
       past: all.filter((s) => !s.seated),
       spoken,
-      citations: spoken.reduce((a, x) => a + x.cited.length, 0),
+
     };
   }, [turns, experts, t]);
   const last = built.spoken[built.spoken.length - 1];
@@ -125,117 +119,20 @@ export function useRoom(turns: RoomTurn[], experts: string[]) {
   };
 }
 
-function Avatar({ seat, size, ring }: { seat: Seat; size: "lg" | "sm"; ring?: boolean }) {
+function Avatar({ seat }: { seat: Seat }) {
   return (
     <span
       aria-hidden
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-semibold text-white",
-        hue(seat.role),
-        size === "lg" ? "size-12 text-base" : "size-8 text-xs",
-        ring && "ring-3 ring-brand ring-offset-3 ring-offset-background",
-      )}
+      className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", hue(seat.role))}
     >
       {initial(seat.name)}
     </span>
   );
 }
 
-/** The table, with what the picked seat (else whoever spoke last) said. */
-export function RoomTable({
-  room,
-  sources,
-  topics,
-  thinking,
-  renderText,
-}: {
-  room: Room;
-  sources: number;
-  topics: number;
-  /** What the table is doing while a Turn runs ("The table is talking"), else null. */
-  thinking: string | null;
-  renderText: (text: string) => ReactNode;
-}) {
-  const { t } = useT();
-  const { seats, spoken, last, focus, focusRole } = room;
-  const focusSaid = focus?.said[focus.said.length - 1] ?? null;
-  return (
-    <section aria-labelledby="room-table" className="min-w-0 space-y-3 rounded-2xl border bg-card p-4 shadow-xs">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="room-table" className="text-sm font-semibold">
-          {t("room.title")}
-        </h2>
-        <span className="text-xs text-muted-foreground">{t("room.hint")}</span>
-      </div>
-
-      <div className="relative hidden h-[25rem] rounded-xl bg-muted/40 sm:block">
-        <div aria-hidden className="absolute top-1/2 left-1/2 h-[16rem] w-[24rem] max-w-[70%] -translate-1/2 rounded-[50%] border bg-brand/5" />
-        <div className="absolute top-1/2 left-1/2 flex h-32 w-52 -translate-1/2 flex-col items-center justify-center gap-0.5 rounded-[50%] bg-foreground text-center text-background">
-          {thinking ? (
-            <>
-              <Loader2 className="size-5 animate-spin" />
-              <span className="px-4 text-xs">{thinking}</span>
-            </>
-          ) : (
-            <>
-              <span className="text-[11px] opacity-75">{t("room.base")}</span>
-              <span className="text-2xl font-bold">{sources}</span>
-              <span className="text-[11px] opacity-75">{t("room.baseSub", { n: topics, c: room.citations })}</span>
-            </>
-          )}
-        </div>
-        {seats.map((s, i) => {
-          const angle = -Math.PI / 2 + (i * 2 * Math.PI) / seats.length;
-          const focused = s.role === focusRole;
-          const latest = last && s.role === last.role;
-          return (
-            <button
-              key={s.role}
-              type="button"
-              aria-pressed={focused}
-              onClick={() => room.pick(s.role)}
-              style={{ left: `${50 + 40 * Math.cos(angle)}%`, top: `${50 + 39 * Math.sin(angle)}%` }}
-              className="absolute flex w-36 -translate-1/2 flex-col items-center gap-1 rounded-xl p-1.5 text-center transition-colors hover:bg-background/70 focus-visible:bg-background/70"
-            >
-              <span className={cn(!focused && !s.said.length && "opacity-55")}>
-                <Avatar seat={s} size="lg" ring={focused} />
-              </span>
-              <span className="mt-1 line-clamp-2 text-xs leading-snug font-medium">{s.name}</span>
-              <span className={cn("rounded-full px-2 text-[11px]", latest ? cn(hue(s.role), "font-medium text-white") : "text-muted-foreground")}>
-                {room.status(s)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {focus && (
-        <div className="flex gap-3 rounded-xl border bg-muted/30 p-3.5">
-          <Avatar seat={focus} size="sm" />
-          <div className="min-w-0 space-y-1">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-              <span className="text-sm font-medium">{focus.name}</span>
-              {focusSaid && <KindTag type={focusSaid.turn.type} />}
-              <span className="text-muted-foreground">
-                {focusSaid
-                  ? t(focusSaid.index === spoken.length - 1 ? "room.saidLast" : "room.saidAt", { n: focusSaid.index + 1, c: focusSaid.turn.cited.length })
-                  : t("room.notYet")}
-              </span>
-            </p>
-            {focusSaid ? (
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">{renderText(focusSaid.turn.text)}</div>
-            ) : (
-              focus.description && <p className="text-sm text-muted-foreground">{focus.description}</p>
-            )}
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** Each seat with its latest line: what every expert is doing, at a glance. */
-export function RoomWho({ room, className }: { room: Room; className?: string }) {
+/** Each seat with its latest line: what every expert is doing, at a glance.
+ *  The picked seat (else whoever spoke last) shows its latest line in full. */
+export function RoomWho({ room, renderText, className }: { room: Room; renderText: (text: string) => ReactNode; className?: string }) {
   const { t } = useT();
   const { seats, past, focusRole } = room;
   return (
@@ -258,7 +155,7 @@ export function RoomWho({ room, className }: { room: Room; className?: string })
                 focused ? "border-brand/40 bg-brand/5" : "border-transparent hover:bg-muted/50",
               )}
             >
-              <Avatar seat={s} size="sm" />
+              <Avatar seat={s} />
               <span className="min-w-0 flex-1 space-y-0.5">
                 <span className="flex items-baseline justify-between gap-2 text-sm">
                   <span className="truncate font-medium" title={s.name}>
@@ -267,9 +164,21 @@ export function RoomWho({ room, className }: { room: Room; className?: string })
                   <span className="shrink-0 text-[11px] text-muted-foreground">{room.status(s)}</span>
                 </span>
                 {s.description && <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>}
-                <span className="line-clamp-2 text-xs leading-relaxed text-foreground/85">
-                  {latest ? `${t("room.round", { n: latest.index + 1 })} · ${snippet(latest.turn.text, 90)}` : t("room.notYet")}
-                </span>
+                {latest ? (
+                  <span className="block text-xs leading-relaxed text-foreground/85">
+                    <span className="mr-1.5 inline-flex items-center gap-1.5 align-middle">
+                      <span className="text-muted-foreground">{t("room.round", { n: latest.index + 1 })}</span>
+                      <KindTag type={latest.turn.type} />
+                    </span>
+                    {focused ? (
+                      <span className="mt-1 block text-sm whitespace-pre-wrap">{renderText(latest.turn.text)}</span>
+                    ) : (
+                      <span className="line-clamp-2">{snippet(latest.turn.text, 110)}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="block text-xs text-muted-foreground">{t("room.notYet")}</span>
+                )}
               </span>
             </button>
           </div>

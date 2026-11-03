@@ -1,7 +1,7 @@
-// A Discussion (docs/web-app-design.md, รุ่นสอง: Discussion): the round
-// table first — who sits at it and what each expert has said (components/
-// costorm-room) — then the transcript, folded to its last lines, the mind map
-// and the reports on the right, and at the foot the owner's turn: speak, let the
+// A Discussion (docs/web-app-design.md, รุ่นสอง: Discussion): the 3D round
+// table first, what each expert has said beside it (components/costorm-room),
+// then the transcript, folded to its last lines, the mind map and the reports
+// on the right, and at the foot the owner's turn: speak, let the
 // table go on once or three times, or write a report. Each of those is a Turn
 // that waits in the queue; the page polls until it is done.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +41,7 @@ import {
   formatDate,
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
-import { KindTag, RoomTable, RoomWho, hue, initial, useRoom, type Room } from "@/components/costorm-room";
+import { KindTag, RoomWho, hue, initial, useRoom, type Room } from "@/components/costorm-room";
 import { MoveSessionDialog } from "@/components/move-session";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
@@ -274,7 +274,7 @@ function Side({ d, view, sources, room }: { d: Discussion; view: View | null; so
   const [mapOpen, setMapOpen] = useState(false);
   return (
     <>
-    {room && view && <RoomWho room={room} />}
+    {room && view && <RoomWho room={room} renderText={(text) => <Cited text={text} sources={sources} />} />}
     <SideSection icon={<FileText className="size-3.5" />} title={t("disc.reports")}>
       {d.reports.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("disc.noReports")}</p>
@@ -329,7 +329,8 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
-  const [table3d, setTable3d] = useState(false);
+  // The 3D table is the page's first view; folding it unloads three.js's canvas.
+  const [table3d, setTable3d] = useState(true);
   // The transcript shows its last lines until opened; the round table above it is the page's subject.
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState("");
@@ -571,20 +572,12 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
 
           {started && (
             <div className="mb-6">
-              <RoomTable
+              {/* On wide screens it sits in the side column, beside the table. */}
+              <RoomWho
                 room={room}
-                sources={Object.keys(sources).length}
-                topics={view.mind_map.length}
-                thinking={
-                  d.current && !FINAL.has(d.current.status)
-                    ? d.current.status === "queued"
-                      ? t("status.queued")
-                      : t(`disc.working.${d.current.turn?.action}` as Key)
-                    : null
-                }
                 renderText={(text) => <Cited text={text} sources={sources} />}
+                className="rounded-2xl border bg-card p-4 shadow-xs lg:hidden"
               />
-              <RoomWho room={room} className="mt-4 rounded-2xl border bg-card p-4 shadow-xs lg:hidden" />
             </div>
           )}
 

@@ -10,26 +10,23 @@ import { L, Lw } from "./text";
 
 const A = RC.audience;
 const S = RC.safety;
-const BOX = "grid max-w-[70ch] gap-1.5 rounded-sm px-4 py-3 text-[0.92rem] leading-[1.7]";
-const CHIP =
-  "flex min-h-11 cursor-pointer items-center gap-2 rounded-sm border border-rule bg-ground px-3 py-1.5 font-display text-[0.9rem] hover:border-ink has-[:checked]:border-primary has-[:checked]:bg-rail";
+const BOX = "grid gap-1.5 rounded-lg px-3.5 py-3 text-[13px] leading-[1.65]";
 
 /** Plan 26: who the report is laid out for. Only the presentation changes (lib/audience.ts); not printed. */
 export function AudienceSwitch({ value, onChange, lang }: { value: Audience; onChange: (a: Audience) => void; lang: Lang }) {
   const id = useId();
   return (
-    <fieldset className="grid gap-2 print:hidden" data-audience-switch aria-describedby={`${id}-hint`}>
-      <legend className="label mb-1 p-0">{L(lang, A.legend)}</legend>
-      <div className="flex flex-wrap gap-2">
+    <fieldset className="flex flex-wrap items-center gap-2 print:hidden" data-audience-switch aria-describedby={`${id}-hint`}>
+      <legend className="float-left mr-2 p-0 text-[13px] text-muted">{L(lang, A.legend)}</legend>
+      <div className="flex flex-wrap gap-1.5">
         {AUDIENCES.map((a) => (
-          <label key={a} className={CHIP}>
-            <input type="radio" name={`${id}-audience`} value={a} checked={value === a} onChange={() => onChange(a)}
-              className="size-4 accent-primary" />
+          <label key={a} className="rchip">
+            <input type="radio" name={`${id}-audience`} value={a} checked={value === a} onChange={() => onChange(a)} className="sr-only" />
             {Lw(lang, A.name[a])}
           </label>
         ))}
       </div>
-      <p id={`${id}-hint`} className="text-[0.85rem] text-muted">{L(lang, A.hint)}</p>
+      <p id={`${id}-hint`} className="sr-only">{L(lang, A.hint)}</p>
     </fieldset>
   );
 }
@@ -37,7 +34,7 @@ export function AudienceSwitch({ value, onChange, lang }: { value: Audience; onC
 function Notice({ label, tone, children, kind }: { label: string; tone: string; children: ReactNode; kind: string }) {
   return (
     <aside aria-label={label} className={`${BOX} ${tone}`} data-notice={kind}>
-      <p className="label">{label}</p>
+      <p className="font-semibold">{label}</p>
       {children}
     </aside>
   );

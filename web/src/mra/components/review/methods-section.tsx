@@ -11,7 +11,6 @@ import { ROB_COLUMN, ROB_ORDER } from "@mra/lib/rob-summary";
 import type { Review, ReviewResult } from "@mra/lib/types";
 import { ThaiNodes } from "../ui/thai-text";
 import { DisclosureChevron } from "../ui/disclosure-chevron";
-import { READING } from "./report-parts";
 import { SECTION_H2, SECTION_H3 } from "./report-nav";
 import { fill, L, Lw } from "./text";
 
@@ -40,15 +39,17 @@ function Part({ id, title, lines, children }: { id: string; title: ReactNode; li
   const shown = lines.filter(([, node]) => node != null && node !== false && node !== "");
   if (!shown.length && !children) return null;
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" data-methods-part={id}>
-      <h3 id={id} className={SECTION_H3}>{title}</h3>
-      {shown.length > 0 && (
-        <ul className={`grid max-w-[70ch] grid-cols-[minmax(0,1fr)] list-disc gap-1 pl-5 ${READING}`}>
-          {shown.map(([key, node]) => <li key={key} data-methods-line={key}><ThaiNodes>{node}</ThaiNodes></li>)}
-        </ul>
-      )}
-      {children}
-    </div>
+    <details className="min-w-0 border-t border-rule py-2" data-methods-part={id}>
+      <summary className="cursor-pointer py-1 text-[14px] font-semibold"><h3 id={id} className={`${SECTION_H3} inline text-[14px]`}>{title}</h3></summary>
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)] gap-2 pb-1">
+        {shown.length > 0 && (
+          <ul className="grid grid-cols-[minmax(0,1fr)] list-disc gap-1 pl-5 text-[13px] leading-[1.65]">
+            {shown.map(([key, node]) => <li key={key} data-methods-line={key}><ThaiNodes>{node}</ThaiNodes></li>)}
+          </ul>
+        )}
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -240,8 +241,9 @@ export function MethodsSection({ review, result, type, lang }: {
   ];
 
   return (
-    <section aria-labelledby="h-method" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+    <section aria-labelledby="h-method" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
       <h2 id="h-method" className={SECTION_H2}>{Lw(lang, M.h2)}</h2>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] items-start gap-x-8">
       <Part id="m-eligibility" title={Lw(lang, M.eligibility)} lines={eligibility} />
       <Part id="m-sources" title={Lw(lang, M.sources)} lines={sourcesLines}>{queriesBlock}</Part>
       <Part id="m-selection" title={Lw(lang, M.selection)} lines={selection} />
@@ -266,9 +268,10 @@ export function MethodsSection({ review, result, type, lang }: {
           </ul>
         </div>
       )}
-      <div className="grid gap-1.5 rounded-sm bg-info-bg px-4 py-3" data-methods-part="m-automation">
+      </div>
+      <div className="grid gap-1.5 rounded-lg bg-info-bg px-4 py-3" data-methods-part="m-automation">
         <p className="font-display font-semibold">{L(lang, M.automation)}</p>
-        <p className={`max-w-[70ch] ${READING}`}>
+        <p className="text-[13px] leading-[1.65]">
           {[L(lang, M.automatic), !legacy && L(lang, M.abstractsMissed)].filter(Boolean).join(" ")}
         </p>
         <p className="text-[0.85rem] text-muted" data-disclaimer>

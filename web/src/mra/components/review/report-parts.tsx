@@ -1,20 +1,17 @@
 "use client";
 
-import { createContext, Fragment, useContext, useId, useState, type ReactNode } from "react";
-import { designKey, designLabel, isNonQuantitative, questionDirection } from "@mra/lib/charts-data";
+import { createContext, Fragment, useContext, useState, type ReactNode } from "react";
+import { isNonQuantitative } from "@mra/lib/charts-data";
 import { surnameOf } from "@mra/lib/author";
-import { DIRECTION_LABEL, ROB_LABEL, STRENGTH_LABEL, type Lang } from "@mra/lib/i18n";
+import { DIRECTION_LABEL, type Lang } from "@mra/lib/i18n";
 import { fieldLang, RC, type Pair } from "@mra/lib/i18n-report";
 import { isReviewDiscordant, matrixView } from "@mra/lib/report-view";
-import { isRelatedReport, relatedLabel, relatedReasonText, relatedReportsLabel } from "@mra/lib/trial-reports";
-import { isGraded, REVIEW_TYPE_LABEL, showsCardDirection, showsRiskOfBias, type ReviewTypeOrLegacy } from "@mra/lib/review-type";
+import { isGraded, type ReviewTypeOrLegacy } from "@mra/lib/review-type";
 import { citationOf, isChecked } from "@mra/lib/support";
-import type { ComparisonCell, ComparisonRow, EvidenceCluster, Paper, PaperCard, QuestionBlock, Quality, SupportClaim, Synthesis } from "@mra/lib/types";
-import { DesignMismatchFlag, Glyph, UncertainFlag } from "../ui/evidence";
+import type { ComparisonCell, ComparisonRow, EvidenceCluster, Paper, QuestionBlock, Quality, SupportClaim, Synthesis } from "@mra/lib/types";
+import { Glyph, UncertainFlag } from "../ui/evidence";
 import { Term } from "../ui/term";
 import { ThaiText } from "../ui/thai-text";
-import { DisclosureChevron } from "../ui/disclosure-chevron";
-import { CertaintyMark } from "./certainty";
 import { ScrollRegion } from "./scroll-region";
 import { L } from "./text";
 
@@ -95,42 +92,15 @@ export function CitedText({ text, onSelect, refs, support }: {
 /** How the agent read the question: interpretation, PICO, sub-questions, assumptions. One disclosure, no nesting. */
 export function QuestionDetails({ question, lang, type = "legacy" }: { question?: QuestionBlock; lang: Lang; type?: ReviewTypeOrLegacy }) {
   const text = lang === "en" && question?.english ? question.english : question;
-  const pico = question?.pico;
   const hasMore = !!text?.sub_questions?.length || !!text?.assumptions?.length || !!question?.ambiguities?.length;
-  const isPcc = question?.framework === "PCC";
   const keyTerms = type === "legacy" ? [] : question?.key_terms ?? []; // legacy reports stay as they were
-  if (!text?.interpretation && !pico && !isPcc && !keyTerms.length && !hasMore) return null;
+  // PICO and PCC have their own cards under the band (report-head.tsx)
+  if (!text?.interpretation && !keyTerms.length && !hasMore) return null;
   return (
-    <details className="grid gap-3 text-[0.92rem]">
-      <summary className="cursor-pointer font-display font-semibold">{L(lang, P.interpreted)}</summary>
-      <div className="mt-3 grid gap-3">
-        {text?.interpretation && <p className="max-w-[65ch] text-[0.95rem] text-muted" lang={fieldLang(text.interpretation, lang)}>{text.interpretation}</p>}
-        {isPcc && <p className="label"><Term k="pcc" lang={lang}>PCC</Term></p>}
-        {isPcc && (
-          <dl className="grid gap-px overflow-hidden rounded-sm border border-rule bg-rule sm:grid-cols-3">
-            {([["P", L(lang, P.population), pico?.population], ["C", L(lang, P.concept), question?.concept],
-              ["C", L(lang, P.context), question?.context]] as const)
-              .map(([k, label, v]) => (
-                <div key={label} className="bg-surface px-4 py-2.5">
-                  <dt className="label">{k} · {label}</dt>
-                  <dd className="text-[0.92rem] break-words" lang={fieldLang(v, lang)}>{v || "–"}</dd>
-                </div>
-              ))}
-          </dl>
-        )}
-        {!isPcc && pico && <p className="label"><Term k="pico" lang={lang}>PICO</Term></p>}
-        {!isPcc && pico && (
-          <dl className="grid gap-px overflow-hidden rounded-sm border border-rule bg-rule sm:grid-cols-2">
-            {([["P", L(lang, P.population), pico.population], ["I", L(lang, P.intervention), pico.intervention_or_exposure],
-              ["C", L(lang, P.comparator), pico.comparator], ["O", L(lang, P.outcomes), pico.outcomes?.join(", ")]] as const)
-              .map(([k, label, v]) => (
-                <div key={k} className="bg-surface px-4 py-2.5">
-                  <dt className="label">{k} · {label}</dt>
-                  <dd className="text-[0.92rem] break-words" lang={fieldLang(v, lang)}>{v || "–"}</dd>
-                </div>
-              ))}
-          </dl>
-        )}
+    <details className="grid gap-3 text-[13px] leading-[1.65]">
+      <summary className="cursor-pointer py-1 text-[14px] font-semibold">{L(lang, P.interpreted)}</summary>
+      <div className="mt-2 grid gap-3">
+        {text?.interpretation && <p className="text-muted" lang={fieldLang(text.interpretation, lang)}>{text.interpretation}</p>}
         {!!keyTerms.length && (
           <div>
             <p className="label">{L(lang, P.keyTerms)}</p>
@@ -169,55 +139,27 @@ const FIXED_NOTE: Record<"replaced" | "appended" | "trimmed", Pair> = {
   trimmed: P.fixedTrimmed, appended: P.fixedAppended, replaced: P.fixedReplaced,
 };
 
-export function StrengthLine({ synthesis, lang, quality, type = "legacy", bar = true, openRationale = false }: {
+/** Why the review has the grade the band shows. A type that grades but could not (no quantitative studies) says why in
+ * the open; narrative and scoping need no reason. */
+export function StrengthRationale({ synthesis, lang, quality, type = "legacy", openRationale = false }: {
   synthesis: Synthesis; lang: Lang; quality?: Quality; type?: ReviewTypeOrLegacy;
-  /** false for a meta-analysis without a pooled estimate: the grade rests on single studies, so no graded bar */
-  bar?: boolean;
   /** Plan 26: the rationale disclosure starts open (learner and committee views) */
   openRationale?: boolean;
 }) {
   // A typed result with no grade must never read as "very low": only legacy results keep that fallback.
   const ungraded = type !== "legacy" && (!isGraded(type) || synthesis.evidence_strength == null);
-  const level = synthesis.evidence_strength ?? "very_low";
-  const typeName = type === "legacy" ? "" : REVIEW_TYPE_LABEL[type][lang];
   const rationale = (!ungraded || isGraded(type)) && synthesis.evidence_rationale;
   const fixed = quality?.prose_check?.rationale_fixed ?? null;
+  if (!rationale) return null;
+  if (ungraded) return <p className="text-[13px] leading-[1.65] text-muted" lang={fieldLang(rationale, lang)}>{rationale}</p>;
   return (
-    <div className="grid gap-1.5">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.92rem]">
-        {ungraded ? (
-          <p className="font-display font-semibold">
-            {L(lang, P.notAssessed(typeName))}
-          </p>
-        ) : (
-        <p className="flex flex-wrap items-center gap-2 font-display font-semibold">
-          <Term k="evidenceStrength" lang={lang}>{L(lang, P.strength)}</Term>: <b>{STRENGTH_LABEL[lang][level]}</b>
-          {bar ? <CertaintyMark level={level} lang={lang} label="silent" />
-            : <span className="font-normal text-muted" data-no-bar>{L(lang, P.noBar)}</span>}
-        </p>
-        )}
-        {quality?.numbers_total ? (
-          <p className="text-muted">
-            {L(lang, P.numbersVerified)}{" "}
-            <span className="font-display tabular-nums">{`${quality.numbers_verified ?? 0}/${quality.numbers_total}`}</span>
-          </p>
-        ) : null}
-      </div>
-      {/* A grade's rationale sits behind a disclosure (Plan 20: the answer comes first); a graded type left ungraded
-          (no quantitative studies) says why in the open. Narrative and scoping need no reason. */}
-      {rationale && (ungraded ? <p className="max-w-[65ch] text-[0.88rem] text-muted" lang={fieldLang(rationale, lang)}>{rationale}</p> : (
-        <details className="group text-[0.9rem]" open={openRationale || undefined}>
-          <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 font-display font-semibold text-primary md:min-h-0">
-            <DisclosureChevron />
-            {L(lang, P.whyCertainty)}
-          </summary>
-          <p className="mt-1 max-w-[65ch] text-muted" lang={fieldLang(rationale, lang)}>{rationale}</p>
-          {fixed && FIXED_NOTE[fixed] && (
-            <p className="mt-1 max-w-[65ch] text-[0.8rem] text-muted" data-rationale-fixed={fixed}>{L(lang, FIXED_NOTE[fixed])}</p>
-          )}
-        </details>
-      ))}
-    </div>
+    <details open={openRationale || undefined} className="text-[13px] leading-[1.65]">
+      <summary className="cursor-pointer py-1 text-[14px] font-semibold">{L(lang, P.whyCertainty)}</summary>
+      <p className="mt-1.5 text-muted" lang={fieldLang(rationale, lang)}>{rationale}</p>
+      {fixed && FIXED_NOTE[fixed] && (
+        <p className="mt-1 text-[12px] text-muted" data-rationale-fixed={fixed}>{L(lang, FIXED_NOTE[fixed])}</p>
+      )}
+    </details>
   );
 }
 
@@ -272,11 +214,11 @@ export function ComparisonMatrix({ rows, refs: allRefs, lang, onSelect, selected
       )}
     </div>
     <ScrollRegion lang={lang} label={L(lang, P.scrollable(caption))}>
-      <table aria-label={caption} className="w-full border-collapse text-[0.88rem] sm:min-w-[620px]">
+      <table aria-label={caption} className="w-full border-collapse text-[14px] leading-[1.55]">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="bg-ground">
-            <th scope="col" className="left-0 z-10 min-w-[9rem] bg-ground px-2.5 py-2 text-left label sm:sticky sm:min-w-[190px]">{L(lang, P.outcome)}</th>
+            <th scope="col" className="left-0 z-10 min-w-[9rem] bg-ground px-2.5 py-2 text-left label sm:sticky">{L(lang, P.outcome)}</th>
             <th scope="col" className="px-2 py-2 text-center label" title={L(lang, P.kTitle)}>
               k<span className="sr-only"> {L(lang, P.kSr)}</span>
             </th>
@@ -402,7 +344,7 @@ export function RefButtons({ refs, onSelect, lang, checked, claim }: {
       {refs.map((r) => (
         <button key={r} type="button" onClick={() => (claim ? onSelect(r, undefined, claim) : onSelect(r))}
           aria-label={L(lang, checked?.has(r) ? S.openChecked(r) : P.open(r))} data-checked={checked?.has(r) || undefined}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-rule px-1.5 font-display text-[0.8rem] leading-normal hover:border-ink md:min-h-6 md:min-w-0">
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-rule bg-surface px-[7px] font-display text-[12px] leading-normal font-semibold text-primary hover:bg-info-bg md:min-h-6 md:min-w-0">
           {r}{checked?.has(r) && <span aria-hidden="true" className="ml-1 font-semibold">✓</span>}
         </button>
       ))}
@@ -422,10 +364,10 @@ export function ClaimsPanel({ consensus, conflicts, lang, onSelect, refs, graded
   const discordant = [...consensus, ...conflicts].some(isReviewDiscordant);
   return (
     <div className="grid gap-4">
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4">
       {([[L(lang, P.agree), consensus, false], [L(lang, P.conflict), conflicts, true]] as const).map(([title, items, isConflict]) => (
-        <section key={title} className="grid content-start gap-3">
-          <h3 className="text-lg font-semibold">{title}</h3>
+        <section key={title} className="grid content-start gap-3 border-t border-rule pt-3 first:border-t-0 first:pt-0">
+          <h3 className="text-[15px] leading-[1.45] font-semibold">{title}</h3>
           {items.length === 0 ? (
             <p className="text-[0.9rem] text-muted">{L(lang, isConflict ? P.noConflict : P.noAgree)}</p>
           ) : (
@@ -435,14 +377,14 @@ export function ClaimsPanel({ consensus, conflicts, lang, onSelect, refs, graded
                 const split = isReviewDiscordant(c);
                 return (
                 <li key={c.statement} data-claim data-conflict={isConflict || undefined} data-review-discordant={split || undefined}
-                  className={`grid gap-1.5 rounded-sm p-3 ${split ? "border border-rule bg-info-bg" : isConflict ? "bg-warn-bg" : "bg-ground"}`}>
+                  className={`grid gap-1 ${split ? "rounded-lg border border-rule bg-info-bg p-3" : isConflict ? "rounded-lg bg-warn-bg p-3" : ""}`}>
                   {split && (
                     <span className="label w-fit rounded-sm border border-ink px-1.5 py-0.5 text-ink">
                       <ThaiText>{REVIEW_DISCORDANT_LABEL[lang]}</ThaiText>
                     </span>
                   )}
-                  <b className="font-display" lang={fieldLang(c.statement, lang)}>{c.statement}</b>
-                  <p className={READING} lang={fieldLang(c.explanation, lang)}><CitedText text={c.explanation} onSelect={onSelect} refs={refs} /></p>
+                  <p className="text-[14px] leading-[1.65]" lang={fieldLang(c.statement, lang)}>{c.statement}</p>
+                  <p className="text-[13px] leading-[1.65] text-muted" lang={fieldLang(c.explanation, lang)}><CitedText text={c.explanation} onSelect={onSelect} refs={refs} /></p>
                   {!!c.likely_reasons?.length && (
                     <p className="text-[0.88rem]"><span className="label mr-1.5">{L(lang, P.likelyReasons)}</span>
                       <span lang={fieldLang(c.likely_reasons.join(" "), lang)}>{c.likely_reasons.join(" · ")}</span></p>
@@ -464,65 +406,5 @@ export function ClaimsPanel({ consensus, conflicts, lang, onSelect, refs, graded
       </p>
     )}
     </div>
-  );
-}
-
-const otherComparisons = (card: PaperCard) => card.outcomes.filter((o) => o.matches_question === false).length;
-
-/**
- * What the review made of one paper (year, design, direction, bias, flags, reports of the same trial), as the button
- * that opens it in the source rail. Its accessible name starts with the ref ("P3 …"). Sits in its reference (Task 6).
- */
-export function StudyButton({ p, lang, onSelect, selected, type = "legacy" }: {
-  p: Paper; lang: Lang; onSelect: Select; selected: boolean; type?: ReviewTypeOrLegacy;
-}) {
-  const card = lang === "en" ? p.card_en ?? p.card : p.card;
-  const en = p.card_en ?? p.card; // the checked card: design, direction and comparison flags
-  const others = en ? otherComparisons(en) : 0;
-  const meta = useId();
-  // an unread paper has no source sentences to show: the cue promises only the paper
-  const cue = L(lang, card ? P.showSources : P.showPaper);
-  return (
-    <button type="button" onClick={() => onSelect(p.ref)} aria-pressed={selected} aria-describedby={meta}
-      aria-label={`${p.ref} ${cue}: ${p.title}`}
-      className={`grid min-h-11 w-full min-w-0 gap-1 rounded-sm px-1 py-1 text-left hover:bg-ground ${selected ? "bg-ground" : ""}`}>
-      <span id={meta} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.85rem] text-muted">
-        {card && en ? (
-          <>
-            <span>{designLabel(designKey(card), lang)}</span>
-            {showsCardDirection(type, en) ? (
-              <span className="inline-flex items-center gap-1.5"><Glyph direction={questionDirection(en)} lang={lang} />{DIRECTION_LABEL[lang][questionDirection(en)]}</span>
-            ) : isNonQuantitative(en) && (
-              <span data-theme-paper>{L(lang, P.themesNoDirection)}</span>
-            )}
-            {showsRiskOfBias(type) && <span>{L(lang, P.bias)}: {ROB_LABEL[lang][card.risk_of_bias]}</span>}
-            {others > 0 && (
-              <span data-other-comparison>
-                {L(lang, others === en.outcomes.length ? P.otherOnly : P.otherSome(others))}
-              </span>
-            )}
-          </>
-        ) : (
-          <span className="text-err">{L(lang, P.unread)}{p.error ? ` · ${p.error}` : ""}</span>
-        )}
-        {p.verification?.uncertain && <ReadingFlag lang={lang} />}
-        {p.verification?.design_mismatch && <DesignMismatchFlag lang={lang} />}
-      </span>
-      {/* reports of the same trial (Plan 20 Task 10): one study, however many reports */}
-      {isRelatedReport(p) && (
-        <span className="text-[0.85rem]" data-related-to={p.related_to}>
-          <span className="font-display font-semibold">{relatedLabel(p.related_to!, lang)}</span>
-          {relatedReasonText(p.related_reason, lang) && <span className="text-muted"> · {relatedReasonText(p.related_reason, lang)}</span>}
-        </span>
-      )}
-      {!!p.related_reports?.length && (
-        <span className="text-[0.85rem] text-muted" data-related-reports>
-          {relatedReportsLabel(lang)}: {p.related_reports.join(", ")}
-        </span>
-      )}
-      <span className="font-display text-[0.85rem] font-semibold text-primary underline underline-offset-2 print:hidden">
-        {cue}
-      </span>
-    </button>
   );
 }

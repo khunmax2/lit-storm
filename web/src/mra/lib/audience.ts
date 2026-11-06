@@ -32,7 +32,7 @@ export const LEADING: Record<Audience, readonly TopSectionId[]> = {
   public: [],
   bedside: ["bottom_line", "key_findings", "sof", "limitations"],
   learner: [],
-  committee: ["bottom_line", "selection", "methods", "rob", "sof", "key_findings"],
+  committee: ["bottom_line", "selection", "methods", "rob", "consistency", "sof", "key_findings"],
 };
 
 /** reportLayout(type) in the audience's order; a section the type does not have is skipped. */

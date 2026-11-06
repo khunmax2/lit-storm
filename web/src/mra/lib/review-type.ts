@@ -70,23 +70,24 @@ export const SECTION_BLOCKS: Partial<Record<TopSectionId, readonly BlockId[]>> =
  * (pooled) numbers apart.
  */
 export const SECTIONS_BY_TYPE: Record<ReviewTypeOrLegacy, SectionId[]> = {
-  narrative: ["title", "bottom_line", "key_findings", "characteristics", "lit_matrix", "results", "findings", "forest",
-    "rob", "consistency", "claims", "landscape", "concept_map", "citations", "limitations", "gaps", "discussion",
-    "methods", "references", "downloads", "appendix"],
-  slr: ["title", "bottom_line", "key_findings", "sof", "selection", "prisma", "characteristics", "lit_matrix",
-    "results", "findings", "forest", "rob", "consistency", "claims", "landscape", "concept_map", "citations",
-    "limitations", "gaps", "discussion", "methods", "references", "downloads", "appendix"],
+  // DeepLit's layout: the results before the table of studies, the discussion before the gaps, the references last of all.
+  narrative: ["title", "bottom_line", "key_findings", "results", "findings", "forest", "characteristics", "lit_matrix",
+    "rob", "consistency", "claims", "landscape", "concept_map", "citations", "limitations", "discussion", "gaps",
+    "methods", "appendix", "downloads", "references"],
+  slr: ["title", "bottom_line", "key_findings", "sof", "selection", "prisma", "results", "findings", "forest",
+    "characteristics", "lit_matrix", "rob", "consistency", "claims", "landscape", "concept_map", "citations",
+    "limitations", "discussion", "gaps", "methods", "appendix", "downloads", "references"],
   // Scoping maps what exists: the evidence map is a study characteristic, and there are no results by outcome.
   scoping: ["title", "bottom_line", "key_findings", "selection", "prisma", "characteristics", "evidence_map",
-    "lit_matrix", "landscape", "concept_map", "citations", "limitations", "gaps", "discussion", "methods",
-    "references", "downloads", "appendix"],
+    "lit_matrix", "landscape", "concept_map", "citations", "limitations", "discussion", "gaps", "methods",
+    "appendix", "downloads", "references"],
   // An SLR plus the pooled analysis, after the per-study findings and forest plot in the results.
-  meta_analysis: ["title", "bottom_line", "key_findings", "sof", "selection", "prisma", "characteristics",
-    "lit_matrix", "results", "findings", "forest", "meta", "rob", "consistency", "claims", "landscape",
-    "concept_map", "citations", "limitations", "gaps", "discussion", "methods", "references", "downloads", "appendix"],
+  meta_analysis: ["title", "bottom_line", "key_findings", "sof", "selection", "prisma", "results", "findings", "forest",
+    "meta", "characteristics", "lit_matrix", "rob", "consistency", "claims", "landscape",
+    "concept_map", "citations", "limitations", "discussion", "gaps", "methods", "appendix", "downloads", "references"],
   // Results stored before Plan 14a: the same blocks as before (claims, findings, forest, prisma), in the new order.
   legacy: ["title", "bottom_line", "key_findings", "selection", "prisma", "results", "findings", "forest", "rob",
-    "consistency", "claims", "limitations", "gaps", "discussion", "methods", "references", "downloads", "appendix"],
+    "consistency", "claims", "limitations", "discussion", "gaps", "methods", "appendix", "downloads", "references"],
 };
 
 export function showsSection(type: ReviewTypeOrLegacy, id: SectionId): boolean {

@@ -15,18 +15,15 @@ import { L } from "./text";
 const C = RC.charts;
 
 /**
- * Results figures, built only from verified values in the (filtered) papers: a forest panel per outcome and measure,
- * the diagnostic-accuracy family, and the study map. The study selection flow is PrismaFlow (Plan 20 Task 4).
+ * Results figures, built only from verified values in the (filtered) papers: a forest panel per outcome and measure and
+ * the diagnostic-accuracy family. The study selection flow is PrismaFlow (Plan 20 Task 4); the study map is its own card.
  */
 export function Charts({ content, result, lang, onSelect }: {
   content: ChartsContent; result: ReviewResult; lang: Lang; onSelect: (ref: string, outcome?: string) => void;
 }) {
-  const theme = useTheme();
-  const tokens = useMemo(() => (theme ? readTokens() : null), [theme]);
   const pico = result.question?.pico;
   const arms: Arms = { intervention: pico?.intervention_or_exposure?.trim() || null };
-  if (content.empty) return null;
-  const { forest, dta, map } = content;
+  const { forest, dta } = content;
   const unverified = forest.unplaced.length ? (
     <p className="text-[0.82rem] text-muted" data-forest-left-out>
       <span className="hole mr-2">{L(lang, C.notVerified)}</span>
@@ -35,25 +32,40 @@ export function Charts({ content, result, lang, onSelect }: {
     </p>
   ) : null;
   return (
-    <section aria-labelledby="h-charts" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-8">
+    <section aria-labelledby="h-charts" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <SectionHeading id="h-charts">{L(lang, C.h)}</SectionHeading>
       {forest.panels.length > 0 ? (
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-10" data-forest-panels>
-          <p className="max-w-[65ch] text-[0.85rem] text-muted">
+        <>
+          <p className="text-[13px] leading-[1.65] text-muted">
             {L(lang, C.intro)}
             {content.narrative && <> {L(lang, C.narrative)}</>}
           </p>
-          {forest.panels.map((p) => <ForestPanel key={p.key} panel={p} arms={arms} lang={lang} onSelect={onSelect} />)}
+          <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-7" data-forest-panels>
+            {forest.panels.map((p) => <ForestPanel key={p.key} panel={p} arms={arms} lang={lang} onSelect={onSelect} />)}
+          </div>
           {unverified}
-        </div>
-      ) : !content.narrative && !dta && (
+        </>
+      ) : !content.narrative && !dta && !content.map && (
         <div className="grid gap-2">
           <p className="text-[0.9rem] text-muted">{L(lang, C.none)}</p>
           {unverified}
         </div>
       )}
       {dta && <DtaFigure data={dta} lang={lang} onSelect={onSelect} />}
-      {map && tokens && <StudyMapFigure points={map.points} missing={map.missing} tokens={tokens} lang={lang} onSelect={onSelect} />}
     </section>
   );
+}
+
+/** Whether Charts has anything to show once the study map has its own card. */
+export function hasForestCard(content: ChartsContent): boolean {
+  return !content.empty && (content.forest.panels.length > 0 || !!content.dta || (!content.map && !content.narrative));
+}
+
+/** The study map (year × sample size × direction), in its own card next to the findings table. */
+export function StudyMap({ content, lang, onSelect }: { content: ChartsContent; lang: Lang; onSelect: (ref: string, outcome?: string) => void }) {
+  const theme = useTheme();
+  const tokens = useMemo(() => (theme ? readTokens() : null), [theme]);
+  const { map } = content;
+  if (!map || !tokens) return null;
+  return <StudyMapFigure points={map.points} missing={map.missing} tokens={tokens} lang={lang} onSelect={onSelect} />;
 }

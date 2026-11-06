@@ -58,6 +58,9 @@ export const RC = {
     tryThis: ["ลองแบบนี้", "Try this"],
     contents: ["สารบัญ", "Contents"],
     inThisReport: ["ในรายงานนี้", "In this report"],
+    chapterStudies: ["งานวิจัยที่ใช้", "Studies used"],
+    chapterTrust: ["ความน่าเชื่อถือ", "Trustworthiness"],
+    chapterSources: ["ที่มาและภาคผนวก", "Sources and appendix"],
   },
 
   /** The report bench (report.tsx). */
@@ -98,6 +101,18 @@ export const RC = {
     html: ["HTML (เปิดได้ออฟไลน์)", "HTML (works offline)"],
     print: ["พิมพ์", "Print"],
     reportLanguage: ["ภาษาของรายงาน", "Report language"],
+    statCertainty: ["ความแข็งแรงของหลักฐาน", "Certainty of evidence"],
+    statNotAssessed: ["ไม่ได้ประเมิน", "Not assessed"],
+    statVerified: ["ตัวเลขที่ตรวจผ่าน", "Numbers verified"],
+    statVerifiedOf: (v: number, n: number): Pair => [`${v} จาก ${n} ตัวเลข`, `${v} of ${n} numbers`],
+    statIncluded: ["งานวิจัยที่รวม", "Studies included"],
+    statFound: (n: number): Pair => [`จาก ${n} ระเบียน`, `from ${n} ${pl(n, "record", "records")}`],
+    statSupport: ["ผลไปทางสนับสนุน", "Results in support"],
+    statUnclear: (n: number): Pair => [`อีก ${n} งานไม่ชัด`, `${n} more unclear`],
+    statOf: (n: number): Pair => [`จาก ${n} งาน`, `of ${n} ${pl(n, "study", "studies")}`],
+    sourcesCount: (n: number): Pair => [`${n} แหล่งข้อมูล`, `${n} ${pl(n, "source", "sources")}`],
+    searchedOn: (date: string): Pair => [`ค้นเมื่อ ${date}`, `Searched ${date}`],
+    idLine: (id: string): Pair => [`รหัสรีวิว ${id}`, `Review ID ${id}`],
   },
 
   /** Copy link (ui/copy-link.tsx). */
@@ -110,6 +125,7 @@ export const RC = {
   /** Bottom line (bottom-line.tsx). */
   bottom: {
     h2: ["คำตอบโดยสรุป", "Bottom line"],
+    reading: ["อ่านคำตอบนี้อย่างไร", "How to read this answer"],
     noAnswer: ["ไม่มีคำตอบสั้นสำหรับรีวิวนี้ ดูผลการศึกษาที่สำคัญด้านล่าง", "No short answer for this review; see the key findings below."],
     pooledLabel: ["ค่ารวม (คำนวณโดยระบบ ไม่ใช่ตัวเลขจากงานวิจัยฉบับใด)", "Pooled estimate (computed by the system, not from any single study)"],
     modelNoteScoping: ["สรุปเขียนโดยโมเดล ข้อความสรุปไม่ใช่ตัวเลขที่ตรวจแล้ว ตัวเลขที่ตรวจกับต้นฉบับแล้วมีเส้นใต้ลายเทป ดูได้ในแถบต้นฉบับ (แตะรหัสงานวิจัยในรายการ)",
@@ -283,6 +299,8 @@ export const RC = {
 
   /** Study selection flow (prisma-flow.tsx). */
   prisma: {
+    asTableShort: ["ดูเป็นตาราง", "Show as table"],
+    diagram: ["แผนภาพ", "Diagram:"],
     title: ["แผนภาพการคัดเลือกงานวิจัย", "Study selection flow"],
     asTable: ["ดูแผนภาพนี้เป็นตาราง", "Show the flow as a table"],
     stage: ["ขั้น", "Stage"],
@@ -414,6 +432,7 @@ export const RC = {
 
   /** References and the excluded-at-screening disclosure (references.tsx). */
   refs: {
+    count: (n: number): Pair => [`${n} รายการ`, `${n} ${pl(n, "item", "items")}`],
     newTab: ["(เปิดในแท็บใหม่)", "(opens in a new tab)"],
     related: ["รายงานเพิ่มเติม", "Related report"],
     designExcluded: ["ไม่ใช้เป็นหลักฐาน: อ่านแล้วพบว่ารูปแบบการศึกษาไม่ตรงชนิดที่เลือก", "Not used as evidence: read as a design outside the ticked study types"],
@@ -524,6 +543,10 @@ export const RC = {
     any: ["ทั้งหมด", "Any"],
     rob: ["ความเสี่ยงอคติ", "Risk of bias"],
     design: ["รูปแบบการศึกษา", "Study design"],
+    direction: ["ทิศทางผล", "Direction"],
+    all: ["ทั้งหมด", "All"],
+    more: ["ตัวกรองเพิ่มเติม", "More filters"],
+    shown: (shown: number, total: number): Pair => [`แสดง ${shown} จาก ${total} ฉบับ`, `Showing ${shown} of ${total} ${pl(total, "study", "studies")}`],
   },
 
   /** Scroll regions (scroll-region.tsx). */
@@ -647,6 +670,7 @@ export const RC = {
     networkTitle: ["การอ้างอิงกันระหว่างงานในรีวิวนี้ ตามปีที่ตีพิมพ์", "Citations between the studies in this review, by year"],
     networkLinks: ["เส้นเชื่อมแสดงการอ้างอิงระหว่างงานในรีวิวนี้เท่านั้น ข้อมูลจาก OpenAlex/Europe PMC", "Links show citations between studies in this review only. Data from OpenAlex/Europe PMC"],
     arrows: ["ลูกศรชี้จากงานที่อ้างไปยังงานที่ถูกอ้าง", "Arrows point from the citing study to the cited one"],
+    yearOrder: ["แกนปีเรียงลำดับ ไม่เป็นสัดส่วนตามเวลา", "The years are in order, not to scale"],
     noDataNotNone: ["ไม่มีข้อมูล ≠ ไม่อ้างอิง", "No data ≠ cites nothing"],
     mayCite: ["งานที่ไม่มีข้อมูลรายการอ้างอิงอาจอ้างงานอื่นในรีวิวนี้โดยไม่มีเส้นแสดง", "a study without reference data may cite others in this review without a link being drawn"],
     markerCount: ["ขนาดจุดตามจำนวนครั้งที่ถูกอ้างอิงทั้งหมด (OpenAlex และ Europe PMC นับต่างกัน)", "Marker size follows the total cited-by count (OpenAlex and Europe PMC count differently)"],
@@ -683,6 +707,9 @@ export const RC = {
 
   /** Literature review matrix (lit-matrix.tsx). */
   lit: {
+    tileDirection: { positive: ["สนับสนุน", "Supports"], negative: ["ตรงข้าม", "Opposite"], null: ["ไม่สัมพันธ์", "No link"],
+      mixed: ["ผสม", "Mixed"], unclear: ["ไม่ชัด", "Unclear"] } as Record<string, Pair>,
+    tileTheme: ["ประเด็น", "Themes"],
     notReported: ["ไม่ได้รายงาน", "not reported"],
     noData: ["ไม่มีข้อมูล", "No data"],
     sourceUnknown: ["ไม่ทราบแหล่ง", "source unknown"],

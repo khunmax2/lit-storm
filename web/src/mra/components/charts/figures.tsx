@@ -450,16 +450,16 @@ function citationOption(net: CitationNetwork, layout: CitationLayout, t: ChartTo
       axisTick: { customValues: net.ticks, lineStyle: { color: t.rule } },
       axisLabel: {
         customValues: net.ticks, color: t.muted, fontFamily: t.fontDisplay, fontSize: 11,
-        formatter: (v: number) => (v === net.unknownX ? unknownLabel : String(v)),
+        formatter: (v: number) => (v === net.unknownX ? unknownLabel : String(net.columnYears[v] ?? "")),
       },
     },
     yAxis: { type: "value", inverse: true, show: false, min: -0.6, max: net.lanes - 0.4 },
     series: [
-      ...(net.unknownX != null && net.minYear != null ? [{
+      ...(net.unknownX != null && net.columnYears.length ? [{
         // A dashed rule between the unknown-year column and the years: that column is not on the year scale.
         type: "scatter", data: [], silent: true,
         markLine: { silent: true, symbol: "none", label: { show: false }, lineStyle: { color: t.rule, width: 1, type: "dashed" },
-          data: [{ xAxis: (net.unknownX + net.minYear) / 2 }] },
+          data: [{ xAxis: net.unknownX / 2 }] },
       }] : []),
       {
         type: "graph", coordinateSystem: "cartesian2d", layout: "none", roam: false, cursor: "pointer",
@@ -517,7 +517,7 @@ export function CitationNetworkFigure({ net, tokens, lang, onSelect }: {
       title={L(lang, G.networkTitle)}
       caption={
         <div className="grid gap-1">
-          <p>{L(lang, G.networkLinks)}{" · "}{L(lang, G.arrows)}</p>
+          <p>{L(lang, G.networkLinks)}{" · "}{L(lang, G.arrows)}{" · "}{L(lang, G.yearOrder)}</p>
           <p><b className="font-display font-semibold text-ink">{L(lang, G.noDataNotNone)}</b>{" · "}{L(lang, G.mayCite)}</p>
           <p>{L(lang, G.markerCount)}</p>
           {net.partial && <p>{L(lang, G.partial)}</p>}

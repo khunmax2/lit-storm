@@ -239,11 +239,11 @@ export function SourceRail({ paper, outcome, lang, onClose, headingId, visible =
   const cardEn = paper?.card_en ?? paper?.card;
   return (
     <aside aria-label={L(lang, R.source)} aria-live="polite" data-source-rail
-      className="grid min-w-0 content-start gap-4 bg-rail p-6">
+      className="grid min-w-0 content-start gap-3 p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} tabIndex={-1} className="label">{L(lang, R.source)}{paper ? ` · ${paper.ref}` : ""}</h2>
+        <h2 id={headingId} tabIndex={-1} className="text-[13px] font-semibold text-primary">{L(lang, R.source)}{paper ? ` · ${paper.ref}` : ""}</h2>
         {onClose && (
-          <button type="button" onClick={onClose} className="rounded-sm border border-rule px-2 py-0.5 text-sm lg:hidden">
+          <button type="button" onClick={onClose} className="rbtn">
             {L(lang, R.close)}
           </button>
         )}

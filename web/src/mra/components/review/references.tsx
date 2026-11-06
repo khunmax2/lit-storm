@@ -5,12 +5,10 @@ import { EXCLUSION_REASON_LABEL } from "@mra/lib/charts-data";
 import { citationParts, vancouver, type CitationId } from "@mra/lib/citation";
 import type { Lang } from "@mra/lib/i18n";
 import { fieldLang, RC } from "@mra/lib/i18n-report";
-import type { ReviewTypeOrLegacy } from "@mra/lib/review-type";
 import type { ExclusionReason, Paper, Stats } from "@mra/lib/types";
 import { CopyTextButton } from "../ui/copy-text";
 import { DisclosureChevron } from "../ui/disclosure-chevron";
-import { StudyButton, type Select } from "./report-parts";
-import { SECTION_H2 as H2 } from "./report-nav";
+import type { Select } from "./report-parts";
 import { L, Lw } from "./text";
 
 const R = RC.refs;
@@ -22,12 +20,12 @@ export const referenceId = (ref: string): string => `ref-${ref}`;
 
 /** The reference text with its identifiers as links (doi.org, PubMed, PubMed Central, the ThaiJO page); the text is
  * never translated. Also the quick answer's reference list (Plan 27). */
-export function CitationText({ paper, lang }: { paper: Paper; lang: Lang }) {
+export function CitationText({ paper, lang, small = false }: { paper: Paper; lang: Lang; small?: boolean }) {
   const { text, ids, segments } = citationParts(paper);
   const opens = L(lang, R.newTab);
   return (
     // the reference is written as published (Vancouver, the title in its own language)
-    <p data-citation className="max-w-[75ch] text-[0.95rem] leading-[1.7] break-words" lang={fieldLang(text.join(" "), lang)}>
+    <p data-citation className={small ? "inline break-words" : "max-w-[75ch] text-[0.95rem] leading-[1.7] break-words"} lang={fieldLang(text.join(" "), lang)}>
       {segments.map((s, i) => (
         <Fragment key={i}>{i > 0 && " "}{s.isolate ? <bdi>{s.text}</bdi> : s.text}</Fragment>
       ))}
@@ -35,7 +33,7 @@ export function CitationText({ paper, lang }: { paper: Paper; lang: Lang }) {
         <span key={id.label}>
           {" "}{id.label}:{" "}
           <a href={id.href} target="_blank" rel="noreferrer" aria-label={`${ID_NAME[id.label]} ${id.value} ${opens}`}
-            className="text-primary underline underline-offset-2 [overflow-wrap:anywhere]">
+            className={`underline underline-offset-2 [overflow-wrap:anywhere] ${small ? "" : "text-primary"}`}>
             {/* a break opportunity after each "/" (DOIs): the value wraps there first, mid-value only if it must */}
             {id.value.split("/").map((seg, i) => <Fragment key={i}>{i > 0 && <>/<wbr /></>}{seg}</Fragment>)}
           </a>.
@@ -45,8 +43,8 @@ export function CitationText({ paper, lang }: { paper: Paper; lang: Lang }) {
   );
 }
 
-function Reference({ paper, lang, onSelect, selectedRef, type, related = [], nested = false }: {
-  paper: Paper; lang: Lang; onSelect: Select; selectedRef?: string; type: ReviewTypeOrLegacy;
+function Reference({ paper, lang, onSelect, related = [], nested = false }: {
+  paper: Paper; lang: Lang; onSelect: Select;
   /** further reports of the same trial, listed under this primary reference */
   related?: Paper[];
   /** this is a further report under its primary */
@@ -55,30 +53,25 @@ function Reference({ paper, lang, onSelect, selectedRef, type, related = [], nes
   return (
     // focusable as the target of `#ref-Pn`: following the rail's link puts focus on the reference itself
     <li id={referenceId(paper.ref)} data-reference={paper.ref} tabIndex={-1}
-      className={`grid outline-none scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] grid-cols-[2.6rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 py-3 target:bg-ground ${nested ? "border-t border-dashed border-rule" : "border-b border-rule"}`}>
-      <span className="pt-0.5 font-display text-[0.85rem] font-semibold">{paper.ref}</span>
-      <div className="grid min-w-0 gap-1.5">
-        {nested && (
-          <span data-related-label className="label w-fit nw">{L(lang, R.related)}</span>
-        )}
-        <CitationText paper={paper} lang={lang} />
-        {paper.design_excluded && (
-          <p data-reference-note="design_excluded" className="text-[0.88rem] text-muted">{L(lang, R.designExcluded)}</p>
-        )}
-        {paper.verification?.design_mismatch && (
-          <p data-reference-note="design_mismatch" className="text-[0.88rem] text-muted">{L(lang, R.designMismatch)}</p>
-        )}
-        <StudyButton p={paper} lang={lang} onSelect={onSelect} selected={selectedRef === paper.ref} type={type} />
-        <CopyTextButton text={vancouver(paper)} label={L(lang, R.copy)}
-          name={L(lang, R.copyRef(paper.ref))} copied={L(lang, R.copied)}
-          failed={L(lang, R.copyFailed)}
-          boxLabel={L(lang, R.copyBox(paper.ref))} />
-        {related.length > 0 && (
-          <ul className="mt-1" aria-label={L(lang, R.relatedOf(paper.ref))}>
-            {related.map((r) => <Reference key={r.ref} paper={r} lang={lang} onSelect={onSelect} selectedRef={selectedRef} type={type} nested />)}
-          </ul>
-        )}
+      className={`group mb-2 break-inside-avoid outline-none scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] ${nested ? "mt-2 border-t border-dashed border-rule pt-2" : ""}`}>
+      {nested && <span data-related-label className="label mb-0.5 block w-fit nw">{L(lang, R.related)}</span>}
+      <div className="flex flex-wrap items-baseline gap-x-1">
+        <button type="button" onClick={() => onSelect(paper.ref)} aria-label={L(lang, RC.parts.open(paper.ref))}
+          className="font-semibold text-primary hover:underline">{paper.ref}</button>
+        <div className="min-w-0 flex-1 basis-[80%]">
+          <CitationText paper={paper} lang={lang} small />{" "}
+          <CopyTextButton quiet className="inline-flex [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-within:opacity-100"
+            text={vancouver(paper)} label={L(lang, R.copy)} name={L(lang, R.copyRef(paper.ref))} copied={L(lang, R.copied)}
+            failed={L(lang, R.copyFailed)} boxLabel={L(lang, R.copyBox(paper.ref))} />
+        </div>
       </div>
+      {paper.design_excluded && <p data-reference-note="design_excluded" className="text-muted">{L(lang, R.designExcluded)}</p>}
+      {paper.verification?.design_mismatch && <p data-reference-note="design_mismatch" className="text-muted">{L(lang, R.designMismatch)}</p>}
+      {related.length > 0 && (
+        <ul aria-label={L(lang, R.relatedOf(paper.ref))}>
+          {related.map((r) => <Reference key={r.ref} paper={r} lang={lang} onSelect={onSelect} nested />)}
+        </ul>
+      )}
     </li>
   );
 }
@@ -86,20 +79,18 @@ function Reference({ paper, lang, onSelect, selectedRef, type, related = [], nes
 /**
  * Numbered references in P-number order (Plan 20 Task 6), every paper whatever the filters. A further report of a trial
  * (Task 10) is listed under its primary reference, not as a study of its own. One interaction everywhere: a study
- * code or a reference's study button opens the paper in the source rail, and the rail links back here (`#ref-Pn`).
+ * code opens the paper in the source rail, and the rail links back here (`#ref-Pn`).
  */
-export function ReferenceList({ papers, lang, onSelect, selectedRef, type }: {
-  papers: Paper[]; lang: Lang; onSelect: Select; selectedRef?: string; type: ReviewTypeOrLegacy;
-}) {
+export function ReferenceList({ papers, lang, onSelect }: { papers: Paper[]; lang: Lang; onSelect: Select }) {
   const refs = new Set(papers.map((p) => p.ref));
   const under = new Map<string, Paper[]>();
   for (const p of papers) {
     if (p.related_to && refs.has(p.related_to)) under.set(p.related_to, [...(under.get(p.related_to) ?? []), p]);
   }
   return (
-    <ol className="border-t border-rule" aria-label={L(lang, R.list)}>
+    <ol aria-label={L(lang, R.list)} className="text-[12px] leading-[1.6] text-muted [column-gap:32px] [columns:2_440px]">
       {papers.filter((p) => !(p.related_to && refs.has(p.related_to))).map((p) => (
-        <Reference key={p.ref} paper={p} lang={lang} onSelect={onSelect} selectedRef={selectedRef} type={type} related={under.get(p.ref)} />
+        <Reference key={p.ref} paper={p} lang={lang} onSelect={onSelect} related={under.get(p.ref)} />
       ))}
     </ol>
   );
@@ -149,15 +140,16 @@ export function ExcludedAtScreening({ stats, lang }: { stats?: Stats | null; lan
   );
 }
 
-/** Section 13: references, then the records excluded at screening. */
-export function ReferencesSection({ papers, stats, lang, onSelect, selectedRef, type }: {
-  papers: Paper[]; stats?: Stats | null; lang: Lang; onSelect: Select; selectedRef?: string; type: ReviewTypeOrLegacy;
+/** The last thing on the page: references, then the records excluded at screening. In-text citations are unchanged. */
+export function ReferencesSection({ papers, stats, lang, onSelect }: {
+  papers: Paper[]; stats?: Stats | null; lang: Lang; onSelect: Select;
 }) {
   return (
-    <section aria-labelledby="h-papers" className="grid min-w-0 gap-3">
-      <h2 id="h-papers" className={H2}>{Lw(lang, R.h2)}</h2>
-      <p className="max-w-[65ch] text-[0.85rem] text-muted">{L(lang, R.style)}</p>
-      <ReferenceList papers={papers} lang={lang} onSelect={onSelect} selectedRef={selectedRef} type={type} />
+    <section aria-labelledby="h-papers" className="grid min-w-0 gap-2 border-t border-rule px-1 pt-3">
+      <h2 id="h-papers" className="scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] text-[14px] font-semibold text-muted">
+        {Lw(lang, R.h2)} <span className="font-normal">{L(lang, RC.refs.count(papers.length))} · {L(lang, R.style)}</span>
+      </h2>
+      <ReferenceList papers={papers} lang={lang} onSelect={onSelect} />
       <ExcludedAtScreening stats={stats} lang={lang} />
     </section>
   );

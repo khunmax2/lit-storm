@@ -9,7 +9,7 @@ import { SOURCE_ABBR, SOURCE_LABEL } from "@mra/lib/citation-network";
 import {
   litColumnLabel, litColumns, litFramework, litRows, outcomesClamped, paginate, showsCitedBy, type LitColumn, type LitFramework, type LitRow,
 } from "@mra/lib/lit-matrix";
-import { showsRiskOfBias, type ReviewTypeOrLegacy } from "@mra/lib/review-type";
+import { showsDirection, showsRiskOfBias, type ReviewTypeOrLegacy } from "@mra/lib/review-type";
 import { relatedLabel } from "@mra/lib/trial-reports";
 import type { Citations, Paper, QuestionBlock } from "@mra/lib/types";
 import { DesignMismatchFlag, Glyph, Hole, VerifiedNumber } from "../ui/evidence";
@@ -21,14 +21,13 @@ import { ScrollRegion } from "./scroll-region";
 import { usePrinting } from "./print-mode";
 import { useMinWidth } from "./use-min-width";
 import { L } from "./text";
-import { APP_CHROME_PX } from "@mra/lib/host";
 
 const T = RC.lit;
 
 /** Rows per page (Plan 20 Task 5): a long matrix is paged, never a 10,000px wall. */
 export const LIT_PAGE_SIZE = 15;
 /** The table needs the reading column of the 1280px layout; narrower screens get ruled cards. */
-export const LIT_TABLE_MIN_WIDTH = 1280 + APP_CHROME_PX;
+export const LIT_TABLE_MIN_WIDTH = 1280;
 
 const CLAMP = "line-clamp-3 break-words";
 const TD = "px-2.5 py-2 align-top";
@@ -170,14 +169,14 @@ function StudyCell({ row, onSelect, lang, citedBy, flag }: { row: LitRow; onSele
  * From 1280px: a fixed-layout table whose six columns fit the reading column (no sideways scroll), cells clamped and
  * wrapped; it stays in a scroll region so an unexpectedly long word still scrolls inside it, never the page.
  */
-function MatrixTable({ rows, cols, framework, lang, onSelect, caption, citedBy, risk }: {
+function MatrixTable({ rows, cols, framework, lang, onSelect, caption, citedBy, risk, selected }: {
   rows: LitRow[]; cols: LitColumn[]; framework: LitFramework; lang: Lang; onSelect: (ref: string) => void; caption: string;
-  citedBy: boolean; risk: boolean;
+  citedBy: boolean; risk: boolean; selected?: string;
 }) {
   const others = cols.slice(1);
   return (
     <ScrollRegion lang={lang} label={L(lang, RC.parts.scrollable(caption))}>
-      <table aria-label={caption} className="w-full table-fixed border-collapse text-[0.82rem]">
+      <table aria-label={caption} className="w-full min-w-[860px] table-fixed border-collapse text-[14px] leading-[1.55]">
         <caption className="sr-only">{caption}</caption>
         <colgroup>{cols.map((c) => <col key={c} style={{ width: COL_WIDTH[c] }} />)}</colgroup>
         <thead>
@@ -191,8 +190,8 @@ function MatrixTable({ rows, cols, framework, lang, onSelect, caption, citedBy, 
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.ref} className="border-t border-rule">
-              <th scope="row" className="sticky left-0 z-10 bg-surface px-2 py-2 text-left align-top font-body font-medium">
+            <tr key={row.ref} className={`border-t border-rule ${selected === row.ref ? "bg-info-bg" : ""}`}>
+              <th scope="row" className={`sticky left-0 z-10 px-2 py-2 text-left align-top font-body font-medium ${selected === row.ref ? "bg-info-bg" : "bg-surface"}`}>
                 <StudyCell row={row} onSelect={onSelect} lang={lang} citedBy={citedBy} flag={!cols.includes("direction")} />
               </th>
               {row.failed ? (
@@ -209,7 +208,7 @@ function MatrixTable({ rows, cols, framework, lang, onSelect, caption, citedBy, 
 /** Column shares of the fixed layout (they sum to 100%): outcomes get the most room. */
 const COL_WIDTH: Record<LitColumn, string> = {
   // the intervention column fits "Intervention (vs comparator)" without breaking a word (Task 9)
-  ref: "12%", design: "12%", population: "15%", exposure: "18%", outcomes: "25%", direction: "18%", risk: "18%",
+  ref: "13%", design: "11%", population: "19%", exposure: "19%", outcomes: "26%", direction: "12%", risk: "12%",
 };
 
 /** Below 1280px (phones and 1024–1279 alike): one ruled card per study (no nested card chrome), the same cells. */
@@ -264,15 +263,50 @@ function Pager({ page, pages, start, end, total, lang, onPage }: {
   );
 }
 
+const TILE: Record<string, string> = {
+  positive: "bg-sup text-on-sup", negative: "bg-harm text-on-sup", null: "bg-none text-on-sup", mixed: "bg-mixed text-on-sup",
+  unclear: "border-2 border-dashed border-rule bg-rail text-ink",
+};
+
+/** Every study at a glance: its code, what the agent read as its direction (in words as well as colour), who and how. */
+export function StudyTiles({ papers, lang, type, citations, onSelect, selected }: {
+  papers: Paper[]; lang: Lang; type: ReviewTypeOrLegacy; citations?: Citations | null; onSelect: (ref: string) => void; selected?: string;
+}) {
+  const rows = useMemo(() => litRows(papers, lang, citations ?? null), [papers, lang, citations]);
+  if (!rows.length) return null;
+  return (
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 print:hidden" data-study-tiles>
+      {rows.map((r) => {
+        const direction = showsDirection(type) ? r.direction : null;
+        return (
+          <li key={r.ref} className="grid">
+            <button type="button" onClick={() => onSelect(r.ref)} aria-pressed={selected === r.ref} title={r.title}
+              className={`flex min-h-[92px] flex-col gap-1 rounded-xl p-3 text-left ${direction ? TILE[direction] : "border-2 border-dashed border-rule bg-rail text-ink"} ${selected === r.ref ? "outline-2 outline-offset-2 outline-ink" : ""}`}>
+              <span className="flex justify-between gap-1.5 text-[12px] font-semibold">
+                <span className="font-num">{r.ref}</span>
+                <span>{direction ? L(lang, T.tileDirection[direction]) : r.theme ? L(lang, T.tileTheme) : null}</span>
+              </span>
+              <span className="text-[14px] leading-snug font-semibold"><bdi>{r.byline}</bdi></span>
+              {r.design && <span className="text-[12px] leading-[1.4]"><ThaiText>{r.design.label}</ThaiText></span>}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /**
  * Literature review matrix (Plan 20 Task 5): six compact columns (study with its year and cited-by count, design,
  * population/sample, intervention, outcomes, direction with risk of bias under it), framework-aware labels (PICO, PCC,
  * PICo, SPIDER-like), 15 rows a page. From 1280px a fixed-layout table that fits the reading column (no sideways
  * scroll, sticky first column); below 1280px (1024–1279 included) ruled cards.
  */
-export function LitMatrixSection({ papers, allPapers = papers, lang, type, onSelect, reviewId, offline = false, citations = null, question = null }: {
+export function LitMatrixSection({ papers, allPapers = papers, lang, type, onSelect, reviewId, offline = false, citations = null, question = null, selected }: {
   papers: Paper[]; allPapers?: Paper[]; lang: Lang; type: ReviewTypeOrLegacy; onSelect: (ref: string) => void; reviewId: string; offline?: boolean;
   citations?: Citations | null; question?: QuestionBlock | null;
+  /** the paper open in the source rail: its row is marked */
+  selected?: string;
 }) {
   // A table only where all six columns fit (>= 1280px); cards below, 1024–1279 included (fix round 1). Print (Plan 20
   // Task 8) is always one table of every row: paper repeats its header on each page, so no pager and no cards.
@@ -310,7 +344,7 @@ export function LitMatrixSection({ papers, allPapers = papers, lang, type, onSel
       {rows.length === 0 ? (
         <p className="text-[0.9rem] text-muted">{L(lang, T.noMatch)}</p>
       ) : wide ? (
-        <MatrixTable rows={pg.items} cols={cols} framework={framework} lang={lang} onSelect={onSelect} caption={caption} citedBy={citedBy} risk={riskUnder} />
+        <MatrixTable rows={pg.items} cols={cols} framework={framework} lang={lang} onSelect={onSelect} caption={caption} citedBy={citedBy} risk={riskUnder} selected={selected} />
       ) : (
         <MatrixCards rows={pg.items} cols={cols} framework={framework} lang={lang} onSelect={onSelect} caption={caption} citedBy={citedBy} risk={riskUnder} />
       )}

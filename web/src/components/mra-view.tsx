@@ -1,21 +1,24 @@
-import "@fontsource-variable/anuphan";
-import "@fontsource/bai-jamjuree/500.css";
-import "@fontsource/bai-jamjuree/600.css";
-import "@fontsource/bai-jamjuree/700.css";
-import "@fontsource-variable/martian-mono/standard.css";
+import "@fontsource/ibm-plex-sans-thai/400.css";
+import "@fontsource/ibm-plex-sans-thai/500.css";
+import "@fontsource/ibm-plex-sans-thai/600.css";
+import "@fontsource/ibm-plex-sans-thai/700.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
 import "@fontsource-variable/source-serif-4/opsz.css";
 import "@fontsource-variable/source-serif-4/opsz-italic.css";
 
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { ApiError, api, call } from "@/api/client";
+import { ApiError, api, BASE, call } from "@/api/client";
 import { ErrorText, LoadingRows } from "@/components/common";
 import { QuickAnswer } from "@mra/components/review/quick-answer";
 import { Report } from "@mra/components/review/report";
+import type { ReportDownload } from "@mra/components/review/report-cite";
 import { host } from "@mra/lib/host";
+import { RC } from "@mra/lib/i18n-report";
 import { isQuickReview } from "@mra/lib/quick";
 import type { Review } from "@mra/lib/types";
 import css from "@mra/report.css?inline";
@@ -36,7 +39,12 @@ function hoistProperties() {
 /** MedicalReviewerAgent's own report, drawn here from the review kept with
  *  the Run (MRA's report code, src/mra), in a shadow root so its stylesheet
  *  and DeepLit's never meet. `onMissing`: the Run has no review kept. */
-export function MraView({ runId, onMissing }: { runId: string; onMissing: () => void }) {
+export function MraView({ runId, onMissing, servicePage = false }: {
+  runId: string;
+  onMissing: () => void;
+  /** MRA's own offline page is kept with the Run (a full review). */
+  servicePage?: boolean;
+}) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === "dark" ? "dark" : "light";
   const box = useRef<HTMLDivElement>(null);
@@ -74,6 +82,9 @@ export function MraView({ runId, onMissing }: { runId: string; onMissing: () => 
       const target = id ? shadow.getElementById(decodeURIComponent(id)) : null;
       if (!target) return;
       e.preventDefault();
+      // A link into a closed disclosure (the risk-of-bias criteria in Methods) opens it first.
+      const closed = target.closest("details");
+      if (closed) closed.open = true;
       target.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
       target.focus({ preventScroll: true });
@@ -93,6 +104,15 @@ export function MraView({ runId, onMissing }: { runId: string; onMissing: () => 
     window.dispatchEvent(new Event("themechange"));
   }, [theme]);
 
+  const downloads = useMemo<ReportDownload[]>(() => {
+    const run = `${BASE}/api/runs/${runId}`;
+    return [
+      ...(servicePage ? [{ name: "HTML", ext: ".html", what: RC.cite.html, href: `${run}/service-page` }] : []),
+      { name: "Markdown", ext: ".md", what: RC.cite.md, href: `${run}/export?format=md` },
+      { name: "JSON", ext: ".json", what: RC.cite.json, href: `${run}/service-data` },
+    ];
+  }, [runId, servicePage]);
+
   return (
     <>
       {review.error && !missing && <ErrorText error={review.error} />}
@@ -111,7 +131,7 @@ export function MraView({ runId, onMissing }: { runId: string; onMissing: () => 
               // MRA's "run a full review" opens MRA's own form, which DeepLit does not have.
               <QuickAnswer review={review.data} upgrade={false} />
             ) : (
-              <Report review={review.data} offline />
+              <Report review={review.data} offline downloads={downloads} />
             ),
             root,
           )}

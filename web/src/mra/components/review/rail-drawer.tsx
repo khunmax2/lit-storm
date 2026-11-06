@@ -21,7 +21,7 @@ function useNarrow(): boolean {
 }
 
 /**
- * Wraps the source rail. From `lg` up it is a plain sticky column (unchanged). Below `lg` it is a bottom sheet
+ * Wraps the source rail. From `lg` up it floats at the bottom right while open (Esc closes it). Below `lg` it is a bottom sheet
  * that, while open, is a modal dialog: flat backdrop, focus moves to the heading and is kept inside, Esc or a
  * backdrop click closes, body scroll is locked and focus returns to `returnFocus` on close.
  * No next/* imports: this is also rendered in the offline report build.
@@ -72,12 +72,25 @@ export function RailDrawer({ open, onClose, headingId, returnFocus, children }: 
     };
   }, [modal, headingId, returnFocus]);
 
+  // From lg the panel does not trap focus, but Esc still closes it and gives focus back.
+  useEffect(() => {
+    if (!open || narrow) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.key !== "Escape") return;
+      onCloseRef.current();
+      const back = returnFocus.current;
+      if (back?.isConnected) back.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, narrow, returnFocus]);
+
   return (
     <>
       {modal && <div data-testid="rail-backdrop" aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-ink/40 lg:hidden print:hidden" />}
       {/* not printed (Plan 20 Task 8): the appendix carries every number's source sentence on paper */}
       <div ref={panel} role={modal ? "dialog" : undefined} aria-modal={modal || undefined} aria-labelledby={modal ? headingId : undefined}
-        className={`min-w-0 print:hidden lg:sticky lg:top-[calc(var(--header-h)+env(safe-area-inset-top,0px))] lg:max-h-[calc(100dvh-var(--header-h)-1rem)] lg:self-start lg:overflow-auto ${open ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:max-h-[70dvh] max-lg:overflow-auto max-lg:border-t max-lg:border-ink" : "max-lg:hidden"}`}>
+        className={`min-w-0 print:hidden ${open ? "fixed z-40 overflow-auto bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:max-h-[70dvh] max-lg:border-t max-lg:border-ink lg:right-4 lg:bottom-4 lg:max-h-[76dvh] lg:w-[420px] lg:rounded-xl lg:border lg:border-hatch lg:shadow-[0_12px_32px_rgb(15_23_42/0.18)]" : "hidden"}`}>
         {children}
       </div>
     </>

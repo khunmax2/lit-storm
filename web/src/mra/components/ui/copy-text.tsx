@@ -10,7 +10,7 @@ const CLEAR_AFTER_MS = 4000;
  * after a few seconds. When the clipboard is unavailable or refused, the live region says so and the text appears in a
  * read-only box that takes focus with the text selected, to copy by hand.
  */
-export function CopyTextButton({ text, label, name, copied, failed, boxLabel, className = "" }: {
+export function CopyTextButton({ text, label, name, copied, failed, boxLabel, className = "", quiet = false }: {
   text: string;
   /** visible button text */
   label: string;
@@ -23,6 +23,8 @@ export function CopyTextButton({ text, label, name, copied, failed, boxLabel, cl
   /** accessible name of the fallback box */
   boxLabel: string;
   className?: string;
+  /** a small link for a long list of them (the references) */
+  quiet?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "copied" | "fallback">("idle");
   const [message, setMessage] = useState("");
@@ -57,12 +59,12 @@ export function CopyTextButton({ text, label, name, copied, failed, boxLabel, cl
   }
 
   return (
-    <span className={`flex flex-wrap items-center gap-x-2 gap-y-1 print:hidden ${className}`}>
+    <span className={`flex-wrap items-center gap-x-2 gap-y-1 print:hidden ${className || "flex"}`}>
       <button type="button" onClick={copy} aria-label={name} aria-controls={state === "fallback" ? boxId : undefined}
-        className="inline-flex min-h-11 cursor-pointer items-center rounded-sm border border-rule bg-transparent px-3 font-display text-[0.85rem] font-semibold text-primary hover:border-ink">
+        className={quiet ? "inline-flex cursor-pointer items-center text-[12px] text-muted underline underline-offset-2 hover:text-ink" : "rbtn"}>
         {label}
       </button>
-      <span role="status" aria-live="polite" className="text-[0.85rem] text-muted">{message}</span>
+      <span role="status" aria-live="polite" className={quiet ? "text-[12px] text-muted" : "text-[0.85rem] text-muted"}>{message}</span>
       {state === "fallback" && (
         <textarea id={boxId} ref={box} readOnly aria-label={boxLabel} value={text} rows={3}
           onFocus={(e) => e.currentTarget.select()}

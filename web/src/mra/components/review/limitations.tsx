@@ -8,7 +8,6 @@ import { extractionReading, modelsUsed } from "@mra/lib/report-view";
 import { isGraded, type ReviewTypeOrLegacy } from "@mra/lib/review-type";
 import type { ReviewResult } from "@mra/lib/types";
 import { ThaiNodes } from "../ui/thai-text";
-import { READING } from "./report-parts";
 import { SECTION_H2 } from "./report-nav";
 import { fill, L, Lw } from "./text";
 
@@ -120,8 +119,8 @@ export function Limitations({ result, type, lang }: { result: ReviewResult; type
   return (
     <section aria-labelledby="h-limitations" className="grid gap-3">
       <h2 id="h-limitations" className={SECTION_H2}>{Lw(lang, M.h2)}</h2>
-      <ul className={`grid max-w-[70ch] list-disc gap-1.5 pl-5 ${READING}`}>
-        {items.filter(([, node]) => node != null && node !== "").map(([key, node]) => <li key={key} data-limitation={key}><ThaiNodes>{node}</ThaiNodes></li>)}
+      <ul className="list-disc pl-5 text-[14px] leading-[1.7] [column-gap:40px] [columns:2_420px]">
+        {items.filter(([, node]) => node != null && node !== "").map(([key, node]) => <li key={key} className="mb-2 break-inside-avoid" data-limitation={key}><ThaiNodes>{node}</ThaiNodes></li>)}
       </ul>
     </section>
   );

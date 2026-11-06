@@ -13,96 +13,115 @@
 }
 
 :host {
-  --font-anuphan: "Anuphan Variable", "Anuphan";
-  --font-bai-jamjuree: "Bai Jamjuree";
-  --font-martian-mono: "Martian Mono Variable", "Martian Mono";
+  --font-plex-thai: "IBM Plex Sans Thai";
+  --font-plex-mono: "IBM Plex Mono";
   --font-source-serif: "Source Serif 4 Variable", "Source Serif 4";
   display: block;
+  background: var(--ground);
+  color: var(--ink);
 }
 
 /* Theatre Green — tokens from DESIGN.md. Light "Day theatre" is the default; dark "Night shift" follows the OS
    unless the viewer picks a theme (data-theme on <html>). */
 :host {
-  --ground: #e9efeb;
-  --surface: #f8faf9;
-  --rail: #dce6e0;
-  --ink: #10241e;
-  --muted: #4a5e57;
-  --rule: #bccac1;
-  --primary: #0e5a47;
+  --ground: #eef2f7;
+  --surface: #ffffff;
+  --rail: #f4f6f9;
+  --ink: #0f172a;
+  --muted: #475569;
+  --rule: #d5dce5;
+  --primary: #1d4ed8;
   --on-primary: #ffffff;
   --highlight: #f2d16b;
-  --highlight-ink: #10241e;
-  --tape: #e6ddb8;
-  --stripe: #10241e;
-  --hatch: #9aa8a0;
-  --sup: #0072b2;
-  --harm: #d55e00;
-  --none: #5f6b73;
+  --highlight-ink: #0f172a;
+  --tape: #ffffff;
+  --stripe: #0f172a;
+  --hatch: #94a3b8;
+  --sup: #1d4ed8;
+  --on-sup: #ffffff;
+  --harm: #c2410c;
+  --none: #64748b;
   --mixed: #8e3b7e;
-  --unclear: #5f6b73;
-  --ok: #0e5a47;
-  --warn: #8a5a00;
-  --warn-bg: #f5e7c4;
+  --unclear: #64748b;
+  --ok: #0f766e;
+  --warn: #92400e;
+  --warn-bg: #fdf1dc;
   --err: #a33a12;
-  --err-bg: #f6ddd2;
-  --info-bg: #dde9f3;
+  --err-bg: #fbe6dc;
+  --info-bg: #eef3fb;
+  --band: #0b2a5b;
+  --band-ink: #ffffff;
+  --band-soft: #c7d7f5;
+  --band-text: #eef3fc;
+  --band-accent: #fcd9a4;
+  --band-off: #7f94bb;
+  --band-line: rgb(255 255 255 / 0.16);
+  --chip-on: #0b2a5b;
+  --on-chip: #ffffff;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :host(:not([data-theme="light"])) {
-    --ground: #14271f;
-    --surface: #1b3029;
-    --rail: #22392f;
-    --ink: #ddeae2;
-    --muted: #9db3a8;
-    --rule: #2f4a3f;
-    --primary: #5fc3a0;
-    --on-primary: #0b1f18;
+    --ground: #0c1524;
+    --surface: #151f31;
+    --rail: #1b283c;
+    --ink: #e4eaf3;
+    --muted: #a2b1c6;
+    --rule: #2b394f;
+    --primary: #8fb2ff;
+    --on-primary: #0b1a33;
     --highlight: #e9c75a;
-    --tape: #3a4a36;
-    --stripe: #ddeae2;
-    --hatch: #4f665b;
-    --sup: #3b98d4;
-    --harm: #db712f;
-    --none: #9aa5ad;
-    --mixed: #b05c9e;
-    --unclear: #9aa5ad;
+    --tape: #151f31;
+    --stripe: #e4eaf3;
+    --hatch: #4f6078;
+    --sup: #8fb2ff;
+    --on-sup: #0b1a33;
+    --harm: #f08a4b;
+    --none: #a2b1c6;
+    --mixed: #d08cc0;
+    --unclear: #a2b1c6;
     --ok: #5fc3a0;
     --warn: #e9c75a;
     --warn-bg: #3a3420;
     --err: #f08a4b;
     --err-bg: #3b2a20;
-    --info-bg: #1e3342;
+    --info-bg: #1b2c48;
+    --band: #12305f;
+    --chip-on: #dbe6fb;
+    --on-chip: #0b1a33;
     color-scheme: dark;
   }
 }
 
 :host([data-theme="dark"]) {
-  --ground: #14271f;
-  --surface: #1b3029;
-  --rail: #22392f;
-  --ink: #ddeae2;
-  --muted: #9db3a8;
-  --rule: #2f4a3f;
-  --primary: #5fc3a0;
-  --on-primary: #0b1f18;
+  --ground: #0c1524;
+  --surface: #151f31;
+  --rail: #1b283c;
+  --ink: #e4eaf3;
+  --muted: #a2b1c6;
+  --rule: #2b394f;
+  --primary: #8fb2ff;
+  --on-primary: #0b1a33;
   --highlight: #e9c75a;
-  --tape: #3a4a36;
-  --stripe: #ddeae2;
-  --hatch: #4f665b;
-  --sup: #3b98d4;
-  --harm: #db712f;
-  --none: #9aa5ad;
-  --mixed: #b05c9e;
-  --unclear: #9aa5ad;
+  --tape: #151f31;
+  --stripe: #e4eaf3;
+  --hatch: #4f6078;
+  --sup: #8fb2ff;
+  --on-sup: #0b1a33;
+  --harm: #f08a4b;
+  --none: #a2b1c6;
+  --mixed: #d08cc0;
+  --unclear: #a2b1c6;
   --ok: #5fc3a0;
   --warn: #e9c75a;
   --warn-bg: #3a3420;
   --err: #f08a4b;
   --err-bg: #3b2a20;
-  --info-bg: #1e3342;
+  --info-bg: #1b2c48;
+  --band: #12305f;
+  --chip-on: #dbe6fb;
+  --on-chip: #0b1a33;
   color-scheme: dark;
 }
 
@@ -127,13 +146,15 @@
   --color-err: var(--err);
   --color-err-bg: var(--err-bg);
   --color-info-bg: var(--info-bg);
-  --font-display: var(--font-bai-jamjuree), var(--font-anuphan), system-ui, sans-serif;
-  --font-body: var(--font-anuphan), var(--font-bai-jamjuree), system-ui, sans-serif;
-  --font-num: var(--font-martian-mono), ui-monospace, Menlo, monospace;
+  --color-on-sup: var(--on-sup);
+  --color-hatch: var(--hatch);
+  --font-display: var(--font-plex-thai), system-ui, sans-serif;
+  --font-body: var(--font-plex-thai), system-ui, sans-serif;
+  --font-num: var(--font-plex-mono), ui-monospace, Menlo, monospace;
   --font-quote: var(--font-source-serif), Georgia, "Times New Roman", serif;
   /* Code is not a verified number, so it never borrows Martian Mono. */
   --font-code: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
-  --radius-sm: 2px;
+  --radius-sm: 6px;
 }
 
 * {
@@ -185,8 +206,7 @@ h4 {
 /* Verified numbers: Martian Mono + autoclave-tape underline. Only for values that passed verification. */
 .num-verified {
   font-family: var(--font-num);
-  font-stretch: 87.5%;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   font-size: 0.92em;
   position: relative;
@@ -198,8 +218,8 @@ h4 {
   position: absolute;
   inset-inline: 0;
   bottom: -2px;
-  height: 4px;
-  background: repeating-linear-gradient(135deg, var(--stripe) 0 2px, var(--tape) 2px 5px);
+  height: 2px;
+  background: repeating-linear-gradient(115deg, var(--stripe) 0 2px, transparent 2px 5px);
   transition: opacity 0.4s ease-out;
 }
 .num-verified[data-pending="true"] {
@@ -277,7 +297,7 @@ h4 {
 }
 [lang="th"] .reading,
 .reading[lang="th"] {
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.75;
 }
 
@@ -313,7 +333,22 @@ h4 {
   grid-template-columns: minmax(0, 30%) minmax(0, 1fr) 10.5rem;
   grid-template-areas: "label plot num";
 }
+/* half a card wide (two panels side by side): the same row, a narrower number column */
 @container forest (max-width: 34rem) {
+  .forest-row {
+    grid-template-columns: minmax(0, 32%) minmax(0, 1fr) 5.5rem;
+  }
+  .forest-tick-minor {
+    display: none;
+  }
+  .forest-favours > span {
+    width: 50% !important;
+  }
+  .forest-row > :has(> .forest-favours) {
+    grid-area: auto / 1 / auto / -1 !important;
+  }
+}
+@container forest (max-width: 22rem) {
   .forest-row {
     grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
     grid-template-areas: "label plot" "num plot";
@@ -719,4 +754,234 @@ h4 {
 .g-unclear {
   border-radius: 50%;
   border: 2px dashed var(--unclear);
+}
+
+/* The report's layout: white cards on the ground, the navy answer band, chips and the chapter list. */
+@layer components {
+  .rc {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 12px;
+    min-width: 0;
+    padding: 24px;
+    border-radius: 18px;
+    background: var(--surface);
+  }
+  .rrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 16px;
+    min-width: 0;
+  }
+  .rrow > * {
+    flex: 1 1 380px;
+  }
+  .rrow > .rrow-main {
+    flex: 999 1 560px;
+  }
+  .rstack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    min-width: 0;
+  }
+  .ground-h2 {
+    padding: 8px 4px 0;
+  }
+
+  .rbtn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .rbtn:hover {
+    background: var(--rail);
+  }
+  .rchip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .rchip:hover {
+    background: var(--rail);
+  }
+  .rchip[aria-pressed="true"],
+  .rchip:has(:checked) {
+    border-color: var(--chip-on);
+    background: var(--chip-on);
+    color: var(--on-chip);
+  }
+  .rchip:has(:focus-visible) {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  /* The band speaks in its own tokens, so what sits inside it (cited links, marks, terms) follows. */
+  .mra-band {
+    --ink: var(--band-ink);
+    --muted: var(--band-soft);
+    --primary: var(--band-ink);
+    --rule: var(--band-line);
+    --surface: var(--band);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 28px;
+    padding: 26px 28px;
+    border-radius: 20px;
+    background: var(--band);
+    color: var(--band-ink);
+  }
+  .mra-stats {
+    flex: 1 1 300px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .mra-stat {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border-top: 1px solid var(--band-line);
+  }
+  .mra-stat:first-child {
+    border-top: 0;
+  }
+
+  /* The last box of the flow: what the review ended with. */
+  .mra-flow-final {
+    --ink: var(--band-ink);
+    --muted: var(--band-soft);
+    --rule: var(--band-line);
+    background: var(--band);
+    color: var(--band-ink);
+  }
+
+  /* Chapters: a row on a narrow page, the list beside the report from lg. */
+  .mra-toc {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 5;
+    display: flex;
+    gap: 2px 14px;
+    overflow-x: auto;
+    padding: 8px 4px;
+    background: var(--ground);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .mra-toc-h,
+  .mra-tocsub {
+    display: none;
+  }
+  .mra-tocitem,
+  .mra-tocsub {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .mra-tocitem {
+    padding: 6px 0;
+  }
+  .mra-tocitem:hover,
+  .mra-tocsub:hover,
+  .mra-tocitem[data-open="true"],
+  .mra-tocsub[aria-current="location"] {
+    color: var(--ink);
+  }
+  .mra-tocitem[data-open="true"] {
+    font-weight: 600;
+  }
+
+  /* A phone: less padding around everything, so two tiles and a table still fit. */
+  @media (max-width: 40rem) {
+    .rc {
+      padding: 16px;
+    }
+    .mra-band {
+      gap: 16px;
+      padding: 20px;
+    }
+    .mra-band h1 {
+      font-size: 22px;
+    }
+    .mra-toc {
+      scrollbar-width: none;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .mra-stats {
+      padding-left: 28px;
+      border-left: 1px solid var(--band-line);
+    }
+    .mra-toc {
+      top: calc(var(--header-h) + 16px);
+      flex-direction: column;
+      gap: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      max-height: calc(100dvh - var(--header-h) - 32px);
+      padding: 0;
+      background: none;
+      box-shadow: inset 1px 0 0 var(--rule);
+    }
+    .mra-toc-h {
+      display: block;
+      flex: none;
+      padding: 0 0 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    /* One weight per level whatever is open: a bolder label would change the column's width as the reader moves on. */
+    .mra-tocitem,
+    .mra-tocitem[data-open="true"] {
+      flex: none;
+      padding: 5px 0 5px 10px;
+      line-height: 1.4;
+      border-left: 2px solid transparent;
+      font-weight: 500;
+    }
+    .mra-tocsub {
+      display: block;
+      flex: none;
+      padding: 3px 0 3px 20px;
+      font-size: 12px;
+      line-height: 1.4;
+      border-left: 2px solid transparent;
+    }
+    /* Closed sections stay at zero height: the column keeps the width of the longest label. */
+    .mra-tocsub[data-show="false"] {
+      height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      overflow: hidden;
+      visibility: hidden;
+    }
+    .mra-tocitem[aria-current="location"],
+    .mra-tocsub[aria-current="location"] {
+      border-left-color: var(--ink);
+    }
+  }
 }

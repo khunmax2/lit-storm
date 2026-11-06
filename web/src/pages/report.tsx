@@ -625,8 +625,8 @@ export function ReportPage() {
   const mra = summary?.engine === "medical" && !mraMissing;
 
   return (
-    // MRA's report takes the width MRA gives it (its own page is up to 1680px wide).
-    <div className={cn("mx-auto w-full px-6 py-8", mra ? "max-w-[1680px]" : "max-w-6xl")}>
+    // MRA's report lays out its own page, on its own ground, up to the edges of the area.
+    <div className={cn("w-full", !mra && "mx-auto max-w-6xl px-6 py-8")}>
       {/* How far through the report the reader is. */}
       {!mra && (
         <div
@@ -665,7 +665,7 @@ export function ReportPage() {
 
       {mra ? (
         <Suspense fallback={<LoadingRows rows={6} />}>
-          <MraView runId={runId} onMissing={() => setMraMissing(true)} />
+          <MraView runId={runId} servicePage={servicePage} onMissing={() => setMraMissing(true)} />
         </Suspense>
       ) : view === "visual" ? (
         <VisualView runId={runId} />

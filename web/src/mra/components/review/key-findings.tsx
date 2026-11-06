@@ -79,32 +79,36 @@ export function KeyFindings({ findings, lang, onSelect, support, papers }: {
   });
   return (
     <section aria-labelledby="h-key-findings" className="grid gap-3">
-      <h2 id="h-key-findings" className={SECTION_H2}>{Lw(lang, F.h2)}</h2>
-      <ol className="grid gap-0 border-t border-rule">
+      <h2 id="h-key-findings" className={`${SECTION_H2} ground-h2`}>{Lw(lang, F.h2)}</h2>
+      <ol className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-4">
         {findings.map((f, i) => (
-          <li key={`${f.outcome}-${i}`} className="grid gap-1.5 border-b border-rule py-3" data-key-finding>
-            <p className="font-display font-semibold break-words" lang={fieldLang(f.outcome, lang)}><ThaiText>{f.outcome}</ThaiText></p>
+          <li key={`${f.outcome}-${i}`} className="flex min-w-0 flex-col gap-2.5 rounded-[18px] bg-surface p-5" data-key-finding>
+            <p className="text-[15px] leading-[1.45] font-semibold break-words text-primary" lang={fieldLang(f.outcome, lang)}><ThaiText>{f.outcome}</ThaiText></p>
             {/* Plain prose in the reading face, as written: a fixed lead clause ("Low-certainty evidence suggests: …") is
                 part of the statement, never styled as a quote */}
-            <p className={`max-w-[65ch] ${READING}`} data-prose lang={fieldLang(f.statement, lang)}><ThaiText>{f.statement}</ThaiText></p>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.9rem]">
+            <p className={`grow ${READING}`} data-prose lang={fieldLang(f.statement, lang)}><ThaiText>{f.statement}</ThaiText></p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-[1.65] text-muted">
               {f.certainty && (
-                <span className="inline-flex flex-wrap items-center gap-x-1.5 font-display" data-finding-certainty>
+                <span className="inline-flex flex-wrap items-center gap-x-1.5" data-finding-certainty>
                   {/* the review's single grade, copied onto each finding by the engine: never a per-outcome grade */}
-                  <Term k="evidenceStrength" lang={lang}><span className="text-muted">{L(lang, F.reviewCertainty)}</span></Term>
+                  <Term k="evidenceStrength" lang={lang}>{L(lang, F.reviewCertainty)}</Term>
                   <CertaintyMark level={f.certainty} lang={lang} />
                 </span>
               )}
               <StudyCount k={f.k} lang={lang} themes={f.themes} />
-              {f.pools.map((p) => <PooledValue key={p.key} pool={p} lang={lang} />)}
-              {!f.pools.length && f.effect && <StudyEffectValue state={f.effect} lang={lang} onSelect={onSelect} />}
-              {!f.pools.length && !f.effect && f.k === 1 && !f.themes && <NoEffectText lang={lang} />}
-              {f.refs.length > 0 && <RefButtons refs={f.refs} onSelect={onSelect} lang={lang} checked={checks[i].refs} claim={checks[i].claim} />}
             </div>
+            {(f.pools.length > 0 || f.effect || (f.k === 1 && !f.themes)) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                {f.pools.map((p) => <PooledValue key={p.key} pool={p} lang={lang} />)}
+                {!f.pools.length && f.effect && <StudyEffectValue state={f.effect} lang={lang} onSelect={onSelect} />}
+                {!f.pools.length && !f.effect && f.k === 1 && !f.themes && <NoEffectText lang={lang} />}
+              </div>
+            )}
+            {f.refs.length > 0 && <RefButtons refs={f.refs} onSelect={onSelect} lang={lang} checked={checks[i].refs} claim={checks[i].claim} />}
           </li>
         ))}
       </ol>
-      {checks.some((c) => c.refs.size > 0) && <SupportLegend lang={lang} />}
+      {checks.some((c) => c.refs.size > 0) && <div className="px-1"><SupportLegend lang={lang} /></div>}
     </section>
   );
 }

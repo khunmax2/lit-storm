@@ -21,3 +21,23 @@ to `@mra/`. What differs from MRA's code:
   `report.css`, `use-wide.ts`, `rail-drawer.tsx` and `LIT_TABLE_MIN_WIDTH` in `lit-matrix.tsx`.
 - `lib/config.ts`: no `NEXT_PUBLIC_API_URL`.
 - `shims-link.tsx` stands in for `next/link` (from MRA's `standalone/shims`).
+
+## DeepLit's layout (2026-11-06)
+
+The report keeps every block and rule MRA draws from the review (which sections each review type has, what is left out
+when the data is missing, verified and computed numbers, the four audiences) and lays them out differently, from the
+approved mock:
+
+- **Colours and type** are `report.css`'s tokens: a blue-grey ground, white cards, navy; IBM Plex Sans Thai and IBM Plex
+  Mono. Charts read the same tokens.
+- `report-head.tsx` replaces `title-block.tsx`: the answer band across the page with its figures, the PICO cards, the
+  toolbar. `ReadingCard` (`bottom-line.tsx`) holds what stays of the bottom line.
+- `lib/report-toc.ts` and `ReportChapters` (`report-nav.tsx`): six chapters; only the one being read opens its sections.
+  The list beside the report is as wide as its longest label and keeps that width while the reader moves.
+- **Section order** (`lib/review-type.ts`): the results before the table of studies, the discussion before the gaps, the
+  references last of all, small. The committee view brings "agree and conflict" forward with the risk of bias.
+- **PRISMA** reads left to right from a 48rem card, with a chart/table switch. The **study map** has its own card, and
+  the **citation network** spaces its years evenly (in order, not to scale). **Filters** are chips and add direction;
+  **study tiles** sit above them. The **source rail** floats over the page from `lg`.
+- **Downloads** come from `MraView` (HTML, Markdown, JSON from DeepLit's API); `lib/export-csv.ts` makes the CSV from the
+  review, with the columns of MRA's `render_csv`.

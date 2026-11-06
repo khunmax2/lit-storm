@@ -18,6 +18,11 @@ function C({ n }: { n: number }) {
   return <span className={`font-display tabular-nums ${n ? "" : "text-muted"}`}>{n}</span>;
 }
 
+/** The more studies a judgement holds, the deeper its cell; the count is always printed, so colour is never the only cue. */
+function heat(n: number) {
+  return n ? { background: `color-mix(in srgb, var(--sup) ${Math.min(8 + n * 5, 30)}%, transparent)`, fontWeight: 600 } : undefined;
+}
+
 /**
  * Risk of bias summary (Plan 20 Task 4): judgement counts by study design, a caveat that a model judged them from the
  * abstract, and a link to the criteria in Methods. Hidden for scoping reviews (no appraisal) and when no paper has a
@@ -31,13 +36,13 @@ export function RobSummarySection({ papers, type, lang, fullText = false }: {
   const s = useMemo(() => (showsRiskOfBias(type) ? robSummary(papers, lang) : null), [papers, type, lang]);
   if (!s) return null;
   const caption = L(lang, R.caption);
-  // Compact on a phone (headers wrap), a sized table rather than a page-wide spread from md up.
-  const TH = "px-1.5 py-2 text-right align-bottom label md:px-4";
-  const TD = "px-1.5 py-1.5 text-right md:px-4";
+  // Compact: the headers wrap, the card may sit beside another.
+  const TH = "px-1.5 py-2 text-right align-bottom label md:px-2.5";
+  const TD = "px-1.5 py-1.5 text-right md:px-2.5";
   return (
     <section aria-labelledby="h-rob" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
       <h2 id="h-rob" className={SECTION_H2}>{Lw(lang, R.h2)}</h2>
-      <p className="max-w-[65ch] text-[0.9rem] text-muted" data-rob-caveat>
+      <p className="text-[13px] leading-[1.65] text-muted" data-rob-caveat>
         {L(lang, fullText ? R.caveatFullText : R.caveat)}
         {" · "}
         <a href="#m-rob" className="font-display font-semibold text-primary underline underline-offset-2">
@@ -45,11 +50,11 @@ export function RobSummarySection({ papers, type, lang, fullText = false }: {
         </a>
       </p>
       <div className="min-w-0 overflow-x-auto" role="region" tabIndex={0} aria-label={caption}>
-        <table className="w-full border-collapse text-[0.86rem] md:w-auto md:min-w-[32rem] md:text-[0.9rem]" data-rob-table>
-          <caption className="pb-1 text-left label">{caption}</caption>
+        <table className="w-full border-collapse text-[14px]" data-rob-table>
+          <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b border-rule">
-              <th scope="col" className="py-2 pr-1.5 text-left align-bottom label md:min-w-[13rem] md:pr-4">
+              <th scope="col" className="py-2 pr-1.5 text-left align-bottom label">
                 <Term k="studyDesign" lang={lang}>{L(lang, R.design)}</Term>
               </th>
               {ROB_ORDER.map((k) => <th key={k} scope="col" className={TH}><ThaiText>{ROB_COLUMN[lang][k]}</ThaiText></th>)}
@@ -63,7 +68,7 @@ export function RobSummarySection({ papers, type, lang, fullText = false }: {
                   <ThaiText>{r.label}</ThaiText>
                   {r.themes && <span className="block text-[0.78rem] text-muted">{L(lang, R.themes)}</span>}
                 </th>
-                {ROB_ORDER.map((k) => <td key={k} className={TD}><C n={r.counts[k]} /></td>)}
+                {ROB_ORDER.map((k) => <td key={k} className={TD} style={heat(r.counts[k])}><C n={r.counts[k]} /></td>)}
                 <td className={`${TD} font-semibold`}><C n={r.total} /></td>
               </tr>
             ))}

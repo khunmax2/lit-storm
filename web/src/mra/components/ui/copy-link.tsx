@@ -31,7 +31,7 @@ export function CopyLinkButton({ className = "", lang = "th" }: { className?: st
       <button
         type="button"
         onClick={copy}
-        className="cursor-pointer rounded-sm border border-rule bg-transparent px-3 py-1.5 text-sm hover:text-primary"
+        className="rbtn"
       >
         {L(lang, RC.copyLink.button)}
       </button>

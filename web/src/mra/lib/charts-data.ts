@@ -21,14 +21,15 @@ export interface Filters {
   yearTo: number | null;
   risk: RiskOfBias[];
   designs: string[];
+  directions: Direction[];
 }
 
 export function emptyFilters(): Filters {
-  return { minRelevance: 0, yearFrom: null, yearTo: null, risk: [], designs: [] };
+  return { minRelevance: 0, yearFrom: null, yearTo: null, risk: [], designs: [], directions: [] };
 }
 
 export function isFiltered(f: Filters): boolean {
-  return f.minRelevance > 0 || f.yearFrom != null || f.yearTo != null || f.risk.length > 0 || f.designs.length > 0;
+  return f.minRelevance > 0 || f.yearFrom != null || f.yearTo != null || f.risk.length > 0 || f.designs.length > 0 || f.directions.length > 0;
 }
 
 export function filterPapers(papers: Paper[], f: Filters): Paper[] {
@@ -39,6 +40,7 @@ export function filterPapers(papers: Paper[], f: Filters): Paper[] {
     if (f.yearTo != null && (p.year == null || p.year > f.yearTo)) return false;
     if (f.risk.length && (!card || !f.risk.includes(card.risk_of_bias))) return false;
     if (f.designs.length && (!card || !f.designs.includes(designKey(card)))) return false;
+    if (f.directions.length && (!card || isNonQuantitative(card) || !f.directions.includes(questionDirection(card)))) return false;
     return true;
   });
 }

@@ -30,11 +30,11 @@ const TD = "px-3 py-2.5 align-top";
  */
 function cards(printing: boolean) {
   return printing
-    ? { table: "", head: "", body: "", row: "", rowHead: "", td: "", statement: "" }
+    ? { table: "", head: "", body: "", row: "", rowHead: "", td: "" }
     : {
       table: "max-md:block", head: "max-md:sr-only", row: "max-md:block", td: TD_CARD,
       body: "max-md:mb-3 max-md:block max-md:rounded-sm max-md:border max-md:border-rule max-md:bg-surface max-md:px-3 max-md:py-2",
-      rowHead: "max-md:block max-md:px-0 max-md:pt-0.5", statement: "max-md:block max-md:px-0 max-md:pb-1",
+      rowHead: "max-md:block max-md:px-0 max-md:pt-0.5",
     };
 }
 const COUNT = new Intl.NumberFormat("en-US");
@@ -163,8 +163,7 @@ function Statement({ row, lang }: { row: SofRow; lang: Lang }) {
  * Summary of findings (Plan 20; SLR and meta-analysis): per outcome the studies (k, designs, participants: the sum of
  * verified sample sizes, computed), the effect (pooled value as computed, else the range of verified values of one
  * named measure, else a single verified value, else why there is none), the certainty (an LLM-assisted GRADE-lite
- * judgement, not an expert GRADE assessment) and, on a full-width line under it, what it means. Fits the reading
- * column with no sideways scrolling; below 768px every outcome is a stacked card. A real table: caption, scoped headers.
+ * judgement, not an expert GRADE assessment) and what it means. Below 768px every outcome is a stacked card. A real table: caption, scoped headers.
  * Thai cell text wraps only between words (ThaiText, Plan 20 Task 7); short labels never wrap.
  */
 export function SofTable({ rows, lang, onSelect, graded }: { rows: SofRow[]; lang: Lang; onSelect: Select; graded: boolean }) {
@@ -183,31 +182,32 @@ export function SofTable({ rows, lang, onSelect, graded }: { rows: SofRow[]; lan
   return (
     <section aria-labelledby="h-sof" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
       <h2 id="h-sof" className={SECTION_H2}>{Lw(lang, S.h2)}</h2>
-      <p className="max-w-[65ch] text-[0.85rem] text-muted" id="sof-note">
+      <p className="text-[13px] leading-[1.65] text-muted" id="sof-note">
         <ThaiNodes>
           {L(lang, S.note)}
           {reviewLevel && <>{" "}<b className="font-semibold" data-review-level>{L(lang, S.reviewLevelNote)}</b></>}
         </ThaiNodes>
       </p>
       {/* Fits without scrolling since Task 3; the region keeps the scroll cue in case a long word ever widens it. */}
-      <ScrollRegion label={caption} lang={lang} bordered={false} className="rounded-sm md:border md:border-rule">
-        <table role="table" className={`w-full border-collapse text-[0.9rem] ${c.table}`} aria-describedby="sof-note">
+      <ScrollRegion label={caption} lang={lang} bordered={false}>
+        <table role="table" className={`w-full border-collapse text-[14px] leading-[1.55] md:min-w-[860px] ${c.table}`} aria-describedby="sof-note">
           <caption className="sr-only">
             {caption} {L(lang, S.captionNote)}
           </caption>
           <thead role="rowgroup" className={c.head}>
             <tr role="row" className="bg-ground">
-              <th scope="col" role="columnheader" className={`${TH} w-[24%]`}>{L(lang, S.colOutcome)}</th>
-              <th scope="col" role="columnheader" className={`${TH} w-[26%]`}>{col.studies}</th>
-              <th scope="col" role="columnheader" className={TH}>{col.effect}</th>
+              <th scope="col" role="columnheader" className={`${TH} w-[21%]`}>{L(lang, S.colOutcome)}</th>
+              <th scope="col" role="columnheader" className={`${TH} w-[22%]`}>{col.studies}</th>
+              <th scope="col" role="columnheader" className={`${TH} w-[13%]`}>{col.effect}</th>
               <th scope="col" role="columnheader" className={`${TH} w-[7.5rem]`}><Term k="evidenceStrength" lang={lang}>{col.certainty}</Term></th>
+              <th scope="col" role="columnheader" className={TH}>{col.means}</th>
             </tr>
           </thead>
           {rows.map((r) => (
             <tbody key={r.key} role="rowgroup" data-sof-row className={`border-t border-rule ${c.body}`}>
               <tr role="row" className={c.row}>
                 <th scope="row" role="rowheader" lang={fieldLang(r.outcome, lang)}
-                  className={`px-3 pt-2.5 text-left align-top font-display font-semibold break-words ${c.rowHead}`}>
+                  className={`px-3 py-2.5 text-left align-top font-display font-semibold break-words ${c.rowHead}`}>
                   <ThaiText>{r.outcome}</ThaiText>
                 </th>
                 <td role="cell" className={`${TD} ${c.td}`} data-label={col.studies}>
@@ -234,10 +234,7 @@ export function SofTable({ rows, lang, onSelect, graded }: { rows: SofRow[]; lan
                     </span>
                   ) : <span className="text-[0.88rem] text-muted nw">{L(lang, S.notAssessed)}</span>}
                 </td>
-              </tr>
-              <tr role="row" className={c.row}>
-                <td role="cell" colSpan={4} className={`px-3 pb-3 text-[0.92rem] ${c.statement}`} data-sof-statement>
-                  <span className="label mr-2">{col.means}</span>
+                <td role="cell" className={`${TD} ${c.td}`} data-label={col.means} data-sof-statement>
                   <Statement row={r} lang={lang} />
                 </td>
               </tr>

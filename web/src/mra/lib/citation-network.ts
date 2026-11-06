@@ -46,7 +46,9 @@ export interface CitationNetwork {
   maxYear: number | null;
   /** x of the "unknown year" column, or null when every paper has a year. */
   unknownX: number | null;
-  /** Axis label positions (years, plus the unknown column when present). */
+  /** The year of each column (a node's x is its column's index). */
+  columnYears: number[];
+  /** Axis label positions (the columns, plus the unknown column when present). */
   ticks: number[];
   /** Axis range. */
   xMin: number;
@@ -65,7 +67,6 @@ const SIZE_MIN = 12;
 const SIZE_MAX = 30;
 /** Counts at or above this get the largest marker. */
 export const CITED_BY_CAP = 1000;
-const MAX_TICKS = 6;
 
 const refNumber = (ref: string) => Number(/\d+/.exec(ref)?.[0] ?? Number.MAX_SAFE_INTEGER);
 const byRef = (a: string, b: string) => refNumber(a) - refNumber(b) || a.localeCompare(b);
@@ -93,12 +94,6 @@ export function isPartial(c: Citations | null | undefined): boolean {
 
 const isSource = (s: unknown): s is CitationSource => s === "openalex" || s === "europepmc";
 
-/** Year step for axis labels: every year up to MAX_TICKS columns, else a round step. */
-function yearStep(span: number): number {
-  for (const s of [1, 2, 5, 10, 20, 50]) if (Math.floor(span / s) + 1 <= MAX_TICKS) return s;
-  return 100;
-}
-
 /** Network of the given (filtered) papers; edges are kept only when both ends are among them. */
 export function citationNetwork(papers: Paper[], citations: Citations, lang: Lang): CitationNetwork {
   const refs = new Set(papers.map((p) => p.ref));
@@ -112,12 +107,12 @@ export function citationNetwork(papers: Paper[], citations: Citations, lang: Lan
   const years = papers.map((p) => p.year).filter((y): y is number => typeof y === "number" && Number.isFinite(y));
   const minYear = years.length ? Math.min(...years) : null;
   const maxYear = years.length ? Math.max(...years) : null;
-  const span = minYear != null && maxYear != null ? maxYear - minYear : 0;
-  const step = yearStep(span);
+  // One column per year that has a study, evenly spaced (DeepLit's layout: a 40-year span with a cluster at its end would
+  // otherwise need 2,600px or squeeze the cluster). The axis says it is in order, not to scale.
+  const columnYears = [...new Set(years)].sort((a, b) => a - b);
   const hasUnknown = papers.some((p) => p.year == null || !Number.isFinite(p.year));
-  // The unknown column sits one label step (at least 1.5 years) left of the first year, so it never reads as a year.
-  const gap = Math.max(1.5, step);
-  const unknownX = hasUnknown ? (minYear ?? 0) - gap : null;
+  // The unknown column sits to the left of the first year, so it never reads as a year.
+  const unknownX = hasUnknown ? -1 : null;
 
   const nodes: NetNode[] = papers.map((p) => {
     const card = p.card_en ?? p.card;
@@ -137,7 +132,7 @@ export function citationNetwork(papers: Paper[], citations: Citations, lang: Lan
       coverage: isSource(cov) ? cov : null,
       cites: edges.filter((e) => e.from === p.ref).map((e) => e.to).sort(byRef),
       citedByIn: edges.filter((e) => e.to === p.ref).map((e) => e.from).sort(byRef),
-      x: year ?? unknownX ?? 0, lane: 0, size: markerSize(count),
+      x: year != null ? columnYears.indexOf(year) : unknownX ?? 0, lane: 0, size: markerSize(count),
     };
   });
 
@@ -150,22 +145,13 @@ export function citationNetwork(papers: Paper[], citations: Citations, lang: Lan
     col.forEach((n, i) => { n.lane = i; });
   }
 
-  const ticks: number[] = [];
-  if (unknownX != null) ticks.push(unknownX);
-  if (minYear != null && maxYear != null) {
-    const first = Math.ceil(minYear / step) * step;
-    const set = new Set<number>([minYear, maxYear]);
-    for (let y = first; y <= maxYear; y += step) set.add(y);
-    // Drop a round year that would crowd the first or last label.
-    const sorted = [...set].sort((a, b) => a - b).filter((y) => y === minYear || y === maxYear || (y - minYear >= step / 2 && maxYear - y >= step / 2));
-    ticks.push(...sorted);
-  }
-  const lo = unknownX ?? minYear ?? 0;
-  const hi = maxYear ?? lo;
-  const pad = Math.max(0.6, (hi - lo) * 0.06);
+  const ticks = [...(unknownX != null ? [unknownX] : []), ...columnYears.map((_, i) => i)];
+  const lo = unknownX ?? 0;
+  const hi = Math.max(lo, columnYears.length - 1);
+  const pad = 0.6;
   const covered = nodes.filter((n) => n.coverage).length;
   return {
-    nodes: [...nodes].sort((a, b) => byRef(a.ref, b.ref)), edges, minYear, maxYear, unknownX, ticks,
+    nodes: [...nodes].sort((a, b) => byRef(a.ref, b.ref)), edges, minYear, maxYear, unknownX, ticks, columnYears,
     xMin: lo - pad, xMax: hi + pad,
     lanes: Math.max(1, ...[...columns.values()].map((c) => c.length)), columns: columns.size,
     covered, total: nodes.length, partial: isPartial(citations),

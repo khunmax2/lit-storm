@@ -1,15 +1,16 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useState, type ReactNode } from "react";
+import type { Chapter } from "@mra/lib/report-toc";
+import type { Lang } from "@mra/lib/i18n";
 import { ThaiText } from "../ui/thai-text";
 import { byId } from "@mra/lib/host";
-
-export interface NavItem { id: string; label: string }
+import { L } from "./text";
 
 /** Section headings the nav links to: the jump clears the site header (--header-h) and the sticky nav. */
-export const SECTION_H2 = "scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] text-lg font-semibold";
+export const SECTION_H2 = "scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] text-[21px] leading-[1.35] font-bold";
 /** A block inside a group section (Plan 20): one level down, same jump offset. */
-export const SECTION_H3 = "scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] font-display text-base font-semibold";
+export const SECTION_H3 = "scroll-mt-[calc(var(--header-h)+env(safe-area-inset-top,0px)+3.5rem)] font-display text-[15px] leading-[1.45] font-semibold";
 
 const Nested = createContext(false);
 
@@ -31,103 +32,68 @@ export function SectionHeading({ id, children, className = "" }: { id: string; c
     : <h2 id={id} className={`${SECTION_H2} ${className}`}>{text}</h2>;
 }
 
-/** The section in view (aria-current), skipped where IntersectionObserver is missing (jsdom, old browsers). */
-export function useCurrentSection(items: NavItem[], offsetOf: () => number): string | null {
+/**
+ * The section being read: the last one whose heading has passed the top quarter of the window, or the last on the page
+ * once the page has run out (short sections at the end never reach that line).
+ */
+function useCurrentSection(ids: string[]): string | null {
   const [current, setCurrent] = useState<string | null>(null);
-  const key = items.map((i) => i.id).join("|");
-  const offset = useRef(offsetOf);
-  useEffect(() => { offset.current = offsetOf; });
+  const key = ids.join("|");
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const ids = key.split("|").filter(Boolean);
-    const seen = new Map<string, boolean>();
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) seen.set(e.target.id, e.isIntersecting);
-      const first = ids.find((id) => seen.get(id));
-      if (first) setCurrent(first);
-    }, { rootMargin: `-${offset.current()}px 0px -60% 0px` });
-    for (const id of ids) {
-      const el = byId(id);
-      if (el) io.observe(el);
-    }
-    return () => io.disconnect();
+    const list = key.split("|").filter(Boolean);
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const line = window.innerHeight * 0.25;
+      const placed = list.map((id) => ({ id, top: byId(id)?.getBoundingClientRect().top ?? Infinity }))
+        .filter((s) => s.top !== Infinity).sort((a, b) => a.top - b.top);
+      if (!placed.length) return;
+      const last = placed[placed.length - 1];
+      // two sections side by side start at the same height: the first of them is the one being read
+      const passed = placed.filter((s) => s.top <= line).pop() ?? placed[0];
+      const first = placed.find((s) => Math.abs(s.top - passed.top) < 2) ?? passed;
+      const end = last.top < window.innerHeight * 0.9
+        && document.documentElement.scrollHeight - window.scrollY - window.innerHeight < 8;
+      setCurrent(end ? last.id : first.id);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(measure); };
+    measure();
+    // capture: the page may scroll inside an element of the app around the report
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("resize", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [key]);
   return current;
 }
 
 /**
- * In-page section links, sticky inside the reading column just under the site header (`--header-h`; 0 offline).
- * Below 1280px only (the left table of contents takes over from `xl`), or at every width when `always` (a report with
- * no study has no left table of contents). It scrolls sideways on a phone, with an edge fade on the side that has more
- * links. No next/* imports: this is also rendered in the offline report build.
+ * The report's contents: six chapters, of which only the one being read opens its sections. From `lg` a list beside the
+ * report, as wide as its longest label; narrower, a row of chapters under the site header. Both stay in view.
  */
-export function ReportNav({ items, label, always = false }: { items: NavItem[]; label: string; always?: boolean }) {
-  const nav = useRef<HTMLElement>(null);
-  const scroller = useRef<HTMLUListElement>(null);
-  const [edges, setEdges] = useState({ start: false, end: false });
-  // Ignore what sits under the site header and this nav (their height changes as the header wraps on a phone).
-  const current = useCurrentSection(items, () => {
-    const el = nav.current;
-    return el ? Math.round((parseFloat(getComputedStyle(el).top) || 0) + el.offsetHeight) : 112;
-  });
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const update = () => setEdges({ start: el.scrollLeft > 2, end: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-    ro?.observe(el);
-    return () => { el.removeEventListener("scroll", update); ro?.disconnect(); };
-  }, [items.length]);
-
-  if (!items.length) return null;
+export function ReportChapters({ chapters, label, lang }: { chapters: Chapter[]; label: string; lang: Lang }) {
+  const current = useCurrentSection(chapters.flatMap((c) => c.ids));
+  if (!chapters.length) return null;
   return (
-    <nav ref={nav} aria-label={label}
-      className={`sticky top-[calc(var(--header-h)+env(safe-area-inset-top,0px))] z-10 -mx-5 border-b border-rule bg-surface sm:-mx-8 print:hidden ${always ? "" : "xl:hidden"}`}>
-      <ul ref={scroller} data-fade-start={edges.start || undefined} data-fade-end={edges.end || undefined}
-        className="nav-fade flex gap-x-5 overflow-x-auto px-5 sm:px-8">
-        {items.map((i) => (
-          <li key={i.id} className="shrink-0">
-            <a href={`#${i.id}`} aria-current={current === i.id ? "location" : undefined}
-              className="inline-flex min-h-11 items-center whitespace-nowrap font-display text-[0.9rem] text-muted no-underline hover:text-ink aria-[current=location]:font-semibold aria-[current=location]:text-ink">
-              {i.label}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
-/**
- * The left table of contents from 1280px (`xl`): sticky under the site header, short labels, one link per section,
- * the section in view marked with aria-current. Hidden below `xl`, where ReportNav runs along the top instead.
- */
-export function ReportToc({ items, label }: { items: NavItem[]; label: string }) {
-  const sticky = useRef<HTMLDivElement>(null);
-  // Ignore what sits under the site header (the sticky list's own top offset).
-  const current = useCurrentSection(items, () => {
-    const el = sticky.current;
-    return Math.round((el ? parseFloat(getComputedStyle(el).top) || 0 : 56) + 16);
-  });
-  if (!items.length) return null;
-  return (
-    <nav aria-label={label}
-      className="hidden min-w-0 border-r border-rule xl:block print:hidden">
-      <div ref={sticky} className="sticky top-[calc(var(--header-h)+env(safe-area-inset-top,0px))] max-h-[calc(100dvh-var(--header-h))] overflow-y-auto px-4 py-6">
-        <p className="label mb-2">{label}</p>
-        <ol className="grid">
-          {items.map((i) => (
-            <li key={i.id}>
-              <a href={`#${i.id}`} aria-current={current === i.id ? "location" : undefined}
-                className="-mx-2 flex min-h-11 items-center border-l-2 border-transparent px-2 font-display text-[0.9rem] leading-snug text-muted no-underline hover:text-ink aria-[current=location]:border-ink aria-[current=location]:font-semibold aria-[current=location]:text-ink">
-                {i.label}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </div>
+    <nav aria-label={label} className="mra-toc lg:col-start-2 lg:row-start-2 print:hidden">
+      <span className="mra-toc-h">{label}</span>
+      {chapters.map((c) => {
+        const open = current != null && c.ids.includes(current);
+        const listed = c.items.some((i) => i.id === c.head);
+        return (
+          <Fragment key={c.head}>
+            <a href={`#${c.head}`} className="mra-tocitem" data-open={open}
+              aria-current={!listed && current === c.head ? "location" : undefined}>{L(lang, c.label)}</a>
+            {c.items.map((i) => (
+              <a key={i.id} href={`#${i.id}`} className="mra-tocsub" data-show={open}
+                aria-current={current === i.id ? "location" : undefined}>{i.label}</a>
+            ))}
+          </Fragment>
+        );
+      })}
     </nav>
   );
 }

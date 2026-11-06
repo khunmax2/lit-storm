@@ -129,7 +129,9 @@ export function MraView({ runId, onMissing, servicePage = false }: {
           createPortal(
             isQuickReview(review.data) ? (
               // MRA's "run a full review" opens MRA's own form, which DeepLit does not have.
-              <QuickAnswer review={review.data} upgrade={false} />
+              <div style={{ maxWidth: 1680, margin: "0 auto", padding: "28px 24px 56px" }}>
+                <QuickAnswer review={review.data} upgrade={false} />
+              </div>
             ) : (
               <Report review={review.data} offline downloads={downloads} />
             ),

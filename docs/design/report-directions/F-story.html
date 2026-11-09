@@ -1,0 +1,37 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
+@font-face{font-family:'LS Latin';src:url(fonts/geist-latin-wght-normal.woff2) format('woff2');font-weight:100 900;unicode-range:U+0000-00FF,U+2000-206F}
+@font-face{font-family:'LS Thai';src:url(fonts/ibm-plex-sans-thai-thai-400-normal.woff2) format('woff2');font-weight:400;unicode-range:U+0E01-0E5B,U+200C-200D}
+@font-face{font-family:'LS Thai';src:url(fonts/ibm-plex-sans-thai-thai-600-normal.woff2) format('woff2');font-weight:500 700;unicode-range:U+0E01-0E5B,U+200C-200D}
+@font-face{font-family:'LS Serif Latin';src:url(fonts/instrument-serif-latin-400-normal.woff2) format('woff2');font-weight:400;unicode-range:U+0000-00FF,U+2000-206F}
+@font-face{font-family:'LS Serif Thai';src:url(fonts/noto-serif-thai-thai-wght-normal.woff2) format('woff2');font-weight:100 900;unicode-range:U+0E01-0E5B,U+200C-200D}
+:root{--sans:'LS Latin','LS Thai',sans-serif;--serif:'LS Serif Latin','LS Serif Thai',serif}
+*{box-sizing:border-box}body{margin:0;font-family:var(--sans);-webkit-font-smoothing:antialiased}
+
+body{background:#0F1A2E;color:#F4F1EA;overflow:hidden}
+.rail{position:fixed;left:34px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:14px;z-index:3}
+.ch{font-size:12px;color:rgb(244 241 234/.45);display:flex;gap:10px;align-items:center} .ch span{font-family:var(--sans);font-weight:600;width:28px;height:28px;border-radius:50%;border:1px solid rgb(244 241 234/.3);display:grid;place-items:center;font-size:11px}
+.ch.on{color:#F4F1EA} .ch.on span{background:#F2A65A;border-color:#F2A65A;color:#0F1A2E}
+.stage{position:fixed;inset:0;left:300px;display:grid;grid-template-columns:1.15fr .85fr;align-items:center}
+.viz{height:100vh;display:flex;flex-direction:column;justify-content:center;padding:0 60px;background:radial-gradient(50rem 30rem at 40% 50%,#1D3355 0%,transparent 70%)}
+.kick{font-size:13px;letter-spacing:.2em;color:#F2A65A;font-weight:600}
+.huge{font-family:var(--serif);font-size:210px;line-height:.9;letter-spacing:-.03em;background:linear-gradient(180deg,#FFE3C2,#F2A65A);-webkit-background-clip:text;background-clip:text;color:transparent}
+.huge small{font-size:54px;-webkit-text-fill-color:#F4F1EA}
+.therm{display:flex;gap:26px;align-items:flex-end;height:220px;margin-top:20px}
+.bar{width:90px;border-radius:14px 14px 4px 4px;background:linear-gradient(180deg,#F2A65A,#C2410C);position:relative}
+.bar b{position:absolute;top:-34px;left:0;right:0;text-align:center;font-size:22px} .bar i{position:absolute;bottom:-30px;left:0;right:0;text-align:center;font-style:normal;font-size:14px;color:rgb(244 241 234/.7)}
+.bar.dim{opacity:.35}
+.steps{padding:0 70px 0 10px;display:flex;flex-direction:column;gap:22px}
+.step{background:rgb(244 241 234/.06);border:1px solid rgb(244 241 234/.12);border-radius:20px;padding:24px 26px;font-size:17px;line-height:1.9;backdrop-filter:blur(8px)}
+.step.on{background:#F4F1EA;color:#0F1A2E;box-shadow:0 30px 60px -30px #000}
+.step .s{display:inline-block;margin-left:4px;padding:1px 7px;border-radius:999px;background:#F2A65A;color:#0F1A2E;font-size:11px;font-weight:700;vertical-align:3px}
+.prog{position:fixed;left:0;top:0;height:3px;width:42%;background:#F2A65A}
+.title{position:fixed;left:34px;top:30px;font-family:var(--serif);font-size:22px;color:rgb(244 241 234/.8)}
+</style></head><body><div class="prog"></div><div class="title">การปลูกทุเรียนในไทย</div>
+<div class="rail"><div class="ch"><span>00</span>บทนำ</div><div class="ch on"><span>01</span>การบริหารจัดการห่วงโซ่อุปท…</div><div class="ch"><span>02</span>นวัตกรรมเกษตรและเทคโนโลยีเ…</div></div>
+<div class="stage"><div class="viz"><div class="kick">บทที่ 01 · การเก็บรักษาละอองเรณู</div>
+<div class="huge">36<small> วัน</small></div>
+<div class="therm"><div class="bar" style="height:216px"><b>36</b><i>0 °C</i></div><div class="bar dim" style="height:168px"><b>28</b><i>5 °C</i></div><div class="bar dim" style="height:36px"><b>6</b><i>25 °C</i></div></div></div>
+<div class="steps"><div class="step">ทุเรียนถูกยกย่องให้เป็น “ราชาแห่งผลไม้” และไทยส่งออกไปจีนเป็นหลัก<span class="s">1</span></div>
+<div class="step on">ละอองเรณูที่เก็บไว้ที่ <b>0 องศาเซลเซียส</b> เก็บได้นาน <b>36 วัน</b> ที่ 5 °C ได้ 28 วัน และที่ 25 °C เพียง 6 วัน<span class="s">3</span><br><span style="font-size:13px;opacity:.6">เลื่อนต่อ → อุณหภูมิอื่นจะสว่างขึ้นทีละแท่ง</span></div>
+<div class="step">ระบบรดน้ำด้วย IoT ลดการใช้น้ำและไฟฟ้าได้ 40%<span class="s">23</span></div></div></div>
+</body></html>

@@ -1,0 +1,206 @@
+"""First-run setup, signing in, set-password links, and who may see what."""
+
+import pytest
+
+from conftest import make_user
+
+pytestmark = pytest.mark.db
+
+
+def test_setup_needs_the_installers_code(browser, bootstrap_code):
+    b = browser()
+    assert b.get("/api/setup").json() == {"needed": True, "code_configured": True}
+    r = b.post("/api/setup", json={"code": "wrong", "email": "a@b.org", "name": "A", "password": "long enough 1"})
+    assert r.status_code == 403
+    r = b.post("/api/setup", json={"code": bootstrap_code, "email": "a@b.org", "name": "A", "password": "long enough 1"})
+    assert r.status_code == 200 and r.json()["role"] == "admin"
+    assert b.get("/api/setup").json()["needed"] is False
+
+
+def test_setup_happens_once(admin, browser, bootstrap_code):
+    r = browser().post(
+        "/api/setup", json={"code": bootstrap_code, "email": "x@b.org", "name": "X", "password": "long enough 1"}
+    )
+    assert r.status_code == 409
+
+
+def test_setup_is_closed_without_a_code(browser, db):
+    r = browser().post("/api/setup", json={"code": "", "email": "a@b.org", "name": "A", "password": "long enough 1"})
+    assert r.status_code == 409
+
+
+def test_changes_need_the_csrf_header(admin):
+    r = admin.client.post("/api/projects", json={"name": "P"})  # no header
+    assert r.status_code == 403
+    assert admin.post("/api/projects", json={"name": "P"}).status_code == 201
+
+
+def test_login_failures_all_look_alike(admin, browser):
+    make_user(admin, browser)
+    wrong_password = browser().post("/api/auth/login", json={"email": "user@example.org", "password": "nope nope nope"})
+    no_account = browser().post("/api/auth/login", json={"email": "ghost@example.org", "password": "nope nope nope"})
+    assert wrong_password.status_code == no_account.status_code == 401
+    assert wrong_password.json() == no_account.json()
+
+
+def test_a_new_account_signs_in_through_its_link(admin, browser):
+    link = admin.post("/api/admin/users", json={"email": "New@Example.org", "name": "N"}).json()["link"]
+    token = link.split("#", 1)[1]
+    b = browser()
+    # No password yet, so no way in but the link.
+    assert b.post("/api/auth/login", json={"email": "new@example.org", "password": "anything at all"}).status_code == 401
+    assert b.post("/api/auth/password-link", json={"token": token, "password": ""}).json()["valid"] is True
+    assert b.post("/api/auth/password", json={"token": token, "password": "short"}).status_code == 422
+    assert b.post("/api/auth/password", json={"token": token, "password": "a fine password"}).status_code == 200
+    assert b.get("/api/me").json()["email"] == "new@example.org"
+    # Used once.
+    assert browser().post("/api/auth/password", json={"token": token, "password": "another password"}).status_code == 410
+
+
+def test_a_new_link_replaces_the_old_one(admin, browser):
+    created = admin.post("/api/admin/users", json={"email": "n@e.org", "name": "N"}).json()
+    first = created["link"].split("#", 1)[1]
+    second = admin.post(f"/api/admin/users/{created['user']['id']}/link").json()["link"].split("#", 1)[1]
+    assert browser().post("/api/auth/password", json={"token": first, "password": "a fine password"}).status_code == 410
+    assert browser().post("/api/auth/password", json={"token": second, "password": "a fine password"}).status_code == 200
+
+
+def test_turning_an_account_off_ends_its_link(admin, browser):
+    """A link that got out (a screenshot, a forwarded message) dies with the account: the page says so
+    at once, and turning the account back on does not revive it; a new link does."""
+    created = admin.post("/api/admin/users", json={"email": "t@e.org", "name": "T"}).json()
+    token = created["link"].split("#", 1)[1]
+    uid = created["user"]["id"]
+    assert admin.patch(f"/api/admin/users/{uid}", json={"is_active": False}).status_code == 200
+    b = browser()
+    assert b.post("/api/auth/password-link", json={"token": token, "password": ""}).json() == {
+        "valid": False, "email": None, "purpose": None}
+    assert b.post("/api/auth/password", json={"token": token, "password": "a fine password"}).status_code == 410
+
+    admin.patch(f"/api/admin/users/{uid}", json={"is_active": True})
+    assert b.post("/api/auth/password-link", json={"token": token, "password": ""}).json()["valid"] is False
+    fresh = admin.post(f"/api/admin/users/{uid}/link").json()["link"].split("#", 1)[1]
+    assert b.post("/api/auth/password", json={"token": fresh, "password": "a fine password"}).status_code == 200
+
+
+def test_an_account_never_used_can_be_deleted(admin, browser):
+    """Made by mistake, or never used: it goes, with its link, its sign-ins and its keys."""
+    created = admin.post("/api/admin/users", json={"email": "oops@e.org", "name": "Oops"}).json()
+    token = created["link"].split("#", 1)[1]
+    user = make_user(admin, browser, "used-once@e.org")
+    uid = user.get("/api/me").json()["id"]
+    assert user.post("/api/me/tokens", json={"name": "k", "scopes": ["read"]}).status_code == 201
+    listed = {u["email"]: u["deletable"] for u in admin.get("/api/admin/users").json()}
+    assert listed["oops@e.org"] is True and listed["used-once@e.org"] is True
+
+    assert admin.delete(f"/api/admin/users/{created['user']['id']}").status_code == 204
+    assert admin.delete(f"/api/admin/users/{uid}").status_code == 204
+    emails = [u["email"] for u in admin.get("/api/admin/users").json()]
+    assert "oops@e.org" not in emails and "used-once@e.org" not in emails
+    assert user.get("/api/me").status_code == 401
+    assert browser().post("/api/auth/password", json={"token": token, "password": "a fine password"}).status_code == 410
+    # The address is free again.
+    assert admin.post("/api/admin/users", json={"email": "oops@e.org", "name": "Oops"}).status_code == 201
+
+
+def test_an_account_with_research_is_turned_off_not_deleted(admin, browser):
+    """Its Runs carry the month's quota and cost, so the account stays; turning it off is the way."""
+    alice = make_user(admin, browser, "alice@example.org")
+    uid = alice.get("/api/me").json()["id"]
+    alice.post("/api/projects", json={"name": "A"})
+    assert {u["email"]: u["deletable"] for u in admin.get("/api/admin/users").json()}["alice@example.org"] is False
+    r = admin.delete(f"/api/admin/users/{uid}")
+    assert r.status_code == 409 and r.json()["detail"] == "has_research"
+    assert alice.get("/api/me").status_code == 200
+
+
+def test_an_admin_cannot_delete_themself(admin):
+    me = admin.get("/api/me").json()["id"]
+    r = admin.delete(f"/api/admin/users/{me}")
+    assert r.status_code == 409 and r.json()["detail"] == "cannot_delete_self"
+    assert admin.delete("/api/admin/users/00000000-0000-0000-0000-000000000000").status_code == 404
+
+
+def test_reset_stops_the_old_password_and_signs_out(admin, browser):
+    user = make_user(admin, browser)
+    uid = user.get("/api/me").json()["id"]
+    link = admin.post(f"/api/admin/users/{uid}/link").json()["link"]
+    assert user.get("/api/me").status_code == 401  # signed out everywhere
+    old = browser().post("/api/auth/login", json={"email": "user@example.org", "password": "user password 1"})
+    assert old.status_code == 401
+    b = browser()
+    assert b.post("/api/auth/password", json={"token": link.split("#", 1)[1], "password": "brand new password"}).status_code == 200
+
+
+def test_users_cannot_reach_admin_pages(admin, browser):
+    user = make_user(admin, browser)
+    assert user.get("/api/admin/users").status_code == 403
+
+
+def test_one_user_cannot_see_anothers_work(admin, browser):
+    alice = make_user(admin, browser, "alice@example.org")
+    bob = make_user(admin, browser, "bob@example.org")
+    project = alice.post("/api/projects", json={"name": "Alice's"}).json()
+    assert bob.get(f"/api/projects/{project['id']}").status_code == 404
+    assert bob.get("/api/projects").json() == []
+
+
+def test_an_admin_does_not_read_users_research(admin, browser):
+    alice = make_user(admin, browser, "alice@example.org")
+    project = alice.post("/api/projects", json={"name": "Private"}).json()
+    assert admin.get(f"/api/projects/{project['id']}").status_code == 404
+
+
+def test_stored_keys_are_encrypted_and_only_hinted(admin, db):
+    from litstorm.db.models import LlmCredential
+
+    r = admin.put("/api/admin/llm-credentials/openrouter", json={"api_key": "sk-or-secret-1b1b"})
+    assert r.json()["key_hint"] == "…1b1b"
+    listed = admin.get("/api/admin/llm-credentials").json()
+    assert "sk-or-secret-1b1b" not in str(listed)
+    stored = db.get(LlmCredential, "openrouter").api_key_ciphertext
+    assert "sk-or-secret" not in stored
+
+
+def test_only_one_default_model(admin):
+    a = admin.post("/api/admin/llm-models", json={"label": "A", "provider": "openrouter", "model": "a/a", "is_default": True}).json()
+    b = admin.post("/api/admin/llm-models", json={"label": "B", "provider": "openrouter", "model": "b/b", "is_default": True}).json()
+    defaults = [m["id"] for m in admin.get("/api/admin/llm-models").json() if m["is_default"]]
+    assert defaults == [b["id"]] and a["id"] != b["id"]
+
+
+
+def test_more_requests_than_connections_wait_their_turn(admin, monkeypatch):
+    """Twenty requests at once on a pool of two and four threads: each waits for a slot
+    (api/deps.py) instead of every thread waiting on the pool for a
+    connection held by a request waiting for a thread."""
+    import asyncio
+
+    import anyio
+    import httpx
+
+    from litstorm import db
+    from litstorm.api import create_app
+
+    monkeypatch.setattr(db, "POOL_SIZE", 1)
+    monkeypatch.setattr(db, "MAX_OVERFLOW", 1)
+    monkeypatch.setattr(db, "POOL_TIMEOUT", 3)
+    db.engine.cache_clear()
+    db.sessions.cache_clear()
+    cookies = dict(admin.client.cookies)
+
+    async def burst():
+        # Fewer threads than requests, as with 40 threads and 100 requests.
+        anyio.to_thread.current_default_thread_limiter().total_tokens = 4
+        transport = httpx.ASGITransport(app=create_app(), raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t", cookies=cookies) as client:
+            return await asyncio.gather(*(client.get("/api/projects") for _ in range(20)))
+
+    try:
+        statuses = [r.status_code for r in asyncio.run(burst())]
+    finally:
+        db.engine().dispose()
+        monkeypatch.undo()
+        db.engine.cache_clear()
+        db.sessions.cache_clear()
+    assert statuses == [200] * 20

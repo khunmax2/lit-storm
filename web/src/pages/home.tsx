@@ -1,0 +1,273 @@
+// Home: the research mode as tabs, one question in the middle, shortcuts and
+// recent research under it.
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { AlertTriangle, ArrowRight, History, Sparkles } from "lucide-react";
+import { useState, type ReactNode } from "react";
+
+import { api, call } from "@/api/client";
+import { DOT } from "@/components/app-sidebar";
+import { ErrorText, timeAgo } from "@/components/common";
+import { Composer, QuotaLine, startResearch, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
+import { useOpenIssues } from "@/components/system-status";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Segmented } from "@/components/segmented";
+import { has, useT, type Key } from "@/i18n";
+import { cn } from "@/lib/utils";
+
+const ACTIVE = new Set(["running", "queued", "cancelling"]);
+
+function Shortcut({ to, art, title, action }: { to: string; art: ReactNode; title: string; action: string }) {
+  return (
+    <Link
+      to={to}
+      className="group overflow-hidden rounded-xl border bg-card shadow-xs transition-shadow hover:shadow-md"
+    >
+      <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex h-8 w-11 shrink-0 items-center">{art}</div>
+        <span className="truncate font-medium">{title}</span>
+      </div>
+      <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground transition-colors group-hover:text-foreground">
+        {action}
+        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+      </div>
+    </Link>
+  );
+}
+
+// Small flat drawings for the shortcut cards, in the reference's spirit.
+const ART = {
+  projects: (
+    <div className="relative h-7 w-10">
+      <div className="absolute top-2 left-0 h-5 w-10 rounded-sm bg-amber-100 dark:bg-amber-200/30" />
+      <div className="absolute top-1 left-0 h-2.5 w-10 rounded-sm bg-amber-200 dark:bg-amber-300/50" />
+      <Sparkles className="absolute -top-1.5 -left-1 size-3.5 fill-amber-400 text-amber-400" />
+    </div>
+  ),
+  report: (
+    <div className="flex h-7 w-10 flex-col gap-1">
+      <div className="h-3.5 rounded-sm bg-sky-400" />
+      <div className="h-1 w-8 rounded-full bg-sky-200 dark:bg-sky-300/40" />
+      <div className="h-1 w-6 rounded-full bg-sky-200 dark:bg-sky-300/40" />
+    </div>
+  ),
+  trash: (
+    <div className="flex h-7 w-10 flex-col justify-center gap-1.5">
+      <div className="h-2 w-6 rounded-sm bg-indigo-500" />
+      <div className="ml-3 h-2 w-7 rounded-sm bg-indigo-300 dark:bg-indigo-400/60" />
+    </div>
+  ),
+};
+
+/** What a research mode is good at, shown when the pointer rests on its tab:
+ *  its name, what stands out, and what it suits. Nothing for a mode whose
+ *  words are not written yet. */
+function ModeHint({ id, label }: { id: string; label: string }) {
+  const { t } = useT();
+  const key = `mode.tip.${id}`;
+  if (!has(key)) return null;
+  const fit = `${key}.fit`;
+  return (
+    <span className="grid gap-1.5">
+      <span className="text-[13px] font-semibold">{label}</span>
+      <span className="grid gap-1">
+        {t(key as Key)
+          .split("\n")
+          .map((line) => (
+            <span key={line} className="flex gap-1.5 leading-snug opacity-90">
+              <span aria-hidden className="opacity-60">•</span>
+              {line}
+            </span>
+          ))}
+      </span>
+      {has(fit) && (
+        <span className="mt-0.5 border-t border-background/20 pt-1.5 leading-snug">
+          <span className="opacity-60">{t("mode.tip.fit")}: </span>
+          {t(fit as Key)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// For an Administrator: the system has failures nobody has looked at yet (server: monitor.badge).
+function IssuesNotice() {
+  const { t, lang } = useT();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => call(api.GET("/api/me")), retry: false });
+  const issues = useOpenIssues(me.data?.role === "admin");
+  const open = issues.data?.open_count ?? 0;
+  if (!open) return null;
+  return (
+    <Link
+      to="/status"
+      className="mt-6 flex items-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm transition-colors hover:bg-destructive/10"
+    >
+      <AlertTriangle className="size-4 shrink-0 text-destructive" />
+      <span className="flex-1">
+        <span className="font-medium text-destructive">{t("home.issues", { count: open })}</span>
+        {issues.data?.last_at && (
+          <span className="text-muted-foreground"> · {t("monitor.last")} {timeAgo(issues.data.last_at, lang)}</span>
+        )}
+      </span>
+      <span className="flex items-center gap-1 font-medium">
+        {t("home.issuesLink")}
+        <ArrowRight className="size-4" />
+      </span>
+    </Link>
+  );
+}
+
+export function HomePage() {
+  const { t, lang } = useT();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const projects = useQuery({ queryKey: ["projects"], queryFn: () => call(api.GET("/api/projects")) });
+  const recent = useQuery({
+    queryKey: ["recent"],
+    queryFn: () => call(api.GET("/api/sessions/recent", { params: { query: { limit: 12 } } })),
+    refetchInterval: 15000,
+  });
+  const [form, setForm] = useState<RunForm>({
+    topic: "",
+    language: lang,
+    llm_model_id: "",
+    search_provider_id: "",
+    depth: "standard",
+    engine: "storm",
+  });
+  // The tabs are the modes that can be used today: ready Engines the
+  // Administrator has not switched off (docs/web-app-design.md, แท็บโหมด).
+  const engines = useRunOptions().data?.engines ?? [];
+  const mode = engines.some((e) => e.id === form.engine) ? form.engine : (engines[0]?.id ?? "storm");
+  const modeLead = `mode.${mode}`;
+  const requestKey = useRequestKey();
+
+  // Research from here is filed in no Project; the owner can file it later
+  // (as ChatGPT, Claude and Gemini do), or start it from inside a Project.
+  const start = useMutation({
+    mutationFn: () => startResearch({ ...form, engine: mode }, requestKey.current()),
+    onSuccess: (s) => {
+      requestKey.next();
+      queryClient.invalidateQueries();
+      navigate({ to: "/sessions/$sessionId", params: { sessionId: s.id } });
+    },
+  });
+
+  const running = recent.data?.filter((s) => s.last_status && ACTIVE.has(s.last_status)).length ?? 0;
+  const latestDone = recent.data?.find((s) => s.last_status === "succeeded");
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-5 md:px-6">
+        <div className="max-w-full overflow-x-auto [scrollbar-width:none]">
+          {engines.length > 1 && (
+            <Segmented
+              label={t("mode.label")}
+              value={mode}
+              onChange={(engine) => setForm({ ...form, engine })}
+              options={engines.map((e) => ({ value: e.id, label: e.label, hint: <ModeHint id={e.id} label={e.label} /> }))}
+            />
+          )}
+        </div>
+        <div
+          className={cn(
+            "flex h-9 items-center gap-2 rounded-lg border px-3 text-sm",
+            running
+              ? "border-success/40 bg-success-soft text-success"
+              : "text-muted-foreground",
+          )}
+        >
+          <span className={cn("size-2 rounded-full", running ? "animate-pulse bg-success" : "bg-muted-foreground/40")} />
+          {t("home.running")}
+          <span className={cn("rounded-md px-1.5 text-xs", running ? "bg-success/15" : "bg-muted")}>{running}</span>
+        </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-16">
+        <IssuesNotice />
+        <div className="flex flex-col items-center pt-[9vh] pb-8 text-center">
+          <h1 className="font-display text-4xl leading-tight tracking-tight text-balance md:text-6xl">
+            {t("home.title")}
+          </h1>
+          {has(modeLead) && (
+            <p className="mt-3 max-w-xl text-balance text-muted-foreground">{t(modeLead as Key)}</p>
+          )}
+        </div>
+
+        <Composer
+          form={{ ...form, engine: mode }}
+          setForm={setForm}
+          onSubmit={() => start.mutate()}
+          pending={start.isPending}
+          autoFocus
+        />
+        <div className="mt-3 flex justify-center">
+          <QuotaLine />
+        </div>
+        {start.error && (
+          <div className="mt-4">
+            <ErrorText error={start.error} />
+          </div>
+        )}
+
+        <div className="mt-10 grid gap-3 sm:grid-cols-3">
+          <Shortcut
+            to="/projects"
+            art={ART.projects}
+            title={t("home.cardProjects")}
+            action={t("home.cardProjectsAction", { n: projects.data?.length ?? 0 })}
+          />
+          <Shortcut
+            to={latestDone ? `/sessions/${latestDone.id}` : "/projects"}
+            art={ART.report}
+            title={t("home.cardReport")}
+            action={latestDone ? t("home.cardReportAction") : t("home.cardReportNone")}
+          />
+          <Shortcut to="/trash" art={ART.trash} title={t("nav.trash")} action={t("home.cardTrashAction")} />
+        </div>
+
+        <section className="mt-10">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+            <History className="size-4 text-muted-foreground" />
+            {t("home.recentReports")}
+          </h2>
+          {recent.isLoading && (
+            <div className="space-y-2 pl-6">
+              {Array.from({ length: 3 }, (_, i) => (
+                <Skeleton key={i} className="h-6" />
+              ))}
+            </div>
+          )}
+          {recent.data?.length === 0 && <p className="pl-6 text-sm text-muted-foreground">{t("projects.empty")}</p>}
+          {!!recent.data?.length && (
+            <ul className="ml-2 border-l pl-4">
+              {recent.data.slice(0, 5).map((s) => (
+                <li key={s.id}>
+                  <Link
+                    to="/sessions/$sessionId"
+                    params={{ sessionId: s.id }}
+                    className="flex items-center gap-3 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-muted/60"
+                  >
+                    <span
+                      className={cn("size-1.5 shrink-0 rounded-full", DOT[s.last_status ?? ""] ?? "bg-muted-foreground/40")}
+                    />
+                    <span className="truncate">{s.title}</span>
+                    {s.project_name && (
+                      <span className="hidden truncate text-xs text-muted-foreground sm:inline">· {s.project_name}</span>
+                    )}
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{timeAgo(s.updated_at, lang)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!!recent.data?.length && (
+            <Link to="/research" className="mt-2 ml-8 inline-block text-sm font-medium hover:underline">
+              {t("home.seeMore")}
+            </Link>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}

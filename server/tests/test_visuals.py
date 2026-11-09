@@ -1,0 +1,431 @@
+"""Visual blocks: facts cut from the evidence, and nothing kept that the
+facts do not bear out (litstorm.visuals)."""
+
+import copy
+
+from litstorm import visuals
+
+REPORT = {
+    "schema": 1,
+    "engine": "storm",
+    "title": "ทุเรียน",
+    "language": "th",
+    "lead": "ทุเรียนเป็นผลไม้ส่งออก [1]",
+    "sections": [
+        {"id": "s1", "heading": "ตลาด", "body": "ส่งออกไปจีนมาก [1] [2]", "children": [
+            {"id": "s2", "heading": "ราคา", "body": "ราคาสูงขึ้น [3]", "children": []},
+        ]},
+    ],
+    "sources": [
+        {"id": 1, "url": "https://a.example", "title": "A", "description": "",
+         "evidence": ["ในปี 2566 ไทยส่งออกทุเรียนสด 929,000 ตัน มูลค่ากว่า 110,000 ล้านบาท"]},
+        {"id": 2, "url": "https://b.example", "title": "B", "description": "",
+         "evidence": ["ปี ๒๕๖๕ ส่งออก ๘๒๕,๐๐๐ ตัน ระบบ GAP คือมาตรฐานการปฏิบัติทางการเกษตรที่ดีสำหรับฟาร์ม"]},
+        {"id": 3, "url": "https://c.example", "title": "C", "description": "",
+         "evidence": ["Monthong accounts for 42.5% of plantings. PMCS is a traceability model used by exporters since 2019."]},
+    ],
+}
+
+
+def _fact(facts, words):
+    return next(f["id"] for f in facts if words in f["text"])
+
+
+def test_facts_are_numbered_and_keep_their_source():
+    facts = visuals.facts(REPORT)
+    assert [f["id"] for f in facts] == [f"F{i}" for i in range(1, len(facts) + 1)]
+    assert all(f["origin"] == "evidence" for f in facts)
+    by_source = {f["source"] for f in facts}
+    assert by_source == {1, 2, 3}
+
+
+def test_numbers_are_read_in_thai_digits_and_with_thousands_marks():
+    assert 825000.0 in visuals.numbers_in("ส่งออก ๘๒๕,๐๐๐ ตัน")
+    assert 42.5 in visuals.numbers_in("42.5%")
+    assert 42.5 in visuals.numbers_in("42,5 %")
+
+
+def test_a_figure_is_kept_only_when_its_fact_holds_it():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    blocks, dropped = visuals.check([{
+        "type": "stat_cards", "anchor": {"section": "s1"}, "title": "ตัวเลขสำคัญ",
+        "items": [
+            {"label": "ส่งออก 2566", "value": 929000, "unit": "ตัน", "fact": f1},
+            {"label": "ส่งออก 2565", "value": "825,000", "unit": "ตัน", "fact": f2},
+            {"label": "แต่งเอง", "value": 999, "unit": "ตัน", "fact": f1},
+            {"label": "ไม่มีที่มา", "value": 929000, "unit": "ตัน", "fact": "F999"},
+        ],
+    }], REPORT, facts)
+    assert not dropped
+    [block] = blocks
+    assert [i["value"] for i in block["items"]] == [929000, 825000]
+    # The source is the fact's, whatever the model said.
+    assert block["items"][1]["cite"]["source"] == 2
+    assert block["sources"] == [1, 2] and block["anchor"] == "s1"
+
+
+def test_a_chart_left_too_thin_is_dropped_whole():
+    facts = visuals.facts(REPORT)
+    f1 = _fact(facts, "929,000")
+    thin = {"type": "chart", "chart": "bar", "series": [{"name": "x", "points": [
+        {"x": "2566", "y": 929000, "fact": f1},
+        {"x": "2567", "y": 1000000, "fact": f1},
+        {"x": "2568", "y": 1100000, "fact": f1},
+    ]}]}
+    blocks, dropped = visuals.check([thin], REPORT, facts)
+    assert not blocks and dropped[0]["type"] == "chart"
+
+
+def test_chart_kinds_that_would_mislead_become_bars():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    points = [{"x": "ทุเรียนสด", "y": 929000, "fact": f1}, {"x": "ปีก่อน", "y": 825000, "fact": f2}]
+    line = {"type": "chart", "chart": "line", "series": [{"name": "ส่งออก", "points": points}]}
+    pie = {"type": "chart", "chart": "pie", "series": [{"name": "a", "points": points}, {"name": "b", "points": points}]}
+    # Each on its own: the two show the same values, and one would be dropped.
+    assert [visuals.check([b], REPORT, facts)[0][0]["chart"] for b in (line, pie)] == ["bar", "bar"]
+
+
+def test_a_line_over_years_is_ordered():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    line = {"type": "chart", "chart": "line", "unit": "ตัน", "series": [{"name": "ส่งออก", "points": [
+        {"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    [block], _ = visuals.check([line], REPORT, facts)
+    assert block["chart"] == "line"
+    assert [p["x"] for p in block["series"][0]["points"]] == ["2565", "2566"]
+
+
+def test_timeline_years_match_in_either_era_and_sort():
+    facts = visuals.facts(REPORT)
+    f1, f3 = _fact(facts, "929,000"), _fact(facts, "PMCS")
+    blocks, _ = visuals.check([{"type": "timeline", "events": [
+        {"date": "2566", "label": "ส่งออกเกือบล้านตัน", "fact": f1},
+        {"date": "2019", "label": "เริ่มใช้ PMCS", "fact": f3},
+        {"date": "2001", "label": "ไม่มีในข้อเท็จจริง", "fact": f3},
+    ]}], REPORT, facts)
+    [block] = blocks
+    assert [e["date"] for e in block["events"]] == ["2019", "2566"]
+
+
+def test_a_glossary_term_must_be_what_its_fact_talks_about():
+    facts = visuals.facts(REPORT)
+    f2, f3 = _fact(facts, "GAP"), _fact(facts, "PMCS")
+    blocks, _ = visuals.check([{"type": "glossary", "terms": [
+        {"term": "GAP", "definition": "มาตรฐานการปฏิบัติทางการเกษตรที่ดี", "fact": f2},
+        {"term": "PMCS", "definition": "โมเดลตรวจสอบย้อนกลับ", "fact": f3},
+        {"term": "GMP", "definition": "ไม่อยู่ในข้อเท็จจริง", "fact": f2},
+    ]}], REPORT, facts)
+    assert [t["term"] for t in blocks[0]["terms"]] == ["GAP", "PMCS"]
+
+
+def test_diagram_keeps_only_linked_known_steps():
+    report = copy.deepcopy(REPORT)
+    report["sources"][2]["evidence"].append("ผลผลิตจากสวนส่งเข้าโรงคัดบรรจุ แล้วขนส่งไปยังท่าเรือเพื่อส่งออก")
+    facts = visuals.facts(report)
+    made_up = {"type": "diagram", "facts": [_fact(facts, "PMCS")],
+               "nodes": [{"id": "a", "label": "ดาวอังคาร"}, {"id": "b", "label": "ดาวพุธ"}, {"id": "c", "label": "ดาวเสาร์"}],
+               "edges": [{"from": "a", "to": "b"}, {"from": "b", "to": "c"}]}
+    assert visuals.check([made_up], report, facts)[1][0]["reason"] == "its steps are not in its facts"
+    blocks, _ = visuals.check([{"type": "diagram", "kind": "flow", "facts": [_fact(facts, "โรงคัดบรรจุ")],
+        "nodes": [{"id": "farm", "label": "สวน"}, {"id": "pack", "label": "โรงคัดบรรจุ"},
+                  {"id": "port", "label": "ท่าเรือ"}, {"id": "Bad Id!", "label": "x"}],
+        "edges": [{"from": "farm", "to": "pack"}, {"from": "pack", "to": "port"},
+                  {"from": "pack", "to": "nowhere"}, {"from": "farm", "to": "farm"}]}], report, facts)
+    [block] = blocks
+    assert [n["id"] for n in block["nodes"]] == ["farm", "pack", "port"]
+    assert len(block["edges"]) == 2
+
+
+def test_a_report_without_evidence_gets_no_numbers():
+    report = copy.deepcopy(REPORT)
+    report["engine"] = "agent"
+    for source in report["sources"]:
+        source["evidence"] = []
+    report["sections"][0]["body"] = "ในปี 2566 ไทยส่งออกทุเรียนสด 929,000 ตัน [1]"
+    facts = visuals.facts(report)
+    assert facts and all(f["origin"] == "report" for f in facts)
+    f = _fact(facts, "2566")
+    blocks, dropped = visuals.check([
+        {"type": "stat_cards", "items": [{"label": "ส่งออก", "value": 929000, "fact": f}]},
+        {"type": "timeline", "events": [{"date": "2566", "label": "a", "fact": f}, {"date": "2566", "label": "b", "fact": f}]},
+    ], report, facts)
+    assert [b["type"] for b in blocks] == ["timeline"]
+    assert dropped[0]["type"] == "stat_cards"
+
+
+def test_unknown_anchor_goes_to_the_lead_and_blocks_are_capped():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    values = [(929000, f1), (110000, f1), (2566, f1), (825000, f2), (2565, f2), (42.5, f3), (2019, f3)]
+    many = [{"type": "stat_cards", "anchor": {"section": "nope"}, "items": [{"label": "a", "value": v, "fact": f}]} for v, f in values]
+    many.append({"type": "timeline", "events": [{"date": "2566", "label": "a", "fact": f1}, {"date": "2565", "label": "b", "fact": f2}]})
+    blocks, dropped = visuals.check(many, REPORT, facts)
+    assert len(blocks) == visuals.MAX_BLOCKS and blocks[0]["anchor"] == "lead"
+    assert len(dropped) == 2
+
+
+def test_text_is_cut_to_size_and_control_characters_go():
+    facts = visuals.facts(REPORT)
+    f1 = _fact(facts, "929,000")
+    [block], _ = visuals.check([{"type": "stat_cards", "title": "x​" * 200,
+        "items": [{"label": "<b>ส่งออก</b>\x07", "value": 929000, "fact": f1}]}], REPORT, facts)
+    assert len(block["title"]) <= visuals.MAX_TEXT["title"] and "​" not in block["title"]
+    # Markup stays text here; the renderer escapes it.
+    assert block["items"][0]["label"] == "<b>ส่งออก</b>"
+
+
+def test_the_file_belongs_to_one_report(tmp_path):
+    path = str(tmp_path / "visuals.json")
+    visuals.write({"schema": 1, "report": visuals.report_hash(REPORT), "blocks": [], "hidden": []}, path)
+    assert visuals.load(path, REPORT) is not None
+    changed = copy.deepcopy(REPORT)
+    changed["title"] = "อื่น"
+    assert visuals.load(path, changed) is None
+
+
+def test_hidden_blocks_are_known_ones():
+    v = {"schema": 1, "blocks": [{"id": "v1"}, {"id": "v2"}], "hidden": []}
+    assert visuals.set_hidden(v, ["v2", "v9"])["hidden"] == ["v2"]
+
+
+def test_page_furniture_and_references_are_not_facts():
+    report = copy.deepcopy(REPORT)
+    report["sources"][0]["evidence"] = [
+        "![logo](https://x.example/l.png) ## Songkran became a soft power strategy by 2023, drawing 500,000 visitors. "
+        "See <https://x.example/page> for more.\n"
+        "References\nAppadurai, A. (2013). The future as cultural fact. Verso Books.\n"
+        "Becker, K. (2020). Revitalizing tradition. Journal of Baltic Studies, 51(3), 342-364."
+    ]
+    texts = [f["text"] for f in visuals.facts(report) if f["source"] == 1]
+    assert any("soft power strategy by 2023" in t for t in texts)
+    assert not any("http" in t or "logo" in t or "##" in t for t in texts)
+    assert not any("Appadurai" in t or "Becker" in t for t in texts)
+
+
+def test_a_line_is_not_made_of_citation_years_or_one_repeated_figure():
+    report = copy.deepcopy(REPORT)
+    report["sources"][0]["evidence"] = [
+        "ระหว่าง ค.ศ. 1990-1997 การผลิตเมล็ดพืชเพิ่มเฉลี่ย 1 เปอร์เซ็นต์ต่อปี",
+        "อัตราการเพิ่มของประชากรเฉลี่ย 1.3 เปอร์เซ็นต์ (Hinrichsen and Robey, 2000) ซึ่งคล้อยตามทฤษฎีของมัลทัส",
+    ]
+    facts = visuals.facts(report)
+    grain, people = _fact(facts, "1990-1997"), _fact(facts, "Hinrichsen")
+    line = {"type": "chart", "chart": "line", "series": [
+        {"name": "เมล็ดพืช", "points": [{"x": "1990", "y": 1, "fact": grain}, {"x": "1997", "y": 1, "fact": grain}]},
+        {"name": "ประชากร", "points": [{"x": "2000", "y": 1.3, "fact": people}, {"x": "2001", "y": 1.3, "fact": people}]},
+    ]}
+    blocks, dropped = visuals.check([line], report, facts)
+    assert not blocks and dropped[0]["type"] == "chart"
+    # Nor is a timeline dated by the paper it cites.
+    blocks, _ = visuals.check([{"type": "timeline", "events": [
+        {"date": "2000", "label": "a", "fact": people}, {"date": "1990", "label": "b", "fact": grain}]}], report, facts)
+    assert not blocks
+
+
+def test_a_comparison_may_name_its_label_column():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปี", "ปริมาณ"],
+           "rows": [{"label": "2566", "cells": ["929,000 ตัน"], "fact": f1},
+                    {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    kept, dropped = visuals.check([raw], REPORT, facts)
+    assert not dropped and kept[0]["columns"] == ["ปริมาณ"] and len(kept[0]["rows"]) == 2
+
+
+def test_what_is_on_show_is_not_shown_twice():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    chart = {"type": "chart", "chart": "bar", "anchor": "s1", "title": "ส่งออก",
+             "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "ส่งออก 2566", "value": 929000, "unit": "ตัน", "fact": f1},
+                       {"label": "หมอนทอง", "value": 42.5, "unit": "%", "fact": f3}]}
+    kept, dropped = visuals.check([chart, dict(chart, title="ส่งออกอีกครั้ง"), stats], REPORT, facts)
+    assert [b["type"] for b in kept] == ["chart", "stat_cards"]
+    assert dropped == [{"id": "v2", "type": "chart", "reason": "shows what an earlier block shows"}]
+    # The figure the chart already shows is left out of the cards; the other stays.
+    assert [i["value"] for i in kept[1]["items"]] == [42.5]
+    # A second answer is checked against what the first kept.
+    more, again = visuals.check([chart], REPORT, facts, start=3, earlier=kept)
+    assert not more and again[0]["reason"] == "shows what an earlier block shows"
+
+
+def test_a_comparison_column_said_twice_is_said_once():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปี", "ปริมาณส่งออก"],
+           "rows": [{"label": "2566", "cells": ["929,000 ตัน", "929,000 ตัน"], "fact": f1},
+                    {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน", "๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    kept, _ = visuals.check([raw], REPORT, facts)
+    assert kept[0]["columns"] == ["ปริมาณส่งออก"] and kept[0]["rows"][0]["cells"] == ["929,000 ตัน"]
+
+
+def test_a_comparison_said_again_in_other_words_is_one_too_many():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    first = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปริมาณ"],
+             "rows": [{"label": "2566", "cells": ["929,000 ตัน"], "fact": f1},
+                      {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    again = dict(first, title="ส่งออกอีกแบบ", rows=[{"label": "ปี 2566", "cells": ["ส่งออก 929,000 ตัน"], "fact": f1},
+                                                    {"label": "ปี 2565", "cells": ["825,000 ตัน"], "fact": f2}])
+    kept, dropped = visuals.check([first, again], REPORT, facts)
+    assert len(kept) == 1 and dropped[0]["reason"] == "shows what an earlier block shows"
+
+
+def test_the_review_leaves_out_what_it_rejects():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    chart = {"type": "chart", "chart": "bar", "anchor": "s1", "title": "ส่งออก",
+             "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "หมอนทอง", "value": 42.5, "unit": "%", "fact": f3},
+                       {"label": "มูลค่า", "value": 110000, "unit": "ล้านบาท", "fact": f1}]}
+    kept, _ = visuals.check([chart, stats], REPORT, facts)
+    entries = visuals.review_entries(kept)
+    assert "[v1] bar chart" in entries and "[v2.1] key figure" in entries and "929,000 ตัน" in entries
+    said = visuals.verdicts('```json\n{"verdicts": [{"id": "v1", "ok": false, "why": "two kinds"}, '
+                            '{"id": "[v2.2]", "ok": false}, {"id": "v2.1", "ok": true}]}\n```')
+    assert said == {"v1": "two kinds", "v2.2": "rejected"}
+    left, dropped = visuals.apply_review(kept, said)
+    assert [b["id"] for b in left] == ["v2"] and [i["value"] for i in left[0]["items"]] == [42.5]
+    assert left[0]["sources"] == [3] and dropped[0]["reason"] == "review: two kinds"
+    # Nonsense from the reviewer rejects nothing.
+    assert visuals.verdicts("no idea") == {} and visuals.verdicts('[1, 2]') == {}
+
+
+def test_comparison_numbers_are_checked_and_their_passage_found():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปริมาณ"],
+           "rows": [{"label": "ส่งออก 2566", "cells": ["929,000 ตัน", f1]},           # its fact as a cell
+                    {"label": "ส่งออก ๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f3},   # the wrong fact named
+                    {"label": "ส่งออก 2564", "cells": ["700,000 ตัน"], "fact": f1}]}   # a number no passage holds
+    kept, _ = visuals.check([raw], REPORT, facts)
+    rows = kept[0]["rows"]
+    assert [(r["label"], r["cite"]["fact"]) for r in rows] == [("ส่งออก 2566", f1), ("ส่งออก ๒๕๖๕", f2)]
+    assert rows[0]["cells"] == ["929,000 ตัน"]
+
+
+def test_a_row_showing_a_key_figure_again_is_one_too_many():
+    facts = visuals.facts(REPORT)
+    f1, f2 = _fact(facts, "929,000"), _fact(facts, "๘๒๕")
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "ส่งออก 2566", "value": 929000, "unit": "ตัน", "fact": f1},
+                       {"label": "ส่งออก 2565", "value": 825000, "unit": "ตัน", "fact": f2}]}
+    table = {"type": "comparison", "anchor": "s1", "title": "ส่งออก", "columns": ["ปริมาณ"],
+             "rows": [{"label": "2566", "cells": ["929,000 ตัน"], "fact": f1},
+                      {"label": "๒๕๖๕", "cells": ["๘๒๕,๐๐๐ ตัน"], "fact": f2}]}
+    kept, dropped = visuals.check([stats, table], REPORT, facts)
+    assert [b["type"] for b in kept] == ["stat_cards"] and dropped[0]["type"] == "comparison"
+
+
+def test_a_key_figure_dated_with_no_date_is_left_undated():
+    facts = visuals.facts(REPORT)
+    f3 = _fact(facts, "42.5")
+    raw = {"type": "stat_cards", "anchor": "lead", "items": [
+        {"label": "หมอนทอง", "value": 42.5, "unit": "%", "as_of": "ไม่ระบุ", "fact": f3},
+        {"label": "PMCS", "value": 2019, "unit": "", "as_of": "N/A", "fact": f3}]}
+    kept, _ = visuals.check([raw], REPORT, facts)
+    assert [i["as_of"] for i in kept[0]["items"]] == ["", ""]
+
+
+def _kept_file():
+    facts = visuals.facts(REPORT)
+    f1, f2, f3 = _fact(facts, "929,000"), _fact(facts, "๘๒๕"), _fact(facts, "42.5")
+    chart = {"type": "chart", "chart": "bar", "anchor": "s1", "title": "ส่งออก", "x_label": "ปี",
+             "series": [{"name": "ตัน", "points": [{"x": "2566", "y": 929000, "fact": f1}, {"x": "2565", "y": 825000, "fact": f2}]}]}
+    stats = {"type": "stat_cards", "anchor": "lead", "title": "ตัวเลข",
+             "items": [{"label": "หมอนทอง", "value": 42.5, "unit": "%", "as_of": "2019", "fact": f3}]}
+    terms = {"type": "glossary", "anchor": "lead", "title": "ศัพท์",
+             "terms": [{"term": "GAP", "definition": "มาตรฐานการปฏิบัติทางการเกษตรที่ดี", "fact": f2},
+                       {"term": "PMCS", "definition": "traceability model", "fact": f3}]}
+    kept, _ = visuals.check([chart, stats, terms], REPORT, facts)
+    return {"schema": 1, "report": visuals.report_hash(REPORT), "model": "M", "blocks": kept, "dropped": [], "hidden": []}
+
+
+def test_checking_again_changes_nothing_that_still_holds():
+    v = _kept_file()
+    # Names as a file may have them after hiding and drawing: not in order.
+    for b, name in zip(v["blocks"], ("v2", "v5", "v7")):
+        b["id"] = name
+    v["hidden"] = ["v5"]
+    out = visuals.recheck(v, REPORT)
+    assert out["blocks"] == v["blocks"] and out["hidden"] == ["v5"] and out["checks"] == visuals.CHECKS
+
+
+def test_checking_again_drops_what_todays_checks_reject():
+    v = _kept_file()
+    v["blocks"][1]["items"][0]["as_of"] = "ไม่ระบุ"            # a when with no number
+    v["blocks"][0]["series"][0]["points"][0]["y"] = 1234.0     # a number its passage does not hold
+    v["blocks"][0]["series"][0]["points"][0]["x"] = "x"
+    v["hidden"] = ["v1"]
+    out = visuals.recheck(v, REPORT)
+    assert [b["id"] for b in out["blocks"]] == ["v2", "v3"]
+    assert out["blocks"][0]["items"][0]["as_of"] == ""
+    assert out["dropped"][0]["id"] == "v1" and out["dropped"][0]["reason"].startswith("checked again: ")
+    assert out["hidden"] == []  # what was hidden is gone
+
+
+def test_a_file_kept_under_older_checks_is_checked_again_once_when_read(tmp_path):
+    path = str(tmp_path / "visuals.json")
+    v = _kept_file()
+    v["blocks"][1]["items"][0]["as_of"] = "N/A"
+    visuals.write(v, path)
+    read = visuals.load(path, REPORT)
+    assert read["checks"] == visuals.CHECKS and read["blocks"][1]["items"][0]["as_of"] == ""
+    assert visuals.load(path)["checks"] == visuals.CHECKS  # kept so
+    assert visuals.outdated(read) and not visuals.outdated({**read, "generation": visuals.GENERATION})
+
+
+ENGLISH = {**REPORT, "sources": [
+    {**REPORT["sources"][0], "evidence": ["Dust accumulation has the greatest impact on PV output, followed by temperature."]},
+    {**REPORT["sources"][1], "evidence": ["In January 2015 the regulator replaced the adder scheme with a feed-in tariff of 5.66 baht per unit, down from 6.96 baht."]},
+    *REPORT["sources"][2:]]}
+
+
+def test_a_thai_row_may_cite_an_english_passage_but_its_numbers_still_must_be_there():
+    facts = visuals.facts(ENGLISH)
+    dust, tariff = _fact(facts, "Dust accumulation"), _fact(facts, "5.66")
+    raw = {"type": "comparison", "anchor": "s1", "title": "ปัจจัย", "columns": ["ผลกระทบ"],
+           "rows": [{"label": "ฝุ่นสะสม", "cells": ["มากที่สุด"], "fact": dust},
+                    {"label": "อุณหภูมิ", "cells": ["รองลงมา"], "fact": dust},
+                    {"label": "ความชื้น", "cells": ["ราว 12%"], "fact": dust}]}  # a number the passage lacks
+    kept, _ = visuals.check([raw], ENGLISH, facts)
+    assert [r["label"] for r in kept[0]["rows"]] == ["ฝุ่นสะสม", "อุณหภูมิ"]
+
+
+def test_one_row_compares_its_columns_and_a_reworded_copy_is_dropped():
+    facts = visuals.facts(ENGLISH)
+    tariff = _fact(facts, "5.66")
+    one = {"type": "comparison", "anchor": "s1", "title": "กลไกรับซื้อไฟฟ้า", "columns": ["เดิม", "ใหม่ (2558)"],
+           "rows": [{"label": "รูปแบบ", "cells": ["Adder", "Feed-in Tariff"], "fact": tariff}]}
+    copy = dict(one, title="กลไกอีกแบบ", columns=["ก่อน", "หลัง"],
+                rows=[{"label": "การรับซื้อ", "cells": ["adder", "feed in tariff"], "fact": tariff}])
+    kept, dropped = visuals.check([one, copy], ENGLISH, facts)
+    assert [b["title"] for b in kept] == ["กลไกรับซื้อไฟฟ้า"] and dropped[0]["reason"] == "shows what an earlier block shows"
+    lone = dict(one, columns=["กลไก"], rows=[{"label": "รูปแบบ", "cells": ["Adder"], "fact": tariff}])
+    assert visuals.check([lone], ENGLISH, facts)[1][0]["reason"] == "fewer than two rows with facts"
+
+
+def test_a_pie_of_percentages_that_are_not_parts_of_one_whole_is_a_bar():
+    report = {**REPORT, "sources": [
+        {**REPORT["sources"][0], "evidence": ["Farmers who own a smartphone: 99.5% of those surveyed."]},
+        {**REPORT["sources"][1], "evidence": ["Households with electricity reached 98.9 percent in 2565."]},
+        {**REPORT["sources"][2], "evidence": ["Rice took 60% of farm land, rubber 25% and fruit 15%."]},
+    ]}
+    facts = visuals.facts(report)
+    phone, power, land = _fact(facts, "99.5"), _fact(facts, "98.9"), _fact(facts, "Rice took")
+
+    def pie(unit, points):
+        return {"type": "chart", "chart": "pie", "unit": unit, "series": [{"name": "a", "points": points}]}
+
+    apart = [{"x": "สมาร์ทโฟน", "y": 99.5, "fact": phone}, {"x": "ไฟฟ้า", "y": 98.9, "fact": power}]
+    whole = [{"x": "ข้าว", "y": 60, "fact": land}, {"x": "ยาง", "y": 25, "fact": land},
+             {"x": "ผลไม้", "y": 15, "fact": land}]
+    kinds = [visuals.check([b], report, facts)[0][0]["chart"]
+             for b in (pie("%", apart), pie("", apart), pie("ร้อยละ", whole))]
+    # 198.4%, said a percent or only written so in its facts: no one whole.
+    # Shares that add up to one whole stay a pie.
+    assert kinds == ["bar", "bar", "pie"]

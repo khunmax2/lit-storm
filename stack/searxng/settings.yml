@@ -1,0 +1,87 @@
+# SearXNG for lit-storm. Layered on the image's defaults; only what differs
+# from stock is here.
+#
+# The one setting that matters is `search.formats`. JSON is off by default,
+# and without it every request from the app gets a 403 and a page of HTML.
+
+use_default_settings: true
+
+general:
+  instance_name: "lit-storm search"
+  # Nothing here is exposed to the public, so no need to advertise.
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+server:
+  # Read from SEARXNG_SECRET in the environment; see docker-compose.yml.
+  secret_key: "changeme-overridden-by-env"
+  limiter: false
+  image_proxy: false
+
+# How long a query waits for each engine. SearXNG answers when the slowest
+# engine has, and an engine that is refusing (DuckDuckGo, Wikipedia on
+# 2026-09-30) times out every query: at the stock 3 s that was most of a
+# search's 3.4 s average, while Bing answered in 0.3 s and Yahoo in 1 s.
+outgoing:
+  request_timeout: 2.0
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+# Web search. SearXNG sends every query to every enabled engine in the
+# "general" category, so more engines do not spread the load; they are
+# spares. Out of the box only Brave, DuckDuckGo and Google CSE are on, and
+# with DuckDuckGo behind a CAPTCHA and Google CSE suspended a Run was left
+# with Brave alone, then nothing (2026-09-30). Google, Bing and Yahoo
+# answered in Thai and English when tried; Qwant asked for a CAPTCHA, and
+# Yep and Mwmbl had nothing in Thai.
+#
+# Academic search: the engines searxng-LDR-academic turns on, plus Europe
+# PMC. The fork's other two are left out: BASE answers "Access denied" to an
+# IP it has not approved, and its Library of Congress engine searches
+# photos. They sit in the "science" category, which a query without
+# `engines=` never reaches, so lit-storm
+# offers them as a Search Provider of their own ("SearXNG LDR-academic"),
+# whose engines list names them. That gives the fork's academic search
+# without carrying the fork (see docs/web-app-design.md).
+engines:
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: yahoo
+    disabled: false
+  # Its own 3 s would set every general query's wait (SearXNG waits for the
+  # largest engine timeout), whatever request_timeout says.
+  - name: wikidata
+    timeout: 2.0
+  - name: arxiv
+    disabled: false
+  # Stock gives Crossref 30 s, and one slow answer held an academic query
+  # past the 30 s the app waits: the whole query was lost.
+  - name: crossref
+    disabled: false
+    timeout: 6.0
+  - name: europepmc
+    disabled: false
+  - name: google scholar
+    disabled: false
+  - name: openairedatasets
+    disabled: false
+    timeout: 6.0
+  - name: openairepublications
+    disabled: false
+    timeout: 6.0
+  - name: openalex
+    disabled: false
+  - name: pdbe
+    disabled: false
+  - name: pubmed
+    disabled: false
+  - name: semantic scholar
+    disabled: false

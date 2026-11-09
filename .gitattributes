@@ -1,0 +1,9 @@
+# One line ending for the whole repository, decided here rather than by
+# whichever machine happens to clone it. Git's default on Windows rewrites
+# line endings on checkout, which turns a one-line change into a diff of the
+# whole file — this repo already carried seven CRLF files among LF ones, and
+# a ten-line edit to one of them once showed up as three hundred and sixty.
+#
+# `text=auto` still lets Git detect binaries and leave them alone; the images
+# and the PDF under assets/ are covered by that.
+* text=auto eol=lf

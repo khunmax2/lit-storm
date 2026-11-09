@@ -1,0 +1,86 @@
+[
+  {
+    "run_id": "92df0ca3-5601-4556-91c4-b44068c4c22c",
+    "topic": "Retrieval-augmented generation",
+    "language": "en",
+    "status": "succeeded",
+    "reason": "succeeded",
+    "sources": 24,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "SearXNG",
+    "seconds": {
+      "queued": 1.0505430698394775,
+      "startup": 11.084042072296143,
+      "research": 44.196199893951416,
+      "outline": 5.015226125717163,
+      "article": 20.06780982017517,
+      "polish": 5.015104055404663,
+      "normalize": 0.008466005325317383,
+      "total": 85.38684797286987
+    },
+    "tokens_in": 21233,
+    "tokens_out": 7923,
+    "searches": 36,
+    "cost_usd": 0.017193
+  },
+  {
+    "run_id": "6626b540-8184-49a5-bfdc-24099db5485e",
+    "topic": "โมเดลภาษาขนาดใหญ่สำหรับภาษาที่มีทรัพยากรน้อย",
+    "language": "th",
+    "status": "failed",
+    "reason": "empty_report",
+    "sources": null,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "SearXNG",
+    "seconds": {
+      "queued": 1.1519169807434082,
+      "startup": 10.031065940856934,
+      "research": 37.13106322288513,
+      "total": 47.162129163742065
+    },
+    "tokens_in": 8675,
+    "tokens_out": 4116,
+    "searches": 29,
+    "cost_usd": 0.008343
+  },
+  {
+    "run_id": "d9abc09b-3fbc-4de2-80b0-5d14960bd8ee",
+    "topic": "History of the Songkran festival",
+    "language": "en",
+    "status": "failed",
+    "reason": "empty_report",
+    "sources": null,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "SearXNG",
+    "seconds": {
+      "queued": 0.1817340850830078,
+      "startup": 11.040871858596802,
+      "research": 34.07562017440796,
+      "total": 45.11649203300476
+    },
+    "tokens_in": 5978,
+    "tokens_out": 3373,
+    "searches": 36,
+    "cost_usd": 0.006554
+  },
+  {
+    "run_id": "357434e6-7a43-4f54-8026-7d9b052fdc23",
+    "topic": "ผลกระทบของการนอนดึกต่อสุขภาพ",
+    "language": "th",
+    "status": "failed",
+    "reason": "empty_report",
+    "sources": null,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "SearXNG",
+    "seconds": {
+      "queued": 0.3317840099334717,
+      "startup": 11.052585124969482,
+      "research": 35.12374305725098,
+      "total": 46.17632818222046
+    },
+    "tokens_in": 8077,
+    "tokens_out": 3244,
+    "searches": 36,
+    "cost_usd": 0.006885
+  }
+]

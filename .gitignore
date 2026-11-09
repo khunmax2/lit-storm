@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# mac
+.DS_Store
+
+# Other
+.vscode
+*.tsv
+*.pt
+gpt*.txt
+*.env
+local/
+local_*
+build/
+*.egg-info/
+.idea
+.venv
+
+# Project-specific
+# Matches secrets.toml and any copy beside it — a ".backup" holding live
+# keys is exactly as dangerous as the original.
+secrets.toml*
+*.log
+*/assertion.log
+*results/
+.venv/
+# Local agent + editor config
+.claude/
+stack/secrets/

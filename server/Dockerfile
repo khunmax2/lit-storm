@@ -1,0 +1,76 @@
+# The API and the Worker: one image, two commands (docs/adr/0001).
+# Built from the repository root, because it installs knowledge_storm from there:
+#   docker build -f server/Dockerfile .
+# Two more build contexts hold the other Engines' forks (stack/compose.yml):
+# "agents" (lit_agents-deep-research) and "deep" (lit_deep-research-web).
+
+# Deep Research's CLI, bundled into one file that plain Node runs
+# (cli/litstorm.ts in the fork; docs/adr/0004).
+FROM node:24-slim AS deep-cli
+WORKDIR /fork
+COPY --from=deep package.json pnpm-lock.yaml ./
+RUN npx --yes --package=pnpm@12.8.1 -- pnpm install --frozen-lockfile --ignore-scripts
+COPY --from=deep . .
+RUN npx --yes --package=pnpm@12.8.1 -- pnpm run build:litstorm
+
+FROM python:3.12-slim
+
+# Noto Sans Thai for the PDF export: Chromium prints with the fonts the
+# machine has, and without a Thai one a Thai report prints as boxes.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pinned by digest: a new uv under the same tag would change this layer and rebuild every one
+# after it (all the Python dependencies, Chromium, the embedding model).
+COPY --from=ghcr.io/astral-sh/uv:0.9@sha256:538e0b39736e7feae937a65983e49d2ab75e1559d35041f9878b7b7e51de91e4 /uv /usr/local/bin/uv
+# Node, only to run the Deep Research CLI: the binary and its bundle, no
+# node_modules (the same Debian release as this image).
+COPY --from=deep-cli /usr/local/bin/node /usr/local/bin/node
+COPY --from=deep-cli /fork/dist/litstorm-deep.mjs /opt/deep-research/litstorm-deep.mjs
+RUN node --version
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH=/opt/venv/bin:$PATH PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+
+WORKDIR /app
+# Third-party packages first, from the lock alone: editing knowledge_storm or
+# the README no longer reinstalls them, Chromium and the embedding model
+# (about ten minutes a build).
+COPY server/pyproject.toml server/uv.lock ./server/
+RUN cd server && uv sync --frozen --no-dev --extra pdf --no-install-project \
+    --no-install-package knowledge-storm --no-install-package deep-researcher
+RUN playwright install --with-deps chromium
+
+# STORM's built-in embedding model, in the image: otherwise every new
+# container fetched it from Hugging Face on its first Run, and every Run
+# asked the Hub about it again (30 requests, seconds each Run), failing the
+# article stage whenever the Hub could not be reached.
+ENV HF_HOME=/opt/hf
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-MiniLM-L6-v2')" \
+    && chmod -R a+rX /opt/hf
+ENV HF_HUB_OFFLINE=1
+
+# knowledge_storm, installed editable from here by the sync below.
+COPY setup.py requirements.txt README.md ./
+COPY knowledge_storm ./knowledge_storm
+# Agent Research (khunmax2/lit_agents-deep-research), from a second build
+# context named "agents" (stack/compose.yml), where server/pyproject.toml's
+# path ../../agents-deep-research finds it.
+COPY --from=agents setup.py requirements.txt README.md MANIFEST.in /agents-deep-research/
+COPY --from=agents deep_researcher /agents-deep-research/deep_researcher
+
+COPY server ./server
+RUN cd server && uv sync --frozen --no-dev --extra pdf
+
+WORKDIR /app/server
+RUN useradd --create-home --uid 10001 litstorm && mkdir -p /data && chown litstorm /data
+USER litstorm
+ENV LITSTORM_DATA_DIR=/data
+
+EXPOSE 8000
+# The api service migrates, then serves. The worker service overrides this.
+# Two processes by default: one tops out a core at about 60 requests a second
+# (100 Users watching live Runs; docs/benchmarks/2026-09-30-concurrency.md).
+# Each holds up to 30 database connections (litstorm/db).
+ENV LITSTORM_API_WORKERS=2
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn litstorm.api:app --host 0.0.0.0 --port 8000 --proxy-headers --workers ${LITSTORM_API_WORKERS}"]

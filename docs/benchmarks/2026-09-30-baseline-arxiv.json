@@ -1,0 +1,50 @@
+[
+  {
+    "run_id": "765a54c5-ec0d-4688-8f24-e52f6d58dbbb",
+    "topic": "Retrieval-augmented generation",
+    "language": "en",
+    "status": "succeeded",
+    "reason": "succeeded",
+    "sources": 23,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "arXiv",
+    "seconds": {
+      "queued": 1.4096999168395996,
+      "startup": 10.02493405342102,
+      "research": 196.52715492248535,
+      "outline": 2.024317979812622,
+      "article": 14.028962135314941,
+      "polish": 3.010856866836548,
+      "normalize": 0.005887031555175781,
+      "total": 225.62211298942566
+    },
+    "tokens_in": 41979,
+    "tokens_out": 9264,
+    "searches": 36,
+    "cost_usd": 0.024391
+  },
+  {
+    "run_id": "03bb77dc-6cfa-44e5-af0a-e2c11de71e44",
+    "topic": "โมเดลภาษาขนาดใหญ่สำหรับภาษาที่มีทรัพยากรน้อย",
+    "language": "th",
+    "status": "succeeded",
+    "reason": "succeeded",
+    "sources": 11,
+    "model": "Gemini 3.1 Flash Lite",
+    "search": "arXiv",
+    "seconds": {
+      "queued": 1.7438631057739258,
+      "startup": 10.035356998443604,
+      "research": 302.72686791419983,
+      "outline": 6.031419992446899,
+      "article": 19.069950103759766,
+      "polish": 7.032451868057251,
+      "normalize": 1.006648063659668,
+      "total": 345.902694940567
+    },
+    "tokens_in": 30680,
+    "tokens_out": 11572,
+    "searches": 29,
+    "cost_usd": 0.025028
+  }
+]

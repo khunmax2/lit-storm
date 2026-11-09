@@ -1,0 +1,108 @@
+# The web app that replaces Streamlit, on one machine (docs/web-app-design.md,
+# การติดตั้งและการเข้าถึง). One port is published, on localhost only.
+#
+#   ./stack/init-secrets.sh            # once: the two secrets below
+#   docker compose -f stack/compose.yml up -d --build
+#   open http://localhost:8090 and enter stack/secrets/bootstrap_code
+#
+# Data lives in named volumes and survives `down` and rebuilds; `down -v`
+# deletes it.
+name: litstorm
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    # Up to 30 connections for each API process and 30 for the Worker
+    # (server/src/litstorm/db): room for 4 API processes.
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      POSTGRES_USER: litstorm
+      POSTGRES_PASSWORD: litstorm  # reachable only inside this network
+      POSTGRES_DB: litstorm
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litstorm"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      # The Agent Research engine's source, a sibling checkout of
+      # khunmax2/lit_agents-deep-research.
+      additional_contexts:
+        agents: ../../agents-deep-research
+        # The Deep Research engine's source: khunmax2/lit_deep-research-web.
+        deep: ../../deep-research-web-ui
+    image: litstorm/server:dev
+    restart: unless-stopped
+    environment:
+      <<: &server-env
+        LITSTORM_DATABASE_URL: postgresql+psycopg://litstorm:litstorm@db:5432/litstorm
+        LITSTORM_SECRET_KEY_FILE: /run/secrets/secret_key
+        LITSTORM_PUBLIC_URL: http://localhost:${LITSTORM_PORT:-8090}
+        LITSTORM_SEARXNG_URL: http://searxng:8080/search
+      # Only the api service sees the setup code.
+      LITSTORM_BOOTSTRAP_CODE_FILE: /run/secrets/bootstrap_code
+      # uvicorn processes; each holds up to 30 database connections.
+      LITSTORM_API_WORKERS: ${LITSTORM_API_WORKERS:-2}
+      # Where research_export's download links point, when MCP clients reach the
+      # API by another name than the public URL (Agenta on a shared Docker
+      # network: http://deeplit-api:8000). Empty: the public URL.
+      LITSTORM_EXPORT_URL: ${LITSTORM_EXPORT_URL:-}
+    secrets: [secret_key, bootstrap_code]
+    # Services on the machine itself (Ollama for embeddings) are reached as
+    # host.docker.internal, on Docker Desktop and on Linux alike.
+    extra_hosts: &host ["host.docker.internal:host-gateway"]
+    volumes:
+      - run-data:/data
+    depends_on:
+      db: { condition: service_healthy }
+
+  worker:
+    image: litstorm/server:dev
+    restart: unless-stopped
+    command: ["python", "-m", "litstorm.worker.main"]
+    environment: *server-env
+    secrets: [secret_key]
+    extra_hosts: *host
+    volumes:
+      - run-data:/data
+    depends_on:
+      api: { condition: service_started }  # the api service runs the migrations
+    # A stopped Worker's Runs are marked interrupted, never restarted; give
+    # it a moment to exit cleanly.
+    stop_grace_period: 20s
+
+  web:
+    build: { context: ../web }
+    image: litstorm/web:dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LITSTORM_PORT:-8090}:80"
+    depends_on: [api]
+
+  searxng:
+    # Pinned, tag and digest (the digest is what is used): a rebuild must not
+    # change the engines under a Run. To upgrade, change both and check search
+    # still answers (server/tests/compare_searxng.py).
+    image: searxng/searxng:2026.9.20-2e624bed4@sha256:76f9ec5b3832921c8734c06c34248c9538d94a6cae0cf5e579fa5b41c8479789
+    restart: unless-stopped
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-litstorm-local-not-for-production}
+
+secrets:
+  secret_key:
+    file: ./secrets/secret_key
+  bootstrap_code:
+    file: ./secrets/bootstrap_code
+
+volumes:
+  db-data:
+  run-data:

@@ -1,0 +1,33 @@
+# The stack as it will run on host 203, on this machine (docs/web-app-
+# design.md, รุ่นสอง: การติดตั้ง): an nginx in front standing in for the
+# host's, the app under /litstorm, one origin, no TLS.
+#
+#   docker compose -f stack/compose.yml -f stack/compose.mirror.yml up -d --build
+#   open http://localhost:8090/litstorm/
+#
+# Scripts against it use the base URL http://127.0.0.1:8090/litstorm.
+services:
+  api:
+    environment:
+      LITSTORM_PUBLIC_URL: http://localhost:${LITSTORM_PORT:-8090}/litstorm
+  worker:
+    environment:
+      LITSTORM_PUBLIC_URL: http://localhost:${LITSTORM_PORT:-8090}/litstorm
+
+  web:
+    build:
+      context: ../web
+      args:
+        LITSTORM_BASE_PATH: /litstorm
+    image: litstorm/web:mirror
+    # Reached only through the edge, as through the host's nginx.
+    ports: !reset []
+
+  edge:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LITSTORM_PORT:-8090}:80"
+    volumes:
+      - ./edge/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [web]

@@ -1,0 +1,41 @@
+# The server image builds from the repository root (stack/compose.yml) and
+# copies only knowledge_storm/ and server/. Everything else stays out of the
+# build context: local environments, secrets, and state.
+
+.venv/
+venv/
+env/
+
+# Keys and secrets never enter a build context, even one that does not copy
+# them: stack/.env holds the scripts' API key, stack/secrets/ the stack's own.
+*.env
+.env*
+stack/secrets/
+
+.git/
+.gitignore
+.github/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+docs/
+examples/
+assets/
+
+.claude/
+.vscode/
+.idea/
+*.md
+!README.md
+
+.DS_Store
+Thumbs.db
+
+server/.venv/
+server/data/
+web/node_modules/
+web/dist/

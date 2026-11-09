@@ -1,0 +1,825 @@
+"""What only an Administrator does: accounts, models, Search Providers, limits.
+
+Stored keys never leave the server: an admin sees the last four characters
+(docs/web-app-design.md, หน้าตั้งค่าบริการภายนอก).
+"""
+
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from types import SimpleNamespace
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import delete, exists, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
+
+from litstorm import checks, cost, embedding, limits, modes, monitor, quota, roles, security
+from litstorm.api import deps
+from litstorm.api.auth import issue_link
+from litstorm.catalog import ENGINES, LLM_PROVIDERS, SEARCH_PROVIDERS
+from litstorm.db.models import (
+    PERSON, AuthSession, LlmCredential, LlmModel, PasswordSetupToken, Project, ResearchSession, Run, SearchProvider,
+    User,
+)
+
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(deps.admin)])
+
+
+# --- users ----------------------------------------------------------------
+
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+    has_password: bool
+    monthly_run_quota: int | None
+    max_concurrent_runs: int | None
+    max_queued_runs: int | None
+    created_at: datetime
+    # This month's quota, as the User sees it.
+    quota_limit: int | None = None
+    quota_used: int | None = None
+    quota_reserved: int | None = None
+    # Never had a Project, a Session or a Run: the account can be deleted outright.
+    # One that has is turned off instead, and keeps its quota and cost history.
+    deletable: bool = False
+
+
+def _has_research(user_id):
+    return or_(*(exists().where(t.owner_id == user_id) for t in (Project, ResearchSession, Run)))
+
+
+def user_out(user, usage=None, deletable=False):
+    return UserOut(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        is_active=user.is_active,
+        has_password=bool(user.password_hash) and not user.must_set_password,
+        monthly_run_quota=user.monthly_run_quota,
+        max_concurrent_runs=user.max_concurrent_runs,
+        max_queued_runs=user.max_queued_runs,
+        created_at=user.created_at,
+        quota_limit=usage.limit if usage else None,
+        quota_used=usage.used if usage else None,
+        quota_reserved=usage.reserved if usage else None,
+        deletable=deletable,
+    )
+
+
+class UserIn(BaseModel):
+    email: EmailStr
+    name: str = Field(min_length=1, max_length=200)
+    role: str = Field(default="user", pattern="^(user|admin)$")
+
+
+class LinkOut(BaseModel):
+    user: UserOut
+    link: str
+    expires_at: datetime
+
+
+class UserPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    role: str | None = Field(default=None, pattern="^(user|admin)$")
+    is_active: bool | None = None
+    # Explicit null clears an override back to the global default.
+    monthly_run_quota: int | None = Field(default=None, ge=0)
+    max_concurrent_runs: int | None = Field(default=None, ge=0)
+    max_queued_runs: int | None = Field(default=None, ge=0)
+
+
+@router.get("/users", response_model=list[UserOut])
+def list_users(session=Depends(deps.database)):
+    configured = limits.load(session)
+    rows = session.execute(
+        # Integration accounts have a page of their own (api/tokens.py).
+        select(User, ~_has_research(User.id)).where(User.kind == PERSON).order_by(User.created_at)
+    )
+    return [user_out(u, quota.usage(session, u, configured=configured), deletable) for u, deletable in rows]
+
+
+@router.post("/users", response_model=LinkOut, status_code=201)
+def create_user(body: UserIn, session=Depends(deps.database)):
+    user = User(email=body.email.strip().lower(), name=body.name.strip(), role=body.role, must_set_password=True)
+    session.add(user)
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(409, "email_taken")
+    link, expires = issue_link(session, user)
+    session.commit()
+    return LinkOut(user=user_out(user), link=link, expires_at=expires)
+
+
+@router.post("/users/{user_id}/link", response_model=LinkOut)
+def reset_link(user_id: uuid.UUID, admin=Depends(deps.admin), session=Depends(deps.database)):
+    """Issue a set-password link. For an account that has a password this is
+    a reset: the old password stops working and the User is signed out
+    everywhere until they choose a new one."""
+    user = session.get(User, user_id)
+    if user is None or user.kind != PERSON:  # an integration account never signs in
+        raise HTTPException(404, "not_found")
+    link, expires = issue_link(session, user)
+    if user.password_hash:
+        user.must_set_password = True
+        session.execute(AuthSession.__table__.delete().where(AuthSession.user_id == user.id))
+    session.commit()
+    return LinkOut(user=user_out(user), link=link, expires_at=expires)
+
+
+@router.patch("/users/{user_id}", response_model=UserOut)
+def patch_user(user_id: uuid.UUID, body: UserPatch, admin=Depends(deps.admin), session=Depends(deps.database)):
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "not_found")
+    changes = body.model_dump(exclude_unset=True)
+    if user.id == admin.id and (changes.get("role") == "user" or changes.get("is_active") is False):
+        raise HTTPException(409, "cannot_demote_self")
+    for key, value in changes.items():
+        setattr(user, key, value)
+    if changes.get("is_active") is False:
+        session.execute(AuthSession.__table__.delete().where(AuthSession.user_id == user.id))
+        # A set-password link that got out dies with the account; turning it back on takes a new link.
+        session.execute(PasswordSetupToken.__table__.delete().where(PasswordSetupToken.user_id == user.id))
+    session.commit()
+    return user_out(user)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: uuid.UUID, admin=Depends(deps.admin), session=Depends(deps.database)):
+    """Only an account that never had research: its keys, sign-ins and links
+    go with it (ON DELETE CASCADE). The admin doing it stays, so an
+    admin always remains."""
+    user = session.get(User, user_id)
+    if user is None or user.kind != PERSON:
+        raise HTTPException(404, "not_found")
+    if user.id == admin.id:
+        raise HTTPException(409, "cannot_delete_self")
+    if session.scalar(select(_has_research(user.id))):
+        raise HTTPException(409, "has_research")
+    try:
+        session.execute(delete(User).where(User.id == user.id))
+        session.commit()
+    except IntegrityError:  # a Project made in the meantime
+        session.rollback()
+        raise HTTPException(409, "has_research")
+
+
+# --- LLM credentials and models --------------------------------------------
+
+
+class CredentialOut(BaseModel):
+    provider: str
+    key_hint: str
+    api_base: str | None
+
+
+class CredentialIn(BaseModel):
+    api_key: str = Field(min_length=1)
+    api_base: str | None = None
+
+
+@router.get("/llm-credentials", response_model=list[CredentialOut])
+def list_credentials(session=Depends(deps.database)):
+    rows = {c.provider: c for c in session.scalars(select(LlmCredential))}
+    return [
+        CredentialOut(
+            provider=name,
+            key_hint=security.hint(security.decrypt(rows[name].api_key_ciphertext)) if name in rows else "",
+            api_base=rows[name].api_base if name in rows else None,
+        )
+        for name in LLM_PROVIDERS
+    ]
+
+
+@router.put("/llm-credentials/{provider}", response_model=CredentialOut)
+def put_credential(provider: str, body: CredentialIn, session=Depends(deps.database)):
+    if provider not in LLM_PROVIDERS:
+        raise HTTPException(404, "unknown_provider")
+    if LLM_PROVIDERS[provider].get("needs_base") and not body.api_base:
+        raise HTTPException(422, "api_base_required")
+    row = session.get(LlmCredential, provider) or LlmCredential(provider=provider)
+    row.api_key_ciphertext = security.encrypt(body.api_key.strip())
+    row.api_base = body.api_base
+    session.add(row)
+    session.commit()
+    return CredentialOut(provider=provider, key_hint=security.hint(body.api_key.strip()), api_base=row.api_base)
+
+
+@router.delete("/llm-credentials/{provider}", status_code=204)
+def delete_credential(provider: str, session=Depends(deps.database)):
+    row = session.get(LlmCredential, provider)
+    if row:
+        session.delete(row)
+        session.commit()
+
+
+class ModelIn(BaseModel):
+    label: str = Field(min_length=1, max_length=200)
+    provider: str
+    model: str = Field(min_length=1, max_length=200)
+    reasoning: str = ""
+    max_tokens: dict = Field(default_factory=dict)
+    enabled: bool = True
+    is_default: bool = False
+    # USD per million tokens; leave empty to use LiteLLM's price table.
+    price_in_per_mtok: Decimal | None = Field(default=None, ge=0)
+    price_out_per_mtok: Decimal | None = Field(default=None, ge=0)
+    # Whether it can call tools: set by the test, which the Administrator
+    # may overrule; None is untested (litstorm.modes).
+    supports_tools: bool | None = None
+
+
+class ModelOut(ModelIn):
+    id: str
+    # LiteLLM's price, USD per million tokens, used when none is set above,
+    # and the name its table knows the model by; None when it has none, and
+    # then the model's Runs cost is unknown until a price is set.
+    table_price_in: Decimal | None = None
+    table_price_out: Decimal | None = None
+    table_name: str | None = None
+
+
+def model_out(m):
+    table = cost.table_rates(LLM_PROVIDERS.get(m.provider, {}).get("prefix", "") + m.model)
+    return ModelOut(
+        id=str(m.id), label=m.label, provider=m.provider, model=m.model, reasoning=m.reasoning,
+        max_tokens=m.max_tokens or {}, enabled=m.enabled, is_default=m.is_default,
+        price_in_per_mtok=m.price_in_per_mtok, price_out_per_mtok=m.price_out_per_mtok,
+        supports_tools=m.supports_tools,
+        table_price_in=table[0] if table else None,
+        table_price_out=table[1] if table else None,
+        table_name=table[2] if table else None,
+    )
+
+
+def _park(session):
+    """Turning a model or provider off parks the queued Runs that chose it,
+    now rather than when the Worker next looks, so their owners see it."""
+    from litstorm.worker.queue import park_unavailable
+
+    park_unavailable(session)
+
+
+def _clear_default(session, table, wanted, keep_id=None):
+    """Unset the current default before a new one is written: one default
+    at most is enforced by a unique index, checked row by row."""
+    if wanted:
+        query = update(table).values(is_default=False)
+        if keep_id is not None:
+            query = query.where(table.id != keep_id)
+        session.execute(query)
+
+
+@router.get("/llm-models", response_model=list[ModelOut])
+def list_models(session=Depends(deps.database)):
+    return [model_out(m) for m in session.scalars(select(LlmModel).order_by(LlmModel.created_at))]
+
+
+def _check_model(body):
+    if body.provider not in LLM_PROVIDERS:
+        raise HTTPException(422, "unknown_provider")
+    if body.is_default and not body.enabled:
+        raise HTTPException(422, "default_must_be_enabled")
+
+
+@router.post("/llm-models", response_model=ModelOut, status_code=201)
+def create_model(body: ModelIn, session=Depends(deps.database)):
+    _check_model(body)
+    _clear_default(session, LlmModel, body.is_default)
+    row = LlmModel(**body.model_dump())
+    session.add(row)
+    session.commit()
+    return model_out(row)
+
+
+@router.put("/llm-models/{model_id}", response_model=ModelOut)
+def update_model(model_id: uuid.UUID, body: ModelIn, session=Depends(deps.database)):
+    _check_model(body)
+    row = session.get(LlmModel, model_id)
+    if row is None:
+        raise HTTPException(404, "not_found")
+    _clear_default(session, LlmModel, body.is_default, keep_id=row.id)
+    for key, value in body.model_dump().items():
+        setattr(row, key, value)
+    session.flush()
+    _park(session)
+    session.commit()
+    return model_out(row)
+
+
+# --- Search Providers -------------------------------------------------------
+
+
+class SearchIn(BaseModel):
+    label: str = Field(min_length=1, max_length=200)
+    kind: str
+    endpoint: str | None = None
+    engines: str | None = None
+    # Absent keeps the stored key; "" removes it.
+    api_key: str | None = None
+    enabled: bool = True
+    is_default: bool = False
+
+
+class SearchOut(BaseModel):
+    id: str
+    label: str
+    kind: str
+    endpoint: str | None
+    engines: str | None
+    key_hint: str
+    enabled: bool
+    is_default: bool
+
+
+def search_out(p):
+    return SearchOut(
+        id=str(p.id), label=p.label, kind=p.kind, endpoint=p.endpoint, engines=p.engines,
+        key_hint=security.hint(security.decrypt(p.api_key_ciphertext)), enabled=p.enabled,
+        is_default=p.is_default,
+    )
+
+
+def _check_search(body):
+    if body.kind not in SEARCH_PROVIDERS:
+        raise HTTPException(422, "unknown_kind")
+    if body.kind == "searxng" and not body.endpoint:
+        raise HTTPException(422, "endpoint_required")
+    if body.is_default and not body.enabled:
+        raise HTTPException(422, "default_must_be_enabled")
+
+
+def _apply_search(row, body):
+    data = body.model_dump(exclude={"api_key"})
+    for key, value in data.items():
+        setattr(row, key, value)
+    if body.api_key is not None:
+        row.api_key_ciphertext = security.encrypt(body.api_key.strip()) if body.api_key.strip() else None
+
+
+@router.get("/search-providers", response_model=list[SearchOut])
+def list_search(session=Depends(deps.database)):
+    return [search_out(p) for p in session.scalars(select(SearchProvider).order_by(SearchProvider.created_at))]
+
+
+@router.post("/search-providers", response_model=SearchOut, status_code=201)
+def create_search(body: SearchIn, session=Depends(deps.database)):
+    _check_search(body)
+    _clear_default(session, SearchProvider, body.is_default)
+    row = SearchProvider()
+    _apply_search(row, body)
+    session.add(row)
+    session.commit()
+    return search_out(row)
+
+
+@router.put("/search-providers/{provider_id}", response_model=SearchOut)
+def update_search(provider_id: uuid.UUID, body: SearchIn, session=Depends(deps.database)):
+    _check_search(body)
+    row = session.get(SearchProvider, provider_id)
+    if row is None:
+        raise HTTPException(404, "not_found")
+    _clear_default(session, SearchProvider, body.is_default, keep_id=row.id)
+    _apply_search(row, body)
+    session.flush()
+    _park(session)
+    session.commit()
+    return search_out(row)
+
+
+# --- test buttons ---------------------------------------------------------------------------
+
+
+class CheckOut(BaseModel):
+    ok: bool
+    message: str
+    seconds: float
+    # A few titles the search found, so the Administrator sees what it returns.
+    samples: list[str] = []
+
+
+class ModelCheckOut(CheckOut):
+    # Whether it called a tool; None when that could not be told.
+    tools: bool | None = None
+
+
+@router.post("/llm-models/{model_id}/test", response_model=ModelCheckOut)
+def test_model(model_id: uuid.UUID, session=Depends(deps.database)):
+    model = session.get(LlmModel, model_id)
+    if model is None:
+        raise HTTPException(404, "not_found")
+    credential = session.get(LlmCredential, model.provider)
+    key = security.decrypt(credential.api_key_ciphertext) if credential else ""
+    base = credential.api_base if credential else None
+    ok, message, seconds = checks.llm(model, key, base)
+    tools = checks.tools(model, key, base) if ok else None
+    if tools is not None:
+        model.supports_tools = tools
+        session.commit()
+    return ModelCheckOut(ok=ok, message=message, seconds=round(seconds, 2), tools=tools)
+
+
+class ModelDraftIn(BaseModel):
+    provider: str
+    model: str = Field(min_length=1, max_length=200)
+    reasoning: str = ""
+    max_tokens: dict = Field(default_factory=dict)
+    # Absent: test with the key and base already stored for the provider.
+    api_key: str | None = None
+    api_base: str | None = None
+
+
+@router.post("/llm-models/check", response_model=ModelCheckOut)
+def check_model_draft(body: ModelDraftIn, session=Depends(deps.database)):
+    """Test the model in the dialog before it is saved, with a key typed
+    there or the one stored for its provider."""
+    if body.provider not in LLM_PROVIDERS:
+        raise HTTPException(422, "unknown_provider")
+    credential = session.get(LlmCredential, body.provider)
+    key = (body.api_key or "").strip() or (security.decrypt(credential.api_key_ciphertext) if credential else "")
+    base = (body.api_base or "").strip() or (credential.api_base if credential else None)
+    if LLM_PROVIDERS[body.provider].get("needs_base") and not base:
+        return ModelCheckOut(ok=False, message="this provider needs an API base URL", seconds=0.0)
+    draft = SimpleNamespace(
+        provider=body.provider, model=body.model.strip(), reasoning=body.reasoning, max_tokens=body.max_tokens
+    )
+    ok, message, seconds = checks.llm(draft, key, base)
+    tools = checks.tools(draft, key, base) if ok else None
+    return ModelCheckOut(ok=ok, message=message, seconds=round(seconds, 2), tools=tools)
+
+
+@router.post("/search-providers/{provider_id}/test", response_model=CheckOut)
+def test_search(provider_id: uuid.UUID, session=Depends(deps.database)):
+    provider = session.get(SearchProvider, provider_id)
+    if provider is None:
+        raise HTTPException(404, "not_found")
+    ok, message, seconds, samples = checks.search(provider, security.decrypt(provider.api_key_ciphertext))
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2), samples=samples)
+
+
+class SearchDraftIn(BaseModel):
+    kind: str
+    endpoint: str | None = None
+    engines: str | None = None
+    # Absent while editing: test with the key already stored for `id`.
+    api_key: str | None = None
+    id: uuid.UUID | None = None
+    query: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/search-providers/check", response_model=CheckOut)
+def check_search_draft(body: SearchDraftIn, session=Depends(deps.database)):
+    """Test what is in the dialog before it is saved, so a key can be tried
+    where it is typed."""
+    if body.kind not in SEARCH_PROVIDERS:
+        raise HTTPException(422, "unknown_kind")
+    key = body.api_key
+    if key is None and body.id is not None:
+        stored = session.get(SearchProvider, body.id)
+        key = security.decrypt(stored.api_key_ciphertext) if stored else None
+    draft = SimpleNamespace(kind=body.kind, endpoint=(body.endpoint or "").strip(), engines=(body.engines or "").strip())
+    ok, message, seconds, samples = checks.search(draft, (key or "").strip(), body.query)
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2), samples=samples)
+
+
+# --- the fast model ----------------------------------------------------------
+# One for the whole system, for research's short calls (litstorm.roles).
+
+
+class RolesIO(BaseModel):
+    fast_model_id: str | None = None
+
+
+@router.get("/model-roles", response_model=RolesIO)
+def get_roles(session=Depends(deps.database)):
+    return RolesIO(**roles.load(session).model_dump())
+
+
+@router.put("/model-roles", response_model=RolesIO)
+def put_roles(body: RolesIO, session=Depends(deps.database)):
+    if body.fast_model_id:
+        try:
+            model = session.get(LlmModel, uuid.UUID(body.fast_model_id))
+        except ValueError:
+            model = None
+        if model is None:
+            raise HTTPException(404, "not_found")
+        if not model.enabled:
+            raise HTTPException(422, "model_disabled")
+    roles.save(session, roles.Roles(fast_model_id=body.fast_model_id or None))
+    session.commit()
+    return get_roles(session)
+
+
+# --- embedding service ------------------------------------------------------
+# One for the whole system (litstorm.embedding). Its key is the LLM
+# credential of its provider, so there is no key field of its own.
+
+
+class EmbeddingOut(embedding.Embedding):
+    # The address a Run would call, once the provider's and the stored
+    # credential's are taken into account; empty for the built-in model.
+    resolved_base: str = ""
+    has_key: bool = False
+
+
+def _embedding_out(session, value):
+    credential = session.get(LlmCredential, value.provider) if value.provider != embedding.BUILTIN else None
+    return EmbeddingOut(
+        **value.model_dump(),
+        resolved_base="" if value.provider == embedding.BUILTIN else embedding.base_url(
+            value, credential.api_base if credential else None
+        ),
+        has_key=bool(embedding.key_for(value, credential)),
+    )
+
+
+@router.get("/embedding", response_model=EmbeddingOut)
+def get_embedding(session=Depends(deps.database)):
+    return _embedding_out(session, embedding.load(session))
+
+
+@router.put("/embedding", response_model=EmbeddingOut)
+def put_embedding(body: embedding.Embedding, session=Depends(deps.database)):
+    body = body.model_copy(update={"model": body.model.strip(), "api_base": (body.api_base or "").strip() or None})
+    credential = session.get(LlmCredential, body.provider)
+    wrong = embedding.problem(body, credential.api_base if credential else None)
+    if wrong:
+        raise HTTPException(422, wrong)
+    embedding.save(session, body)
+    session.commit()
+    return _embedding_out(session, body)
+
+
+@router.post("/embedding/check", response_model=CheckOut)
+def check_embedding(body: embedding.Embedding, session=Depends(deps.database)):
+    """Test the setting in the form before it is saved."""
+    body = body.model_copy(update={"model": body.model.strip(), "api_base": (body.api_base or "").strip() or None})
+    credential = session.get(LlmCredential, body.provider)
+    ok, message, seconds = embedding.check(
+        body, embedding.key_for(body, credential), credential.api_base if credential else None
+    )
+    return CheckOut(ok=ok, message=message, seconds=round(seconds, 2))
+
+
+# --- research modes ------------------------------------------------------------
+
+
+class EngineOut(BaseModel):
+    id: str
+    label: str
+    ready: bool  # built; not ready yet means no tab whatever is chosen here
+    enabled: bool
+    search_kinds: list[str]
+    needs_tools: bool
+    remote: bool = False  # a service elsewhere, set up under Medical Review (api/medical.py)
+    # Whether its Runs can read their topic first, and whether they do (litstorm.interpret).
+    interprets: bool = False
+    interpret: bool = False
+
+
+@router.get("/engines", response_model=list[EngineOut])
+def list_engines(session=Depends(deps.database)):
+    off = set(modes.load(session).disabled)
+    return [
+        EngineOut(id=name, label=e["label"], ready=e["ready"], enabled=name not in off,
+                  search_kinds=list(e["search"]), needs_tools=e["needs_tools"], remote=bool(e.get("remote")),
+                  interprets=bool(e.get("interprets")), interpret=modes.interprets(session, name))
+        for name, e in ENGINES.items()
+    ]
+
+
+class EngineSwitch(BaseModel):
+    # Either or both; what is left out stays as it is.
+    enabled: bool | None = None
+    interpret: bool | None = None
+
+
+@router.put("/engines/{engine}", response_model=list[EngineOut])
+def switch_engine(engine: str, body: EngineSwitch, session=Depends(deps.database)):
+    """Offer a mode or stop offering it; have its new Runs read their topic
+    first or not. Runs already made keep what they were made with."""
+    if engine not in ENGINES:
+        raise HTTPException(404, "not_found")
+    value = modes.load(session)
+    off, plain = set(value.disabled), set(value.uninterpreted)
+    if body.enabled is not None:
+        (off.discard if body.enabled else off.add)(engine)
+        if not modes.offered(session, off):
+            raise HTTPException(409, "last_engine")
+    if body.interpret is not None:
+        if not ENGINES[engine].get("interprets"):
+            raise HTTPException(422, "cannot_interpret")
+        (plain.discard if body.interpret else plain.add)(engine)
+    modes.save(session, modes.EngineSettings(disabled=sorted(off), uninterpreted=sorted(plain)))
+    session.commit()
+    return list_engines(session)
+
+
+# --- usage ---------------------------------------------------------------------------------------
+# What an Administrator sees of other people's research: who, when, how
+# much, with which model, and how it ended — never the topic or the report
+# (docs/web-app-design.md, สิทธิ์ผู้ดูแลต่อเนื้อหางานวิจัย).
+
+
+class UsageRow(BaseModel):
+    user_id: str
+    email: str
+    name: str = ""
+    kind: str = "person"  # or "integration" (api/tokens.py)
+    mcp_runs: int = 0  # started through the MCP server
+    runs: int
+    succeeded: int
+    failed: int
+    refunded: int
+    tokens_in: int
+    tokens_out: int
+    search_calls: int
+    cost_usd: Decimal | None
+    # True when some Run's cost is unknown, so the sum is a lower bound.
+    cost_incomplete: bool
+
+
+class UsageOut(BaseModel):
+    month: str
+    rows: list[UsageRow]
+    total_cost_usd: Decimal | None
+
+
+@router.get("/usage", response_model=UsageOut)
+def usage(month: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}$"), session=Depends(deps.database)):
+    month = month or limits.quota_month()
+    started = Run.started_at.is_not(None)
+    rows = session.execute(
+        select(
+            User.id,
+            User.email,
+            func.count(Run.id).filter(started),
+            func.count(Run.id).filter(Run.status == "succeeded"),
+            func.count(Run.id).filter(Run.status.in_(("failed", "interrupted"))),
+            # Quota units given back: a Discussion's Turns mostly take none.
+            func.coalesce(func.sum(Run.quota_units).filter(Run.quota_refunded.is_(True)), 0),
+            func.coalesce(func.sum(Run.tokens_in), 0),
+            func.coalesce(func.sum(Run.tokens_out), 0),
+            func.coalesce(func.sum(Run.search_calls), 0),
+            func.sum(Run.cost_usd),
+            func.count(Run.id).filter(started, Run.finished_at.is_not(None), Run.cost_usd.is_(None)),
+            User.name,
+            User.kind,
+            func.count(Run.id).filter(started, Run.via_token_id.is_not(None)),
+        )
+        .join(Run, (Run.owner_id == User.id) & (Run.quota_month == month))
+        .group_by(User.id, User.email, User.name, User.kind)
+        .order_by(User.email)
+    ).all()
+    out = [
+        UsageRow(
+            user_id=str(r[0]), email=r[1], runs=r[2], succeeded=r[3], failed=r[4], refunded=r[5],
+            tokens_in=r[6], tokens_out=r[7], search_calls=r[8], cost_usd=r[9], cost_incomplete=r[10] > 0,
+            name=r[11], kind=r[12], mcp_runs=r[13],
+        )
+        for r in rows
+    ]
+    total = sum((r.cost_usd for r in out if r.cost_usd is not None), Decimal(0))
+    return UsageOut(month=month, rows=out, total_cost_usd=total if out else None)
+
+
+class AdminRunOut(BaseModel):
+    id: str
+    email: str
+    name: str = ""
+    kind: str = PERSON
+    status: str
+    reason: str | None
+    model_label: str
+    queued_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    tokens_in: int | None
+    tokens_out: int | None
+    search_calls: int | None
+    cost_usd: Decimal | None
+    # The models no price was found for, and those priced under another
+    # name of LiteLLM's table (cost.price).
+    cost_unpriced: list[str] = []
+    cost_priced_as: dict[str, str] = {}
+    quota_refunded: bool
+
+
+@router.get("/runs", response_model=list[AdminRunOut])
+def recent_runs(limit: int = Query(default=100, le=500), session=Depends(deps.database)):
+    rows = session.execute(
+        select(Run, User.email, User.name, User.kind).join(User, User.id == Run.owner_id).order_by(Run.queued_at.desc()).limit(limit)
+    ).all()
+    return [
+        AdminRunOut(
+            id=str(run.id), email=email, name=name, kind=kind, status=run.status, reason=run.reason,
+            model_label=run.config.get("llm", {}).get("label", ""),
+            queued_at=run.queued_at, started_at=run.started_at, finished_at=run.finished_at,
+            tokens_in=run.tokens_in, tokens_out=run.tokens_out, search_calls=run.search_calls,
+            cost_usd=run.cost_usd, quota_refunded=run.quota_refunded,
+            cost_unpriced=(run.notes or {}).get("cost", {}).get("unpriced", []),
+            cost_priced_as=(run.notes or {}).get("cost", {}).get("priced_as", {}),
+        )
+        for run, email, name, kind in rows
+    ]
+
+
+# --- system status (litstorm.monitor) -------------------------------------------
+
+
+class OccurrenceOut(BaseModel):
+    at: datetime
+    who: str
+
+
+class IssueOut(BaseModel):
+    key: str
+    reason: str
+    severity: str  # "system": the system's own failure; "watch": often the topic's
+    engine: str
+    engine_label: str
+    model_label: str
+    count: int
+    users: list[str]
+    first_at: datetime
+    last_at: datetime
+    message: str  # the latest failure's words, the topic taken out
+    acknowledged_at: datetime | None
+    open: bool
+    recent: list[OccurrenceOut]
+
+
+class EngineStatOut(BaseModel):
+    engine: str
+    engine_label: str
+    runs: int
+    succeeded: int
+    failed: int  # the system's failures only
+    p50_minutes: float | None
+    p90_minutes: float | None
+
+
+class QueueOut(BaseModel):
+    queued: int
+    running: int
+    oldest_wait_seconds: int | None
+    max_running: int
+
+
+class MonitorOut(BaseModel):
+    since: datetime
+    issues: list[IssueOut]
+    open_count: int
+    engines: list[EngineStatOut]
+    queue: QueueOut
+
+
+class AcknowledgeIn(BaseModel):
+    keys: list[str] = Field(min_length=1, max_length=200)
+
+
+@router.get("/monitor", response_model=MonitorOut)
+def system_status(
+    days: int = Query(default=monitor.DEFAULT_DAYS, ge=1, le=monitor.MAX_DAYS), session=Depends(deps.database)
+):
+    return monitor.status(session, days)
+
+
+class BadgeOut(BaseModel):
+    open_count: int
+    last_at: datetime | None
+
+
+@router.get("/monitor/open", response_model=BadgeOut)
+def open_issues(session=Depends(deps.database)):
+    """The sidebar's badge and the home page's notice ask this every minute."""
+    return monitor.badge(session)
+
+
+@router.post("/monitor/acknowledge", status_code=204)
+def acknowledge(body: AcknowledgeIn, admin=Depends(deps.admin), session=Depends(deps.database)):
+    monitor.acknowledge(session, body.keys, admin)
+
+
+# --- limits -------------------------------------------------------------------
+
+
+@router.get("/limits", response_model=limits.Limits)
+def get_limits(session=Depends(deps.database)):
+    return limits.load(session)
+
+
+@router.put("/limits", response_model=limits.Limits)
+def put_limits(body: limits.Limits, session=Depends(deps.database)):
+    limits.save(session, body)
+    session.commit()
+    return body

@@ -1,0 +1,179 @@
+// Pieces of a Run's card that a Discussion's Turns use too: the stepper,
+// the notes on how it went, why it failed, and the confirm dialog.
+import { Check, Circle, History, Info, Loader2, Timer } from "lucide-react";
+import { useState } from "react";
+
+import type { Schemas } from "@/api/client";
+import { useRunOptions } from "@/components/composer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { has, useT, type Key } from "@/i18n";
+import { cn } from "@/lib/utils";
+
+export const FINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
+// STORM's stages; every Engine's own list comes with the options.
+const DEFAULT_STAGES = ["research", "outline", "article", "polish"];
+
+/** Why a Run or Turn did not work, whose fault it was, and what to do next. A failure of the
+ * system's own (server: monitor.SYSTEM) says so, and that the Administrators see it on
+ * System status: the owner has nothing to report. */
+export function FailureNote({
+  run,
+  refunded = "run.refunded",
+  className,
+}: {
+  run: Schemas["RunOut"];
+  refunded?: Key;
+  className?: string;
+}) {
+  const { t } = useT();
+  if (!run.reason || run.reason === "cancelled" || run.status === "succeeded") return null;
+  const reason = `reason.${run.reason}`;
+  const next = `failure.next.${run.reason}`;
+  const after = [
+    run.system_fault && t("failure.system"),
+    has(next) && t(next as Key),
+    run.quota_refunded && t(refunded),
+  ].filter(Boolean);
+  return (
+    <div className={cn("rounded-lg bg-destructive/5 px-3 py-2 text-sm", className)}>
+      <p className="text-destructive">{has(reason) ? t(reason as Key) : run.reason}</p>
+      {/* What the service said, e.g. MRA's message and its hotlines for an emergency. */}
+      {run.reason === "service_declined" && run.message && <p className="mt-1 text-destructive">{run.message}</p>}
+      {after.length > 0 && <p className="mt-1 text-xs text-muted-foreground">{after.join(" · ")}</p>}
+    </div>
+  );
+}
+
+/** Ask before doing something that cannot be undone from this page. */
+export function useConfirm() {
+  const { t } = useT();
+  const [state, setState] = useState<{ text: string; action: () => void } | null>(null);
+  const dialog = (
+    <AlertDialog open={!!state} onOpenChange={(open) => !open && setState(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("common.confirm")}</AlertDialogTitle>
+          <AlertDialogDescription>{state?.text}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={() => {
+              state?.action();
+              setState(null);
+            }}
+          >
+            {t("yes")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+  return { confirm: (text: string, action: () => void) => setState({ text, action }), dialog };
+}
+
+export function Stepper({
+  stage,
+  status,
+  engine,
+  interpret = false,
+}: {
+  stage: string | null;
+  status: string;
+  engine: string;
+  // It reads its topic first (server: litstorm.interpret).
+  interpret?: boolean;
+}) {
+  const { t } = useT();
+  const own = useRunOptions().data?.engines.find((e) => e.id === engine)?.stages ?? DEFAULT_STAGES;
+  const STAGES = interpret ? ["interpret", ...own] : own;
+  const current = STAGES.indexOf(stage ?? "");
+  const done = status === "succeeded";
+  return (
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
+      {STAGES.map((s, i) => {
+        const state = done || i < current ? "done" : i === current ? "now" : "todo";
+        return (
+          <li key={s} className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                state === "done" && "bg-success-soft text-success",
+                state === "now" && "bg-brand-soft font-medium text-brand",
+                state === "todo" && "bg-muted text-muted-foreground",
+              )}
+            >
+              {state === "done" ? (
+                <Check className="size-3" />
+              ) : state === "now" ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Circle className="size-3" />
+              )}
+              {t(`stage.${s}` as Key)}
+            </span>
+            {i < STAGES.length - 1 && <span className="h-px w-3 bg-border" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// How a Run went, where the owner should know: it wrote from what it had
+// when its time ran short, wrote its report a second time because the first
+// stopped part-way, or matched sources with the fallback model.
+// Cached searches are good news, said quietly.
+export function RunNotes({ notes }: { notes: Record<string, unknown> }) {
+  const { t } = useT();
+  const cut = notes.research_cut_short as { seconds?: number } | undefined;
+  const fallback = notes.embedding as { fallback?: boolean } | undefined;
+  const cache = notes.search_cache as { hits?: number } | undefined;
+  const skipped = Object.keys((notes.sources_skipped as { sources?: Record<string, string> } | undefined)?.sources ?? {});
+  const rewritten = !!notes.rewritten;
+  if (!cut && !fallback?.fallback && !cache?.hits && !skipped.length && !rewritten) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {cut && (
+        <span className="flex items-center gap-1 text-warning">
+          <Timer className="size-3" />
+          {t("run.note.cutShort", { n: Math.round((cut.seconds ?? 0) / 60) || 1 })}
+        </span>
+      )}
+      {skipped.length > 0 && (
+        <span className="flex items-center gap-1 text-warning">
+          <Info className="size-3" />
+          {t("run.note.sourcesSkipped", { names: skipped.join(", ") })}
+        </span>
+      )}
+      {rewritten && (
+        <span className="flex items-center gap-1 text-warning">
+          <Info className="size-3" />
+          {t("run.note.rewritten")}
+        </span>
+      )}
+      {fallback?.fallback && (
+        <span className="flex items-center gap-1 text-warning">
+          <Info className="size-3" />
+          {t("run.note.embeddingFallback")}
+        </span>
+      )}
+      {!!cache?.hits && (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <History className="size-3" />
+          {t("run.note.cached", { n: cache.hits })}
+        </span>
+      )}
+    </div>
+  );
+}

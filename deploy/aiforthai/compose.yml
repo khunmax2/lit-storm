@@ -85,7 +85,9 @@ services:
         target: /var/lib/postgresql/data
         bind: { create_host_path: false }
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "litstorm"]
+      # TCP, not the socket: on a first start the image initialises the data folder with a socket-only
+      # server, which would read as ready before anything can connect over the network.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "litstorm"]
       interval: 5s
       retries: 20
     networks: [deeplit]
@@ -223,7 +225,8 @@ services:
         target: /var/lib/postgresql/data
         bind: { create_host_path: false }
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mra -d mra"]
+      # TCP, as for db: the first start initialises over a socket-only server.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U mra -d mra"]
       interval: 5s
       timeout: 3s
       retries: 20

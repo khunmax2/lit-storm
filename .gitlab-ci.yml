@@ -1,0 +1,111 @@
+# Deploys DeepLit with MedicalReviewerAgent to https://deeplit.aiforthai.in.th on the
+# ai4thai-gpu1 runner (deploy/aiforthai/README.md). Shaped after the aiforthai
+# administrators' guide and 10service/sansarndeep, the pipeline already running on
+# this runner: its jobs drive the host's own Docker, so what `up` starts outlives
+# the job.
+#
+#   check   on every branch: which machine the runner reaches, and the data folders
+#   build   on main: every image, from this commit and the pinned forks
+#   deploy  on main, a button: data folders, `up`, a health gate
+#   verify  after deploy: DeepLit, MRA and the key between them answer
+#   stop    a button: `down`, data kept
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  COMPOSE: "docker compose -f deploy/aiforthai/compose.yml --env-file .env"
+  DEPLOY_TAG: "$CI_COMMIT_SHORT_SHA"
+  # Not a secret; the same as DATA_PATH in ENV_FILE, for the check job, which
+  # runs on branches that cannot read ENV_FILE (it is Protected).
+  HOST_DATA_PATH: "/home/search/Thoughtmind/deeplit"
+
+services:
+  - docker:dind
+
+stages:
+  - check
+  - build
+  - deploy
+  - verify
+  - stop
+
+default:
+  tags:
+    - ai4thai-gpu1
+
+# .env from the ENV_FILE variable (type File: the variable is its path), checked
+# for shape, and the pinned commits. Nothing from .env is ever printed.
+.with-env:
+  before_script:
+    - umask 077
+    - test -s "$ENV_FILE" || { echo "ENV_FILE is not set for this branch (it is Protected: main only)"; exit 1; }
+    - cp "$ENV_FILE" .env
+    - sh deploy/aiforthai/check-env.sh .env
+    - . deploy/aiforthai/pins.sh
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+check_host:
+  stage: check
+  script:
+    # Which daemon the job reached: a throwaway DinD would show a fresh, empty
+    # machine here, and what `up` starts would vanish with the job.
+    - docker info --format 'daemon {{.ServerVersion}} on {{.Name}} ({{.OperatingSystem}}, {{.NCPU}} CPUs, {{.MemTotal}} bytes)'
+    - docker ps --format '{{.Names}}' | head -n 20
+    - echo "== $HOST_DATA_PATH on the host"
+    - docker run --rm -v "$HOST_DATA_PATH:/d:ro" alpine:3.22 sh -c 'ls -ln /d; df -h /d'
+
+build_images:
+  stage: build
+  extends: .with-env
+  script:
+    # One image at a time, each tried up to three times: every image fetches
+    # from GitHub, PyPI and npm, and a single dropped download (seen in the
+    # rehearsal) would otherwise fail all of them.
+    - >
+      for svc in searxng web mra mra-searxng mra-migrate mra-web api; do
+        n=1;
+        until $COMPOSE build --pull "$svc"; do
+          [ "$n" -ge 3 ] && { echo "!! $svc failed to build 3 times"; exit 1; };
+          n=$((n + 1)); echo "-- retrying $svc ($n of 3)"; sleep 20;
+        done;
+      done
+
+deploy_app:
+  stage: deploy
+  extends: .with-env
+  resource_group: production
+  script:
+    # The data folders, made if missing and owned right; lists them.
+    - $COMPOSE run --rm prepare
+    # No `down` first: `up` replaces only the containers whose image or config
+    # changed. --remove-orphans: services dropped from compose.yml stop too.
+    - $COMPOSE up -d --remove-orphans
+    - sh deploy/aiforthai/wait-healthy.sh "$COMPOSE"
+    - $COMPOSE ps
+    - docker image prune -f
+  environment:
+    name: production
+    url: https://deeplit.aiforthai.in.th
+  # A button, not a consequence of pushing: there is no staging behind this
+  # runner, so every deploy is a live change someone chose to make.
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+smoke_test:
+  stage: verify
+  extends: .with-env
+  needs: [deploy_app]
+  script:
+    - sh deploy/aiforthai/smoke-test.sh "$COMPOSE"
+
+stop_app:
+  stage: stop
+  extends: .with-env
+  script:
+    # `down` without -v; the data is in host folders under DATA_PATH either way.
+    - $COMPOSE down
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual

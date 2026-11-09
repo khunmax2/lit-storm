@@ -38,7 +38,8 @@ default:
 .with-env:
   before_script:
     - umask 077
-    - test -s "$ENV_FILE" || { echo "ENV_FILE is not set for this branch (it is Protected: main only)"; exit 1; }
+    # quoted: the ": " in the message would make YAML read the line as a key
+    - 'test -s "$ENV_FILE" || { echo "ENV_FILE is not set for this branch (it is Protected: main only)"; exit 1; }'
     - cp "$ENV_FILE" .env
     - sh deploy/aiforthai/check-env.sh .env
     - . deploy/aiforthai/pins.sh

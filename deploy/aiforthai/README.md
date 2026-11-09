@@ -9,7 +9,7 @@ paths, `0.0.0.0` ports) and the pipeline of `10service/sansarndeep` on the same 
 |---|---|
 | Public address | https://deeplit.aiforthai.in.th/ (the aiforthai reverse proxy, 203.185.132.210, terminates TLS) |
 | Host port | `0.0.0.0:10370` → DeepLit's web container, port 80 |
-| Data | `/home/search/Thoughtmind/deeplit` (`DATA_PATH`) |
+| Data | `/home/search/Thoughtmind/deeplit/data` (`DATA_PATH`; every project on the machine keeps its data in `<project>/data`) |
 | Runner | `ai4thai-gpu1` (its jobs drive the host's Docker; `hackathon-siamai1` in the guide is stale) |
 | Secrets | the `ENV_FILE` CI variable, from `env.example` |
 

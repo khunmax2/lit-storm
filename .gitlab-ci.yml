@@ -17,7 +17,7 @@ variables:
   DEPLOY_TAG: "$CI_COMMIT_SHORT_SHA"
   # Not a secret; the same as DATA_PATH in ENV_FILE, for the check job, which
   # runs on branches that cannot read ENV_FILE (it is Protected).
-  HOST_DATA_PATH: "/home/search/Thoughtmind/deeplit"
+  HOST_DATA_PATH: "/home/search/Thoughtmind/deeplit/data"
 
 services:
   - docker:dind

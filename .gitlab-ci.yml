@@ -56,6 +56,8 @@ check_host:
     - echo "== $HOST_DATA_PATH on the host"
     # --mount, not -v: a missing folder fails here instead of being made on the host.
     - docker run --rm --mount "type=bind,source=$HOST_DATA_PATH,target=/d,readonly" alpine:3.22 sh -c 'ls -ln /d; df -h /d'
+    # TEMPORARY: how the other projects lay out their data, folder names only, two levels.
+    - docker run --rm --mount "type=bind,source=$(dirname "$HOST_DATA_PATH"),target=/p,readonly" alpine:3.22 sh -c 'cd /p && find . -mindepth 1 -maxdepth 2 -type d | sort | head -n 80'
 
 build_images:
   stage: build

@@ -44,8 +44,9 @@ reads them. Nothing is bind-mounted from the checkout: config is built into imag
 ## First deploy
 
 1. **ENV_FILE**: Settings → CI/CD → Variables → Add variable. Key `ENV_FILE`, type
-   **File**, **Protected**, environment scope `production`, **Expand variable
-   reference off**. Value: `env.example` with every `CHANGE_ME` replaced. Keep a copy
+   **File**, **Protected**, environments **All** (`*`: build, smoke test and stop read
+   it too, and only `deploy_app` is in `production`), **Expand variable reference
+   off**. Value: `env.example` with every `CHANGE_ME` replaced. Keep a copy
    of `LITSTORM_SECRET_KEY` off the machine.
 2. **Merge to main** (main is protected, no force push): push a branch, open a merge
    request. On the branch, `check_host` already shows which machine the runner

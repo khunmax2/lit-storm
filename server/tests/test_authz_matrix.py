@@ -152,6 +152,7 @@ ACCESS: dict[tuple[str, str], str] = {
     ("PATCH", "/api/runs/{run_id}/visuals"): "owner",
     ("GET", "/api/runs/{run_id}/interactive"): "owner",
     ("GET", "/api/runs/{run_id}/service-page"): "owner",
+    ("GET", "/api/runs/{run_id}/service-data"): "owner",
     ("GET", "/api/runs/{run_id}/observatory"): "owner",
     ("GET", "/api/runs/{run_id}/export"): "owner",
     ("GET", "/api/exports/{token}"): "public",

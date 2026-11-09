@@ -22,6 +22,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@mra/*": [
+        "./src/mra/*"
+      ],
+      "next/link": [
+        "./src/mra/shims-link.tsx"
       ]
     }
   },

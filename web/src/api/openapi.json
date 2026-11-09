@@ -2741,6 +2741,48 @@
     }
    }
   },
+  "/api/runs/{run_id}/service-data": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "View Service Data",
+    "description": "A remote Engine's own answer, kept with the Run (Medical Review: MRA's\nreview JSON), for the web app to draw MRA's report itself.",
+    "operationId": "view_service_data_api_runs__run_id__service_data_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}/service-page": {
    "get": {
     "tags": [

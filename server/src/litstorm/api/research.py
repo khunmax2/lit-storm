@@ -1281,6 +1281,18 @@ def view_interactive(
     )
 
 
+@router.get("/runs/{run_id}/service-data")
+def view_service_data(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """A remote Engine's own answer, kept with the Run (Medical Review: MRA's
+    review JSON), for the web app to draw MRA's report itself."""
+    run = deps.readable(session, Run, run_id, user)
+    path = os.path.join(settings.get().runs_dir, str(run.id), "work", "mra_review.json")
+    if not catalog.remote(run.engine) or not os.path.exists(path):
+        raise HTTPException(404, "no_service_data")
+    with open(path, "rb") as f:
+        return Response(f.read(), media_type="application/json", headers={"Cache-Control": "private, no-store"})
+
+
 @router.get("/runs/{run_id}/service-page")
 def view_service_page(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
     """A remote Engine's own report page, kept with the Run when it ended

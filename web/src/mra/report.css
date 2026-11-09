@@ -1,0 +1,991 @@
+/* MRA's report stylesheet (frontend/src/app/globals.css), compiled on its own and used only inside the shadow root
+   MraView makes: :root and body become :host, so nothing here reaches DeepLit's page. */
+@import "tailwindcss" source(none);
+@source "./";
+
+/* DeepLit's sidebar takes 16rem beside the report from md up: MRA's breakpoints from md are 16rem wider here
+   (lib/host.ts APP_CHROME_PX), so its columns switch at the width they were drawn for. sm stays (no sidebar there). */
+@theme {
+  --breakpoint-md: 64rem;
+  --breakpoint-lg: 80rem;
+  --breakpoint-xl: 96rem;
+  --breakpoint-2xl: 112rem;
+}
+
+:host {
+  --font-plex-thai: "IBM Plex Sans Thai";
+  --font-plex-mono: "IBM Plex Mono";
+  --font-source-serif: "Source Serif 4 Variable", "Source Serif 4";
+  display: block;
+  background: var(--ground);
+  color: var(--ink);
+}
+
+/* Theatre Green — tokens from DESIGN.md. Light "Day theatre" is the default; dark "Night shift" follows the OS
+   unless the viewer picks a theme (data-theme on <html>). */
+:host {
+  --ground: #eef2f7;
+  --surface: #ffffff;
+  --rail: #f4f6f9;
+  --ink: #0f172a;
+  --muted: #475569;
+  --rule: #d5dce5;
+  --primary: #1d4ed8;
+  --on-primary: #ffffff;
+  --highlight: #f2d16b;
+  --highlight-ink: #0f172a;
+  --tape: #ffffff;
+  --stripe: #0f172a;
+  --hatch: #94a3b8;
+  --sup: #1d4ed8;
+  --on-sup: #ffffff;
+  --harm: #c2410c;
+  --none: #64748b;
+  --mixed: #8e3b7e;
+  --unclear: #64748b;
+  --ok: #0f766e;
+  --warn: #92400e;
+  --warn-bg: #fdf1dc;
+  --err: #a33a12;
+  --err-bg: #fbe6dc;
+  --info-bg: #eef3fb;
+  --band: #0b2a5b;
+  --band-ink: #ffffff;
+  --band-soft: #c7d7f5;
+  --band-text: #eef3fc;
+  --band-accent: #fcd9a4;
+  --band-off: #7f94bb;
+  --band-line: rgb(255 255 255 / 0.16);
+  --chip-on: #0b2a5b;
+  --on-chip: #ffffff;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme="light"])) {
+    --ground: #0c1524;
+    --surface: #151f31;
+    --rail: #1b283c;
+    --ink: #e4eaf3;
+    --muted: #a2b1c6;
+    --rule: #2b394f;
+    --primary: #8fb2ff;
+    --on-primary: #0b1a33;
+    --highlight: #e9c75a;
+    --tape: #151f31;
+    --stripe: #e4eaf3;
+    --hatch: #4f6078;
+    --sup: #8fb2ff;
+    --on-sup: #0b1a33;
+    --harm: #f08a4b;
+    --none: #a2b1c6;
+    --mixed: #d08cc0;
+    --unclear: #a2b1c6;
+    --ok: #5fc3a0;
+    --warn: #e9c75a;
+    --warn-bg: #3a3420;
+    --err: #f08a4b;
+    --err-bg: #3b2a20;
+    --info-bg: #1b2c48;
+    --band: #12305f;
+    --chip-on: #dbe6fb;
+    --on-chip: #0b1a33;
+    color-scheme: dark;
+  }
+}
+
+:host([data-theme="dark"]) {
+  --ground: #0c1524;
+  --surface: #151f31;
+  --rail: #1b283c;
+  --ink: #e4eaf3;
+  --muted: #a2b1c6;
+  --rule: #2b394f;
+  --primary: #8fb2ff;
+  --on-primary: #0b1a33;
+  --highlight: #e9c75a;
+  --tape: #151f31;
+  --stripe: #e4eaf3;
+  --hatch: #4f6078;
+  --sup: #8fb2ff;
+  --on-sup: #0b1a33;
+  --harm: #f08a4b;
+  --none: #a2b1c6;
+  --mixed: #d08cc0;
+  --unclear: #a2b1c6;
+  --ok: #5fc3a0;
+  --warn: #e9c75a;
+  --warn-bg: #3a3420;
+  --err: #f08a4b;
+  --err-bg: #3b2a20;
+  --info-bg: #1b2c48;
+  --band: #12305f;
+  --chip-on: #dbe6fb;
+  --on-chip: #0b1a33;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-rail: var(--rail);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-highlight: var(--highlight);
+  --color-sup: var(--sup);
+  --color-harm: var(--harm);
+  --color-none: var(--none);
+  --color-mixed: var(--mixed);
+  --color-unclear: var(--unclear);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --color-info-bg: var(--info-bg);
+  --color-on-sup: var(--on-sup);
+  --color-hatch: var(--hatch);
+  --font-display: var(--font-plex-thai), system-ui, sans-serif;
+  --font-body: var(--font-plex-thai), system-ui, sans-serif;
+  --font-num: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+  --font-quote: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  /* Code is not a verified number, so it never borrows Martian Mono. */
+  --font-code: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --radius-sm: 6px;
+}
+
+* {
+  border-color: var(--rule);
+}
+
+:host {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Site header height, measured live by <HeaderHeight>; these are first-paint fallbacks (it wraps to two rows below md).
+   The offline report has no header and sets it to 0 on its root. */
+:host {
+  --header-h: 3.5rem;
+}
+@media (max-width: 47.98rem) {
+  :host {
+    --header-h: 7.75rem;
+  }
+}
+
+:host {
+  /* DeepLit: the report's card sits on the app's page, with no ground of its own around it */
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--highlight);
+  color: var(--highlight-ink);
+}
+
+/* Verified numbers: Martian Mono + autoclave-tape underline. Only for values that passed verification. */
+.num-verified {
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92em;
+  position: relative;
+  white-space: nowrap;
+  padding-bottom: 3px;
+}
+.num-verified::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -2px;
+  height: 2px;
+  background: repeating-linear-gradient(115deg, var(--stripe) 0 2px, transparent 2px 5px);
+  transition: opacity 0.4s ease-out;
+}
+.num-verified[data-pending="true"] {
+  font-family: var(--font-body);
+}
+.num-verified[data-pending="true"]::after {
+  opacity: 0;
+}
+
+/* Computed numbers (pooled analysis): display-face tabular figures, no tape, a small outlined "คำนวณ" tag.
+   Never Martian Mono, which means "checked against the paper". */
+.num-computed {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.computed-tag {
+  font: 600 0.68rem/1.3 var(--font-display);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 0 4px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  align-self: center;
+}
+
+.hole {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 0.78rem/1.4 var(--font-display);
+  color: var(--muted);
+  padding: 1px 8px;
+  border: 1px dashed var(--hatch);
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--hatch) 35%, transparent) 4px 5px
+  );
+}
+
+.tape-mark {
+  background: repeating-linear-gradient(135deg, var(--stripe) 0 3px, var(--tape) 3px 7px);
+}
+
+/* Thai has no spaces between words: keep a headline phrase on one line instead of breaking it anywhere. */
+.nw {
+  white-space: nowrap;
+}
+
+/* Plan 20 Task 7: Thai segmented by ThaiText (each word a .th-w, a <wbr> between words). The strict rules help engines
+   that honour them for Thai; Chromium does not, which is why each word does not wrap. Words stay inline (an inline-block
+   word would add spaces to a heading's accessible name in Chromium); a run too long to be one word is left as plain text,
+   which `overflow-wrap: anywhere` may break as a last resort, so nothing overflows (fix round 1). */
+.th-seg {
+  line-break: strict;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.th-w,
+.th-n {
+  white-space: nowrap;
+}
+
+/* Running prose in the report (answer, findings, claims, gaps, limitations, methods): the body size in English, the
+   Thai reading size (DESIGN.md body-thai-reading: 17px / 1.75) in a Thai report, untranslated English lines included. */
+.reading {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+[lang="th"] .reading,
+.reading[lang="th"] {
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+/* Report section nav (Plan 20): fade the edge that has more links, so a cut-off row reads as scrollable. */
+.nav-fade {
+  scrollbar-width: thin;
+}
+.nav-fade[data-fade-end],
+.edge-fade[data-fade-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+.nav-fade[data-fade-start],
+.edge-fade[data-fade-start] {
+  mask-image: linear-gradient(to right, transparent, #000 2.5rem);
+}
+.nav-fade[data-fade-start][data-fade-end],
+.edge-fade[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+}
+/* A scroll region's mask would also fade its focus ring: drop the mask while it has keyboard focus. */
+.edge-fade:focus-visible {
+  mask-image: none;
+}
+
+/* Plan 20 Task 5 forest panels: one grid per row (label · plot · numbers), the same columns in every row so the
+   numeric column lines up; in a narrow panel the numbers move under the label and the plot keeps the width. */
+.forest {
+  container: forest / inline-size;
+  font-feature-settings: "tnum";
+}
+.forest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 30%) minmax(0, 1fr) 10.5rem;
+  grid-template-areas: "label plot num";
+}
+/* half a card wide (two panels side by side): the same row, a narrower number column */
+@container forest (max-width: 34rem) {
+  .forest-row {
+    grid-template-columns: minmax(0, 32%) minmax(0, 1fr) 5.5rem;
+  }
+  .forest-tick-minor {
+    display: none;
+  }
+  .forest-favours > span {
+    width: 50% !important;
+  }
+  .forest-row > :has(> .forest-favours) {
+    grid-area: auto / 1 / auto / -1 !important;
+  }
+}
+@container forest (max-width: 22rem) {
+  .forest-row {
+    grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
+    grid-template-areas: "label plot" "num plot";
+  }
+  .forest-row > .forest-num {
+    padding-left: 0;
+    padding-top: 0;
+  }
+  .forest-tick-minor {
+    display: none;
+  }
+  /* the favours labels split the axis in halves (not at the null line) so neither is squeezed */
+  .forest-favours > span {
+    width: 50% !important;
+  }
+}
+
+.label {
+  font: 600 0.75rem/1.3 var(--font-display);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  /* a static ping ring would sit on the tile edge and hide the dashed "working" outline */
+  .stage-ping {
+    display: none;
+  }
+}
+
+/* Agent stage loops (disabled by the reduced-motion block above). */
+@keyframes stage-march {
+  to { stroke-dashoffset: -14; }
+}
+@keyframes stage-pulse {
+  50% { opacity: 0.45; }
+}
+@keyframes thought-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes evidence-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.stage-march {
+  animation: stage-march 1.2s linear infinite;
+}
+.stage-pulse {
+  animation: stage-pulse 1.6s ease-in-out infinite;
+}
+/* Plan 17b: the agent that is working sends out a thin ring (stroke only: no glow, no fill). */
+@keyframes stage-ping {
+  from { opacity: 0.55; transform: scale(1.08); } /* starts outside the tile outline, never on it */
+  to { opacity: 0; transform: scale(1.45); }
+}
+.stage-ping {
+  opacity: 0; /* the keyframes drive it */
+  animation: stage-ping 1.8s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Plan 18 team view: a working agent blinks every 4-6 s (period set per member), its mouth moves while its speech
+   types in, and a sender's eyes glance at the receiver during a hand-off. All off under reduced motion (above). */
+@keyframes team-blink {
+  0%, 93%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.12); }
+}
+.team-blink {
+  animation: team-blink 5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes team-talk {
+  50% { transform: scaleY(2.4); }
+}
+[data-member][data-typing] .team-mouth {
+  animation: team-talk 0.24s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.team-eyes {
+  transition: transform 150ms ease-out;
+}
+.team-eyes[data-look="r"] { transform: translateX(2.5px); }
+.team-eyes[data-look="l"] { transform: translateX(-2.5px); }
+.team-eyes[data-look="d"] { transform: translateY(2.5px); }
+.team-eyes[data-look="u"] { transform: translateY(-2.5px); }
+
+/* Plan 20 Task 8: print / PDF. A4 with a running header (short title, review id) and "page X of Y" in the @page margin
+   boxes (their text is written per report by <Report>, lib/print.ts; a browser without margin boxes shows none). The
+   light theme whatever the screen theme; controls hidden (Tailwind `print:hidden` on each); every disclosure open (JS,
+   with ::details-content as the CSS fallback) and every clamped cell in full; tables at 9pt with rows kept whole and
+   their header repeated; the verified tape as a solid underline plus ✓, a blanked value as bracketed text. */
+@page {
+  size: A4;
+  margin: 18mm 14mm 16mm;
+  @top-left {
+    font: 500 8pt/1.3 "Bai Jamjuree", "Anuphan", system-ui, sans-serif;
+    color: #4a5e57;
+  }
+  @top-right {
+    font: 500 8pt/1.3 ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    color: #4a5e57;
+  }
+  @bottom-right {
+    font: 500 8pt/1.3 "Bai Jamjuree", "Anuphan", system-ui, sans-serif;
+    color: #4a5e57;
+  }
+}
+
+@media print {
+  /* the light tokens, over any screen theme (more specific than both dark rules above) */
+  :host {
+    --ground: #ffffff;
+    --surface: #ffffff;
+    --rail: #ffffff;
+    --ink: #0f172a;
+    --muted: #475569;
+    --rule: #d5dce5;
+    --primary: #1d4ed8;
+    --on-primary: #ffffff;
+    --highlight: #f2d16b;
+    --tape: #ffffff;
+    --stripe: #0f172a;
+    --hatch: #94a3b8;
+    --sup: #1d4ed8;
+    --on-sup: #ffffff;
+    --harm: #c2410c;
+    --none: #64748b;
+    --mixed: #8e3b7e;
+    --unclear: #64748b;
+    --ok: #0f766e;
+    --warn: #92400e;
+    --warn-bg: #fdf1dc;
+    --err: #a33a12;
+    --err-bg: #fbe6dc;
+    --info-bg: #eef3fb;
+    --band: #0b2a5b;
+    --chip-on: #0b2a5b;
+    --on-chip: #ffffff;
+    color-scheme: light;
+  }
+  html,
+  body {
+    background: #ffffff;
+  }
+  /* direction glyphs, forest whiskers and certainty marks are drawn with background colours, which browsers drop
+     when printing by default: the report keeps its colours (the light tokens above) */
+  [data-report],
+  [data-offline-header] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    font-size: 10pt;
+    line-height: 1.55;
+  }
+  .reading,
+  [lang="th"] .reading,
+  .reading[lang="th"] {
+    font-size: 10.5pt;
+    line-height: 1.6;
+  }
+  main {
+    padding-bottom: 0 !important;
+  }
+
+  /* the report bench prints as one column of text: no frame, no padding, no sticky parts */
+  [data-report] > div,
+  [data-report] > div > div {
+    border: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  /* the table of contents and the rail are not printed: the reading column takes the whole width */
+  [data-report] > div {
+    display: block !important;
+  }
+  /* Block flow on paper (fix round 1). Chromium does not grow a grid when page breaking pushes one of its items to
+     the next page, so the items after it, and the footer, were drawn over it (and a grid disclosure, the appendix,
+     left a blank page after the report). The report's structural grids (the page, its sections, figures, lists,
+     disclosures and their wrappers) flow as blocks, the gap turned into a top margin. Small
+     units keep their grid: a cell's stacked lines, a list entry, a button, a two-column list (dl), a PRISMA stage. */
+  [data-report].grid,
+  [data-report] :is(div, section, figure, ul, ol, header, article, details).grid:not([data-flow-stage], .print\:hidden, .hidden, :is(td, th, li, button, span, p, dd, dt, label) *) {
+    display: block !important;
+  }
+  [data-report].grid > * + *,
+  [data-report] :is(div, section, figure, ul, ol, header, article, details).grid:not([data-flow-stage], :is(td, th, li, button, span, p, dd, dt, label) *) > * + * {
+    margin-top: 0.5rem;
+  }
+  [data-report] :is(div, section, figure, ul, ol, header, article, details).grid:is(.gap-0\.5, .gap-1, .gap-1\.5):not([data-flow-stage], :is(td, th, li, button, span, p, dd, dt, label) *) > * + * {
+    margin-top: 0.25rem;
+  }
+  [data-report] :is(div, section, figure, ul, ol, header, article, details).grid:is(.gap-3, .gap-4):not([data-flow-stage], :is(td, th, li, button, span, p, dd, dt, label) *) > * + * {
+    margin-top: 0.75rem;
+  }
+  [data-report].gap-6 > * + *,
+  [data-report] :is(div, section, figure, ul, ol, header, article, details).grid.gap-6:not(:is(td, th, li, button, span, p, dd, dt, label) *) > * + * {
+    margin-top: 1.25rem;
+  }
+  [data-report] :is(div, section, figure, ul, ol, header, article, details).grid.gap-10 > * + * {
+    margin-top: 1.75rem;
+  }
+  /* body and main end with the report: no viewport-high minimum that can add a blank last page */
+  body {
+    min-height: 0 !important;
+  }
+  /* the site footer (its disclaimer) prints whole at the end, in block flow: a grid footer pushed to a new page
+     left a blank page after the report */
+  body > footer .grid:not(.print\:hidden) {
+    display: block !important;
+  }
+  body > footer .grid > * + * {
+    margin-top: 0.75rem;
+  }
+  /* the footer's last line ends the paper with no padding under it: its bottom padding alone pushed an empty last page
+     after the Thai meta-analysis report (Task 9; some other long Thai reports still get one, see e2e/pdf-layout.ts) */
+  body > footer > div:last-child {
+    padding-bottom: 0 !important;
+  }
+  [data-report] .sticky {
+    position: static !important;
+  }
+  /* screen-reader-only text is for screen readers: on paper its 1px box printed as a stray dot (and, placed outside
+     the flow, could add a blank last page) */
+  [data-report] .sr-only {
+    display: none !important;
+  }
+  /* Thai marks above the letters stand higher than a tight heading line (1.2): on the first line of a page they
+     were painted at the foot of the page before, as stray dots. On paper headings get room for them */
+  [data-report] :is(h1, h2, h3, h4, figcaption, .label) {
+    line-height: 1.6 !important;
+  }
+  /* touch targets mean nothing on paper */
+  [data-report] button {
+    min-height: 0 !important;
+    min-width: 0 !important;
+  }
+
+  /* scroll regions show everything: no mask, no clipping (tables fit the page instead) */
+  .edge-fade,
+  .nav-fade {
+    mask-image: none !important;
+    overflow: visible !important;
+  }
+  [data-report] table {
+    font-size: 9pt;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  [data-report] thead {
+    display: table-header-group;
+  }
+  /* small units stay whole (a row, a list entry, a card, a PRISMA stage); big tables and lists break between them,
+     the table header repeated */
+  [data-report] tr,
+  [data-report] tbody[data-sof-row],
+  [data-report] li,
+  [data-report] [data-claim] {
+    break-inside: avoid;
+  }
+  /* a scroll region's frame would be split into an empty box at a page foot: the rows carry the rules */
+  [data-report] [data-scroll-region] > [role="region"] {
+    border: 0 !important;
+  }
+  /* a scroll box cannot break across pages: on paper every one shows its content in flow */
+  [data-report] .overflow-x-auto,
+  [data-report] .overflow-auto {
+    overflow: visible !important;
+  }
+
+  /* clamped cells print in full (SoF "what it means", literature-matrix outcomes and fields) */
+  [data-report] .line-clamp-2,
+  [data-report] .line-clamp-3 {
+    display: revert !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: none !important;
+    overflow: visible !important;
+  }
+
+  /* every disclosure open (the JS opens them; this shows their content where it did not run) */
+  @supports selector(::details-content) {
+    [data-report] details::details-content {
+      content-visibility: visible;
+      display: block;
+    }
+  }
+
+  /* headings stay with what follows; figures and their captions never split */
+  h1,
+  h2,
+  h3,
+  h4,
+  summary {
+    break-after: avoid;
+  }
+  /* a figure with its caption stays whole, unless it is taller than a page (marked by print mode); the PRISMA flow
+     breaks between its stages */
+  [data-report] figure:not([data-print-tall]):not([data-prisma-flow]):not(:has([data-echart])) {
+    break-inside: avoid;
+  }
+  /* a chart figure: the drawing stays whole and its title and notes stay with it (a whole-figure "avoid" around an
+     echarts drawing made Chromium open a blank page at the end of the report) */
+  [data-report] figure:has([data-echart]) [data-echart] {
+    break-inside: avoid;
+  }
+  [data-report] figure > :first-child,
+  [data-report] figcaption {
+    break-after: avoid;
+  }
+  [data-report] [data-echart] + * {
+    break-before: avoid;
+  }
+  /* charts scale down as vectors to the width there is, in proportion, never clipped: print mode fits each drawing
+     (lib/print.ts fitChartForPrint: aspect-ratio box, viewBox). The drawing sits in flow: echarts positions its SVG
+     absolutely, and an absolute box inside a figure that page breaking moved opened a blank page after the report. */
+  [data-echart] svg {
+    position: static !important;
+    display: block;
+  }
+  /* the appendix's source sentences at the table size */
+  [data-appendix] .font-quote {
+    font-size: 9pt;
+    line-height: 1.35;
+  }
+
+  /* verified numbers: a solid underline and a check mark (the striped tape prints as a smudge) */
+  .num-verified {
+    padding-bottom: 0;
+    text-decoration: underline solid currentColor;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+  .num-verified::after {
+    content: "✓";
+    position: static;
+    display: inline-block; /* the underline does not run under the mark */
+    height: auto;
+    margin-left: 1px;
+    background: none;
+    font-family: var(--font-display);
+    font-size: 0.85em;
+  }
+  .num-verified[data-pending="true"] {
+    text-decoration: none;
+  }
+  .num-verified[data-pending="true"]::after {
+    content: none;
+  }
+  /* a blanked value: bracketed text in the report language, no hatch */
+  .hole[data-print-label] {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font-size: 0; /* the screen words give way to the bracketed print label */
+  }
+  .hole[data-print-label]::before {
+    content: attr(data-print-label);
+    font: 600 9pt/1.4 var(--font-display);
+  }
+  /* the number marked in its source sentence: no highlight colour on paper */
+  mark {
+    background: none !important;
+    color: inherit !important;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+}
+
+/* Finding-direction glyphs (DESIGN.md): shape + color, never color alone. */
+.g {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  vertical-align: middle;
+}
+.g-sup {
+  background: var(--sup);
+  border-radius: 50%;
+}
+.g-harm {
+  background: var(--harm);
+  transform: rotate(45deg) scale(0.85);
+}
+/* 14 x 5, the same aspect as the chart's flat bar (lib/glyphs.ts, 100 x 36) */
+.g-none {
+  background: var(--none);
+  height: 5px;
+  width: 14px;
+}
+.g-mixed {
+  border-radius: 50%;
+  border: 2px solid var(--mixed);
+  background: linear-gradient(90deg, var(--mixed) 50%, transparent 50%);
+}
+.g-unclear {
+  border-radius: 50%;
+  border: 2px dashed var(--unclear);
+}
+
+/* The report's layout: white cards on the ground, the navy answer band, chips and the chapter list. */
+@layer components {
+  .rc {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 12px;
+    min-width: 0;
+    padding: 24px;
+    border-radius: 18px;
+    background: var(--surface);
+  }
+  .rrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 16px;
+    min-width: 0;
+  }
+  .rrow > * {
+    flex: 1 1 380px;
+  }
+  .rrow > .rrow-main {
+    flex: 999 1 560px;
+  }
+  .rstack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    min-width: 0;
+  }
+  .ground-h2 {
+    padding: 8px 4px 0;
+  }
+
+  .rbtn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .rbtn:hover {
+    background: var(--rail);
+  }
+  .rchip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .rchip:hover {
+    background: var(--rail);
+  }
+  .rchip[aria-pressed="true"],
+  .rchip:has(:checked) {
+    border-color: var(--chip-on);
+    background: var(--chip-on);
+    color: var(--on-chip);
+  }
+  .rchip:has(:focus-visible) {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  /* The band speaks in its own tokens, so what sits inside it (cited links, marks, terms) follows. */
+  .mra-band {
+    --ink: var(--band-ink);
+    --muted: var(--band-soft);
+    --primary: var(--band-ink);
+    --rule: var(--band-line);
+    --surface: var(--band);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 28px;
+    padding: 26px 28px;
+    border-radius: 20px;
+    background: var(--band);
+    color: var(--band-ink);
+  }
+  .mra-stats {
+    flex: 1 1 300px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .mra-stat {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border-top: 1px solid var(--band-line);
+  }
+  .mra-stat:first-child {
+    border-top: 0;
+  }
+
+  /* The last box of the flow: what the review ended with. */
+  .mra-flow-final {
+    --ink: var(--band-ink);
+    --muted: var(--band-soft);
+    --rule: var(--band-line);
+    background: var(--band);
+    color: var(--band-ink);
+  }
+
+  /* Chapters: a row on a narrow page, the list beside the report from lg. */
+  .mra-toc {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 5;
+    display: flex;
+    gap: 2px 14px;
+    overflow-x: auto;
+    padding: 8px 4px;
+    background: var(--ground);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .mra-toc-h,
+  .mra-tocsub {
+    display: none;
+  }
+  .mra-tocitem,
+  .mra-tocsub {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .mra-tocitem {
+    padding: 6px 0;
+  }
+  .mra-tocitem:hover,
+  .mra-tocsub:hover,
+  .mra-tocitem[data-open="true"],
+  .mra-tocsub[aria-current="location"] {
+    color: var(--ink);
+  }
+  .mra-tocitem[data-open="true"] {
+    font-weight: 600;
+  }
+
+  /* A phone: less padding around everything, so two tiles and a table still fit. */
+  @media (max-width: 40rem) {
+    .rc {
+      padding: 16px;
+    }
+    .mra-band {
+      gap: 16px;
+      padding: 20px;
+    }
+    .mra-band h1 {
+      font-size: 22px;
+    }
+    .mra-toc {
+      scrollbar-width: none;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .mra-stats {
+      padding-left: 28px;
+      border-left: 1px solid var(--band-line);
+    }
+    .mra-toc {
+      top: calc(var(--header-h) + 16px);
+      flex-direction: column;
+      gap: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      max-height: calc(100dvh - var(--header-h) - 32px);
+      padding: 0;
+      background: none;
+      box-shadow: inset 1px 0 0 var(--rule);
+    }
+    .mra-toc-h {
+      display: block;
+      flex: none;
+      padding: 0 0 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    /* One weight per level whatever is open: a bolder label would change the column's width as the reader moves on. */
+    .mra-tocitem,
+    .mra-tocitem[data-open="true"] {
+      flex: none;
+      padding: 5px 0 5px 10px;
+      line-height: 1.4;
+      border-left: 2px solid transparent;
+      font-weight: 500;
+    }
+    .mra-tocsub {
+      display: block;
+      flex: none;
+      padding: 3px 0 3px 20px;
+      font-size: 12px;
+      line-height: 1.4;
+      border-left: 2px solid transparent;
+    }
+    /* Closed sections stay at zero height: the column keeps the width of the longest label. */
+    .mra-tocsub[data-show="false"] {
+      height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      overflow: hidden;
+      visibility: hidden;
+    }
+    .mra-tocitem[aria-current="location"],
+    .mra-tocsub[aria-current="location"] {
+      border-left-color: var(--ink);
+    }
+  }
+}

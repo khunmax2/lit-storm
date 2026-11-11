@@ -1,6 +1,5 @@
 // Who sits at a Discussion's round table (pages/discussion.tsx: the side
-// column's people card, the flat map of components/costorm-map and the 3D
-// table of components/agent-observatory-3d), who spoke last, and what each of
+// column's people card and the 3D table of components/agent-observatory-3d), who spoke last, and what each of
 // them has said so far. Built from the view engines/costorm writes beside each
 // finished Turn; nothing here is invented: counts are utterances in that view.
 import { ChevronDown } from "lucide-react";
@@ -123,17 +122,6 @@ export function useRoom(turns: RoomTurn[], experts: string[]) {
     status: (s: Seat) =>
       last && s.role === last.role ? t("room.spokeLast") : s.said.length ? t("room.spoke", { n: s.said.length }) : t("room.listening"),
   };
-}
-
-/** The few words of an expert's role that tell them apart, for a label with
- *  little room: "นักวิจัยด้านทัศนศาสตร์และเทคโนโลยีการถ่ายภาพ" → "ทัศนศาสตร์". */
-export function shortRole(name: string) {
-  const rest = name
-    .trim()
-    .replace(/^(นักวิจัย|นักวิชาการ|นักวิเคราะห์|ที่ปรึกษา|ผู้เชี่ยวชาญ|ตัวแทน|วิศวกร|ผู้)(ด้าน)?/, "")
-    .split(/และ| and |\(|,/)[0]
-    .trim();
-  return rest || name.trim();
 }
 
 export function isFixed(role: string) {

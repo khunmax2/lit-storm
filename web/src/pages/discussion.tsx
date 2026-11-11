@@ -1,8 +1,8 @@
 // A Discussion (docs/web-app-design.md, รุ่นสอง: Discussion): the discussion
-// at a glance first (components/costorm-map, or the 3D table one switch away),
+// at a glance first (the 3D round table of components/agent-observatory-3d),
 // the reports under it, then the transcript, folded to its last lines; on the
 // right two cards, who is at the table and the mind map, picked in step with
-// the map; at the foot the owner's turn: speak, let the table go on once or
+// the table; at the foot the owner's turn: speak, let the table go on once or
 // three times, or write a report. Each of those is a Turn that waits in the
 // queue; the page polls until it is done.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,7 +46,6 @@ import {
   formatDate,
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
-import { CoStormMap2D, ReplayBar, topicKey, topicTone, useReplay, type MindNode } from "@/components/costorm-map";
 import { KindTag, RoomPeople, initial, isFixed, tone, useRoom, type Room } from "@/components/costorm-room";
 import { MoveSessionDialog } from "@/components/move-session";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
@@ -274,6 +273,13 @@ function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => voi
 }
 
 // --- the side column --------------------------------------------------------------------
+
+type MindNode = { name: string; count: number; children: MindNode[] };
+
+/** A top topic's colour in the mind map, and its key in the room's one selection. */
+const TOPIC_TONES = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#14b8a6", "#ef4444"];
+const topicTone = (i: number) => TOPIC_TONES[i % TOPIC_TONES.length];
+const topicKey = (i: number) => `topic:${i}`;
 
 /** What a topic holds, its subtopics included. */
 const held = (n: MindNode): number => n.count + n.children.reduce((a, c) => a + held(c), 0);
@@ -542,8 +548,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
-  // The flat map is the page's first view; the 3D table is one switch away (three.js loads only then).
-  const [table3d, setTable3d] = useState(false);
   // The transcript shows its last lines until opened; the round table above it is the page's subject.
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState("");
@@ -603,7 +607,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const warmup = conversation.filter((x) => x.warmup);
   const later = conversation.filter((x) => !x.warmup);
   const room = useRoom(conversation, view?.experts ?? NO_EXPERTS);
-  const replay = useReplay(conversation.length);
   // With the transcript open, keep its newest line in sight as it grows.
   useEffect(() => {
     if (chatOpen && later.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -745,22 +748,15 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             </span>
           </div>
 
-          {/* The discussion at a glance: who, about what; flat, or the 3D table. */}
+          {/* The discussion at a glance: the 3D round table, with what it holds above it. */}
           {started && view && (
             <section aria-labelledby="disc-map" className="mb-6 space-y-3 rounded-2xl border bg-card p-4 shadow-xs">
-              <div className="flex items-center gap-2">
-                <h2 id="disc-map" className="flex flex-1 items-center gap-2 text-sm font-semibold">
-                  <Network className="size-4 text-muted-foreground" />
-                  {t("map.title")}
-                </h2>
-                <label htmlFor="disc-3d" className="text-xs text-muted-foreground">
-                  {t("map.3d")}
-                </label>
-                <Switch id="disc-3d" checked={table3d} onCheckedChange={setTable3d} />
-              </div>
-              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
+              <h2 id="disc-map" className="flex items-center gap-2 text-sm font-semibold">
+                <Network className="size-4 text-muted-foreground" />
+                {t("map.title")}
+              </h2>
+              <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-3">
                 {[
-                  { icon: MessageCircle, label: t("map.shown"), value: t("map.shownOf", { n: table3d ? replay.total : replay.shown, total: replay.total }) },
                   { icon: Users, label: t("map.experts"), value: t("map.roles", { n: room.seats.filter((s) => !isFixed(s.role)).length }) },
                   { icon: Layers, label: t("map.topics"), value: t("map.topicsN", { n: nodeCount(view.mind_map) }) },
                   { icon: Database, label: t("map.cited"), value: t("map.citedN", { n: new Set(conversation.flatMap((x) => x.cited)).size }) },
@@ -774,23 +770,15 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   </div>
                 ))}
               </dl>
-              {table3d ? (
-                // three.js loads only now, and a canvas laid out while hidden would have no size.
-                <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
-                  <CoStormObservatory3D
-                    view={view}
-                    currentId={d.current?.id ?? null}
-                    live={!!d.current && !FINAL.has(d.current.status)}
-                    picked={room.picked?.startsWith("topic:") ? null : room.picked}
-                    onPick={(role) => (role ? room.pick(role) : room.picked && room.pick(room.picked))}
-                  />
-                </Suspense>
-              ) : (
-                <>
-                  <CoStormMap2D room={room} topic={d.title} topics={view.mind_map} turns={conversation} replay={replay} />
-                  <ReplayBar replay={replay} />
-                </>
-              )}
+              <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
+                <CoStormObservatory3D
+                  view={view}
+                  currentId={d.current?.id ?? null}
+                  live={!!d.current && !FINAL.has(d.current.status)}
+                  picked={room.picked?.startsWith("topic:") ? null : room.picked}
+                  onPick={(role) => (role ? room.pick(role) : room.picked && room.pick(room.picked))}
+                />
+              </Suspense>
             </section>
           )}
           {/* The reports right under the map, where the owner is looking while the table works:

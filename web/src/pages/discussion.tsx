@@ -291,8 +291,9 @@ function Side({ d, view, sources, room }: { d: Discussion; view: View | null; so
   );
 }
 
-/** The Discussion's reports, in the middle of the page above the table: the
- *  newest first and largest, the one being written as it is written. */
+/** The Discussion's reports, in the middle of the page under the table: the
+ *  newest first and largest, the one being written as it is written (the first
+ *  one by itself, after the warm start). */
 function Reports({ d }: { d: Discussion }) {
   const { t, lang } = useT();
   const writing = d.current?.turn?.action === "report" && !FINAL.has(d.current.status);
@@ -308,7 +309,7 @@ function Reports({ d }: { d: Discussion }) {
       {writing && (
         <div className="flex items-center gap-3 rounded-2xl border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          {t("disc.working.report")}
+          {t(d.current?.turn?.auto ? "disc.working.reportFirst" : "disc.working.report")}
         </div>
       )}
       {latest && (
@@ -567,12 +568,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             </span>
           </div>
 
-          {/* The reports first: they are what the Discussion is for. */}
-          {started && (d.reports.length > 0 || d.current?.turn?.action === "report") && (
-            <div className="mb-6">
-              <Reports d={d} />
-            </div>
-          )}
           {started && (
             <details className="group mb-6" open={table3d} onToggle={(e) => setTable3d((e.target as HTMLDetailsElement).open)}>
               <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
@@ -594,6 +589,13 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                 </div>
               )}
             </details>
+          )}
+          {/* The reports right under the table, where the owner is looking while the table works:
+              the first one is written by itself after the warm start, and lands here. */}
+          {started && (d.reports.length > 0 || d.current?.turn?.action === "report") && (
+            <div className="mb-6">
+              <Reports d={d} />
+            </div>
           )}
           {started && (
             <details className="mb-6 rounded-xl border px-4 py-3 lg:hidden">

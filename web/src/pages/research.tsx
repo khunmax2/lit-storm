@@ -17,6 +17,7 @@ import {
   Sparkles,
   Square,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -820,6 +821,21 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                   <MedicalCanvas runId={run.id} live={!FINAL.has(run.status)} />
                 ) : (
                   <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
+                )}
+                {/* Whoever watched the work to the end finds the report right where they are looking. */}
+                {readable && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
+                    <span className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="size-4 text-success" />
+                      {t("run.reportReady")}
+                    </span>
+                    <Button asChild>
+                      <Link to="/runs/$runId" params={{ runId: run.id }}>
+                        <FileText />
+                        {t("run.open")}
+                      </Link>
+                    </Button>
+                  </div>
                 )}
               </div>
             )}

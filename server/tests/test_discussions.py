@@ -92,6 +92,30 @@ def test_a_block_of_turns_then_an_extension_that_takes_a_unit(admin, browser, co
     assert user.get(f"/api/discussions/{d['id']}").json()["allowance"]["remaining"] == 2
 
 
+def test_the_first_report_follows_the_warm_start_by_itself(admin, browser, configured, db):
+    from litstorm import discussion
+
+    user = make_user(admin, browser)
+    d = start(user)
+    warm = uuid.UUID(d["turns"][0]["id"])
+    finish(db, d["turns"][0]["id"], status="failed")
+    assert discussion.first_report(db, warm) is None  # no warm start, nothing to write up
+    again = ask(user, d["id"], action="start").json()
+    finish(db, again["id"])
+    assert discussion.first_report(db, uuid.UUID(again["id"])) is not None
+    shown = user.get(f"/api/discussions/{d['id']}").json()
+    assert shown["current"]["turn"] == {"action": "report", "auto": True}
+    assert shown["current"]["quota_units"] == 0  # a Turn of the block already paid for
+    assert discussion.first_report(db, uuid.UUID(again["id"])) is None  # once
+    finish(db, shown["current"]["id"])
+    shown = user.get(f"/api/discussions/{d['id']}").json()
+    assert len(shown["reports"]) == 1 and shown["report_ready"] is False
+    # Later reports are the owner's to ask for.
+    said = ask(user, d["id"], action="say", text="And the hotels?").json()
+    finish(db, said["id"])
+    assert discussion.first_report(db, uuid.UUID(said["id"])) is None
+
+
 def test_a_report_again_only_after_the_table_has_said_something_new(admin, browser, configured, db):
     user = make_user(admin, browser)
     d = start(user)

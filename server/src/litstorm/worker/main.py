@@ -16,7 +16,7 @@ import signal
 import threading
 import time
 
-from litstorm import catalog, db, medical, notify, search_cache, settings, trash
+from litstorm import catalog, db, discussion, medical, notify, search_cache, settings, trash
 from litstorm import report as report_mod
 from litstorm.db.models import RunEvent
 from litstorm.runner.supervisor import Spare, supervise
@@ -102,6 +102,11 @@ def run_one(claim, spare=None):
         title, sources = report["title"], len(report["sources"])
     written = with_session(lambda s: queue.finish(s, claim, outcome, title, sources))
     log.info("run %s: %s (%s)%s", claim.run_id, outcome.status, outcome.reason, "" if written else " — not ours any more")
+    if written and (claim.config.discussion or {}).get("action") == "start":
+        # A Discussion's warm start is done: its first report follows by itself.
+        queued = with_session(lambda s: getattr(discussion.first_report(s, claim.run_id), "id", None))
+        if queued is not None:
+            log.info("run %s: first report queued as %s", claim.run_id, queued)
 
 
 def main():

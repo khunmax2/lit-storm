@@ -63,6 +63,41 @@ def report_ready(rows):
     return False
 
 
+def first_report(session, run_id):
+    """After a warm start that worked, the first report, queued for the owner:
+    it is what they started for, and they may not know a report is theirs to
+    ask for. Only once per Discussion, and only while its block has a Turn
+    left; every later report waits for the owner. The queued Turn, or None."""
+    from litstorm import limits
+    from litstorm.db.models import QUEUED, ResearchSession
+
+    run = session.get(Run, run_id)
+    if run is None or run.status != SUCCEEDED or (run.turn or {}).get("action") != "start":
+        return None
+    rows = turns(session, session.get(ResearchSession, run.session_id))
+    if in_progress(rows) or any((r.turn or {}).get("action") == "report" for r in rows):
+        return None
+    if allowance(rows, limits.load(session).turns_per_quota).remaining <= 0:
+        return None
+    report = Run(
+        session_id=run.session_id,
+        owner_id=run.owner_id,
+        engine=run.engine,
+        topic=run.topic,
+        language=run.language,
+        llm_model_id=run.llm_model_id,
+        search_provider_id=run.search_provider_id,
+        config=dict(run.config),
+        status=QUEUED,
+        quota_month=limits.quota_month(),
+        quota_units=0,
+        turn={"action": "report", "auto": True},
+    )
+    session.add(report)
+    session.commit()
+    return report
+
+
 def in_progress(rows):
     """The Turn waiting or running, if any."""
     return next((r for r in rows if r.status in WAITING or r.status in ACTIVE), None)

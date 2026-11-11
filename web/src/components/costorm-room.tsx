@@ -1,7 +1,9 @@
-// Who sits at a Discussion's round table (pages/discussion.tsx, beside the 3D
+// Who sits at a Discussion's round table (pages/discussion.tsx: the side
+// column's people card, the flat map of components/costorm-map and the 3D
 // table of components/agent-observatory-3d), who spoke last, and what each of
 // them has said so far. Built from the view engines/costorm writes beside each
 // finished Turn; nothing here is invented: counts are utterances in that view.
+import { ChevronDown } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { useT, type Key } from "@/i18n";
@@ -9,9 +11,9 @@ import { cn } from "@/lib/utils";
 
 export type RoomTurn = { role: string; role_description: string; type: string; text: string; cited: number[]; warmup: boolean };
 
-const MODERATOR = "Moderator";
-const GKP = "General Knowledge Provider";
-const GUEST = "Guest";
+export const MODERATOR = "Moderator";
+export const GKP = "General Knowledge Provider";
+export const GUEST = "Guest";
 
 // The same speaker keeps the same colour everywhere: the transcript, the cards
 // and the 3D table (components/agent-observatory-3d) all take it from here.
@@ -121,6 +123,21 @@ export function useRoom(turns: RoomTurn[], experts: string[]) {
   };
 }
 
+/** The few words of an expert's role that tell them apart, for a label with
+ *  little room: "นักวิจัยด้านทัศนศาสตร์และเทคโนโลยีการถ่ายภาพ" → "ทัศนศาสตร์". */
+export function shortRole(name: string) {
+  const rest = name
+    .trim()
+    .replace(/^(นักวิจัย|นักวิชาการ|นักวิเคราะห์|ที่ปรึกษา|ผู้เชี่ยวชาญ|ตัวแทน|วิศวกร|ผู้)(ด้าน)?/, "")
+    .split(/และ| and |\(|,/)[0]
+    .trim();
+  return rest || name.trim();
+}
+
+export function isFixed(role: string) {
+  return role === MODERATOR || role === GKP || role === GUEST;
+}
+
 function Avatar({ seat }: { seat: Seat }) {
   return (
     <span
@@ -133,60 +150,84 @@ function Avatar({ seat }: { seat: Seat }) {
   );
 }
 
-/** Each seat with its latest line: what every expert is doing, at a glance.
- *  The picked seat (else whoever spoke last) shows its latest line in full. */
-export function RoomWho({ room, renderText, className }: { room: Room; renderText: (text: string) => ReactNode; className?: string }) {
+function PersonRow({ room, seat, renderText, you }: { room: Room; seat: Seat; renderText: (text: string) => ReactNode; you?: boolean }) {
   const { t } = useT();
-  const { seats, past, focusRole } = room;
+  const picked = room.picked === seat.role;
+  const latest = seat.said[seat.said.length - 1];
+  // The three fixed roles say what they do; an expert says what it said last, or that it has not yet.
+  const line = isFixed(seat.role) ? seat.description : latest ? snippet(latest.turn.text, 110) : t("room.notYet");
   return (
-    <section aria-labelledby="room-who" className={cn("min-w-0 space-y-1.5", className)}>
-      <h2 id="room-who" className="text-sm font-semibold">
-        {t("room.who")}
-      </h2>
-      {[...seats, ...past].map((s, i) => {
-        const focused = s.role === focusRole;
-        const latest = s.said[s.said.length - 1];
-        return (
-          <div key={s.role}>
-            {i === seats.length && <p className="pt-2 pb-1 text-xs text-muted-foreground">{t("room.left")}</p>}
-            <button
-              type="button"
-              aria-pressed={focused}
-              onClick={() => room.pick(s.role)}
-              className={cn(
-                "flex w-full gap-2.5 rounded-xl border p-2.5 text-left transition-colors",
-                focused ? "border-brand/40 bg-brand/5" : "border-transparent hover:bg-muted/50",
-              )}
-            >
-              <Avatar seat={s} />
-              <span className="min-w-0 flex-1 space-y-0.5">
-                <span className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="truncate font-medium" title={s.name}>
-                    {s.name}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{room.status(s)}</span>
-                </span>
-                {s.description && <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>}
-                {latest ? (
-                  <span className="block text-xs leading-relaxed text-foreground/85">
-                    <span className="mr-1.5 inline-flex items-center gap-1.5 align-middle">
-                      <span className="text-muted-foreground">{t("room.round", { n: latest.index + 1 })}</span>
-                      <KindTag type={latest.turn.type} />
-                    </span>
-                    {focused ? (
-                      <span className="mt-1 block text-sm whitespace-pre-wrap">{renderText(latest.turn.text)}</span>
-                    ) : (
-                      <span className="line-clamp-2">{snippet(latest.turn.text, 110)}</span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="block text-xs text-muted-foreground">{t("room.notYet")}</span>
-                )}
-              </span>
-            </button>
-          </div>
-        );
-      })}
-    </section>
+    <button
+      type="button"
+      aria-pressed={picked}
+      onClick={() => room.pick(seat.role)}
+      className={cn(
+        "flex w-full gap-2.5 rounded-xl border p-2.5 text-left transition-[background-color,box-shadow]",
+        picked ? "border-brand bg-brand/5 ring-3 ring-brand/15" : you ? "border-success/25 bg-success/5 hover:bg-success/10" : "bg-card hover:bg-muted/50",
+      )}
+    >
+      <Avatar seat={seat} />
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex items-start justify-between gap-2">
+          <span className="text-sm leading-snug font-medium">{seat.name}</span>
+          {!isFixed(seat.role) && (
+            <span className="mt-0.5 shrink-0 rounded-full bg-muted px-2 py-px text-[11px] text-muted-foreground">{room.status(seat)}</span>
+          )}
+        </span>
+        {picked && latest ? (
+          <span className="block space-y-1 pt-0.5">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {t("room.round", { n: latest.index + 1 })}
+              <KindTag type={latest.turn.type} />
+            </span>
+            <span className="block text-sm leading-relaxed whitespace-pre-wrap">{renderText(latest.turn.text)}</span>
+          </span>
+        ) : (
+          line && <span className="line-clamp-2 text-xs text-muted-foreground">{line}</span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+/** Who is at the table, in the side column: the experts, the two who help the
+ *  table along, and the owner. A seat picked here or on the map is picked
+ *  everywhere, and shows its latest line in full. */
+export function RoomPeople({ room, renderText }: { room: Room; renderText: (text: string) => ReactNode }) {
+  const { t } = useT();
+  const experts = room.seats.filter((s) => !isFixed(s.role));
+  const helpers = room.seats.filter((s) => s.role === MODERATOR || s.role === GKP);
+  const you = room.seats.find((s) => s.role === GUEST);
+  const [helpersOpen, setHelpersOpen] = useState(true);
+  const group = "rounded-lg bg-muted/60 px-2.5 py-1 text-xs font-semibold";
+  return (
+    <div className="space-y-2">
+      <p className={group}>
+        {t("room.expertsGroup")} <span className="font-normal text-muted-foreground">· {t("map.roles", { n: experts.length })}</span>
+      </p>
+      {experts.map((s) => (
+        <PersonRow key={s.role} room={room} seat={s} renderText={renderText} />
+      ))}
+      {room.past.length > 0 && (
+        <>
+          <p className="px-1 pt-1 text-xs text-muted-foreground">{t("room.left")}</p>
+          {room.past.map((s) => (
+            <PersonRow key={s.role} room={room} seat={s} renderText={renderText} />
+          ))}
+        </>
+      )}
+      <button
+        type="button"
+        aria-expanded={helpersOpen}
+        onClick={() => setHelpersOpen((o) => !o)}
+        className={cn(group, "flex w-full items-center justify-between text-left")}
+      >
+        {t("room.helpers")}
+        <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", !helpersOpen && "-rotate-90")} />
+      </button>
+      {(helpersOpen || helpers.some((s) => s.role === room.picked)) &&
+        helpers.map((s) => <PersonRow key={s.role} room={room} seat={s} renderText={renderText} />)}
+      {you && <PersonRow room={room} seat={you} renderText={renderText} you />}
+    </div>
   );
 }

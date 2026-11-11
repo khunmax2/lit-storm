@@ -1,21 +1,26 @@
-// A Discussion (docs/web-app-design.md, รุ่นสอง: Discussion): the 3D round
-// table first, what each expert has said beside it (components/costorm-room),
-// then the transcript, folded to its last lines, the mind map and the reports
-// on the right, and at the foot the owner's turn: speak, let the
-// table go on once or three times, or write a report. Each of those is a Turn
-// that waits in the queue; the page polls until it is done.
+// A Discussion (docs/web-app-design.md, รุ่นสอง: Discussion): the discussion
+// at a glance first (components/costorm-map, or the 3D table one switch away),
+// the reports under it, then the transcript, folded to its last lines; on the
+// right two cards, who is at the table and the mind map, picked in step with
+// the map; at the foot the owner's turn: speak, let the table go on once or
+// three times, or write a report. Each of those is a Turn that waits in the
+// queue; the page polls until it is done.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  ArrowRight,
   BookOpen,
+  ChevronDown,
   ChevronRight,
+  Database,
   FileText,
   FolderInput,
   FolderOpen,
   Gauge,
   Globe,
+  Layers,
   Loader2,
-  MessagesSquare,
+  MessageCircle,
   MoreHorizontal,
   Network,
   Play,
@@ -41,7 +46,8 @@ import {
   formatDate,
 } from "@/components/common";
 import { QuotaLine, type Depth } from "@/components/composer";
-import { KindTag, RoomWho, initial, tone, useRoom, type Room } from "@/components/costorm-room";
+import { CoStormMap2D, ReplayBar, topicKey, topicTone, useReplay, type MindNode } from "@/components/costorm-map";
+import { KindTag, RoomPeople, initial, isFixed, tone, useRoom, type Room } from "@/components/costorm-room";
 import { MoveSessionDialog } from "@/components/move-session";
 import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
 import {
@@ -70,6 +76,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useT, type Key } from "@/i18n";
 import { useRunLive } from "@/hooks/use-run-live";
@@ -85,7 +92,6 @@ type Discussion = Schemas["DiscussionOut"];
 
 // What engines/costorm/engine.py `view` writes beside each finished Turn.
 type ViewTurn = { role: string; role_description: string; type: string; text: string; cited: number[]; warmup: boolean };
-type MindNode = { name: string; count: number; children: MindNode[] };
 type Source = { url: string; title: string; snippets: string[] };
 type View = { topic: string; turns: ViewTurn[]; mind_map: MindNode[]; sources: Record<string, Source>; experts: string[] };
 
@@ -225,68 +231,196 @@ function TurnFailed({ turn, onRetry, pending }: { turn: Turn; onRetry: () => voi
 
 // --- the side column --------------------------------------------------------------------
 
+/** What a topic holds, its subtopics included. */
 const held = (n: MindNode): number => n.count + n.children.reduce((a, c) => a + held(c), 0);
+const nodeCount = (nodes: MindNode[]): number => nodes.reduce((a, n) => a + 1 + nodeCount(n.children), 0);
 
-/** Folded, the top topics only, each with what its whole subtree holds. */
-function MindMap({ nodes, depth = 0, open }: { nodes: MindNode[]; depth?: number; open: boolean }) {
+function SubTopics({ nodes }: { nodes: MindNode[] }) {
   return (
-    <ul className={cn("flex min-w-0 flex-col gap-0.5", depth > 0 && "mt-0.5 ml-3 border-l pl-2")}>
-      {nodes.map((n, i) => {
-        const count = open ? n.count : held(n);
-        return (
-          <li key={`${n.name}-${i}`} className="min-w-0">
-            <div className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted/60">
-              <ChevronRight
-                className={cn("size-3 shrink-0 text-muted-foreground transition-transform", !n.children.length && "opacity-0", open && "rotate-90")}
-              />
-              <span className="min-w-0 flex-1 truncate" title={n.name}>
-                {n.name}
-              </span>
-              {count > 0 && <span className="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground">{count}</span>}
-            </div>
-            {open && n.children.length > 0 && <MindMap nodes={n.children} depth={depth + 1} open />}
-          </li>
-        );
-      })}
+    <ul className="mt-0.5 ml-3 flex min-w-0 flex-col gap-0.5 border-l pl-2">
+      {nodes.map((n, i) => (
+        <li key={`${n.name}-${i}`} className="min-w-0">
+          <div className="flex items-start gap-2 px-1.5 py-1 text-xs text-foreground/85">
+            <span className="min-w-0 flex-1 leading-snug">{n.name}</span>
+            {held(n) > 0 && <span className="shrink-0 rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">{held(n)}</span>}
+          </div>
+          {n.children.length > 0 && <SubTopics nodes={n.children} />}
+        </li>
+      ))}
     </ul>
   );
 }
 
-function SideSection({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+/** A card of the side column, folded by its heading. */
+function SideCard({
+  icon,
+  tint,
+  title,
+  count,
+  lead,
+  open,
+  onToggle,
+  children,
+}: {
+  icon: ReactNode;
+  tint: string;
+  title: string;
+  count?: ReactNode;
+  lead: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
-    <section className="min-w-0 space-y-2">
-      <h2 className="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {icon}
-        {title}
-      </h2>
-      {children}
+    <section className="min-w-0 rounded-2xl border bg-card p-3 shadow-xs">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="flex w-full items-center gap-2.5 rounded-lg p-1 text-left transition-colors hover:bg-muted/40"
+      >
+        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", tint)}>{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">
+            {title}
+            {count != null && <span className="font-normal text-muted-foreground"> · {count}</span>}
+          </span>
+          <span className="block text-xs text-muted-foreground">{lead}</span>
+        </span>
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", !open && "-rotate-90")} />
+      </button>
+      {open && <div className="mt-2 border-t pt-3">{children}</div>}
     </section>
   );
 }
 
-/** What each expert is doing (wide screens: beside the table) and the mind map:
- *  the side column on wide screens, a fold above the conversation on narrow
- *  ones, where the experts sit under the table instead. */
-function Side({ d, view, sources, room }: { d: Discussion; view: View | null; sources: Record<string, Source>; room?: Room }) {
+/** Who is at the table. Opens by itself when someone is picked on the map. */
+function PeopleCard({ room, sources }: { room: Room; sources: Record<string, Source> }) {
   const { t } = useT();
-  const [mapOpen, setMapOpen] = useState(false);
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (room.picked && !room.picked.startsWith("topic:")) setOpen(true);
+  }, [room.picked]);
   return (
-    <>
-    {room && view && <RoomWho room={room} renderText={(text) => <Cited text={text} sources={sources} />} />}
-    <SideSection icon={<Network className="size-3.5" />} title={t("disc.mindMap")}>
-      {view?.mind_map.length ? (
-        <>
-          <MindMap nodes={view.mind_map} open={mapOpen} />
-          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" aria-expanded={mapOpen} onClick={() => setMapOpen((o) => !o)}>
-            {t(mapOpen ? "room.mapFold" : "room.mapOpen")}
-          </Button>
-        </>
+    <SideCard
+      icon={<Users className="size-4" />}
+      tint="bg-brand-soft text-brand"
+      title={t("room.people")}
+      count={room.seats.length}
+      lead={t("room.peopleLead")}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+    >
+      <RoomPeople room={room} renderText={(text) => <Cited text={text} sources={sources} />} />
+    </SideCard>
+  );
+}
+
+/** The mind map: its top topics in the map's colours, each pickable as on the
+ *  map, and every source the table has collected. */
+function MindMapCard({ view, room, sources }: { view: View; room: Room; sources: Record<string, Source> }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(true);
+  const [mainOnly, setMainOnly] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  useEffect(() => {
+    if (room.picked?.startsWith("topic:")) setOpen(true);
+  }, [room.picked]);
+  const listed = Object.entries(sources).sort(([a], [b]) => Number(a) - Number(b));
+  return (
+    <SideCard
+      icon={<Network className="size-4" />}
+      tint="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200"
+      title={t("disc.mindMap")}
+      count={view.mind_map.length ? t("map.topicsN", { n: nodeCount(view.mind_map) }) : undefined}
+      lead={t("room.mapLead")}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+    >
+      {view.mind_map.length ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-end gap-2 pb-1">
+            <label htmlFor="disc-main-only" className="text-xs text-muted-foreground">
+              {t("room.mainOnly")}
+            </label>
+            <Switch id="disc-main-only" size="sm" checked={mainOnly} onCheckedChange={setMainOnly} />
+          </div>
+          <ul className="flex flex-col">
+            {view.mind_map.map((n, i) => {
+              const key = topicKey(i);
+              const picked = room.picked === key;
+              return (
+                <li key={`${n.name}-${i}`} className="border-b py-1 last:border-b-0">
+                  <button
+                    type="button"
+                    aria-pressed={picked}
+                    onClick={() => room.pick(key)}
+                    className={cn(
+                      "flex w-full items-start gap-2 rounded-lg border px-1.5 py-1.5 text-left text-sm font-medium transition-[background-color,box-shadow]",
+                      picked ? "border-brand bg-brand/5 ring-3 ring-brand/15" : "border-transparent hover:bg-muted/50",
+                    )}
+                  >
+                    <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full" style={{ background: topicTone(i) }} />
+                    <span className="min-w-0 flex-1 leading-snug">{n.name}</span>
+                    {held(n) > 0 && (
+                      <span className="shrink-0 rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">{held(n)}</span>
+                    )}
+                  </button>
+                  {!mainOnly && n.children.length > 0 && <SubTopics nodes={n.children} />}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">{t("disc.mindMapEmpty")}</p>
       )}
-    </SideSection>
-    {d.turns.length > 0 && <RunNotes notes={d.turns[d.turns.length - 1].notes ?? {}} />}
-    <p className="text-xs text-muted-foreground">{t("disc.sources", { n: Object.keys(sources).length })}</p>
+      {listed.length > 0 && (
+        <div className="mt-3">
+          <button
+            type="button"
+            aria-expanded={sourcesOpen}
+            onClick={() => setSourcesOpen((o) => !o)}
+            className="flex w-full items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <BookOpen className="size-4 text-muted-foreground" />
+            <span className="flex-1">
+              {t("room.sourcesAll")} <span className="font-normal text-muted-foreground">{t("map.citedN", { n: listed.length })}</span>
+            </span>
+            <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", !sourcesOpen && "-rotate-90")} />
+          </button>
+          {sourcesOpen && (
+            <ol className="mt-2 max-h-80 space-y-1 overflow-y-auto pr-1">
+              {listed.map(([n, s]) => (
+                <li key={n}>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted/60"
+                  >
+                    <span className="shrink-0 text-muted-foreground tabular-nums">[{n}]</span>
+                    <span className="min-w-0">
+                      <span className="line-clamp-2 text-foreground/90">{s.title || s.url}</span>
+                      <span className="text-muted-foreground">{domainOf(s.url)}</span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+    </SideCard>
+  );
+}
+
+/** The side column's cards: beside the page on wide screens, under the reports on narrow ones. */
+function SideCards({ view, room, sources }: { view: View; room: Room; sources: Record<string, Source> }) {
+  return (
+    <>
+      <PeopleCard room={room} sources={sources} />
+      <MindMapCard view={view} room={room} sources={sources} />
     </>
   );
 }
@@ -364,8 +498,8 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
   const [moving, setMoving] = useState(false);
-  // The 3D table is the page's first view; folding it unloads three.js's canvas.
-  const [table3d, setTable3d] = useState(true);
+  // The flat map is the page's first view; the 3D table is one switch away (three.js loads only then).
+  const [table3d, setTable3d] = useState(false);
   // The transcript shows its last lines until opened; the round table above it is the page's subject.
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState("");
@@ -425,6 +559,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
   const warmup = conversation.filter((x) => x.warmup);
   const later = conversation.filter((x) => !x.warmup);
   const room = useRoom(conversation, view?.experts ?? NO_EXPERTS);
+  const replay = useReplay(conversation.length);
   // With the transcript open, keep its newest line in sight as it grows.
   useEffect(() => {
     if (chatOpen && later.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -547,66 +682,85 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
               )
             }
           />
-          <div className="-mt-5 mb-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/80">Co-STORM</span>
-            <span className="flex items-center gap-1">
-              <Globe className="size-3" />
+          <div className="-mt-5 mb-6 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5 rounded-lg bg-brand-soft px-2.5 py-1 font-semibold text-brand">
+              <Layers className="size-3.5" />
+              Co-STORM
+            </span>
+            <span className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1">
+              <Globe className="size-3.5" />
               {d.language === "th" ? t("lang.th") : t("lang.en")}
             </span>
-            <span className="flex items-center gap-1">
-              <Sparkles className="size-3" />
+            <span className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1">
+              <Sparkles className="size-3.5" />
               {d.model_label}
             </span>
-            <span>{d.search_label}</span>
-            <span className="flex items-center gap-1">
-              <Gauge className="size-3" />
+            <span className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1">
+              <Gauge className="size-3.5" />
               {t(`depth.${d.depth as Depth}`)}
-            </span>
-            <span className={cn("flex items-center gap-1", exhausted && "text-warning")}>
-              <MessagesSquare className="size-3" />
-              {t("disc.turnsLeft", { n: d.allowance.remaining, total: d.allowance.per_block * Math.max(1, d.allowance.blocks) })}
             </span>
           </div>
 
-          {started && (
-            <details className="group mb-6" open={table3d} onToggle={(e) => setTable3d((e.target as HTMLDetailsElement).open)}>
-              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground select-none hover:text-foreground">
-                <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
-                {t("obs3d.costorm")}
-              </summary>
-              {/* Drawn only when open: three.js loads then, and a canvas laid out while folded has no size. */}
-              {table3d && (
-                <div className="mt-2">
-                  <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
-                    <CoStormObservatory3D
-                      view={view ?? null}
-                      currentId={d.current?.id ?? null}
-                      live={!!d.current && !FINAL.has(d.current.status)}
-                      picked={room.picked}
-                      onPick={(role) => (role ? room.pick(role) : room.picked && room.pick(room.picked))}
-                    />
-                  </Suspense>
-                </div>
+          {/* The discussion at a glance: who, about what; flat, or the 3D table. */}
+          {started && view && (
+            <section aria-labelledby="disc-map" className="mb-6 space-y-3 rounded-2xl border bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-2">
+                <h2 id="disc-map" className="flex flex-1 items-center gap-2 text-sm font-semibold">
+                  <Network className="size-4 text-muted-foreground" />
+                  {t("map.title")}
+                </h2>
+                <label htmlFor="disc-3d" className="text-xs text-muted-foreground">
+                  {t("map.3d")}
+                </label>
+                <Switch id="disc-3d" checked={table3d} onCheckedChange={setTable3d} />
+              </div>
+              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-4">
+                {[
+                  { icon: MessageCircle, label: t("map.shown"), value: t("map.shownOf", { n: table3d ? replay.total : replay.shown, total: replay.total }) },
+                  { icon: Users, label: t("map.experts"), value: t("map.roles", { n: room.seats.filter((s) => !isFixed(s.role)).length }) },
+                  { icon: Layers, label: t("map.topics"), value: t("map.topicsN", { n: nodeCount(view.mind_map) }) },
+                  { icon: Database, label: t("map.cited"), value: t("map.citedN", { n: new Set(conversation.flatMap((x) => x.cited)).size }) },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="flex items-center gap-2.5 bg-muted/40 px-3 py-2.5 dark:bg-muted/20">
+                    <Icon className="size-5 shrink-0 text-brand" />
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">{label}</dt>
+                      <dd className="text-sm font-semibold">{value}</dd>
+                    </div>
+                  </div>
+                ))}
+              </dl>
+              {table3d ? (
+                // three.js loads only now, and a canvas laid out while hidden would have no size.
+                <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
+                  <CoStormObservatory3D
+                    view={view}
+                    currentId={d.current?.id ?? null}
+                    live={!!d.current && !FINAL.has(d.current.status)}
+                    picked={room.picked?.startsWith("topic:") ? null : room.picked}
+                    onPick={(role) => (role ? room.pick(role) : room.picked && room.pick(room.picked))}
+                  />
+                </Suspense>
+              ) : (
+                <>
+                  <CoStormMap2D room={room} topic={d.title} topics={view.mind_map} turns={conversation} replay={replay} />
+                  <ReplayBar replay={replay} />
+                </>
               )}
-            </details>
+            </section>
           )}
-          {/* The reports right under the table, where the owner is looking while the table works:
+          {/* The reports right under the map, where the owner is looking while the table works:
               the first one is written by itself after the warm start, and lands here. */}
           {started && (d.reports.length > 0 || d.current?.turn?.action === "report") && (
             <div className="mb-6">
               <Reports d={d} />
             </div>
           )}
-          {started && (
-            <details className="mb-6 rounded-xl border px-4 py-3 lg:hidden">
-              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none">
-                <Network className="size-4 text-muted-foreground" />
-                {t("disc.mindMap")}
-              </summary>
-              <div className="mt-4 space-y-6">
-                <Side d={d} view={view} sources={sources} />
-              </div>
-            </details>
+          {/* On narrow screens the side column's cards come here. */}
+          {started && view && (
+            <div className="mb-6 space-y-4 lg:hidden">
+              <SideCards view={view} room={room} sources={sources} />
+            </div>
           )}
           {/* Before the warm start has finished there is nothing to read yet. */}
           {!started && d.current && <TurnProgress turn={d.current} onChange={refresh} />}
@@ -615,21 +769,11 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
           )}
 
           {started && (
-            <div className="mb-6">
-              {/* On wide screens it sits in the side column, beside the table. */}
-              <RoomWho
-                room={room}
-                renderText={(text) => <Cited text={text} sources={sources} />}
-                className="rounded-2xl border bg-card p-4 shadow-xs lg:hidden"
-              />
-            </div>
-          )}
-
-          {started && (
-            <div className="space-y-6">
+            <section aria-labelledby="disc-chat" className="space-y-6 rounded-2xl border bg-card p-4 shadow-xs">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">
-                  {t("room.chat")}{" "}
+                <h2 id="disc-chat" className="flex items-center gap-2 text-sm font-semibold">
+                  <MessageCircle className="size-4 text-muted-foreground" />
+                  {t("room.chat")}
                   <span className="font-normal text-muted-foreground">
                     {chatOpen || later.length <= 3
                       ? t("room.chatAll", { n: later.length })
@@ -637,11 +781,18 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   </span>
                 </h2>
                 {(later.length > 3 || warmup.length > 0) && (
-                  <Button variant="outline" size="sm" aria-expanded={chatOpen} onClick={() => setChatOpen((o) => !o)}>
-                    {t(chatOpen ? "room.fold" : "room.showAll")}
+                  <Button variant="link" size="sm" className="h-auto px-0" aria-expanded={chatOpen} onClick={() => setChatOpen((o) => !o)}>
+                    {t(chatOpen ? "room.fold" : "room.chatAllLink")}
+                    {!chatOpen && <ArrowRight />}
                   </Button>
                 )}
               </div>
+              {!chatOpen && later.length === 0 && !pendingSay && !d.current && !failed && (
+                <p className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                  <MessageCircle className="size-4" />
+                  {t("room.chatEmpty")}
+                </p>
+              )}
               {chatOpen && warmup.length > 0 && (
                 <details className="group rounded-xl border bg-muted/30 px-4 py-3" open={later.length === 0}>
                   <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none">
@@ -688,7 +839,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                 />
               )}
               <div ref={endRef} />
-            </div>
+            </section>
           )}
         </div>
 
@@ -749,8 +900,9 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
         )}
       </div>
 
-      <aside className="sticky top-16 hidden h-[calc(100svh-4rem)] w-80 shrink-0 space-y-7 overflow-x-hidden overflow-y-auto border-l p-5 lg:block">
-        <Side d={d} view={view} sources={sources} room={room} />
+      <aside className="sticky top-16 hidden h-[calc(100svh-4rem)] w-96 shrink-0 space-y-4 overflow-x-hidden overflow-y-auto p-4 lg:block">
+        {view && <SideCards view={view} room={room} sources={sources} />}
+        {d.turns.length > 0 && <RunNotes notes={d.turns[d.turns.length - 1].notes ?? {}} />}
       </aside>
     </div>
   );

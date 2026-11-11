@@ -367,30 +367,33 @@
   }
 }
 
-/* A STORM interview's answer (components/storm-interviews): model markdown, kept small. */
-.iv-answer p {
+/* Model markdown kept small: a STORM interview's answer, a Discussion's utterance (lib/model-markdown). */
+.md-body p {
   margin: 0 0 0.5rem;
 }
-.iv-answer :is(ul, ol) {
+.md-body > :last-child {
+  margin-bottom: 0;
+}
+.md-body :is(ul, ol) {
   margin: 0.25rem 0 0.5rem;
   padding-left: 1.25rem;
 }
-.iv-answer ul {
+.md-body ul {
   list-style: disc;
 }
-.iv-answer ol {
+.md-body ol {
   list-style: decimal;
 }
-.iv-answer :is(h1, h2, h3, h4) {
+.md-body :is(h1, h2, h3, h4) {
   margin: 0.5rem 0 0.25rem;
   font-size: inherit;
   font-weight: 600;
 }
-.iv-answer strong {
+.md-body strong {
   font-weight: 600;
   color: var(--foreground);
 }
-.iv-answer a.iv-cite {
+.md-body a.iv-cite {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -407,7 +410,7 @@
   border-radius: 9999px;
   text-decoration: none;
 }
-.iv-answer a.iv-cite:hover {
+.md-body a.iv-cite:hover {
   background: var(--brand);
   color: white;
 }

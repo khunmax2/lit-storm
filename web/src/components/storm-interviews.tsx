@@ -5,31 +5,21 @@
 // and each [n] links to the nth page found for that question.
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Globe, MessageSquareText, Search } from "lucide-react";
-import MarkdownIt from "markdown-it";
 import { useState } from "react";
 
 import { api, call } from "@/api/client";
 import { domainOf } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
+import { modelHtml } from "@/lib/model-markdown";
 import { cn } from "@/lib/utils";
 
 type Source = { title: string; url: string };
 type Turn = { question: string; queries: string[]; answer: string; sources: Source[] };
 type Perspective = { name: string; description: string; turns: Turn[] };
 
-const md = new MarkdownIt({ html: false, linkify: false });
-
-const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-
 /** The answer as HTML, its [n] markers links to the pages the expert found. */
-function answerHtml(text: string, sources: Source[]) {
-  return md.render(text).replace(/\[(\d+)\]/g, (whole, n) => {
-    const s = sources[Number(n) - 1];
-    if (!s || !/^https?:\/\//.test(s.url)) return whole;
-    return `<a class="iv-cite" href="${escape(s.url)}" target="_blank" rel="noreferrer" title="${escape(s.title || s.url)}">${n}</a>`;
-  });
-}
+const answerHtml = (text: string, sources: Source[]) => modelHtml(text, (n) => sources[n - 1]);
 
 const TONES = [
   "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200",
@@ -82,7 +72,7 @@ function Answer({ turn, n, tone, asker }: { turn: Turn; n: number; tone: string;
         <div className="min-w-0 flex-1">
           <p className="mb-1 text-xs font-medium text-muted-foreground">{t("iv.answer", { n: turn.sources.length })}</p>
           <div
-            className={cn("iv-answer text-sm leading-relaxed text-foreground/90", !open && "line-clamp-6")}
+            className={cn("md-body text-sm leading-relaxed text-foreground/90", !open && "line-clamp-6")}
             dangerouslySetInnerHTML={{ __html: answerHtml(turn.answer, turn.sources) }}
           />
         </div>

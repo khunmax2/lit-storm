@@ -80,6 +80,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useT, type Key } from "@/i18n";
 import { useRunLive } from "@/hooks/use-run-live";
+import { modelHtml } from "@/lib/model-markdown";
 import { cn } from "@/lib/utils";
 
 // three.js comes only with the 3D table, when someone opens it.
@@ -128,10 +129,25 @@ function Cited({ text, sources }: { text: string; sources: Record<string, Source
   );
 }
 
+/** Who said it, in the reader's words: Co-STORM's own role names stay out of sight. */
+function speakerName(role: string, t: ReturnType<typeof useT>["t"]) {
+  const r = role.toLowerCase();
+  if (r.includes("moderator")) return t("disc.moderator");
+  if (role === "General Knowledge Provider") return t("room.gkp");
+  if (r.startsWith("background discussion expert")) return t("obs3d.bgExpert");
+  return role;
+}
+
+// Past this many letters an utterance shows its first lines until opened.
+const LONG = 420;
+
+/** One utterance. A question stands out as a card of its own, so the talk reads
+ *  as question and answers; an answer is rendered markdown, its [n] markers
+ *  small links to their sources, and a long one folded to its first lines. */
 function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, Source> }) {
   const { t } = useT();
-  const guest = turn.role === "Guest";
-  if (guest)
+  const [open, setOpen] = useState(false);
+  if (turn.role === "Guest")
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm whitespace-pre-wrap text-primary-foreground">
@@ -139,31 +155,59 @@ function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, 
         </div>
       </div>
     );
-  const moderator = turn.role.toLowerCase().includes("moderator");
+  const name = speakerName(turn.role, t);
+  const question = turn.type === "Original Question" || turn.role.toLowerCase().includes("moderator");
+  const html = modelHtml(turn.text, (n) => sources[String(n)]);
+  const long = turn.text.length > LONG;
+  const avatar = (
+    <span
+      aria-hidden
+      className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+      style={{ background: tone(turn.role) }}
+    >
+      {initial(name)}
+    </span>
+  );
+  if (question)
+    return (
+      <div className="rounded-xl border bg-muted/40 px-4 py-3">
+        <div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+          {avatar}
+          <span className="font-medium text-foreground">{name}</span>
+          <span>{t("room.asks")}</span>
+        </div>
+        <div className="md-body text-[15px] leading-relaxed font-medium" dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    );
+  // An answer is the usual thing to say; only another kind is worth a tag.
+  const tagged = turn.type && turn.type !== "Potential Answer";
   return (
-    <div className="flex gap-3">
-      <span
-        aria-hidden
-        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-        style={{ background: tone(turn.role) }}
-      >
-        {initial(moderator ? t("disc.moderator") : turn.role === "General Knowledge Provider" ? t("room.gkp") : turn.role)}
-      </span>
+    <div className="flex gap-3 pl-1 sm:pl-4">
+      {avatar}
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex flex-wrap items-baseline gap-x-2 text-sm">
-          <span className="font-medium">
-            {moderator ? t("disc.moderator") : turn.role === "General Knowledge Provider" ? t("room.gkp") : turn.role}
-          </span>
-          <KindTag type={turn.type} />
+        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+          <span className="font-medium">{name}</span>
+          {tagged && <KindTag type={turn.type} />}
           {turn.role_description && (
             <span className="truncate text-xs text-muted-foreground" title={turn.role_description}>
               {turn.role_description}
             </span>
           )}
         </div>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-          <Cited text={turn.text} sources={sources} />
-        </div>
+        <div
+          className={cn("md-body max-w-prose text-sm leading-7 text-foreground/90", long && !open && "line-clamp-5")}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+        {long && (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="mt-1 text-xs font-medium text-brand hover:underline"
+          >
+            {t(open ? "room.readLess" : "room.readMore")}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -775,7 +819,9 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   <MessageCircle className="size-4 text-muted-foreground" />
                   {t("room.chat")}
                   <span className="font-normal text-muted-foreground">
-                    {chatOpen || later.length <= 3
+                    {later.length === 0 && warmup.length > 0
+                      ? t("room.chatWarmOnly", { n: warmup.length })
+                      : chatOpen || later.length <= 3
                       ? t("room.chatAll", { n: later.length })
                       : t("room.chatRecent", { n: 3, total: later.length })}
                   </span>
@@ -794,13 +840,13 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                 </p>
               )}
               {chatOpen && warmup.length > 0 && (
-                <details className="group rounded-xl border bg-muted/30 px-4 py-3" open={later.length === 0}>
+                <details className="group border-t pt-3" open={later.length === 0}>
                   <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium select-none">
                     <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
                     {t("disc.warmup", { n: warmup.length })}
                   </summary>
-                  <p className="mt-2 mb-4 text-xs text-muted-foreground">{t("disc.warmupLead")}</p>
-                  <div className="space-y-5">
+                  <p className="mt-1 mb-4 pl-6 text-xs text-muted-foreground">{t("disc.warmupLead")}</p>
+                  <div className="space-y-4">
                     {warmup.map((x, i) => (
                       <Utterance key={i} turn={x} sources={sources} />
                     ))}

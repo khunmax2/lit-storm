@@ -22,6 +22,8 @@ export function tone(role: string) {
   if (role === MODERATOR || role.toLowerCase().includes("moderator")) return "#64748b";
   if (role === GKP) return "#14b8a6";
   if (role === GUEST) return "#22c55e";
+  // The warm start's background expert is nobody at the table: a quiet slate, dark enough for a white letter.
+  if (role.toLowerCase().startsWith("background discussion expert")) return "#5b6b94";
   let n = 0;
   for (const ch of role) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
   return TONES[n % TONES.length];

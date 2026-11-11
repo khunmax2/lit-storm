@@ -2783,6 +2783,48 @@
     }
    }
   },
+  "/api/runs/{run_id}/interviews": {
+   "get": {
+    "tags": [
+     "research"
+    ],
+    "summary": "View Interviews",
+    "description": "A STORM Run's interviews, as STORM kept them (conversation_log.json):\neach perspective's questions to the topic expert, what the expert searched\nand answered. An answer's [n] is the nth page found for that question; the\npages' own text stays on disk, only their titles and addresses are sent.",
+    "operationId": "view_interviews_api_runs__run_id__interviews_get",
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/runs/{run_id}/service-page": {
    "get": {
     "tags": [

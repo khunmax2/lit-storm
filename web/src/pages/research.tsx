@@ -39,6 +39,7 @@ import { ProjectSettingsDialog } from "@/components/project-settings";
 import { AgentFlowCanvas } from "@/components/agent-flow-canvas";
 import { MedicalCanvas } from "@/components/medical-canvas";
 import { ResearchCanvas } from "@/components/research-canvas";
+import { StormInterviews } from "@/components/storm-interviews";
 
 // three.js comes only with the 3D view, when someone opens it.
 const StormObservatory3D = lazy(() => import("@/components/agent-observatory-3d").then((m) => ({ default: m.StormObservatory3D })));
@@ -850,6 +851,8 @@ function RunCard({ run, round, confirm }: { run: Run; round?: number; confirm: (
             )}
           </details>
         )}
+        {/* What the report was written from: each perspective's interview with the topic expert. */}
+        {readable && run.engine === "storm" && <StormInterviews runId={run.id} />}
       </CardContent>
     </Card>
   );

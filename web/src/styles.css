@@ -366,3 +366,48 @@
     display: none !important;
   }
 }
+
+/* A STORM interview's answer (components/storm-interviews): model markdown, kept small. */
+.iv-answer p {
+  margin: 0 0 0.5rem;
+}
+.iv-answer :is(ul, ol) {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.25rem;
+}
+.iv-answer ul {
+  list-style: disc;
+}
+.iv-answer ol {
+  list-style: decimal;
+}
+.iv-answer :is(h1, h2, h3, h4) {
+  margin: 0.5rem 0 0.25rem;
+  font-size: inherit;
+  font-weight: 600;
+}
+.iv-answer strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+.iv-answer a.iv-cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.15rem;
+  margin: 0 0.1rem;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1;
+  vertical-align: 0.15em;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 9999px;
+  text-decoration: none;
+}
+.iv-answer a.iv-cite:hover {
+  background: var(--brand);
+  color: white;
+}

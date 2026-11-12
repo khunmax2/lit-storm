@@ -890,7 +890,8 @@ class RunDetail(RunOut):
 # database for whoever debugs; they are not the owner's reading.
 # MRA's own events, for Medical Review's canvas (engines/medical) too, and
 # what the Run read its topic as (litstorm.interpret).
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical", "interpretation"}
+# "warmup": how far a Discussion's warm start has got (engines/costorm: its step, and the library's own words).
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical", "interpretation", "warmup"}
 
 
 EVENTS_PER_READ = 500

@@ -64,7 +64,17 @@ class _Callbacks(BaseCallbackHandler):
         self.progress = progress
 
     def on_warmstart_update(self, message, **kwargs):
-        self.progress.note("warmup", message=str(message)[:300])
+        """The warm start says where it is ("… (Step 2 / 4)") and which pages
+        it has read ("Finish browsing <url>" a line): the steps as numbers the
+        page can show, the pages as the same note the later Turns give."""
+        text = str(message)
+        read = re.findall(r"^Finish browsing (\S+)", text, re.M)
+        if read:
+            self.progress.note("browsed", urls=list(dict.fromkeys(read)))
+            return
+        at = re.search(r"\(Step (\d+) / (\d+)\)", text)
+        steps = {"step": int(at[1]), "steps": int(at[2])} if at else {}
+        self.progress.note("warmup", message=text[:300], **steps)
 
     def on_expert_information_collection_end(self, info, **kwargs):
         urls = sorted({i.url for i in info or []})

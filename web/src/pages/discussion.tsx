@@ -10,8 +10,10 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
   BookOpen,
+  Check,
   ChevronDown,
   ChevronRight,
+  Circle,
   Database,
   FileText,
   FolderInput,
@@ -48,7 +50,7 @@ import {
 import { QuotaLine, type Depth } from "@/components/composer";
 import { KindTag, RoomPeople, initial, isFixed, tone, useRoom, type Room } from "@/components/costorm-room";
 import { MoveSessionDialog } from "@/components/move-session";
-import { FailureNote, FINAL, RunNotes, Stepper, useConfirm } from "@/components/run-parts";
+import { FailureNote, FINAL, RunNotes, useConfirm } from "@/components/run-parts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -217,10 +219,14 @@ function Utterance({ turn, sources }: { turn: ViewTurn; sources: Record<string, 
 function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) {
   const { t } = useT();
   const [browsed, setBrowsed] = useState<string[]>([]);
+  // How far the warm start has got (engines/costorm: its four steps, as notes).
+  const [step, setStep] = useState(0);
   const live = turn.status === "running" || turn.status === "cancelling";
   useRunLive(turn.id, live, (d) => {
     const urls = d.events.flatMap((e) => (e.type === "note" && e.data.kind === "browsed" ? (e.data.urls as string[]) : []));
     if (urls.length) setBrowsed((prev) => [...new Set([...prev, ...urls])]);
+    const steps = d.events.flatMap((e) => (e.type === "note" && e.data.kind === "warmup" && e.data.step ? [Number(e.data.step)] : []));
+    if (steps.length) setStep((s) => Math.max(s, ...steps));
     if (d.status !== turn.status || d.stage !== turn.stage) onChange();
   });
 
@@ -228,7 +234,7 @@ function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) 
   return (
     <div className="space-y-3 rounded-xl bg-muted/50 p-4">
       {action === "start" ? (
-        <Stepper stage={turn.stage} status={turn.status} engine="co-storm" />
+        <WarmSteps step={turn.status === "queued" ? 0 : Math.max(1, step)} />
       ) : (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
@@ -248,6 +254,31 @@ function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) 
       )}
       <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>
     </div>
+  );
+}
+
+/** The warm start's four steps as they happen, and the first report it leads to. */
+function WarmSteps({ step }: { step: number }) {
+  const { t } = useT();
+  const labels: Key[] = ["warm.step1", "warm.step2", "warm.step3", "warm.step4", "warm.report"];
+  return (
+    <ol className="space-y-1.5 text-sm">
+      {labels.map((label, i) => {
+        const state = i + 1 < step ? "done" : i + 1 === step ? "now" : "todo";
+        return (
+          <li key={label} className={cn("flex items-center gap-2", state === "todo" && "text-muted-foreground", state === "now" && "font-medium text-brand")}>
+            {state === "done" ? (
+              <Check className="size-4 text-success" />
+            ) : state === "now" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Circle className="size-4" />
+            )}
+            {t(label)}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -633,6 +664,8 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
     );
 
   const started = !!view;
+  // The warm start at work: no view yet, but the table can already be watched filling.
+  const warming = !started && !!d.current && (d.current.status === "running" || d.current.status === "cancelling");
   const busy = !!d.current || ask.isPending;
   const exhausted = d.allowance.remaining === 0;
   const go = (asked: Asked) => (exhausted ? setExtending(asked) : ask.mutate({ asked }));
@@ -748,13 +781,15 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
             </span>
           </div>
 
-          {/* The discussion at a glance: the 3D round table, with what it holds above it. */}
-          {started && view && (
+          {/* The discussion at a glance: the 3D round table, with what it holds above it; while the
+              warm start works, the table as it fills, what it reads arriving as it reads it. */}
+          {(view || warming) && (
             <section aria-labelledby="disc-map" className="mb-6 space-y-3 rounded-2xl border bg-card p-4 shadow-xs">
               <h2 id="disc-map" className="flex items-center gap-2 text-sm font-semibold">
                 <Network className="size-4 text-muted-foreground" />
                 {t("map.title")}
               </h2>
+              {view && (
               <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-3">
                 {[
                   { icon: Users, label: t("map.experts"), value: t("map.roles", { n: room.seats.filter((s) => !isFixed(s.role)).length }) },
@@ -770,9 +805,11 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
                   </div>
                 ))}
               </dl>
+              )}
               <Suspense fallback={<p className="text-xs text-muted-foreground">{t("obs3d.loading")}</p>}>
                 <CoStormObservatory3D
                   view={view}
+                  topic={d.title}
                   currentId={d.current?.id ?? null}
                   live={!!d.current && !FINAL.has(d.current.status)}
                   picked={room.picked?.startsWith("topic:") ? null : room.picked}

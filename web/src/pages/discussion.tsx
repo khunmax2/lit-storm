@@ -252,29 +252,39 @@ function TurnProgress({ turn, onChange }: { turn: Turn; onChange: () => void }) 
           ))}
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>
     </div>
   );
 }
 
-/** The warm start's four steps as they happen, and the first report it leads to. */
+/** The warm start's four steps as they happen, and the first report it leads to: drawn as a
+ *  STORM Run's stages are (run-parts' Stepper), since a Co-STORM start has no stages of its own. */
 function WarmSteps({ step }: { step: number }) {
   const { t } = useT();
   const labels: Key[] = ["warm.step1", "warm.step2", "warm.step3", "warm.step4", "warm.report"];
   return (
-    <ol className="space-y-1.5 text-sm">
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
       {labels.map((label, i) => {
         const state = i + 1 < step ? "done" : i + 1 === step ? "now" : "todo";
         return (
-          <li key={label} className={cn("flex items-center gap-2", state === "todo" && "text-muted-foreground", state === "now" && "font-medium text-brand")}>
-            {state === "done" ? (
-              <Check className="size-4 text-success" />
-            ) : state === "now" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Circle className="size-4" />
-            )}
-            {t(label)}
+          <li key={label} className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-2.5 py-1",
+                state === "done" && "bg-success-soft text-success",
+                state === "now" && "bg-brand-soft font-medium text-brand",
+                state === "todo" && "bg-muted text-muted-foreground",
+              )}
+            >
+              {state === "done" ? (
+                <Check className="size-3" />
+              ) : state === "now" ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Circle className="size-3" />
+              )}
+              {t(label)}
+            </span>
+            {i < labels.length - 1 && <span className="h-px w-3 bg-border" />}
           </li>
         );
       })}

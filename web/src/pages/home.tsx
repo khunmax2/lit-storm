@@ -1,9 +1,9 @@
-// Home: the research mode as tabs, one question in the middle, shortcuts and
-// recent research under it.
+// Home: the research mode as tabs, one question in the middle, recent research
+// under it.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight, History, Sparkles } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { AlertTriangle, ArrowRight, History } from "lucide-react";
+import { useState } from "react";
 
 import { api, call } from "@/api/client";
 import { DOT } from "@/components/app-sidebar";
@@ -16,48 +16,6 @@ import { has, useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const ACTIVE = new Set(["running", "queued", "cancelling"]);
-
-function Shortcut({ to, art, title, action }: { to: string; art: ReactNode; title: string; action: string }) {
-  return (
-    <Link
-      to={to}
-      className="group overflow-hidden rounded-xl border bg-card shadow-xs transition-shadow hover:shadow-md"
-    >
-      <div className="flex items-center gap-3 px-4 py-4">
-        <div className="flex h-8 w-11 shrink-0 items-center">{art}</div>
-        <span className="truncate font-medium">{title}</span>
-      </div>
-      <div className="flex items-center justify-between border-t bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground transition-colors group-hover:text-foreground">
-        {action}
-        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-      </div>
-    </Link>
-  );
-}
-
-// Small flat drawings for the shortcut cards, in the reference's spirit.
-const ART = {
-  projects: (
-    <div className="relative h-7 w-10">
-      <div className="absolute top-2 left-0 h-5 w-10 rounded-sm bg-amber-100 dark:bg-amber-200/30" />
-      <div className="absolute top-1 left-0 h-2.5 w-10 rounded-sm bg-amber-200 dark:bg-amber-300/50" />
-      <Sparkles className="absolute -top-1.5 -left-1 size-3.5 fill-amber-400 text-amber-400" />
-    </div>
-  ),
-  report: (
-    <div className="flex h-7 w-10 flex-col gap-1">
-      <div className="h-3.5 rounded-sm bg-sky-400" />
-      <div className="h-1 w-8 rounded-full bg-sky-200 dark:bg-sky-300/40" />
-      <div className="h-1 w-6 rounded-full bg-sky-200 dark:bg-sky-300/40" />
-    </div>
-  ),
-  trash: (
-    <div className="flex h-7 w-10 flex-col justify-center gap-1.5">
-      <div className="h-2 w-6 rounded-sm bg-indigo-500" />
-      <div className="ml-3 h-2 w-7 rounded-sm bg-indigo-300 dark:bg-indigo-400/60" />
-    </div>
-  ),
-};
 
 /** What a research mode is good at, shown when the pointer rests on its tab:
  *  its name, what stands out, and what it suits. Nothing for a mode whose
@@ -121,7 +79,6 @@ export function HomePage() {
   const { t, lang } = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const projects = useQuery({ queryKey: ["projects"], queryFn: () => call(api.GET("/api/projects")) });
   const recent = useQuery({
     queryKey: ["recent"],
     queryFn: () => call(api.GET("/api/sessions/recent", { params: { query: { limit: 12 } } })),
@@ -154,7 +111,6 @@ export function HomePage() {
   });
 
   const running = recent.data?.filter((s) => s.last_status && ACTIVE.has(s.last_status)).length ?? 0;
-  const latestDone = recent.data?.find((s) => s.last_status === "succeeded");
 
   return (
     <div className="flex flex-1 flex-col">
@@ -209,22 +165,6 @@ export function HomePage() {
             <ErrorText error={start.error} />
           </div>
         )}
-
-        <div className="mt-10 grid gap-3 sm:grid-cols-3">
-          <Shortcut
-            to="/projects"
-            art={ART.projects}
-            title={t("home.cardProjects")}
-            action={t("home.cardProjectsAction", { n: projects.data?.length ?? 0 })}
-          />
-          <Shortcut
-            to={latestDone ? `/sessions/${latestDone.id}` : "/projects"}
-            art={ART.report}
-            title={t("home.cardReport")}
-            action={latestDone ? t("home.cardReportAction") : t("home.cardReportNone")}
-          />
-          <Shortcut to="/trash" art={ART.trash} title={t("nav.trash")} action={t("home.cardTrashAction")} />
-        </div>
 
         <section className="mt-10">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">

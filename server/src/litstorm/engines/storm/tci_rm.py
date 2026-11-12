@@ -5,11 +5,15 @@ Thai and English, each with its abstract, which is the passage. Nothing
 else here finds Thai research: the academic engines behind SearXNG return
 almost nothing in Thai (docs/web-app-design.md, SearXNG LDR-academic).
 
-The API needs no key. Its "strict" search wants every word of the query in
-the article, so STORM's long questions (measured 2026-09-30) mostly find
-nothing; then the query is asked again loosely, ranked by score, and only
-the first k are kept. A loose answer can stray from the topic. The same
-two-step search the Open Deep Research app used.
+The API needs no key. Its strict search (matching_strategy "all") wants
+every word of the query in the article, so STORM's long questions (measured
+2026-09-30) mostly find nothing; then the query is asked again loosely,
+ranked by relevance, and only the first k are kept. A loose answer can stray
+from the topic. The same two-step search the Open Deep Research app used.
+
+ThaiJO moved its search in November 2026 from /api/articles/search/ (now a
+404) to /api/v1/articles/search, the one its own site calls. It answers
+`hits`, and leaves each hit's abstract out unless asked to highlight.
 """
 
 import logging
@@ -18,7 +22,7 @@ import time
 import dspy
 import requests
 
-ENDPOINT = "https://www.tci-thaijo.org/api/articles/search/"
+ENDPOINT = "https://www.tci-thaijo.org/api/v1/articles/search"
 TRIES = 3
 RETRYABLE = {429, 500, 502, 503, 504}
 
@@ -54,8 +58,9 @@ class TciRM(dspy.Retrieve):
         return {"TciRM": usage}
 
     def _search(self, query, strict):
-        body = {"term": query, "page": 1, "size": self.k, "strict": strict,
-                "title": True, "author": True, "abstract": True}
+        body = {"q": query, "page": 1, "per_page": self.k, "highlight": True, "facets": False}
+        if strict:
+            body["matching_strategy"] = "all"
         # Three tries in all for what may pass, with growing gaps
         # (docs/web-app-design.md, การ retry คำขอที่ล้มเหลว).
         for attempt in range(TRIES):
@@ -65,30 +70,30 @@ class TciRM(dspy.Retrieve):
                 break
             time.sleep(2**attempt)
         response.raise_for_status()
-        return response.json().get("result") or []
+        return response.json().get("hits") or []
 
     @staticmethod
     def _to_result(item):
-        # articleUrl is the article's page; thaijoUrl is only its journal's.
-        url = item.get("articleUrl")
-        abstract = _text(item.get("abstract_clean"))
+        # article_url is the article's page; journal_url is only its journal's.
+        url = item.get("article_url")
+        abstract = _text(item.get("abstracts"))
         if not url or not abstract:
             return None
-        authors = [
-            name
-            for a in item.get("authors") or []
-            if isinstance(a, dict) and (name := _text(a.get("full_name")))
-        ]
-        published = (item.get("datePublished") or "")[:10]
+        # Authors are kept by locale, a list of names in each.
+        by_locale = item.get("authors") if isinstance(item.get("authors"), dict) else {}
+        names = by_locale.get("th_TH") or by_locale.get("en_US") or next(iter(by_locale.values()), [])
+        authors = [" ".join(n.split()) for n in names or [] if isinstance(n, str) and n.strip()]
+        # A local date ("2025-06-30T00:00:00+07:00"): its first ten letters are the day in Thailand.
+        published = (item.get("date_published") or "")[:10]
         if published.startswith("1970"):
             published = ""  # the epoch: ThaiJO's way of saying no date
         if not published:
-            return {"url": url, "title": _text(item.get("title")) or url,
+            return {"url": url, "title": _text(item.get("titles")) or url,
                     "description": ", ".join(authors[:3]), "snippets": [abstract]}
         byline = ", ".join(authors[:3]) + (" et al." if len(authors) > 3 else "")
         return {
             "url": url,
-            "title": _text(item.get("title")) or url,
+            "title": _text(item.get("titles")) or url,
             "description": f"{byline} ({published})" if byline else published,
             "snippets": [abstract],
         }

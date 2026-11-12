@@ -154,17 +154,17 @@ def search(provider, api_key, query="retrieval augmented generation"):
                 if m
             ]
         elif provider.kind == "tci":
+            # The search ThaiJO's own site calls (engines/storm/tci_rm), loosely.
             r = requests.post(
-                "https://www.tci-thaijo.org/api/articles/search/",
-                json={"term": query, "page": 1, "size": 3, "strict": False,
-                      "title": True, "author": True, "abstract": True},
+                "https://www.tci-thaijo.org/api/v1/articles/search",
+                json={"q": query, "page": 1, "per_page": 3, "highlight": False, "facets": False},
                 timeout=TIMEOUT,
                 headers={"User-Agent": "lit-storm/2"},
             )
             r.raise_for_status()
             titles = [
-                (x.get("title") or {}).get("th_TH") or (x.get("title") or {}).get("en_US") or ""
-                for x in r.json().get("result") or []
+                (x.get("titles") or {}).get("th_TH") or (x.get("titles") or {}).get("en_US") or ""
+                for x in r.json().get("hits") or []
             ]
         else:
             return False, f"no check for {provider.kind!r}", 0.0, []

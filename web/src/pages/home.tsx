@@ -1,16 +1,14 @@
-// Home: the research mode as tabs, one question in the middle, recent research
-// under it.
+// Home: the research mode as tabs and one question in the middle; recent
+// research is in the sidebar.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight, History } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useState } from "react";
 
 import { api, call } from "@/api/client";
-import { DOT } from "@/components/app-sidebar";
 import { ErrorText, timeAgo } from "@/components/common";
 import { Composer, QuotaLine, startResearch, useRequestKey, useRunOptions, type RunForm } from "@/components/composer";
 import { useOpenIssues } from "@/components/system-status";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Segmented } from "@/components/segmented";
 import { has, useT, type Key } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -139,9 +137,10 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-16">
+      {/* The question sits a little above the middle of the page: recent research is in the sidebar. */}
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 pt-6 pb-[14vh]">
         <IssuesNotice />
-        <div className="flex flex-col items-center pt-[9vh] pb-8 text-center">
+        <div className="flex flex-col items-center pb-8 text-center">
           <h1 className="font-display text-4xl leading-tight tracking-tight text-balance md:text-6xl">
             {t("home.title")}
           </h1>
@@ -166,47 +165,6 @@ export function HomePage() {
           </div>
         )}
 
-        <section className="mt-10">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-            <History className="size-4 text-muted-foreground" />
-            {t("home.recentReports")}
-          </h2>
-          {recent.isLoading && (
-            <div className="space-y-2 pl-6">
-              {Array.from({ length: 3 }, (_, i) => (
-                <Skeleton key={i} className="h-6" />
-              ))}
-            </div>
-          )}
-          {recent.data?.length === 0 && <p className="pl-6 text-sm text-muted-foreground">{t("projects.empty")}</p>}
-          {!!recent.data?.length && (
-            <ul className="ml-2 border-l pl-4">
-              {recent.data.slice(0, 5).map((s) => (
-                <li key={s.id}>
-                  <Link
-                    to="/sessions/$sessionId"
-                    params={{ sessionId: s.id }}
-                    className="flex items-center gap-3 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-muted/60"
-                  >
-                    <span
-                      className={cn("size-1.5 shrink-0 rounded-full", DOT[s.last_status ?? ""] ?? "bg-muted-foreground/40")}
-                    />
-                    <span className="truncate">{s.title}</span>
-                    {s.project_name && (
-                      <span className="hidden truncate text-xs text-muted-foreground sm:inline">· {s.project_name}</span>
-                    )}
-                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{timeAgo(s.updated_at, lang)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!!recent.data?.length && (
-            <Link to="/research" className="mt-2 ml-8 inline-block text-sm font-medium hover:underline">
-              {t("home.seeMore")}
-            </Link>
-          )}
-        </section>
       </div>
     </div>
   );

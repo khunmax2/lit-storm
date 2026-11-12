@@ -21,14 +21,22 @@ const queryClient = new QueryClient({
   },
 });
 
+// Frosted Sky is now the light theme: whoever had picked it by name keeps it, as "light".
+try {
+  if (localStorage.getItem("theme") === "frosted") localStorage.setItem("theme", "light");
+  localStorage.removeItem("litstorm.light-theme");
+} catch {
+  /* storage may be blocked */
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider
       attribute="class"
       defaultTheme="system"
       enableSystem
-      // Frosted Sky is a light theme of its own (styles.css, .frosted).
-      themes={["light", "dark", "frosted"]}
+      // Light is Frosted Sky (styles.css, .light); there is no other light theme.
+      themes={["light", "dark"]}
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>

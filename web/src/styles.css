@@ -145,10 +145,11 @@
   }
 }
 
-/* Frosted Sky: a light theme of its own — a sky of soft colour behind,
-   frosted panels in front (Glassmorphism on the Wiki/Knowledge palette,
-   docs/design/). Chosen in the account menu; dark mode is unchanged. */
-.frosted {
+/* The light theme ("Frosted Sky", once a theme of its own beside a plain
+   light one): a sky of soft colour behind, frosted panels in front
+   (Glassmorphism on the Wiki/Knowledge palette, docs/design/). next-themes
+   puts .light on <html> for it, chosen or from the system; dark is unchanged. */
+.light {
   color-scheme: light;
   /* What sits on the sky is solid white, outlined in navy: on the sky the
      glass reads as glass, but a button made of it would disappear. */
@@ -181,7 +182,7 @@
   --sidebar-ring: #2563eb;
   --radius: 0.9rem;
 }
-.frosted body {
+.light body {
   background:
     radial-gradient(55rem 40rem at 85% 0%, #dcd6ff 0%, transparent 60%),
     radial-gradient(60rem 45rem at 0% 30%, #cfe6ff 0%, transparent 60%),
@@ -189,47 +190,47 @@
     #eef3fb;
   background-attachment: fixed;
 }
-.frosted [data-slot="sidebar-inset"] {
+.light [data-slot="sidebar-inset"] {
   background: transparent;
 }
-.frosted [data-slot="sidebar-inner"],
-.frosted header.sticky,
-.frosted .bg-card {
+.light [data-slot="sidebar-inner"],
+.light header.sticky,
+.light .bg-card {
   backdrop-filter: blur(18px) saturate(1.3);
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
 }
-.frosted .bg-card {
+.light .bg-card {
   box-shadow:
     0 8px 30px -12px rgb(30 58 138 / 0.18),
     inset 0 1px 0 rgb(255 255 255 / 0.8);
 }
-.frosted header.sticky {
+.light header.sticky {
   background: rgb(255 255 255 / 0.55);
 }
 /* Under the pointer: a clear blue, not white on white. */
-.frosted [data-slot="button"]:not([data-variant="default"]):not(:disabled):hover,
-.frosted [data-slot="select-trigger"]:hover,
-.frosted [data-slot="dropdown-menu-trigger"]:hover,
-.frosted [role="tab"]:hover,
-.frosted [data-sidebar="menu-button"]:hover {
+.light [data-slot="button"]:not([data-variant="default"]):not(:disabled):hover,
+.light [data-slot="select-trigger"]:hover,
+.light [data-slot="dropdown-menu-trigger"]:hover,
+.light [role="tab"]:hover,
+.light [data-sidebar="menu-button"]:hover {
   background-color: rgb(37 99 235 / 0.12);
   border-color: rgb(37 99 235 / 0.35);
   color: #1e3a8a;
 }
-.frosted [role="tab"][aria-selected="true"]:hover {
+.light [role="tab"][aria-selected="true"]:hover {
   background-color: transparent;
 }
 /* Where you are is stronger still than where the pointer is. */
-.frosted [data-sidebar="menu-button"][data-active="true"] {
+.light [data-sidebar="menu-button"][data-active="true"] {
   background-color: rgb(37 99 235 / 0.16);
   border-color: rgb(37 99 235 / 0.3);
   color: #1e3a8a;
   font-weight: 500;
 }
-.frosted [data-slot="dropdown-menu-item"]:focus,
-.frosted [data-slot="select-item"]:focus,
-.frosted [data-slot="dropdown-menu-radio-item"]:focus,
-.frosted [data-slot="dropdown-menu-checkbox-item"]:focus {
+.light [data-slot="dropdown-menu-item"]:focus,
+.light [data-slot="select-item"]:focus,
+.light [data-slot="dropdown-menu-radio-item"]:focus,
+.light [data-slot="dropdown-menu-checkbox-item"]:focus {
   background-color: rgb(37 99 235 / 0.12);
   color: #1e3a8a;
 }

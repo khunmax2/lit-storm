@@ -674,8 +674,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
     );
 
   const started = !!view;
-  // The warm start at work: no view yet, but the table can already be watched filling.
-  const warming = !started && !!d.current && (d.current.status === "running" || d.current.status === "cancelling");
+  const canCancel = !d.read_only && !!d.current && !FINAL.has(d.current.status) && d.current.status !== "cancelling";
   const busy = !!d.current || ask.isPending;
   const exhausted = d.allowance.remaining === 0;
   const go = (asked: Asked) => (exhausted ? setExtending(asked) : ask.mutate({ asked }));
@@ -793,12 +792,27 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
 
           {/* The discussion at a glance: the 3D round table, with what it holds above it; while the
               warm start works, the table as it fills, what it reads arriving as it reads it. */}
-          {(view || warming) && (
+          {(view || d.current) && (
             <section aria-labelledby="disc-map" className="mb-6 space-y-3 rounded-2xl border bg-card p-4 shadow-xs">
-              <h2 id="disc-map" className="flex items-center gap-2 text-sm font-semibold">
-                <Network className="size-4 text-muted-foreground" />
-                {t("map.title")}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 id="disc-map" className="flex flex-1 items-center gap-2 text-sm font-semibold">
+                  <Network className="size-4 text-muted-foreground" />
+                  {t("map.title")}
+                </h2>
+                {/* The Turn at work can be stopped from here, as a Run is from its card. */}
+                {canCancel && (
+                  <Button
+                    variant="outline"
+                    disabled={cancel.isPending}
+                    onClick={() => confirm(t("run.cancelConfirm"), () => cancel.mutate(d.current!.id))}
+                  >
+                    <Square />
+                    {t("run.cancel")}
+                  </Button>
+                )}
+              </div>
+              {/* The warm start's steps where a STORM Run shows its stages: above the table. */}
+              {!started && d.current && <TurnProgress turn={d.current} onChange={refresh} />}
               {view && (
               <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-3">
                 {[
@@ -841,8 +855,6 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
               <SideCards view={view} room={room} sources={sources} />
             </div>
           )}
-          {/* Before the warm start has finished there is nothing to read yet. */}
-          {!started && d.current && <TurnProgress turn={d.current} onChange={refresh} />}
           {!started && !d.current && failed && (
             <TurnFailed turn={failed} pending={ask.isPending} onRetry={() => ask.mutate({ asked: { action: "start" } })} />
           )}
@@ -894,24 +906,7 @@ export function DiscussionPage({ sessionId }: { sessionId: string }) {
               {pendingSay && (
                 <Utterance turn={{ role: "Guest", role_description: "", type: "", text: pendingSay, cited: [], warmup: false }} sources={sources} />
               )}
-              {d.current && (
-                <div className="flex items-start gap-2">
-                  <div className="flex-1">
-                    <TurnProgress turn={d.current} onChange={refresh} />
-                  </div>
-                  {!FINAL.has(d.current.status) && d.current.status !== "cancelling" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={t("run.cancel")}
-                      disabled={cancel.isPending}
-                      onClick={() => cancel.mutate(d.current!.id)}
-                    >
-                      <Square />
-                    </Button>
-                  )}
-                </div>
-              )}
+              {d.current && <TurnProgress turn={d.current} onChange={refresh} />}
               {failed && (
                 <TurnFailed
                   turn={failed}

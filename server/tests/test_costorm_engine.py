@@ -130,3 +130,28 @@ def test_a_report_without_an_introduction_gets_a_lead_written_for_it(monkeypatch
     assert [s["heading"] for s in report["sections"]] == ["Background and origin"]
     assert report["sections"][0]["body"] == "Old [2]."
     assert usage == [("report", {"openrouter/a": {"prompt_tokens": 9, "completion_tokens": 3}})]
+
+
+def test_the_warm_starts_messages_reach_the_page_as_steps_and_pages_read():
+    from litstorm.engines.costorm.engine import _Callbacks
+
+    class Notes:
+        def __init__(self):
+            self.notes = []
+
+        def note(self, kind, **data):
+            self.notes.append((kind, data))
+
+    notes = Notes()
+    callbacks = _Callbacks(notes)
+    callbacks.on_warmstart_update("Start getting familiar with the topic by chatting with multiple LLM experts (Step 1 / 4)")
+    callbacks.on_warmstart_update("Finish browsing https://a.example.org/x\nFinish browsing https://b.example.org/y\nFinish browsing https://a.example.org/x")
+    callbacks.on_warmstart_update("Synthesizing background information discussion utterances (Step 4 / 4)")
+    callbacks.on_warmstart_update("Something else")
+    assert notes.notes == [
+        ("warmup", {"message": "Start getting familiar with the topic by chatting with multiple LLM experts (Step 1 / 4)", "step": 1, "steps": 4}),
+        # What the warm start read, as the table's later Turns report it: the page draws it the same way.
+        ("browsed", {"urls": ["https://a.example.org/x", "https://b.example.org/y"]}),
+        ("warmup", {"message": "Synthesizing background information discussion utterances (Step 4 / 4)", "step": 4, "steps": 4}),
+        ("warmup", {"message": "Something else"}),
+    ]

@@ -4,6 +4,7 @@ Every row is looked up through `deps.own`, so another User's id is a 404.
 """
 
 import asyncio
+import json
 import os
 import tempfile
 import uuid
@@ -11,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -889,7 +890,8 @@ class RunDetail(RunOut):
 # database for whoever debugs; they are not the owner's reading.
 # MRA's own events, for Medical Review's canvas (engines/medical) too, and
 # what the Run read its topic as (litstorm.interpret).
-_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical", "interpretation"}
+# "warmup": how far a Discussion's warm start has got (engines/costorm: its step, and the library's own words).
+_SHOWN_NOTES = {"perspectives", "browsed", "dropped_citations", "tree", "flow", "medical", "interpretation", "warmup"}
 
 
 EVENTS_PER_READ = 500
@@ -1291,6 +1293,38 @@ def view_service_data(run_id: uuid.UUID, user=Depends(deps.current_user), sessio
         raise HTTPException(404, "no_service_data")
     with open(path, "rb") as f:
         return Response(f.read(), media_type="application/json", headers={"Cache-Control": "private, no-store"})
+
+
+@router.get("/runs/{run_id}/interviews")
+def view_interviews(run_id: uuid.UUID, user=Depends(deps.current_user), session=Depends(deps.database)):
+    """A STORM Run's interviews, as STORM kept them (conversation_log.json):
+    each perspective's questions to the topic expert, what the expert searched
+    and answered. An answer's [n] is the nth page found for that question; the
+    pages' own text stays on disk, only their titles and addresses are sent."""
+    run = deps.readable(session, Run, run_id, user)
+    path = os.path.join(settings.get().runs_dir, str(run.id), "work", "storm", "article", "conversation_log.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            log = json.load(f)
+        perspectives = []
+        for p in log:
+            name, _, description = str(p.get("perspective", "")).partition(": ")
+            turns = [
+                {
+                    "question": str(t.get("user_utterance", "")).strip(),
+                    "queries": [q.strip() for q in t.get("search_queries") or [] if str(q).strip()],
+                    "answer": str(t.get("agent_utterance", "")).strip(),
+                    "sources": [
+                        {"title": str(r.get("title") or ""), "url": str(r.get("url") or "")}
+                        for r in t.get("search_results") or []
+                    ],
+                }
+                for t in p.get("dlg_turns") or []
+            ]
+            perspectives.append({"name": name.strip(), "description": description.strip(), "turns": turns})
+    except (OSError, ValueError, AttributeError, TypeError):
+        raise HTTPException(404, "no_interviews")
+    return JSONResponse({"perspectives": perspectives}, headers={"Cache-Control": "private, no-store"})
 
 
 @router.get("/runs/{run_id}/service-page")

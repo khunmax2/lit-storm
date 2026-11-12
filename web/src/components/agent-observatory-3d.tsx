@@ -864,8 +864,10 @@ const seatOf = (role: string) => {
 const held = (n: MindNode): number => n.count + (n.children || []).reduce((a, c) => a + held(c), 0);
 
 /** `picked` / `onPick`: the role picked on the page's cards (costorm-room), shared with the table. */
-export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: {
+export function CoStormObservatory3D({ view, topic, currentId, live, picked, onPick }: {
   view: DiscussionView | null;
+  // The table's subject while the warm start works and there is no view yet.
+  topic?: string;
   currentId: string | null;
   live: boolean;
   picked?: string | null;
@@ -875,6 +877,8 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
   const director = useDirector();
   const { push, send, world } = director;
   const played = useRef(0);
+  // The first replay of a view is under way: a Turn that starts meanwhile waits behind it.
+  const replaying = useRef(false);
   // The experts at the table now; anyone else who spoke sits on the outer ring, faded.
   const seated = useRef(new Set<string>());
 
@@ -1000,8 +1004,10 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
     (v: DiscussionView) => {
       director.reset();
       build(v);
+      replaying.current = true;
       for (let k = 0; k < v.turns.length; k++) push(...turnSteps(v, k));
       push(() => {
+        replaying.current = false;
         world.current.bubble = null;
         say(world.current, t("obs3d.tableDone", { n: v.turns.length }));
         return 0;
@@ -1012,7 +1018,12 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
   );
 
   useEffect(() => {
-    if (!view) return;
+    // While the warm start works there is no view: an empty table, the knowledge base and the web,
+    // for what it reads to arrive at as it reads it.
+    if (!view) {
+      if (live && !world.current.cores.size) build({ topic: topic ?? "", turns: [], mind_map: [], sources: {}, experts: [] });
+      return;
+    }
     if (played.current === 0) play(view);
     else if (view.turns.length > played.current) {
       // A new Turn finished: catch up at once, rebuild the stars, and play only what was said since.
@@ -1021,14 +1032,16 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
       for (let k = played.current; k < view.turns.length; k++) push(...turnSteps(view, k));
       played.current = view.turns.length;
     }
-  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view, live]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // While a Turn works: what it reads goes from the web to the knowledge base, ahead of any replay.
   const caughtUp = useRef<string | null>(null);
   useRunLive(currentId ?? "", live && !!currentId, (r) => {
     if (caughtUp.current !== currentId) {
       caughtUp.current = currentId;
-      director.flush();
+      // A Turn that starts as the warm start's talk is first played (the first report, queued by
+      // itself) must not cut that play short; any other catches up at once.
+      if (!replaying.current) director.flush();
     }
     for (const e of r.events as unknown as Ev[]) {
       const d = e.data || {};
@@ -1045,7 +1058,7 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
         });
       } else if (e.type === "note" && d.kind === "warmup") {
         push(() => {
-          say(world.current, clip(d.message, 90));
+          say(world.current, d.step ? t(`warm.step${d.step}` as Key) : clip(d.message, 90));
           return 200;
         });
       }
@@ -1062,7 +1075,7 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
     return () => clearInterval(every);
   }, [pickedId, send, world]);
 
-  if (!view) return <p className="text-xs text-muted-foreground">{t("obs3d.waiting")}</p>;
+  if (!view && !live) return <p className="text-xs text-muted-foreground">{t("obs3d.waiting")}</p>;
   const c = world.current.counts;
   return (
     <Stage
@@ -1070,14 +1083,14 @@ export function CoStormObservatory3D({ view, currentId, live, picked, onPick }: 
       camera={[0, 8.5, 11.5]}
       target={[0, -1.2, 0]}
       director={director}
-      canReplay={!!view.turns.length}
-      onReplay={() => play(view)}
+      canReplay={!!view?.turns.length}
+      onReplay={() => view && play(view)}
       picked={pickedId}
       onPick={(id) => onPick?.(id ? roleOf(id) : null)}
       hud={
         <div className="obs3d-meters">
           <span><b>{c.turns}/{c.total}</b>{t("obs3d.turns")}</span>
-          <span><b>{view.experts.length}</b>{t("obs3d.experts")}</span>
+          <span><b>{view?.experts.length ?? 0}</b>{t("obs3d.experts")}</span>
           <span><b>{c.pages}</b>{t("obs3d.concepts")}</span>
           <span><b>{world.current.sats.length}</b>{t("obs3d.sources")}</span>
         </div>

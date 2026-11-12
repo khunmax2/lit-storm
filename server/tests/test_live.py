@@ -136,3 +136,16 @@ def test_only_the_owner_has_the_stream(admin, browser, configured):  # noqa: F81
     other = make_user(admin, browser, email="other@example.org")
     assert other.get(f"/api/runs/{run_id}/live").status_code == 404
     assert browser().get(f"/api/runs/{run_id}/live").status_code == 401
+
+
+def test_the_owner_sees_how_far_a_warm_start_has_got_but_not_its_failures(admin, browser, configured, db):  # noqa: F811
+    from litstorm.db.models import RunEvent
+
+    user = make_user(admin, browser)
+    run_id = _session(user)["runs"][0]["id"]
+    db.add(RunEvent(run_id=run_id, type="note", data={"kind": "warmup", "message": "Organizing (Step 2 / 4)", "step": 2, "steps": 4}))
+    db.add(RunEvent(run_id=run_id, type="note", data={"kind": "sources_skipped", "sources": {"x": "boom"}}))
+    db.commit()
+    events = user.get(f"/api/runs/{run_id}").json()["events"]
+    assert [e["data"]["kind"] for e in events] == ["warmup"]
+    assert events[0]["data"]["step"] == 2

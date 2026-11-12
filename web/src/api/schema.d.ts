@@ -1005,6 +1005,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/interviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * View Interviews
+         * @description A STORM Run's interviews, as STORM kept them (conversation_log.json):
+         *     each perspective's questions to the topic expert, what the expert searched
+         *     and answered. An answer's [n] is the nth page found for that question; the
+         *     pages' own text stays on disk, only their titles and addresses are sent.
+         */
+        get: operations["view_interviews_api_runs__run_id__interviews_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/service-page": {
         parameters: {
             query?: never;
@@ -5182,6 +5205,37 @@ export interface operations {
         };
     };
     view_service_data_api_runs__run_id__service_data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_interviews_api_runs__run_id__interviews_get: {
         parameters: {
             query?: never;
             header?: never;

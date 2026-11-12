@@ -17,6 +17,7 @@ import {
   Sparkles,
   Square,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ import { ProjectSettingsDialog } from "@/components/project-settings";
 import { AgentFlowCanvas } from "@/components/agent-flow-canvas";
 import { MedicalCanvas } from "@/components/medical-canvas";
 import { ResearchCanvas } from "@/components/research-canvas";
+import { StormInterviews } from "@/components/storm-interviews";
 
 // three.js comes only with the 3D view, when someone opens it.
 const StormObservatory3D = lazy(() => import("@/components/agent-observatory-3d").then((m) => ({ default: m.StormObservatory3D })));
@@ -611,7 +613,9 @@ function ChooseAgain({ run }: { run: Run }) {
   );
 }
 
-function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: () => void) => void }) {
+/** `round`: which time the topic was researched in this session (1 = the first),
+ *  given only when it was researched more than once. */
+function RunCard({ run, round, confirm }: { run: Run; round?: number; confirm: (text: string, action: () => void) => void }) {
   const { t, lang } = useT();
   const queryClient = useQueryClient();
   const refresh = () => {
@@ -643,6 +647,10 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
   const readable = run.status === "succeeded" || (run.status === "cancelled" && !!run.report_title);
   const canRetry = ["failed", "interrupted", "cancelled"].includes(run.status);
   const canCancel = !FINAL.has(run.status) && run.status !== "cancelling";
+  // The agents canvas, when open on a finished Run, ends with its own Read button:
+  // the one in the card's header then steps aside, and comes back when the canvas folds.
+  const hasCanvas = ["deep", "agent", "storm", "medical"].includes(run.engine) && run.status !== "queued" && run.status !== "needs_selection";
+  const readAtCanvas = readable && hasCanvas && mapOpen;
 
   return (
     <Card className="gap-4 py-4">
@@ -650,6 +658,9 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {round != null && (
+                <span className="rounded-md bg-primary/10 px-2 py-0.5 font-semibold text-primary">{t("run.round", { n: round })}</span>
+              )}
               <StatusBadge status={run.status} />
               <span>{formatDate(run.queued_at, lang)}</span>
               {run.parent_run_id && (
@@ -734,7 +745,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                 </a>
               </Button>
             )}
-            {readable && (
+            {readable && !readAtCanvas && (
               <Button asChild>
                 <Link to="/runs/$runId" params={{ runId: run.id }}>
                   <FileText />
@@ -791,7 +802,7 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
         {run.status === "needs_selection" && <ChooseAgain run={run} />}
         {run.status === "queued" && <p className="text-xs text-muted-foreground">{t("run.closeSafe")}</p>}
         <LiveProgress run={run} />
-        {(run.engine === "deep" || run.engine === "agent" || run.engine === "storm" || run.engine === "medical") && run.status !== "queued" && run.status !== "needs_selection" && (
+        {hasCanvas && (
           <details
             className="group"
             open={mapOpen}
@@ -821,10 +832,27 @@ function RunCard({ run, confirm }: { run: Run; confirm: (text: string, action: (
                 ) : (
                   <ResearchCanvas runId={run.id} topic={run.topic} live={!FINAL.has(run.status)} />
                 )}
+                {/* Whoever watched the work to the end finds the report right where they are looking. */}
+                {readAtCanvas && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs">
+                    <span className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="size-4 text-success" />
+                      {t("run.reportReady")}
+                    </span>
+                    <Button asChild>
+                      <Link to="/runs/$runId" params={{ runId: run.id }}>
+                        <FileText />
+                        {t("run.open")}
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </details>
         )}
+        {/* What the report was written from: each perspective's interview with the topic expert. */}
+        {readable && run.engine === "storm" && <StormInterviews runId={run.id} />}
       </CardContent>
     </Card>
   );
@@ -973,8 +1001,9 @@ export function SessionPage() {
         }
       />
       <div className="space-y-3">
-        {s.runs.map((r) => (
-          <RunCard key={r.id} run={r} confirm={confirm} />
+        {s.runs.map((r, i) => (
+          // Newest first; a round number only once the topic was researched again in this session.
+          <RunCard key={r.id} run={r} round={s.runs.length > 1 ? s.runs.length - i : undefined} confirm={confirm} />
         ))}
       </div>
       {form && !working && (

@@ -272,8 +272,9 @@ def test_tavily_skips_blank_queries_and_one_it_rejects(monkeypatch):
 
 
 def _tci(monkeypatch, answers):
-    """A fake ThaiJO: `answers` maps strict=True/False to its result list,
-    or to a status code to answer with."""
+    """A fake ThaiJO (its search API since November 2026): `answers` maps
+    strict=True/False to its hit list, or to a status code to answer with.
+    Strict is ThaiJO's matching_strategy "all"; loose leaves it out."""
     import requests
 
     from litstorm.engines.storm import tci_rm
@@ -281,19 +282,22 @@ def _tci(monkeypatch, answers):
     asked = []
 
     class Resp:
-        def __init__(self, code, result=None):
-            self.status_code, self._result = code, result
+        def __init__(self, code, hits=None):
+            self.status_code, self._hits = code, hits
 
         def raise_for_status(self):
             if self.status_code >= 400:
                 raise requests.HTTPError(f"{self.status_code} Server Error")
 
         def json(self):
-            return {"result": self._result, "total": len(self._result or [])}
+            return {"hits": self._hits, "total": len(self._hits or []), "page": 1}
 
     def post(url, json, timeout, headers):
-        asked.append((json["term"], json["strict"]))
-        answer = answers[json["strict"]]
+        assert url == "https://www.tci-thaijo.org/api/v1/articles/search"
+        assert json["highlight"] is True  # without it ThaiJO leaves the abstracts out
+        strict = json.get("matching_strategy") == "all"
+        asked.append((json["q"], strict))
+        answer = answers[strict]
         return Resp(answer) if isinstance(answer, int) else Resp(200, answer)
 
     monkeypatch.setattr(tci_rm.requests, "post", post)
@@ -303,12 +307,12 @@ def _tci(monkeypatch, answers):
 
 def _article(n, title_th="", title_en="", abstract="บทคัดย่อ"):
     return {
-        "articleUrl": f"https://so01.tci-thaijo.org/index.php/j/article/view/{n}",
-        "thaijoUrl": "https://so01.tci-thaijo.org/index.php/j",
-        "title": {"th_TH": title_th, "en_US": title_en},
-        "abstract_clean": {"th_TH": abstract, "en_US": ""},
-        "authors": [{"full_name": {"th_TH": "สมชาย ใจดี", "en_US": "Somchai Jaidee"}}],
-        "datePublished": "2025-06-29T17:00:00+0000",
+        "article_url": f"https://so01.tci-thaijo.org/index.php/j/article/view/{n}",
+        "journal_url": "https://so01.tci-thaijo.org/index.php/j",
+        "titles": {"th_TH": title_th, "en_US": title_en},
+        "abstracts": {"th_TH": abstract, "en_US": ""},
+        "authors": {"th_TH": ["สมชาย ใจดี"], "en_US": ["Somchai Jaidee"]},
+        "date_published": "2025-06-30T00:00:00+07:00",
     }
 
 
@@ -322,7 +326,7 @@ def test_tci_asks_strictly_then_loosely_and_keeps_k(monkeypatch):
     assert [r["title"] for r in found] == ["บทความ 0", "บทความ 1"]
     assert found[0]["url"].endswith("/article/view/0")  # the article, not its journal
     assert found[0]["snippets"] == ["บทคัดย่อ"]
-    assert found[0]["description"] == "สมชาย ใจดี (2025-06-29)"
+    assert found[0]["description"] == "สมชาย ใจดี (2025-06-30)"
     assert rm.get_usage_and_reset() == {"TciRM": 1}
 
 
